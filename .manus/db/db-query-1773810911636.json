@@ -1,0 +1,9 @@
+{
+  "query": "\nCREATE TABLE IF NOT EXISTS `sdr_records` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `sellerId` int NOT NULL,\n  `competitionId` int,\n  `type` enum('agendamento','lead_convertido') NOT NULL,\n  `customerName` varchar(255),\n  `customerPhone` varchar(20),\n  `vehicleInterest` varchar(255),\n  `source` varchar(100),\n  `scheduledDate` bigint,\n  `converted` boolean NOT NULL DEFAULT false,\n  `notes` text,\n  `points` int NOT NULL DEFAULT 1,\n  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `sdr_records_id` PRIMARY KEY(`id`)\n);\n\nALTER TABLE `sellers` ALTER COLUMN `department` SET DEFAULT 'vendas';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute \nCREATE TABLE IF NOT EXISTS `sdr_records` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `sellerId` int NOT NULL,\n  `competitionId` int,\n  `type` enum('agendamento','lead_convertido') NOT NULL,\n  `customerName` varchar(255),\n  `customerPhone` varchar(20),\n  `vehicleInterest` varchar(255),\n  `source` varchar(100),\n  `scheduledDate` bigint,\n  `converted` boolean NOT NULL DEFAULT false,\n  `notes` text,\n  `points` int NOT NULL DEFAULT 1,\n  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `sdr_records_id` PRIMARY KEY(`id`)\n);\n\nALTER TABLE `sellers` ALTER COLUMN `department` SET DEFAULT 'vendas';\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 511
+}

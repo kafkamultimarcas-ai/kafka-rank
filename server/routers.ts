@@ -627,6 +627,58 @@ export const appRouter = router({
     }),
   }),
 
+  // ===== SDR / PRÉ-VENDAS =====
+  sdr: router({
+    register: protectedProcedure.input(z.object({
+      sellerId: z.number(),
+      competitionId: z.number().optional(),
+      type: z.enum(["agendamento", "lead_convertido"]),
+      customerName: z.string().optional(),
+      customerPhone: z.string().optional(),
+      vehicleInterest: z.string().optional(),
+      source: z.string().optional(),
+      scheduledDate: z.number().optional(),
+      converted: z.boolean().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const id = await db.createSdrRecord({
+        sellerId: input.sellerId,
+        competitionId: input.competitionId ?? null,
+        type: input.type,
+        customerName: input.customerName ?? null,
+        customerPhone: input.customerPhone ?? null,
+        vehicleInterest: input.vehicleInterest ?? null,
+        source: input.source ?? null,
+        scheduledDate: input.scheduledDate ?? null,
+        converted: input.converted ?? false,
+        notes: input.notes ?? null,
+        points: input.type === 'lead_convertido' ? 3 : 1,
+      });
+      return { id, message: input.type === 'lead_convertido' ? 'Lead convertido registrado! Aguardando aprovação.' : 'Agendamento registrado! Aguardando aprovação.' };
+    }),
+    list: adminProcedure.input(z.object({
+      competitionId: z.number().optional(),
+      sellerId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listSdrRecords(input?.competitionId, input?.sellerId);
+    }),
+    pending: adminProcedure.query(async () => {
+      return db.listPendingSdrRecords();
+    }),
+    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const record = await db.approveSdrRecord(input.id);
+      return { success: true, record };
+    }),
+    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.rejectSdrRecord(input.id);
+      return { success: true };
+    }),
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteSdrRecord(input.id);
+      return { success: true };
+    }),
+  }),
+
   // ===== PENDING COUNT (all sectors) =====
   pendingCount: router({
     getAll: adminProcedure.query(async () => {

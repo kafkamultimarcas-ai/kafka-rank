@@ -132,3 +132,12 @@
 - [x] Treinamento: 10 Técnicas de Vendas que Realmente Funcionam (com vídeo YouTube)
 - [x] Treinamento: 5 Técnicas de Fechamento (com vídeo YouTube)
 - [x] Vídeos do YouTube encontrados e vinculados a cada treinamento
+
+## Setores e Pré-Vendas/SDR
+- [x] Adicionar campo "setor" na tabela sellers (vendas, pre_vendas, fei, consignacao, despachante)
+- [x] Filtro por setor na tela admin de Vendedores
+- [x] Exibir setor no card de cada vendedor com badge colorido
+- [x] Nova categoria de competição: pré-vendas (agendamentos e leads convertidos)
+- [x] Formulário de registro de pré-vendas (SDR): agendamentos e leads
+- [x] Aprovação de registros de pré-vendas no admin (aba SDR)
+- [x] Pontuação: agendamento = 1pt, lead convertido = 3pts

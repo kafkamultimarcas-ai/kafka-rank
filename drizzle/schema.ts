@@ -24,7 +24,7 @@ export const sellers = mysqlTable("sellers", {
   photoKey: varchar("photoKey", { length: 500 }),
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 320 }),
-  department: varchar("department", { length: 100 }), // vendas, fei, consignacao, despachante
+  department: varchar("department", { length: 100 }).default("vendas"), // vendas, pre_vendas, fei, consignacao, despachante
   active: boolean("active").default(true).notNull(),
   totalSales: int("totalSales").default(0).notNull(),
   totalPoints: int("totalPoints").default(0).notNull(),
@@ -40,7 +40,7 @@ export const competitions = mysqlTable("competitions", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  category: varchar("category", { length: 50 }).default("vendas").notNull(), // vendas, fei, consignacao, despachante, feirao
+  category: varchar("category", { length: 50 }).default("vendas").notNull(), // vendas, pre_vendas, fei, consignacao, despachante, feirao
   type: mysqlEnum("type", ["individual", "team", "group"]).default("individual").notNull(),
   status: mysqlEnum("status", ["draft", "active", "finished"]).default("draft").notNull(),
   pointsPerSale: int("pointsPerSale").default(1).notNull(),
@@ -221,6 +221,27 @@ export const appSettings = mysqlTable("app_settings", {
 
 export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
+
+// Registros de Pré-Vendas / SDR
+export const sdrRecords = mysqlTable("sdr_records", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  competitionId: int("competitionId"),
+  type: mysqlEnum("type", ["agendamento", "lead_convertido"]).notNull(), // tipo de registro
+  customerName: varchar("customerName", { length: 255 }), // nome do cliente/lead
+  customerPhone: varchar("customerPhone", { length: 20 }), // telefone do lead
+  vehicleInterest: varchar("vehicleInterest", { length: 255 }), // veículo de interesse
+  source: varchar("source", { length: 100 }), // origem: OLX, Instagram, site, indicacao, etc.
+  scheduledDate: bigint("scheduledDate", { mode: "number" }), // data agendada para visita/test drive
+  converted: boolean("converted").default(false).notNull(), // se o lead converteu em venda
+  notes: text("notes"), // observações
+  points: int("points").default(1).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SdrRecord = typeof sdrRecords.$inferSelect;
+export type InsertSdrRecord = typeof sdrRecords.$inferInsert;
 
 // Push Subscriptions para notificações push
 export const pushSubscriptions = mysqlTable("push_subscriptions", {

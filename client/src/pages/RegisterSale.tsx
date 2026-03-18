@@ -8,15 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse } from "lucide-react";
+import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones } from "lucide-react";
 
-type Category = "vendas" | "fei" | "consignacao" | "despachante";
+type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
 const CATEGORIES: { value: Category; label: string; icon: typeof Car; color: string }[] = [
   { value: "vendas", label: "Venda", icon: Car, color: "text-red-400" },
   { value: "fei", label: "F&I", icon: Banknote, color: "text-green-400" },
   { value: "consignacao", label: "Consignação", icon: Warehouse, color: "text-blue-400" },
   { value: "despachante", label: "Despachante", icon: FileText, color: "text-purple-400" },
+  { value: "pre_vendas", label: "SDR", icon: Headphones, color: "text-orange-400" },
 ];
 
 export default function RegisterSale() {
@@ -55,10 +56,20 @@ export default function RegisterSale() {
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
 
+  // SDR fields
+  const [sdrType, setSdrType] = useState<"agendamento" | "lead_convertido">("agendamento");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [vehicleInterest, setVehicleInterest] = useState("");
+  const [leadSource, setLeadSource] = useState("");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [sdrNotes, setSdrNotes] = useState("");
+
   const registerSale = trpc.sales.registerBySeller.useMutation();
   const registerFei = trpc.fei.register.useMutation();
   const registerConsignment = trpc.consignment.register.useMutation();
   const registerDispatch = trpc.dispatch.register.useMutation();
+  const registerSdr = trpc.sdr.register.useMutation();
 
   const selectedSeller = useMemo(() => {
     if (!sellerId || !sellers) return null;
@@ -70,17 +81,19 @@ export default function RegisterSale() {
     if (!competitions) return [];
     return competitions.filter(c => {
       if (category === "vendas") return c.category === "vendas" || c.category === "feirao";
+      if (category === "pre_vendas") return c.category === "pre_vendas";
       return c.category === category;
     });
   }, [competitions, category]);
 
-  const isPending = registerSale.isPending || registerFei.isPending || registerConsignment.isPending || registerDispatch.isPending;
+  const isPending = registerSale.isPending || registerFei.isPending || registerConsignment.isPending || registerDispatch.isPending || registerSdr.isPending;
 
   const resetForm = () => {
     setVehicleModel(""); setValue(""); setDescription("");
     setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setPaymentDate("");
     setConsignModel(""); setConsignPlate(""); setOwnerName(""); setOwnerPhone(""); setEntryDate("");
     setDispatchPlate(""); setDocumentType(""); setCustomerPaid(false); setTransferValue("");
+    setSdrType("agendamento"); setCustomerName(""); setCustomerPhone(""); setVehicleInterest(""); setLeadSource(""); setScheduledDate(""); setSdrNotes("");
     setSubmitted(false); setSubmittedMessage("");
   };
 
@@ -128,6 +141,19 @@ export default function RegisterSale() {
             vehiclePlate: dispatchPlate || undefined,
             documentType, customerPaid,
             transferValue: transferValue ? Math.round(parseFloat(transferValue) * 100) : undefined,
+          });
+          break;
+        case "pre_vendas":
+          if (!customerName) { toast.error("Informe o nome do cliente!"); return; }
+          result = await registerSdr.mutateAsync({
+            sellerId: sid, competitionId: cid,
+            type: sdrType,
+            customerName: customerName || undefined,
+            customerPhone: customerPhone || undefined,
+            vehicleInterest: vehicleInterest || undefined,
+            source: leadSource || undefined,
+            scheduledDate: scheduledDate ? new Date(scheduledDate).getTime() : undefined,
+            notes: sdrNotes || undefined,
           });
           break;
       }
@@ -385,6 +411,97 @@ export default function RegisterSale() {
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-blue-400 text-xs">
                     <strong>Regra:</strong> O veículo precisa ficar no mínimo 7 dias no pátio para que a consignação conte pontos na competição.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* PRÉ-VENDAS / SDR */}
+            {category === "pre_vendas" && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold">Tipo de registro *</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSdrType("agendamento")}
+                      className={`p-3 rounded-lg border text-sm font-semibold transition-all ${
+                        sdrType === "agendamento"
+                          ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                          : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
+                      }`}
+                    >
+                      📅 Agendamento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSdrType("lead_convertido")}
+                      className={`p-3 rounded-lg border text-sm font-semibold transition-all ${
+                        sdrType === "lead_convertido"
+                          ? "border-green-500 bg-green-500/20 text-green-400"
+                          : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
+                      }`}
+                    >
+                      ✅ Lead Convertido
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold flex items-center gap-2">
+                    <Headphones className="w-4 h-4 text-orange-400" />
+                    Nome do cliente *
+                  </Label>
+                  <Input value={customerName} onChange={e => setCustomerName(e.target.value)}
+                    placeholder="Nome do cliente" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Telefone</Label>
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                      placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Origem do lead</Label>
+                    <Select value={leadSource} onValueChange={setLeadSource}>
+                      <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                        <SelectValue placeholder="Origem" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {["Instagram", "Facebook", "OLX", "WebMotors", "iCarros", "Indicação", "Loja física", "WhatsApp", "Outro"].map(s => (
+                          <SelectItem key={s} value={s} className="text-white hover:bg-gray-700">{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold">Veículo de interesse</Label>
+                  <Input value={vehicleInterest} onChange={e => setVehicleInterest(e.target.value)}
+                    placeholder="Ex: SUV, Sedan, HB20..." className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
+                {sdrType === "agendamento" && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold">Data do agendamento</Label>
+                    <Input value={scheduledDate} onChange={e => setScheduledDate(e.target.value)}
+                      type="datetime-local" className="bg-gray-800 border-gray-700 text-white" />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold">Observações</Label>
+                  <Textarea value={sdrNotes} onChange={e => setSdrNotes(e.target.value)}
+                    placeholder="Detalhes do atendimento..." className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 resize-none" rows={2} />
+                </div>
+                <div className={`rounded-lg p-3 border ${
+                  sdrType === "lead_convertido"
+                    ? "bg-green-500/10 border-green-500/20"
+                    : "bg-orange-500/10 border-orange-500/20"
+                }`}>
+                  <p className={`text-xs ${
+                    sdrType === "lead_convertido" ? "text-green-400" : "text-orange-400"
+                  }`}>
+                    {sdrType === "lead_convertido"
+                      ? "Lead convertido vale 3 pontos na competição!"
+                      : "Agendamento vale 1 ponto na competição."}
                   </p>
                 </div>
               </>

@@ -15,6 +15,7 @@ import {
   motivationalQuotes, InsertMotivationalQuote,
   notifications, InsertNotification,
   pushSubscriptions, InsertPushSubscription,
+  sdrRecords, InsertSdrRecord,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -694,19 +695,86 @@ export async function deleteDispatchRecord(id: number) {
   await db.delete(dispatchRecords).where(eq(dispatchRecords.id, id));
 }
 
+// ===== SDR / PRÉ-VENDAS =====
+export async function createSdrRecord(data: InsertSdrRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(sdrRecords).values(data);
+  return result[0].insertId;
+}
+
+export async function listSdrRecords(competitionId?: number, sellerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
+  if (sellerId) conditions.push(eq(sdrRecords.sellerId, sellerId));
+  if (conditions.length > 0) return db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.createdAt));
+  return db.select().from(sdrRecords).orderBy(desc(sdrRecords.createdAt));
+}
+
+export async function listPendingSdrRecords() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sdrRecords).where(eq(sdrRecords.status, 'pending')).orderBy(desc(sdrRecords.createdAt));
+}
+
+export async function approveSdrRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record || record.status !== 'pending') throw new Error("Registro SDR não encontrado ou já processado");
+  await db.update(sdrRecords).set({ status: 'approved' }).where(eq(sdrRecords.id, id));
+  await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  return record;
+}
+
+export async function rejectSdrRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(sdrRecords).set({ status: 'rejected' }).where(eq(sdrRecords.id, id));
+}
+
+export async function deleteSdrRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Registro não encontrado");
+  if (record.status === 'approved') {
+    await db.update(sellers).set({
+      totalSales: sql`GREATEST(totalSales - 1, 0)`,
+      totalPoints: sql`GREATEST(totalPoints - ${record.points}, 0)`,
+    }).where(eq(sellers.id, record.sellerId));
+    if (record.competitionId) {
+      await db.update(competitionParticipants).set({
+        points: sql`GREATEST(points - ${record.points}, 0)`,
+        salesCount: sql`GREATEST(salesCount - 1, 0)`,
+      }).where(and(
+        eq(competitionParticipants.competitionId, record.competitionId),
+        eq(competitionParticipants.sellerId, record.sellerId),
+      ));
+    }
+  }
+  await db.delete(sdrRecords).where(eq(sdrRecords.id, id));
+}
+
 // ===== ALL PENDING (cross-sector) =====
 export async function getAllPendingCount() {
   const db = await getDb();
-  if (!db) return { sales: 0, fei: 0, consignment: 0, dispatch: 0, total: 0 };
+  if (!db) return { sales: 0, fei: 0, consignment: 0, dispatch: 0, sdr: 0, total: 0 };
   const [s] = await db.select({ count: sql<number>`count(*)` }).from(sales).where(eq(sales.status, 'pending'));
   const [f] = await db.select({ count: sql<number>`count(*)` }).from(feiRecords).where(eq(feiRecords.status, 'pending'));
   const [c] = await db.select({ count: sql<number>`count(*)` }).from(consignmentRecords).where(eq(consignmentRecords.status, 'pending'));
   const [d] = await db.select({ count: sql<number>`count(*)` }).from(dispatchRecords).where(eq(dispatchRecords.status, 'pending'));
+  const [sdr] = await db.select({ count: sql<number>`count(*)` }).from(sdrRecords).where(eq(sdrRecords.status, 'pending'));
   const salesCount = Number(s?.count || 0);
   const feiCount = Number(f?.count || 0);
   const consignmentCount = Number(c?.count || 0);
   const dispatchCount = Number(d?.count || 0);
-  return { sales: salesCount, fei: feiCount, consignment: consignmentCount, dispatch: dispatchCount, total: salesCount + feiCount + consignmentCount + dispatchCount };
+  const sdrCount = Number(sdr?.count || 0);
+  return { sales: salesCount, fei: feiCount, consignment: consignmentCount, dispatch: dispatchCount, sdr: sdrCount, total: salesCount + feiCount + consignmentCount + dispatchCount + sdrCount };
 }
 
 // ===== APP SETTINGS =====
