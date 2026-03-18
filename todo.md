@@ -38,7 +38,7 @@
 - [x] Grid de largada como tabela de classificação
 
 ## Testes
-- [x] Testes unitários das rotas tRPC (26 testes passando)
+- [x] Testes unitários das rotas tRPC (41 testes passando)
 
 ## PWA e Acesso Restrito
 - [x] Configurar manifest.json para PWA instalável
@@ -81,3 +81,12 @@
 - [x] Alerta especial quando alguém ultrapassar outro no ranking (amarelo)
 - [x] Sons de alerta (beep para venda, motor para ultrapassagem)
 - [x] Banner animado com foto do vendedor, barra de progresso e dismiss
+
+## Notificações Push (iOS + Android)
+- [x] Gerar VAPID keys para Web Push
+- [x] Tabela no banco para salvar push subscriptions
+- [x] Atualizar service worker para receber push
+- [x] Backend: endpoint para salvar subscription e enviar push (pushService.ts)
+- [x] Frontend: pedir permissão e registrar subscription (usePushNotifications hook + botão na Home)
+- [x] Disparar push quando venda for aprovada, ultrapassagem no ranking, nova competição
+- [x] Testes das funcionalidades de push (41 testes passando)

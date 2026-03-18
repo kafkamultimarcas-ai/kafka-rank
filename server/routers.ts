@@ -8,6 +8,7 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
+import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake } from "./pushService";
 
 export const appRouter = router({
   system: systemRouter,
@@ -203,6 +204,8 @@ export const appRouter = router({
         title: `Nova venda para aprovar!`,
         content: `${seller.name} registrou uma venda: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''}. Acesse o painel para aprovar.`,
       });
+      // Push notification para todos
+      sendPushNewSale(seller.name, input.vehicleModel, input.value || 0).catch(console.error);
       return { id, message: "Venda registrada! Aguardando aprovação do gerente." };
     }),
     // Listar vendas pendentes (admin)
@@ -221,6 +224,10 @@ export const appRouter = router({
           title: 'Venda aprovada!',
           message: `Sua venda de ${sale.vehicleModel || 'veículo'} foi aprovada e já conta no ranking!`,
         });
+      }
+      // Push notification de venda aprovada
+      if (seller) {
+        sendPushSaleApproved(seller.name, sale.vehicleModel || 'veículo').catch(console.error);
       }
       return { success: true };
     }),
@@ -400,6 +407,28 @@ export const appRouter = router({
       since: z.number(), // timestamp em ms
     })).query(async ({ input }) => {
       return db.getRecentApprovedSales(input.since);
+    }),
+  }),
+
+  // ===== PUSH NOTIFICATIONS =====
+  push: router({
+    subscribe: publicProcedure.input(z.object({
+      endpoint: z.string(),
+      p256dh: z.string(),
+      auth: z.string(),
+      sellerId: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      await db.savePushSubscription(input);
+      return { success: true };
+    }),
+    unsubscribe: publicProcedure.input(z.object({
+      endpoint: z.string(),
+    })).mutation(async ({ input }) => {
+      await db.deletePushSubscription(input.endpoint);
+      return { success: true };
+    }),
+    getVapidKey: publicProcedure.query(() => {
+      return { key: process.env.VITE_VAPID_PUBLIC_KEY || "" };
     }),
   }),
 

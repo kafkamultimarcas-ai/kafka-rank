@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `push_subscriptions` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`endpoint` text NOT NULL,\n\t`p256dh` text NOT NULL,\n\t`auth` text NOT NULL,\n\t`sellerId` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `push_subscriptions_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute CREATE TABLE `push_subscriptions` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`endpoint` text NOT NULL,\n\t`p256dh` text NOT NULL,\n\t`auth` text NOT NULL,\n\t`sellerId` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `push_subscriptions_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 356
+}

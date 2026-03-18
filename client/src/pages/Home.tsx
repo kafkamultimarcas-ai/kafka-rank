@@ -1,13 +1,16 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Flag, Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield } from "lucide-react";
+import { Flag, Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo } from "react";
 import { getLoginUrl } from "@/const";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { toast } from "sonner";
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
+  const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications();
   const [, setLocation] = useLocation();
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
   const { data: allCompetitions } = trpc.competitions.list.useQuery({});
@@ -27,6 +30,27 @@ export default function Home() {
             <span className="font-heading font-bold text-lg tracking-tight text-foreground">KAFKA RANK</span>
           </div>
           <div className="flex items-center gap-2">
+            {pushSupported && !isSubscribed && permission !== "denied" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  const ok = await subscribePush();
+                  if (ok) toast.success("Notificações ativadas! Você receberá alertas de vendas e ultrapassagens.");
+                  else if (permission === "denied") toast.error("Notificações bloqueadas. Ative nas configurações do navegador.");
+                }}
+                className="gap-1.5 border-yellow-600 text-yellow-500 hover:bg-yellow-600/10"
+              >
+                <Bell className="h-4 w-4" />
+                <span className="hidden sm:inline">Ativar Alertas</span>
+              </Button>
+            )}
+            {isSubscribed && (
+              <div className="flex items-center gap-1 text-xs text-emerald-500 px-2">
+                <BellRing className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Alertas ativos</span>
+              </div>
+            )}
             <Button size="sm" onClick={() => setLocation("/registrar-venda")} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
               <PlusCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Registrar Venda</span>

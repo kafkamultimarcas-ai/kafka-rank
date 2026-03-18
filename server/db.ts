@@ -11,6 +11,7 @@ import {
   actionPlans, InsertActionPlan,
   motivationalQuotes, InsertMotivationalQuote,
   notifications, InsertNotification,
+  pushSubscriptions, InsertPushSubscription,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -404,6 +405,37 @@ export async function markNotificationRead(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+}
+
+// ===== PUSH SUBSCRIPTIONS =====
+export async function savePushSubscription(data: { endpoint: string; p256dh: string; auth: string; sellerId?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Verificar se já existe essa subscription
+  const existing = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, data.endpoint)).limit(1);
+  if (existing.length > 0) {
+    // Atualizar
+    await db.update(pushSubscriptions).set({
+      p256dh: data.p256dh,
+      auth: data.auth,
+      sellerId: data.sellerId ?? null,
+    }).where(eq(pushSubscriptions.id, existing[0].id));
+    return existing[0].id;
+  }
+  const result = await db.insert(pushSubscriptions).values(data);
+  return result[0].insertId;
+}
+
+export async function getAllPushSubscriptions() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pushSubscriptions);
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
 }
 
 // ===== RANKING / DASHBOARD =====

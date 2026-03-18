@@ -4,6 +4,15 @@ import type { TrpcContext } from "./_core/context";
 
 // Mock db module
 vi.mock("./db", () => ({
+  savePushSubscription: vi.fn().mockResolvedValue(1),
+  deletePushSubscription: vi.fn().mockResolvedValue(undefined),
+  getAllPushSubscriptions: vi.fn().mockResolvedValue([]),
+  getRecentApprovedSales: vi.fn().mockResolvedValue([]),
+  listPendingSales: vi.fn().mockResolvedValue([]),
+  approveSale: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, vehicleModel: 'Civic', points: 1, status: 'approved', competitionId: 1 }),
+  rejectSale: vi.fn().mockResolvedValue(undefined),
+  deleteSale: vi.fn().mockResolvedValue(undefined),
+  createNotification: vi.fn().mockResolvedValue(1),
   listSellers: vi.fn().mockResolvedValue([
     { id: 1, name: "João", nickname: "Trovão", active: true, totalSales: 5, totalPoints: 50, photoUrl: null, photoKey: null, phone: null, email: null, createdAt: new Date() },
     { id: 2, name: "Maria", nickname: "Relâmpago", active: true, totalSales: 8, totalPoints: 80, photoUrl: null, photoKey: null, phone: null, email: null, createdAt: new Date() },
@@ -58,6 +67,13 @@ vi.mock("./_core/llm", () => ({
 
 vi.mock("./_core/notification", () => ({
   notifyOwner: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("./pushService", () => ({
+  sendPushNewSale: vi.fn().mockResolvedValue(undefined),
+  sendPushSaleApproved: vi.fn().mockResolvedValue(undefined),
+  sendPushOvertake: vi.fn().mockResolvedValue(undefined),
+  sendPushNewCompetition: vi.fn().mockResolvedValue(undefined),
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -266,6 +282,76 @@ describe("auth", () => {
     const result = await caller.auth.me();
     expect(result).toBeDefined();
     expect(result?.name).toBe("Admin");
+  });
+});
+
+describe("push notifications router", () => {
+  it("subscribes to push notifications publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.push.subscribe({
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-endpoint",
+      p256dh: "test-p256dh-key",
+      auth: "test-auth-key",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("subscribes with optional sellerId", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.push.subscribe({
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-endpoint-2",
+      p256dh: "test-p256dh-key-2",
+      auth: "test-auth-key-2",
+      sellerId: 1,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("unsubscribes from push notifications", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.push.unsubscribe({
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-endpoint",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("returns VAPID public key", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.push.getVapidKey();
+    expect(result).toHaveProperty("key");
+    expect(typeof result.key).toBe("string");
+  });
+});
+
+describe("sales approval with push", () => {
+  it("approves sale as admin and sends push", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.sales.approve({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects sale approval for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.sales.approve({ id: 1 })).rejects.toThrow();
+  });
+
+  it("lists pending sales as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.sales.listPending();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("rejects listing pending sales for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.sales.listPending()).rejects.toThrow();
+  });
+});
+
+describe("live feed router", () => {
+  it("gets recent approved sales", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.feed.recent({ since: Date.now() - 60000 });
+    expect(Array.isArray(result)).toBe(true);
   });
 });
 
