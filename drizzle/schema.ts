@@ -123,6 +123,7 @@ export type InsertActionPlan = typeof actionPlans.$inferInsert;
 // Frases motivacionais
 export const motivationalQuotes = mysqlTable("motivational_quotes", {
   id: int("id").autoincrement().primaryKey(),
+  dayOfYear: int("dayOfYear"),
   quote: text("quote").notNull(),
   author: varchar("author", { length: 255 }),
   generatedAt: timestamp("generatedAt").defaultNow().notNull(),

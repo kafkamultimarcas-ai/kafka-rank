@@ -280,7 +280,23 @@ export async function createQuote(data: InsertMotivationalQuote) {
 export async function getLatestQuote() {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(motivationalQuotes).where(eq(motivationalQuotes.active, true)).orderBy(desc(motivationalQuotes.generatedAt)).limit(1);
+  // Primeiro tenta buscar a frase do dia baseada no dayOfYear
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+  
+  const dailyResult = await db.select().from(motivationalQuotes)
+    .where(and(eq(motivationalQuotes.active, true), eq(motivationalQuotes.dayOfYear, dayOfYear)))
+    .limit(1);
+  if (dailyResult.length > 0) return dailyResult[0];
+  
+  // Fallback: busca a mais recente
+  const result = await db.select().from(motivationalQuotes)
+    .where(eq(motivationalQuotes.active, true))
+    .orderBy(desc(motivationalQuotes.generatedAt))
+    .limit(1);
   return result[0];
 }
 

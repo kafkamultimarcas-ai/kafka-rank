@@ -1,0 +1,1 @@
+ALTER TABLE `motivational_quotes` ADD `dayOfYear` int;
