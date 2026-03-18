@@ -166,6 +166,7 @@ export const appRouter = router({
     }).optional()).query(async ({ input }) => {
       return db.listSales(input?.competitionId, input?.sellerId);
     }),
+    // Admin cria vendas já aprovadas
     create: adminProcedure.input(z.object({
       sellerId: z.number(),
       competitionId: z.number().optional(),
@@ -174,7 +175,7 @@ export const appRouter = router({
       value: z.number().optional(),
       points: z.number().default(1),
     })).mutation(async ({ input }) => {
-      const id = await db.createSale(input);
+      const id = await db.createSale({ ...input, status: 'approved' });
       const seller = await db.getSellerById(input.sellerId);
       if (seller && input.value && input.value >= 50000) {
         await notifyOwner({
@@ -183,6 +184,50 @@ export const appRouter = router({
         });
       }
       return { id };
+    }),
+    // Vendedor registra venda (fica pendente de aprovação)
+    registerBySeller: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      competitionId: z.number().optional(),
+      vehicleModel: z.string().min(1),
+      value: z.number().optional(),
+      description: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const seller = await db.getSellerById(input.sellerId);
+      if (!seller) throw new Error("Vendedor não encontrado");
+      const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
+      const points = comp ? comp.pointsPerSale : 1;
+      const id = await db.createSale({ ...input, points, status: 'pending' });
+      // Notifica o dono
+      await notifyOwner({
+        title: `Nova venda para aprovar!`,
+        content: `${seller.name} registrou uma venda: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''}. Acesse o painel para aprovar.`,
+      });
+      return { id, message: "Venda registrada! Aguardando aprovação do gerente." };
+    }),
+    // Listar vendas pendentes (admin)
+    listPending: adminProcedure.query(async () => {
+      return db.listPendingSales();
+    }),
+    // Aprovar venda (admin)
+    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const sale = await db.approveSale(input.id);
+      const seller = await db.getSellerById(sale.sellerId);
+      // Criar notificação para o vendedor
+      if (seller) {
+        await db.createNotification({
+          sellerId: sale.sellerId,
+          type: 'sale_approved',
+          title: 'Venda aprovada!',
+          message: `Sua venda de ${sale.vehicleModel || 'veículo'} foi aprovada e já conta no ranking!`,
+        });
+      }
+      return { success: true };
+    }),
+    // Rejeitar venda (admin)
+    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.rejectSale(input.id);
+      return { success: true };
     }),
   }),
 

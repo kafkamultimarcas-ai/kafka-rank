@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Flag, Trophy, Users, TrendingUp, ChevronRight, Zap, Settings } from "lucide-react";
+import { Flag, Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo } from "react";
 
@@ -26,6 +26,11 @@ export default function Home() {
             <span className="font-heading font-bold text-lg tracking-tight text-foreground">KAFKA RANK</span>
           </div>
           <div className="flex items-center gap-3">
+            <Button size="sm" onClick={() => setLocation("/registrar-venda")} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
+              <PlusCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Registrar Venda</span>
+              <span className="sm:hidden">Venda</span>
+            </Button>
             {user?.role === "admin" && (
               <Button variant="outline" size="sm" onClick={() => setLocation("/admin")} className="gap-2">
                 <Settings className="h-4 w-4" />

@@ -57,3 +57,12 @@
 - [x] Gerar 365 frases motivacionais para vendedores de veículos
 - [x] Inserir todas as 365 frases no banco de dados
 - [x] Configurar exibição automática da frase do dia (rotação por dia do ano)
+
+## Registro de Vendas pelos Vendedores (com aprovação)
+- [x] Adicionar campo status (pendente/aprovada/rejeitada) na tabela de vendas
+- [x] Criar rota pública para vendedor registrar venda (seleciona seu nome, modelo, valor)
+- [x] Criar página pública simples para vendedor registrar venda
+- [x] Painel admin de aprovação/rejeição de vendas pendentes
+- [x] Notificação para admin quando vendedor registrar venda
+- [x] Ranking considerar apenas vendas aprovadas
+- [x] Testes das novas funcionalidades (32 testes passando)

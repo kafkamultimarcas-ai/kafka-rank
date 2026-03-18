@@ -85,6 +85,7 @@ export const sales = mysqlTable("sales", {
   vehicleModel: varchar("vehicleModel", { length: 255 }),
   value: int("value").default(0),
   points: int("points").default(1).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

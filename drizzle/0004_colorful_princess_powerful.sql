@@ -1,0 +1,1 @@
+ALTER TABLE `sales` ADD `status` enum('pending','approved','rejected') DEFAULT 'pending' NOT NULL;

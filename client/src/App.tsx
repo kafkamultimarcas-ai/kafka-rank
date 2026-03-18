@@ -17,6 +17,8 @@ import CompetitionView from "./pages/CompetitionView";
 import SellerProfile from "./pages/SellerProfile";
 import TrainingsList from "./pages/TrainingsList";
 import RaceTrack from "./pages/RaceTrack";
+import RegisterSale from "./pages/RegisterSale";
+import AdminApprovals from "./pages/admin/AdminApprovals";
 
 function Router() {
   return (
@@ -26,6 +28,7 @@ function Router() {
       <Route path="/competicao/:id" component={CompetitionView} />
       <Route path="/vendedor/:id" component={SellerProfile} />
       <Route path="/treinamentos" component={TrainingsList} />
+      <Route path="/registrar-venda" component={RegisterSale} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/vendedores" component={AdminSellers} />
       <Route path="/admin/competicoes" component={AdminCompetitions} />
@@ -33,6 +36,7 @@ function Router() {
       <Route path="/admin/treinamentos" component={AdminTrainings} />
       <Route path="/admin/planos" component={AdminActionPlans} />
       <Route path="/admin/configuracoes" component={AdminSettings} />
+      <Route path="/admin/aprovacoes" component={AdminApprovals} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

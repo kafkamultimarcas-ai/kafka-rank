@@ -190,23 +190,55 @@ export async function listSales(competitionId?: number, sellerId?: number) {
 export async function createSale(data: InsertSale) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(sales).values(data);
-  // Update seller totals
-  await db.update(sellers).set({
-    totalSales: sql`totalSales + 1`,
-    totalPoints: sql`totalPoints + ${data.points}`,
-  }).where(eq(sellers.id, data.sellerId));
-  // Update participant points if competition
-  if (data.competitionId) {
-    await db.update(competitionParticipants).set({
-      points: sql`points + ${data.points}`,
-      salesCount: sql`salesCount + 1`,
-    }).where(and(
-      eq(competitionParticipants.competitionId, data.competitionId),
-      eq(competitionParticipants.sellerId, data.sellerId),
-    ));
+  // Vendas criadas pelo admin são aprovadas direto, vendas dos vendedores ficam pendentes
+  const saleData = { ...data, status: data.status || 'pending' as const };
+  const result = await db.insert(sales).values(saleData);
+  // Se aprovada direto (admin), atualiza totais
+  if (saleData.status === 'approved') {
+    await updateSaleTotals(data.sellerId, data.competitionId, data.points ?? 1);
   }
   return result[0].insertId;
+}
+
+async function updateSaleTotals(sellerId: number, competitionId: number | null | undefined, points: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(sellers).set({
+    totalSales: sql`totalSales + 1`,
+    totalPoints: sql`totalPoints + ${points}`,
+  }).where(eq(sellers.id, sellerId));
+  if (competitionId) {
+    await db.update(competitionParticipants).set({
+      points: sql`points + ${points}`,
+      salesCount: sql`salesCount + 1`,
+    }).where(and(
+      eq(competitionParticipants.competitionId, competitionId),
+      eq(competitionParticipants.sellerId, sellerId),
+    ));
+  }
+}
+
+export async function listPendingSales() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sales).where(eq(sales.status, 'pending')).orderBy(desc(sales.createdAt));
+}
+
+export async function approveSale(saleId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const saleResult = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  const sale = saleResult[0];
+  if (!sale || sale.status !== 'pending') throw new Error("Venda não encontrada ou já processada");
+  await db.update(sales).set({ status: 'approved' }).where(eq(sales.id, saleId));
+  await updateSaleTotals(sale.sellerId, sale.competitionId, sale.points);
+  return sale;
+}
+
+export async function rejectSale(saleId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(sales).set({ status: 'rejected' }).where(eq(sales.id, saleId));
 }
 
 // ===== TRAININGS =====
