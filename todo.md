@@ -52,3 +52,8 @@
 ## Correções
 - [x] Bug: quotes.latest retorna undefined quando não há frases cadastradas
 - [x] Renomear app para "Kafka Rank" em todos os lugares
+
+## Frases Motivacionais 365 dias
+- [ ] Gerar 365 frases motivacionais para vendedores de veículos
+- [ ] Inserir frases no banco de dados
+- [ ] Configurar exibição automática da frase do dia (rotação por dia do ano)
