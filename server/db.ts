@@ -241,6 +241,32 @@ export async function rejectSale(saleId: number) {
   await db.update(sales).set({ status: 'rejected' }).where(eq(sales.id, saleId));
 }
 
+export async function deleteSale(saleId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const saleResult = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  const sale = saleResult[0];
+  if (!sale) throw new Error("Venda não encontrada");
+  // Se a venda estava aprovada, reverter os pontos
+  if (sale.status === 'approved') {
+    await db.update(sellers).set({
+      totalSales: sql`GREATEST(totalSales - 1, 0)`,
+      totalPoints: sql`GREATEST(totalPoints - ${sale.points}, 0)`,
+    }).where(eq(sellers.id, sale.sellerId));
+    if (sale.competitionId) {
+      await db.update(competitionParticipants).set({
+        points: sql`GREATEST(points - ${sale.points}, 0)`,
+        salesCount: sql`GREATEST(salesCount - 1, 0)`,
+      }).where(and(
+        eq(competitionParticipants.competitionId, sale.competitionId),
+        eq(competitionParticipants.sellerId, sale.sellerId),
+      ));
+    }
+  }
+  await db.delete(sales).where(eq(sales.id, saleId));
+  return sale;
+}
+
 // ===== TRAININGS =====
 export async function listTrainings(activeOnly = false) {
   const db = await getDb();

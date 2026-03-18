@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO competitions (name, description, type, status, pointsPerSale, startDate, endDate, createdAt, updatedAt) VALUES (\n  'Fase 1 - Primeira Chave',\n  'Competição individual livre. Todos os 7 vendedores competem entre si por 11 dias. O último colocado será eliminado no dia 29/03. Critério de desempate: Lucro. Os 6 classificados avançam para a fase mata-mata 2x2.',\n  'individual',\n  'active',\n  1,\n  1742169600000,\n  1743206400000,\n  NOW(),\n  NOW()\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute INSERT INTO competitions (name, description, type, status, pointsPerSale, startDate, endDate, createdAt, updatedAt) VALUES (\n  'Fase 1 - Primeira Chave',\n  'Competição individual livre. Todos os 7 vendedores competem entre si por 11 dias. O último colocado será eliminado no dia 29/03. Critério de desempate: Lucro. Os 6 classificados avançam para a fase mata-mata 2x2.',\n  'individual',\n  'active',\n  1,\n  1742169600000,\n  1743206400000,\n  NOW(),\n  NOW()\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 217
+}

@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, ShoppingCart, TrendingUp } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -33,6 +34,17 @@ export default function AdminSales() {
     onError: () => toast.error("Erro ao registrar venda."),
   });
 
+  const deleteSale = trpc.sales.delete.useMutation({
+    onSuccess: () => {
+      utils.sales.list.invalidate();
+      utils.sellers.list.invalidate();
+      utils.participants.list.invalidate();
+      utils.competitions.ranking.invalidate();
+      toast.success("Venda excluída! Pontos revertidos.");
+    },
+    onError: () => toast.error("Erro ao excluir venda."),
+  });
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.sellerId) { toast.error("Selecione um vendedor"); return; }
@@ -46,13 +58,25 @@ export default function AdminSales() {
     });
   }
 
+  const statusIcon = (status: string) => {
+    if (status === 'approved') return <CheckCircle2 className="h-4 w-4 text-green-400" />;
+    if (status === 'pending') return <Clock className="h-4 w-4 text-yellow-400" />;
+    return <XCircle className="h-4 w-4 text-red-400" />;
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === 'approved') return "Aprovada";
+    if (status === 'pending') return "Pendente";
+    return "Rejeitada";
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading font-bold text-xl text-foreground">Vendas</h1>
-            <p className="text-muted-foreground text-sm mt-1">Registre e acompanhe as vendas</p>
+            <p className="text-muted-foreground text-sm mt-1">Registre, acompanhe e exclua vendas</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -124,6 +148,10 @@ export default function AdminSales() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-sm text-foreground truncate">{seller?.name || `Vendedor #${sale.sellerId}`}</p>
+                      <span className="flex items-center gap-1 text-xs">
+                        {statusIcon(sale.status || 'approved')}
+                        <span className="text-muted-foreground">{statusLabel(sale.status || 'approved')}</span>
+                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {sale.vehicleModel || sale.description || "Venda registrada"}
@@ -131,12 +159,40 @@ export default function AdminSales() {
                       {new Date(sale.createdAt).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
-                    {sale.value ? <p className="text-sm font-semibold text-foreground">R$ {sale.value.toLocaleString("pt-BR")}</p> : null}
-                    <div className="flex items-center gap-1 justify-end">
-                      <TrendingUp className="h-3 w-3 text-primary" />
-                      <span className="text-xs font-heading text-primary">+{sale.points} pts</span>
+                  <div className="text-right shrink-0 flex items-center gap-3">
+                    <div>
+                      {sale.value ? <p className="text-sm font-semibold text-foreground">R$ {sale.value.toLocaleString("pt-BR")}</p> : null}
+                      <div className="flex items-center gap-1 justify-end">
+                        <TrendingUp className="h-3 w-3 text-primary" />
+                        <span className="text-xs font-heading text-primary">+{sale.points} pts</span>
+                      </div>
                     </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-card border-border">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-foreground">Excluir venda?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja excluir esta venda de <strong>{seller?.name}</strong>?
+                            {sale.status === 'approved' && " Os pontos serão revertidos do ranking."}
+                            {" "}Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="border-border text-foreground">Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteSale.mutate({ id: sale.id })}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            Excluir
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               );

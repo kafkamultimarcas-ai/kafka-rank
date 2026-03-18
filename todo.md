@@ -66,3 +66,7 @@
 - [x] Notificação para admin quando vendedor registrar venda
 - [x] Ranking considerar apenas vendas aprovadas
 - [x] Testes das novas funcionalidades (32 testes passando)
+
+## Excluir Vendas
+- [x] Rota backend para excluir venda (admin) - reverte pontos automaticamente
+- [x] Botão de excluir venda no painel Admin > Vendas com confirmação

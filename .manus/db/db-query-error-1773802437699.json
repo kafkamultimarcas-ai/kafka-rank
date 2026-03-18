@@ -1,0 +1,8 @@
+{
+  "query": "INSERT INTO competition_participants (competitionId, sellerId, points, sales, createdAt) VALUES \n(1, 1, 0, 0, NOW()),\n(1, 2, 0, 0, NOW()),\n(1, 3, 0, 0, NOW()),\n(1, 4, 0, 0, NOW()),\n(1, 5, 0, 0, NOW()),\n(1, 6, 0, 0, NOW()),\n(1, 7, 0, 0, NOW());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute INSERT INTO competition_participants (competitionId, sellerId, points, sales, createdAt) VALUES \n(1, 1, 0, 0, NOW()),\n(1, 2, 0, 0, NOW()),\n(1, 3, 0, 0, NOW()),\n(1, 4, 0, 0, NOW()),\n(1, 5, 0, 0, NOW()),\n(1, 6, 0, 0, NOW()),\n(1, 7, 0, 0, NOW());",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'sales' in 'field list'"
+  ]
+}

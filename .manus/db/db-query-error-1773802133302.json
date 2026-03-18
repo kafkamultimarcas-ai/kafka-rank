@@ -1,0 +1,8 @@
+{
+  "query": "INSERT INTO sellers (name, nickname, isActive, totalSales, totalPoints, createdAt, updatedAt) VALUES \n('Leonardo', 'Leo', 1, 0, 0, NOW(), NOW()),\n('Gabriel', 'Gabriel', 1, 0, 0, NOW(), NOW()),\n('Matheus', 'Matheus', 1, 0, 0, NOW(), NOW()),\n('Wesley', 'Wesley', 1, 0, 0, NOW(), NOW()),\n('Petherson', 'Petherson', 1, 0, 0, NOW(), NOW()),\n('Lucas', 'Lucas', 1, 0, 0, NOW(), NOW()),\n('Emanuel', 'Emanuel', 1, 0, 0, NOW(), NOW());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute INSERT INTO sellers (name, nickname, isActive, totalSales, totalPoints, createdAt, updatedAt) VALUES \n('Leonardo', 'Leo', 1, 0, 0, NOW(), NOW()),\n('Gabriel', 'Gabriel', 1, 0, 0, NOW(), NOW()),\n('Matheus', 'Matheus', 1, 0, 0, NOW(), NOW()),\n('Wesley', 'Wesley', 1, 0, 0, NOW(), NOW()),\n('Petherson', 'Petherson', 1, 0, 0, NOW(), NOW()),\n('Lucas', 'Lucas', 1, 0, 0, NOW(), NOW()),\n('Emanuel', 'Emanuel', 1, 0, 0, NOW(), NOW());",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'isActive' in 'field list'"
+  ]
+}

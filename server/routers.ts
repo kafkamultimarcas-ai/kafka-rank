@@ -229,6 +229,11 @@ export const appRouter = router({
       await db.rejectSale(input.id);
       return { success: true };
     }),
+    // Excluir venda (admin) - reverte pontos se aprovada
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteSale(input.id);
+      return { success: true };
+    }),
   }),
 
   // ===== TRAININGS =====
