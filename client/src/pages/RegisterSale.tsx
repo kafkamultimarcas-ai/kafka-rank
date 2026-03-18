@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -85,6 +85,15 @@ export default function RegisterSale() {
       return c.category === category;
     });
   }, [competitions, category]);
+
+  // Auto-selecionar competição quando só tem uma ativa na categoria
+  useEffect(() => {
+    if (filteredCompetitions.length === 1 && !competitionId) {
+      setCompetitionId(filteredCompetitions[0].id.toString());
+    } else if (filteredCompetitions.length === 0) {
+      setCompetitionId("");
+    }
+  }, [filteredCompetitions, competitionId]);
 
   const isPending = registerSale.isPending || registerFei.isPending || registerConsignment.isPending || registerDispatch.isPending || registerSdr.isPending;
 

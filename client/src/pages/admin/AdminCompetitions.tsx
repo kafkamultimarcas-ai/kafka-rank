@@ -5,9 +5,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Play, Square, Users, UserPlus, X } from "lucide-react";
+import { Plus, Trash2, Play, Square, Users, UserPlus, X, Pencil, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  vendas: "Vendas", fei: "F&I", consignacao: "Consignação",
+  despachante: "Despachante", feirao: "Feirão", pre_vendas: "Pré-Vendas",
+};
+const CATEGORY_COLORS: Record<string, string> = {
+  vendas: "bg-red-500/20 text-red-400", fei: "bg-green-500/20 text-green-400",
+  consignacao: "bg-blue-500/20 text-blue-400", despachante: "bg-purple-500/20 text-purple-400",
+  feirao: "bg-orange-500/20 text-orange-400", pre_vendas: "bg-cyan-500/20 text-cyan-400",
+};
+
+type FormState = {
+  name: string; description: string; category: string;
+  type: "individual" | "team" | "group";
+  pointsPerSale: number; goalTarget: string; startDate: string; endDate: string;
+};
+
+const emptyForm: FormState = {
+  name: "", description: "", category: "vendas",
+  type: "individual", pointsPerSale: 1, goalTarget: "", startDate: "", endDate: "",
+};
+
+function tsToDateInput(ts: number) {
+  const d = new Date(ts);
+  return d.toISOString().split("T")[0];
+}
 
 export default function AdminCompetitions() {
   const { data: competitions } = trpc.competitions.list.useQuery({});
@@ -15,21 +41,20 @@ export default function AdminCompetitions() {
   const utils = trpc.useUtils();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingComp, setEditingComp] = useState<any>(null);
   const [participantDialog, setParticipantDialog] = useState<number | null>(null);
   const [teamDialog, setTeamDialog] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    name: "", description: "", category: "vendas",
-    type: "individual" as "individual" | "team" | "group",
-    pointsPerSale: 1, goalTarget: "", startDate: "", endDate: "",
-  });
+  const [form, setForm] = useState<FormState>({ ...emptyForm });
+  const [editForm, setEditForm] = useState<FormState>({ ...emptyForm });
   const [teamForm, setTeamForm] = useState({ name: "", color: "#EF4444" });
 
   const createComp = trpc.competitions.create.useMutation({
-    onSuccess: () => { utils.competitions.list.invalidate(); setDialogOpen(false); resetForm(); toast.success("Competição criada!"); },
+    onSuccess: () => { utils.competitions.list.invalidate(); setDialogOpen(false); setForm({ ...emptyForm }); toast.success("Competição criada!"); },
     onError: () => toast.error("Erro ao criar competição."),
   });
   const updateComp = trpc.competitions.update.useMutation({
-    onSuccess: () => { utils.competitions.list.invalidate(); toast.success("Competição atualizada!"); },
+    onSuccess: () => { utils.competitions.list.invalidate(); setEditDialogOpen(false); setEditingComp(null); toast.success("Competição atualizada!"); },
     onError: () => toast.error("Erro ao atualizar."),
   });
   const deleteComp = trpc.competitions.delete.useMutation({
@@ -48,21 +73,108 @@ export default function AdminCompetitions() {
     onSuccess: () => { utils.teams.list.invalidate(); toast.success("Equipe removida!"); },
   });
 
-  function resetForm() {
-    setForm({ name: "", description: "", category: "vendas", type: "individual", pointsPerSale: 1, goalTarget: "", startDate: "", endDate: "" });
-  }
-
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !form.startDate || !form.endDate) { toast.error("Preencha todos os campos obrigatórios"); return; }
     createComp.mutate({
       name: form.name, description: form.description, type: form.type,
-      category: form.category,
-      pointsPerSale: form.pointsPerSale,
+      category: form.category, pointsPerSale: form.pointsPerSale,
       goalTarget: form.goalTarget ? parseInt(form.goalTarget) : undefined,
       startDate: new Date(form.startDate).getTime(),
       endDate: new Date(form.endDate).getTime(),
     });
+  }
+
+  function openEdit(comp: any) {
+    setEditingComp(comp);
+    setEditForm({
+      name: comp.name, description: comp.description || "",
+      category: comp.category || "vendas", type: comp.type,
+      pointsPerSale: comp.pointsPerSale, goalTarget: comp.goalTarget ? String(comp.goalTarget) : "",
+      startDate: tsToDateInput(comp.startDate), endDate: tsToDateInput(comp.endDate),
+    });
+    setEditDialogOpen(true);
+  }
+
+  function handleEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingComp || !editForm.name.trim() || !editForm.startDate || !editForm.endDate) { toast.error("Preencha todos os campos"); return; }
+    updateComp.mutate({
+      id: editingComp.id,
+      name: editForm.name, description: editForm.description,
+      category: editForm.category, pointsPerSale: editForm.pointsPerSale,
+      goalTarget: editForm.goalTarget ? parseInt(editForm.goalTarget) : undefined,
+      startDate: new Date(editForm.startDate).getTime(),
+      endDate: new Date(editForm.endDate).getTime(),
+    });
+  }
+
+  function CompetitionForm({ f, setF, onSubmit, submitLabel, isPending }: {
+    f: FormState; setF: (v: FormState) => void; onSubmit: (e: React.FormEvent) => void;
+    submitLabel: string; isPending: boolean;
+  }) {
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <Label className="text-foreground">Nome *</Label>
+          <Input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="Ex: Grande Prêmio de Março" className="bg-input border-border text-foreground" />
+        </div>
+        <div>
+          <Label className="text-foreground">Descrição</Label>
+          <Input value={f.description} onChange={e => setF({ ...f, description: e.target.value })} placeholder="Descrição da competição" className="bg-input border-border text-foreground" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-foreground">Categoria</Label>
+            <Select value={f.category} onValueChange={(v) => setF({ ...f, category: v })}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vendas">Vendas</SelectItem>
+                <SelectItem value="fei">F&I</SelectItem>
+                <SelectItem value="consignacao">Consignação</SelectItem>
+                <SelectItem value="despachante">Despachante</SelectItem>
+                <SelectItem value="feirao">Feirão</SelectItem>
+                <SelectItem value="pre_vendas">Pré-Vendas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-foreground">Meta (opcional)</Label>
+            <Input type="number" min={1} value={f.goalTarget} onChange={e => setF({ ...f, goalTarget: e.target.value })} placeholder="Ex: 10" className="bg-input border-border text-foreground" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-foreground">Tipo</Label>
+            <Select value={f.type} onValueChange={(v: any) => setF({ ...f, type: v })}>
+              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="team">Equipes (2v2)</SelectItem>
+                <SelectItem value="group">Grupos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-foreground">Pontos/Registro</Label>
+            <Input type="number" min={1} value={f.pointsPerSale} onChange={e => setF({ ...f, pointsPerSale: parseInt(e.target.value) || 1 })} className="bg-input border-border text-foreground" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-foreground">Data Início *</Label>
+            <Input type="date" value={f.startDate} onChange={e => setF({ ...f, startDate: e.target.value })} className="bg-input border-border text-foreground" />
+          </div>
+          <div>
+            <Label className="text-foreground">Data Fim *</Label>
+            <Input type="date" value={f.endDate} onChange={e => setF({ ...f, endDate: e.target.value })} className="bg-input border-border text-foreground" />
+          </div>
+        </div>
+        <Button type="submit" className="w-full racing-gradient text-white" disabled={isPending}>
+          {isPending ? "Salvando..." : submitLabel}
+        </Button>
+      </form>
+    );
   }
 
   return (
@@ -80,69 +192,11 @@ export default function AdminCompetitions() {
                 <span className="hidden sm:inline">Nova Competição</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border">
+            <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-heading text-foreground">Nova Competição</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <Label className="text-foreground">Nome *</Label>
-                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex: Grande Prêmio de Março" className="bg-input border-border text-foreground" />
-                </div>
-                <div>
-                  <Label className="text-foreground">Descrição</Label>
-                  <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descrição da competição" className="bg-input border-border text-foreground" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-foreground">Categoria</Label>
-                    <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                      <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="vendas">Vendas</SelectItem>
-                        <SelectItem value="fei">F&I</SelectItem>
-                        <SelectItem value="consignacao">Consignação</SelectItem>
-                        <SelectItem value="despachante">Despachante</SelectItem>
-                        <SelectItem value="feirao">Feirão</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-foreground">Meta (opcional)</Label>
-                    <Input type="number" min={1} value={form.goalTarget} onChange={e => setForm({ ...form, goalTarget: e.target.value })} placeholder="Ex: 10" className="bg-input border-border text-foreground" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-foreground">Tipo</Label>
-                    <Select value={form.type} onValueChange={(v: any) => setForm({ ...form, type: v })}>
-                      <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="individual">Individual</SelectItem>
-                        <SelectItem value="team">Equipes (2v2)</SelectItem>
-                        <SelectItem value="group">Grupos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-foreground">Pontos/Venda</Label>
-                    <Input type="number" min={1} value={form.pointsPerSale} onChange={e => setForm({ ...form, pointsPerSale: parseInt(e.target.value) || 1 })} className="bg-input border-border text-foreground" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-foreground">Data Início *</Label>
-                    <Input type="date" value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className="bg-input border-border text-foreground" />
-                  </div>
-                  <div>
-                    <Label className="text-foreground">Data Fim *</Label>
-                    <Input type="date" value={form.endDate} onChange={e => setForm({ ...form, endDate: e.target.value })} className="bg-input border-border text-foreground" />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full racing-gradient text-white" disabled={createComp.isPending}>
-                  {createComp.isPending ? "Criando..." : "Criar Competição"}
-                </Button>
-              </form>
+              <CompetitionForm f={form} setF={setForm} onSubmit={handleCreate} submitLabel="Criar Competição" isPending={createComp.isPending} />
             </DialogContent>
           </Dialog>
         </div>
@@ -157,6 +211,8 @@ export default function AdminCompetitions() {
                 sellers={sellers || []}
                 onStart={() => updateComp.mutate({ id: comp.id, status: "active" })}
                 onFinish={() => updateComp.mutate({ id: comp.id, status: "finished" })}
+                onReactivate={() => updateComp.mutate({ id: comp.id, status: "active" })}
+                onEdit={() => openEdit(comp)}
                 onDelete={() => { if (confirm("Remover esta competição?")) deleteComp.mutate({ id: comp.id }); }}
                 onOpenParticipants={() => setParticipantDialog(comp.id)}
                 onOpenTeams={() => setTeamDialog(comp.id)}
@@ -178,12 +234,22 @@ export default function AdminCompetitions() {
             <p className="text-muted-foreground">Nenhuma competição criada. Clique em "Nova Competição" para começar.</p>
           </div>
         )}
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={(open) => { if (!open) { setEditDialogOpen(false); setEditingComp(null); } }}>
+          <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-foreground">Editar Competição</DialogTitle>
+            </DialogHeader>
+            <CompetitionForm f={editForm} setF={setEditForm} onSubmit={handleEdit} submitLabel="Salvar Alterações" isPending={updateComp.isPending} />
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
 }
 
-function CompetitionCard({ comp, sellers, onStart, onFinish, onDelete, onOpenParticipants, onOpenTeams,
+function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdit, onDelete, onOpenParticipants, onOpenTeams,
   participantDialogOpen, onCloseParticipants, teamDialogOpen, onCloseTeams,
   addParticipant, removeParticipant, createTeam, deleteTeam, teamForm, setTeamForm }: any) {
   const { data: participants } = trpc.participants.list.useQuery({ competitionId: comp.id });
@@ -195,7 +261,7 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onDelete, onOpenPar
     <div className="racing-card p-4 sm:p-5">
       <div className="flex items-start justify-between mb-3">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               comp.status === "active" ? "bg-green-500/20 text-green-400" :
               comp.status === "finished" ? "bg-muted text-muted-foreground" :
@@ -206,14 +272,8 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onDelete, onOpenPar
             <span className="text-xs text-muted-foreground">
               {comp.type === "individual" ? "Individual" : comp.type === "team" ? "Equipes" : "Grupos"}
             </span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              comp.category === "fei" ? "bg-green-500/20 text-green-400" :
-              comp.category === "consignacao" ? "bg-blue-500/20 text-blue-400" :
-              comp.category === "despachante" ? "bg-purple-500/20 text-purple-400" :
-              comp.category === "feirao" ? "bg-orange-500/20 text-orange-400" :
-              "bg-red-500/20 text-red-400"
-            }`}>
-              {comp.category === "fei" ? "F&I" : comp.category === "consignacao" ? "Consignação" : comp.category === "despachante" ? "Despachante" : comp.category === "feirao" ? "Feirão" : "Vendas"}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[comp.category] || CATEGORY_COLORS.vendas}`}>
+              {CATEGORY_LABELS[comp.category] || "Vendas"}
             </span>
           </div>
           <h3 className="font-heading font-bold text-foreground">{comp.name}</h3>
@@ -225,16 +285,29 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onDelete, onOpenPar
           </p>
         </div>
         <div className="flex items-center gap-1">
+          {/* Editar */}
+          <Button variant="ghost" size="icon" onClick={onEdit} title="Editar">
+            <Pencil className="h-4 w-4 text-blue-400" />
+          </Button>
+          {/* Iniciar (rascunho) */}
           {comp.status === "draft" && (
             <Button variant="ghost" size="icon" onClick={onStart} title="Iniciar">
               <Play className="h-4 w-4 text-green-400" />
             </Button>
           )}
+          {/* Encerrar (ativa) */}
           {comp.status === "active" && (
             <Button variant="ghost" size="icon" onClick={onFinish} title="Encerrar">
               <Square className="h-4 w-4 text-yellow-400" />
             </Button>
           )}
+          {/* Reativar (encerrada) */}
+          {comp.status === "finished" && (
+            <Button variant="ghost" size="icon" onClick={onReactivate} title="Reativar">
+              <RotateCcw className="h-4 w-4 text-green-400" />
+            </Button>
+          )}
+          {/* Excluir */}
           <Button variant="ghost" size="icon" onClick={onDelete} title="Remover">
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>

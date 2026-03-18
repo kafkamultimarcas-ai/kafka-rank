@@ -1,0 +1,66 @@
+{
+  "query": "SELECT cp.id, cp.competitionId, cp.sellerId, cp.points, cp.salesCount, sel.name FROM competition_participants cp LEFT JOIN sellers sel ON cp.sellerId = sel.id WHERE cp.competitionId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT cp.id, cp.competitionId, cp.sellerId, cp.points, cp.salesCount, sel.name FROM competition_participants cp LEFT JOIN sellers sel ON cp.sellerId = sel.id WHERE cp.competitionId = 1;",
+  "rows": [
+    {
+      "id": "1",
+      "competitionId": "1",
+      "sellerId": "1",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Leonardo"
+    },
+    {
+      "id": "2",
+      "competitionId": "1",
+      "sellerId": "2",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Gabriel"
+    },
+    {
+      "id": "3",
+      "competitionId": "1",
+      "sellerId": "3",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Matheus"
+    },
+    {
+      "id": "4",
+      "competitionId": "1",
+      "sellerId": "4",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Wesley"
+    },
+    {
+      "id": "5",
+      "competitionId": "1",
+      "sellerId": "5",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Petherson"
+    },
+    {
+      "id": "6",
+      "competitionId": "1",
+      "sellerId": "6",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Lucas"
+    },
+    {
+      "id": "7",
+      "competitionId": "1",
+      "sellerId": "7",
+      "points": "0",
+      "salesCount": "0",
+      "name": "Emanuel"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcompetitionId\tsellerId\tpoints\tsalesCount\tname\n1\t1\t1\t0\t0\tLeonardo\n2\t1\t2\t0\t0\tGabriel\n3\t1\t3\t0\t0\tMatheus\n4\t1\t4\t0\t0\tWesley\n5\t1\t5\t0\t0\tPetherson\n6\t1\t6\t0\t0\tLucas\n7\t1\t7\t0\t0\tEmanuel\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

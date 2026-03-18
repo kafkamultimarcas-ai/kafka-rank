@@ -141,3 +141,13 @@
 - [x] Formulário de registro de pré-vendas (SDR): agendamentos e leads
 - [x] Aprovação de registros de pré-vendas no admin (aba SDR)
 - [x] Pontuação: agendamento = 1pt, lead convertido = 3pts
+
+## Bugs e Melhorias - Competições
+- [x] Bug: competição mostrando como "Encerrada" - causa: datas de 2025 em vez de 2026, corrigido no banco
+- [x] Bug: venda do Leo não contando - causa: competitionId era NULL, corrigido e vinculado
+- [x] Adicionar botão de editar competição (datas, nome, descrição, categoria, meta, pontos)
+- [x] Adicionar botão de reativar competição encerrada
+- [x] Corrigir datas da competição para 18/03/2026 até 29/03/2026
+- [x] Auto-selecionar competição quando só tem uma ativa na categoria
+- [x] Categoria Pré-Vendas adicionada na criação de competições
+- [x] 72 testes passando
