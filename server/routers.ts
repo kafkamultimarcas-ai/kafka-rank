@@ -281,7 +281,8 @@ export const appRouter = router({
   // ===== MOTIVATIONAL QUOTES =====
   quotes: router({
     latest: publicProcedure.query(async () => {
-      return db.getLatestQuote();
+      const quote = await db.getLatestQuote();
+      return quote ?? null;
     }),
     list: publicProcedure.query(async () => {
       return db.listQuotes();

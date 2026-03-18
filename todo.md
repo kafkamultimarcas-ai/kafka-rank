@@ -48,3 +48,6 @@
 - [x] Proteger todas as páginas públicas com código de acesso
 - [x] Permitir admin definir/alterar código de acesso
 - [x] Testes das novas funcionalidades (32 testes passando)
+
+## Correções
+- [x] Bug: quotes.latest retorna undefined quando não há frases cadastradas
