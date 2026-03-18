@@ -124,3 +124,11 @@
 - [x] Opção de excluir/trocar vídeo sem excluir o treinamento
 - [x] Opção de excluir treinamento inteiro (já existia)
 - [x] 72 testes passando
+
+## Treinamentos Pré-populados
+- [ ] Treinamento: Como vender carros todos os dias
+- [ ] Treinamento: Tempo de resposta ao cliente
+- [ ] Treinamento: Atendimento e embalagem visual
+- [ ] Treinamento: Técnicas de vendas que funcionam
+- [ ] Treinamento: Fechamento de vendas
+- [ ] Buscar vídeos do YouTube relevantes para cada tema
