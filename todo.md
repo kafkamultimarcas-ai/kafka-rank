@@ -90,3 +90,7 @@
 - [x] Frontend: pedir permissão e registrar subscription (usePushNotifications hook + botão na Home)
 - [x] Disparar push quando venda for aprovada, ultrapassagem no ranking, nova competição
 - [x] Testes das funcionalidades de push (41 testes passando)
+
+## Correções de Navegação
+- [x] Adicionar botão de voltar na tela de Aprovar Vendas (admin fica preso após aprovar tudo)
+- [x] Verificar e corrigir navegação em todas as páginas admin e públicas (AdminApprovals agora usa DashboardLayout com sidebar)
