@@ -1,0 +1,41 @@
+# Kafka Sales Competition - TODO
+
+## Backend / Banco de Dados
+- [x] Schema: tabelas vendedores, competições, equipes, vendas, treinamentos, frases, planos de ação
+- [x] CRUD vendedores (adicionar, editar, remover, upload foto S3)
+- [x] CRUD competições (individual, 2v2, grupos personalizados)
+- [x] Registro de vendas com pontuação
+- [x] Upload e gerenciamento de fotos via S3
+- [x] Integração LLM para frases motivacionais e planos de ação
+- [x] Notificações automáticas (mudança ranking, ultrapassagem, metas, fim competição)
+- [x] Mini treinamentos com conteúdo educacional
+
+## Painel Administrativo (protegido por autenticação)
+- [x] Dashboard admin com visão geral
+- [x] Gerenciar vendedores (CRUD + foto)
+- [x] Criar/editar/encerrar competições (individual, 2v2, grupos)
+- [x] Registrar vendas e ajustar pontuação
+- [x] Gerenciar mini treinamentos
+- [x] Gerenciar planos de ação por vendedor
+
+## Dashboard Público (pista de corrida)
+- [x] Pista de corrida visual com carros e fotos dos vendedores
+- [x] Ranking ao vivo com posições na pista
+- [x] Frases motivacionais diárias
+- [x] Notificações em tempo real (ultrapassagem, mudança ranking)
+- [x] Visualização de competições ativas e encerradas
+
+## Páginas Adicionais
+- [x] Estatísticas individuais e comparativas (metáforas de corrida)
+- [x] Histórico de competições e performance
+- [x] Mini treinamentos (conteúdo educacional)
+- [x] Planos de ação personalizados por vendedor
+
+## Design e Responsividade
+- [x] Tema visual de corrida imersivo
+- [x] Interface responsiva (celular + notebook)
+- [x] Carros com fotos dos vendedores integradas
+- [x] Grid de largada como tabela de classificação
+
+## Testes
+- [x] Testes unitários das rotas tRPC (26 testes passando)
