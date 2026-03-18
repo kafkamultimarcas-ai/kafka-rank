@@ -1,6 +1,6 @@
 {
-  "name": "Kafka Multimarcas - Competição de Vendas",
-  "short_name": "Kafka Racing",
+  "name": "Kafka Rank",
+  "short_name": "Kafka Rank",
   "description": "Plataforma de gamificação de vendas com tema de corrida",
   "start_url": "/",
   "display": "standalone",

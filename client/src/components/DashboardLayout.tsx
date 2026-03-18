@@ -68,7 +68,7 @@ export default function DashboardLayout({
           <div className="flex flex-col items-center gap-4">
             <Flag className="h-16 w-16 text-primary" />
             <h1 className="text-2xl font-heading font-bold tracking-tight text-center text-foreground">
-              Kafka Multimarcas
+              Kafka Rank
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
               Faça login para acessar o painel administrativo da competição de vendas.
@@ -170,7 +170,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
                 <div className="flex items-center gap-2 min-w-0">
                   <Flag className="h-5 w-5 text-primary shrink-0" />
                   <span className="font-heading font-bold text-sm tracking-tight truncate text-foreground">
-                    KAFKA ADMIN
+                    KAFKA RANK
                   </span>
                 </div>
               )}

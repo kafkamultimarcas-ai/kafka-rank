@@ -51,3 +51,4 @@
 
 ## Correções
 - [x] Bug: quotes.latest retorna undefined quando não há frases cadastradas
+- [x] Renomear app para "Kafka Rank" em todos os lugares

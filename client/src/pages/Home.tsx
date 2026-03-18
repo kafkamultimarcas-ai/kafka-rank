@@ -23,7 +23,7 @@ export default function Home() {
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
             <Flag className="h-7 w-7 text-primary" />
-            <span className="font-heading font-bold text-lg tracking-tight text-foreground">KAFKA MULTIMARCAS</span>
+            <span className="font-heading font-bold text-lg tracking-tight text-foreground">KAFKA RANK</span>
           </div>
           <div className="flex items-center gap-3">
             {user?.role === "admin" && (
@@ -49,7 +49,7 @@ export default function Home() {
               ACELERE SUAS <span className="text-primary">VENDAS</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-              Acompanhe a corrida de vendas da Kafka Multimarcas em tempo real. Cada venda te coloca mais perto da linha de chegada!
+              Acompanhe a corrida de vendas da Kafka Rank em tempo real. Cada venda te coloca mais perto da linha de chegada!
             </p>
             {quote && (
               <div className="racing-card p-4 max-w-lg mx-auto mb-8">
@@ -201,8 +201,7 @@ export default function Home() {
         <div className="container text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Flag className="h-4 w-4 text-primary" />
-            <span className="font-heading text-sm font-bold text-foreground">KAFKA MULTIMARCAS</span>
-          </div>
+        <span className="font-heading text-sm font-bold text-foreground">KAFKA RANK</span>        </div>
           <p className="text-xs text-muted-foreground">Competição de Vendas — Acelere seus resultados</p>
         </div>
       </footer>

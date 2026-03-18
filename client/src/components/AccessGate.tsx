@@ -66,7 +66,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
               <Lock className="h-8 w-8 text-white" />
             </div>
             <h1 className="font-heading font-bold text-xl text-foreground tracking-wider">
-              KAFKA MULTIMARCAS
+              KAFKA RANK
             </h1>
             <p className="text-muted-foreground text-sm">
               Acesso restrito. Digite o código fornecido pelo gerente.
@@ -97,7 +97,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
 
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Flag className="h-3 w-3" />
-            <span>Acesso exclusivo para equipe Kafka</span>
+            <span>Acesso exclusivo para equipe Kafka Rank</span>
           </div>
         </div>
       </div>
