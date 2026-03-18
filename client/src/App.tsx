@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import AccessGate from "./components/AccessGate";
 import Home from "./pages/Home";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminSellers from "./pages/admin/AdminSellers";
@@ -11,6 +12,7 @@ import AdminCompetitions from "./pages/admin/AdminCompetitions";
 import AdminSales from "./pages/admin/AdminSales";
 import AdminTrainings from "./pages/admin/AdminTrainings";
 import AdminActionPlans from "./pages/admin/AdminActionPlans";
+import AdminSettings from "./pages/admin/AdminSettings";
 import CompetitionView from "./pages/CompetitionView";
 import SellerProfile from "./pages/SellerProfile";
 import TrainingsList from "./pages/TrainingsList";
@@ -30,6 +32,7 @@ function Router() {
       <Route path="/admin/vendas" component={AdminSales} />
       <Route path="/admin/treinamentos" component={AdminTrainings} />
       <Route path="/admin/planos" component={AdminActionPlans} />
+      <Route path="/admin/configuracoes" component={AdminSettings} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -42,7 +45,9 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <AccessGate>
+            <Router />
+          </AccessGate>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

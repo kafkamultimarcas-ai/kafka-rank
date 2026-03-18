@@ -345,3 +345,20 @@ export async function getTeamRanking(competitionId: number) {
     };
   }).sort((a, b) => b.totalPoints - a.totalPoints);
 }
+
+// ===== APP SETTINGS =====
+import { appSettings } from "../drizzle/schema";
+
+export async function getAppSetting(key: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(appSettings).where(eq(appSettings.settingKey, key)).limit(1);
+  return result[0]?.settingValue;
+}
+
+export async function setAppSetting(key: string, value: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(appSettings).values({ settingKey: key, settingValue: value })
+    .onDuplicateKeyUpdate({ set: { settingValue: value } });
+}

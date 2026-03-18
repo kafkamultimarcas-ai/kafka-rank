@@ -42,6 +42,8 @@ vi.mock("./db", () => ({
   createQuote: vi.fn().mockResolvedValue(1),
   listNotifications: vi.fn().mockResolvedValue([]),
   markNotificationRead: vi.fn().mockResolvedValue(undefined),
+  getAppSetting: vi.fn().mockResolvedValue("kafka2024"),
+  setAppSetting: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./storage", () => ({
@@ -264,5 +266,41 @@ describe("auth", () => {
     const result = await caller.auth.me();
     expect(result).toBeDefined();
     expect(result?.name).toBe("Admin");
+  });
+});
+
+describe("access control router", () => {
+  it("verifies correct access code", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.access.verify({ code: "kafka2024" });
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects incorrect access code", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.access.verify({ code: "wrongcode" });
+    expect(result.valid).toBe(false);
+  });
+
+  it("gets access code as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.access.getCode();
+    expect(result.code).toBe("kafka2024");
+  });
+
+  it("rejects getting access code for non-admin", async () => {
+    const caller = appRouter.createCaller(createUserContext());
+    await expect(caller.access.getCode()).rejects.toThrow();
+  });
+
+  it("sets access code as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.access.setCode({ code: "newcode123" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects setting access code for public user", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.access.setCode({ code: "hack" })).rejects.toThrow();
   });
 });

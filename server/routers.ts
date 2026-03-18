@@ -341,6 +341,23 @@ export const appRouter = router({
       return { analysis: response.choices[0].message.content as string };
     }),
   }),
+
+  // ===== ACCESS CONTROL =====
+  access: router({
+    verify: publicProcedure.input(z.object({ code: z.string() })).mutation(async ({ input }) => {
+      const storedCode = await db.getAppSetting("access_code");
+      if (!storedCode) return { valid: true };
+      return { valid: input.code === storedCode };
+    }),
+    getCode: adminProcedure.query(async () => {
+      const code = await db.getAppSetting("access_code");
+      return { code: code || "" };
+    }),
+    setCode: adminProcedure.input(z.object({ code: z.string().min(1) })).mutation(async ({ input }) => {
+      await db.setAppSetting("access_code", input.code);
+      return { success: true };
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

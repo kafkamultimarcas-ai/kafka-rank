@@ -39,3 +39,12 @@
 
 ## Testes
 - [x] Testes unitários das rotas tRPC (26 testes passando)
+
+## PWA e Acesso Restrito
+- [x] Configurar manifest.json para PWA instalável
+- [x] Adicionar service worker para funcionamento offline
+- [x] Criar ícones do app para iOS e Android
+- [x] Implementar sistema de código de acesso interno
+- [x] Proteger todas as páginas públicas com código de acesso
+- [x] Permitir admin definir/alterar código de acesso
+- [x] Testes das novas funcionalidades (32 testes passando)

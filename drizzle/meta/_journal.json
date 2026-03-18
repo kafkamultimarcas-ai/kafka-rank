@@ -15,6 +15,13 @@
       "when": 1773796693988,
       "tag": "0001_dark_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1773797983285,
+      "tag": "0002_careful_newton_destine",
+      "breakpoints": true
     }
   ]
 }
