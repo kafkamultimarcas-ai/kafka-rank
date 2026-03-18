@@ -66,6 +66,7 @@ vi.mock("./db", () => ({
   listPendingConsignmentRecords: vi.fn().mockResolvedValue([]),
   approveConsignmentRecord: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, vehicleModel: 'Corolla', isValid: true, points: 1, competitionId: null }),
   rejectConsignmentRecord: vi.fn().mockResolvedValue(undefined),
+  updateConsignmentExitDate: vi.fn().mockResolvedValue({ id: 1, exitDate: Date.now(), isValid: true }),
   // Dispatch
   listDispatchRecords: vi.fn().mockResolvedValue([]),
   createDispatchRecord: vi.fn().mockResolvedValue(1),
@@ -424,7 +425,7 @@ describe("F&I router", () => {
     const caller = appRouter.createCaller(createPublicContext());
     const result = await caller.fei.register({
       sellerId: 1, bankName: "Santander", returnType: "R1",
-      financedValue: 5000000, returnValue: 250000,
+      financedValue: 5000000, paymentDate: Date.now(),
     });
     expect(result.id).toBe(1);
     expect(result.message).toContain("F&I");
@@ -466,10 +467,11 @@ describe("Consignment router", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("registers consignment publicly", async () => {
+  it("registers consignment publicly with ownerPhone", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const result = await caller.consignment.register({
       sellerId: 1, vehicleModel: "Corolla 2023", ownerName: "Jo\u00e3o Silva",
+      ownerPhone: "(11) 99999-9999",
       entryDate: Date.now() - 8 * 24 * 60 * 60 * 1000,
     });
     expect(result.id).toBe(1);
@@ -497,6 +499,18 @@ describe("Consignment router", () => {
   it("rejects consignment approval for non-admin", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     await expect(caller.consignment.approve({ id: 1 })).rejects.toThrow();
+  });
+
+  it("updates exit date as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.consignment.updateExit({ id: 1, exitDate: Date.now() });
+    expect(result.success).toBe(true);
+    expect(result.isValid).toBe(true);
+  });
+
+  it("rejects exit date update for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.consignment.updateExit({ id: 1, exitDate: Date.now() })).rejects.toThrow();
   });
 });
 

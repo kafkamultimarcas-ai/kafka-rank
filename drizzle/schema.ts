@@ -105,7 +105,7 @@ export const feiRecords = mysqlTable("fei_records", {
   bankName: varchar("bankName", { length: 255 }),
   financedValue: int("financedValue").default(0), // valor financiado em centavos
   returnType: varchar("returnType", { length: 10 }), // R1, R2, R3, R4, R5
-  returnValue: int("returnValue").default(0), // valor do retorno em centavos
+  paymentDate: bigint("paymentDate", { mode: "number" }), // data que o banco pagou a ficha
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -122,7 +122,9 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   vehiclePlate: varchar("vehiclePlate", { length: 10 }),
   vehicleModel: varchar("vehicleModel", { length: 255 }),
   ownerName: varchar("ownerName", { length: 255 }),
+  ownerPhone: varchar("ownerPhone", { length: 20 }), // telefone do proprietário
   entryDate: bigint("entryDate", { mode: "number" }).notNull(), // data de entrada no pátio
+  exitDate: bigint("exitDate", { mode: "number" }), // data de saída do pátio (preenchido quando sai)
   validAfterDays: int("validAfterDays").default(7).notNull(), // dias mínimos no pátio
   isValid: boolean("isValid").default(false).notNull(), // se já completou os 7 dias
   points: int("points").default(1).notNull(),

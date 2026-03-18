@@ -153,7 +153,7 @@ export default function AdminApprovals() {
                 <span className="text-muted-foreground">Retorno: <span className="text-yellow-400 font-bold">{record.returnType}</span></span>
               </div>
               {record.financedValue > 0 && <p className="text-green-400 font-bold">Financiado: R$ {(record.financedValue / 100).toLocaleString("pt-BR")}</p>}
-              {record.returnValue > 0 && <p className="text-yellow-400 text-sm">Retorno: R$ {(record.returnValue / 100).toLocaleString("pt-BR")}</p>}
+              {record.paymentDate && <p className="text-yellow-400 text-sm">Pago em: {new Date(Number(record.paymentDate)).toLocaleDateString("pt-BR")}</p>}
               <p className="text-muted-foreground/60 text-xs mt-1">{new Date(record.createdAt).toLocaleString("pt-BR")}</p>
             </div>
             <div className="flex flex-col gap-2 flex-shrink-0">
@@ -199,10 +199,14 @@ export default function AdminApprovals() {
               <div className="flex flex-wrap gap-3 text-sm">
                 {record.vehiclePlate && <span className="text-muted-foreground">Placa: <span className="text-foreground">{record.vehiclePlate}</span></span>}
                 <span className="text-muted-foreground">Dono: <span className="text-foreground">{record.ownerName}</span></span>
+                {record.ownerPhone && <span className="text-muted-foreground">Tel: <span className="text-foreground">{record.ownerPhone}</span></span>}
               </div>
               <div className="mt-1">
                 <span className="text-muted-foreground text-sm">Entrada: {new Date(Number(record.entryDate)).toLocaleDateString("pt-BR")}</span>
-                {daysRemaining > 0 ? (
+                {record.exitDate ? (
+                  <span className="text-muted-foreground text-sm ml-2">| Saída: {new Date(Number(record.exitDate)).toLocaleDateString("pt-BR")}</span>
+                ) : null}
+                {!record.exitDate && daysRemaining > 0 ? (
                   <span className="text-orange-400 text-xs ml-2">({daysRemaining} dias restantes para validar)</span>
                 ) : (
                   <span className="text-green-400 text-xs ml-2">(7+ dias - válido!)</span>

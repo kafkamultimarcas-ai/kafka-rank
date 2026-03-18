@@ -593,6 +593,23 @@ export async function rejectConsignmentRecord(id: number) {
   await db.update(consignmentRecords).set({ status: 'rejected' }).where(eq(consignmentRecords.id, id));
 }
 
+export async function updateConsignmentExitDate(id: number, exitDate: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Registro n\u00e3o encontrado");
+  // Calcular se é válido baseado na diferença entre saída e entrada
+  const daysPassed = Math.floor((exitDate - record.entryDate) / (1000 * 60 * 60 * 24));
+  const isValid = daysPassed >= record.validAfterDays;
+  await db.update(consignmentRecords).set({ exitDate, isValid }).where(eq(consignmentRecords.id, id));
+  // Se ficou válido agora e já estava aprovado, atualizar pontos
+  if (isValid && record.status === 'approved' && !record.isValid) {
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  }
+  return { ...record, exitDate, isValid };
+}
+
 export async function validateConsignmentDays() {
   // Valida consignações aprovadas que completaram os 7 dias
   const db = await getDb();

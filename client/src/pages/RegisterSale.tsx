@@ -37,12 +37,13 @@ export default function RegisterSale() {
   const [bankName, setBankName] = useState("");
   const [financedValue, setFinancedValue] = useState("");
   const [returnType, setReturnType] = useState("");
-  const [returnValue, setReturnValue] = useState("");
+  const [paymentDate, setPaymentDate] = useState("");
 
   // Consignação fields
   const [consignModel, setConsignModel] = useState("");
   const [consignPlate, setConsignPlate] = useState("");
   const [ownerName, setOwnerName] = useState("");
+  const [ownerPhone, setOwnerPhone] = useState("");
   const [entryDate, setEntryDate] = useState("");
 
   // Despachante fields
@@ -77,8 +78,8 @@ export default function RegisterSale() {
 
   const resetForm = () => {
     setVehicleModel(""); setValue(""); setDescription("");
-    setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setReturnValue("");
-    setConsignModel(""); setConsignPlate(""); setOwnerName(""); setEntryDate("");
+    setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setPaymentDate("");
+    setConsignModel(""); setConsignPlate(""); setOwnerName(""); setOwnerPhone(""); setEntryDate("");
     setDispatchPlate(""); setDocumentType(""); setCustomerPaid(false); setTransferValue("");
     setSubmitted(false); setSubmittedMessage("");
   };
@@ -107,7 +108,7 @@ export default function RegisterSale() {
             vehiclePlate: vehiclePlate || undefined,
             bankName, returnType,
             financedValue: financedValue ? Math.round(parseFloat(financedValue) * 100) : undefined,
-            returnValue: returnValue ? Math.round(parseFloat(returnValue) * 100) : undefined,
+            paymentDate: paymentDate ? new Date(paymentDate).getTime() : undefined,
           });
           break;
         case "consignacao":
@@ -116,6 +117,7 @@ export default function RegisterSale() {
             sellerId: sid, competitionId: cid,
             vehiclePlate: consignPlate || undefined,
             vehicleModel: consignModel, ownerName,
+            ownerPhone: ownerPhone || undefined,
             entryDate: new Date(entryDate).getTime(),
           });
           break;
@@ -339,9 +341,9 @@ export default function RegisterSale() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Valor retorno (R$)</Label>
-                    <Input value={returnValue} onChange={e => setReturnValue(e.target.value)}
-                      placeholder="Ex: 2500" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                    <Label className="text-gray-300 font-semibold text-sm">Data pagamento</Label>
+                    <Input value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
+                      type="date" className="bg-gray-800 border-gray-700 text-white" />
                   </div>
                 </div>
               </>
@@ -374,6 +376,11 @@ export default function RegisterSale() {
                   <Label className="text-gray-300 font-semibold">Nome do proprietário *</Label>
                   <Input value={ownerName} onChange={e => setOwnerName(e.target.value)}
                     placeholder="Nome do dono do veículo" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold">Telefone do proprietário</Label>
+                  <Input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)}
+                    placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-blue-400 text-xs">

@@ -452,10 +452,10 @@ export const appRouter = router({
       bankName: z.string().min(1),
       financedValue: z.number().optional(),
       returnType: z.string().min(1),
-      returnValue: z.number().optional(),
+      paymentDate: z.number().optional(),
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
-      if (!seller) throw new Error("Colaborador não encontrado");
+      if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
       const id = await db.createFeiRecord({ ...input, points, status: 'pending' });
@@ -505,16 +505,17 @@ export const appRouter = router({
       vehiclePlate: z.string().optional(),
       vehicleModel: z.string().min(1),
       ownerName: z.string().min(1),
+      ownerPhone: z.string().optional(),
       entryDate: z.number(),
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
-      if (!seller) throw new Error("Colaborador não encontrado");
+      if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
       const id = await db.createConsignmentRecord({ ...input, points, status: 'pending' });
       await notifyOwner({
         title: `Nova consigna\u00e7\u00e3o para aprovar!`,
-        content: `${seller.name} registrou consigna\u00e7\u00e3o: ${input.vehicleModel} | Dono: ${input.ownerName} | Placa: ${input.vehiclePlate || 'N/I'}`,
+        content: `${seller.name} registrou consigna\u00e7\u00e3o: ${input.vehicleModel} | Dono: ${input.ownerName} | Tel: ${input.ownerPhone || 'N/I'} | Placa: ${input.vehiclePlate || 'N/I'}`,
       });
       return { id, message: "Consigna\u00e7\u00e3o registrada! Aguardando aprova\u00e7\u00e3o. Lembre-se: o carro precisa ficar 7 dias no p\u00e1tio para contar pontos." };
     }),
@@ -539,6 +540,14 @@ export const appRouter = router({
     reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.rejectConsignmentRecord(input.id);
       return { success: true };
+    }),
+    // Registrar saída do carro do pátio
+    updateExit: adminProcedure.input(z.object({
+      id: z.number(),
+      exitDate: z.number(),
+    })).mutation(async ({ input }) => {
+      const result = await db.updateConsignmentExitDate(input.id, input.exitDate);
+      return { success: true, isValid: result.isValid };
     }),
   }),
 

@@ -1,0 +1,1 @@
+ALTER TABLE `consignment_records` ADD `ownerPhone` varchar(20);

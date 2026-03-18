@@ -106,3 +106,11 @@
 - [x] Dashboard: exibir competições organizadas por categoria com badges coloridos
 - [x] Suporte a múltiplas competições paralelas (validado)
 - [x] Testes dos novos setores (63 testes passando)
+
+## Ajustes F&I e Consignação
+- [x] F&I: remover campo "Valor retorno" e adicionar "Data pagamento da ficha"
+- [x] Consignação: adicionar campo "Data de saída" para controle dos 7 dias (entrada/saída)
+- [x] Admin pode atualizar data de saída da consignação quando carro sair do pátio (rota updateExit)
+- [x] Cálculo automático dos 7 dias baseado em entrada e saída
+- [x] Consignação: adicionar telefone do proprietário do veículo
+- [x] 65 testes passando após todos os ajustes
