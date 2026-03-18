@@ -19,6 +19,7 @@ import TrainingsList from "./pages/TrainingsList";
 import RaceTrack from "./pages/RaceTrack";
 import RegisterSale from "./pages/RegisterSale";
 import AdminApprovals from "./pages/admin/AdminApprovals";
+import LiveAlerts from "./components/LiveAlerts";
 
 function Router() {
   return (
@@ -50,6 +51,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <AccessGate>
+            <LiveAlerts />
             <Router />
           </AccessGate>
         </TooltipProvider>

@@ -267,6 +267,33 @@ export async function deleteSale(saleId: number) {
   return sale;
 }
 
+// ===== LIVE FEED =====
+export async function getRecentApprovedSales(sinceTimestamp: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const sinceDate = new Date(sinceTimestamp);
+  const result = await db.select({
+    id: sales.id,
+    sellerId: sales.sellerId,
+    vehicleModel: sales.vehicleModel,
+    value: sales.value,
+    points: sales.points,
+    createdAt: sales.createdAt,
+    sellerName: sellers.name,
+    sellerNickname: sellers.nickname,
+    sellerPhoto: sellers.photoUrl,
+  })
+    .from(sales)
+    .innerJoin(sellers, eq(sales.sellerId, sellers.id))
+    .where(and(
+      eq(sales.status, 'approved'),
+      sql`${sales.createdAt} > ${sinceDate}`
+    ))
+    .orderBy(desc(sales.createdAt))
+    .limit(20);
+  return result;
+}
+
 // ===== TRAININGS =====
 export async function listTrainings(activeOnly = false) {
   const db = await getDb();

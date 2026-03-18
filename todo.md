@@ -74,3 +74,10 @@
 ## Acesso Admin pelo Celular
 - [x] Adicionar botão de login discreto na Home para admin acessar pelo celular
 - [x] Botão Admin visível após login do dono (amarelo, destaque)
+
+## Alertas Visuais e Sonoros
+- [x] Sistema de polling para detectar novas vendas em tempo real (a cada 10s)
+- [x] Alertas visuais animados quando alguém registrar venda (verde)
+- [x] Alerta especial quando alguém ultrapassar outro no ranking (amarelo)
+- [x] Sons de alerta (beep para venda, motor para ultrapassagem)
+- [x] Banner animado com foto do vendedor, barra de progresso e dismiss

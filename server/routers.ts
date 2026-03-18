@@ -393,6 +393,16 @@ export const appRouter = router({
     }),
   }),
 
+  // ===== LIVE FEED =====
+  feed: router({
+    // Retorna vendas recentes aprovadas (últimos 30 min) para alertas em tempo real
+    recent: publicProcedure.input(z.object({
+      since: z.number(), // timestamp em ms
+    })).query(async ({ input }) => {
+      return db.getRecentApprovedSales(input.since);
+    }),
+  }),
+
   // ===== ACCESS CONTROL =====
   access: router({
     verify: publicProcedure.input(z.object({ code: z.string() })).mutation(async ({ input }) => {
