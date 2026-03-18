@@ -126,9 +126,9 @@
 - [x] 72 testes passando
 
 ## Treinamentos Pré-populados
-- [ ] Treinamento: Como vender carros todos os dias
-- [ ] Treinamento: Tempo de resposta ao cliente
-- [ ] Treinamento: Atendimento e embalagem visual
-- [ ] Treinamento: Técnicas de vendas que funcionam
-- [ ] Treinamento: Fechamento de vendas
-- [ ] Buscar vídeos do YouTube relevantes para cada tema
+- [x] Treinamento: Como Vender 1 Carro por Dia (com vídeo YouTube)
+- [x] Treinamento: Tempo de Resposta - O Segredo dos Top Vendedores (com vídeo YouTube)
+- [x] Treinamento: Apresentação Visual - Como Encantar na Primeira Impressão (com vídeo YouTube)
+- [x] Treinamento: 10 Técnicas de Vendas que Realmente Funcionam (com vídeo YouTube)
+- [x] Treinamento: 5 Técnicas de Fechamento (com vídeo YouTube)
+- [x] Vídeos do YouTube encontrados e vinculados a cada treinamento
