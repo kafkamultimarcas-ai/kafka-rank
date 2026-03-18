@@ -7,6 +7,9 @@ import {
   competitionParticipants, InsertCompetitionParticipant,
   teams, InsertTeam,
   sales, InsertSale,
+  feiRecords, InsertFeiRecord,
+  consignmentRecords, InsertConsignmentRecord,
+  dispatchRecords, InsertDispatchRecord,
   trainings, InsertTraining,
   actionPlans, InsertActionPlan,
   motivationalQuotes, InsertMotivationalQuote,
@@ -477,6 +480,216 @@ export async function getTeamRanking(competitionId: number) {
       })),
     };
   }).sort((a, b) => b.totalPoints - a.totalPoints);
+}
+
+// ===== F&I RECORDS =====
+export async function listFeiRecords(competitionId?: number, sellerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (competitionId) conditions.push(eq(feiRecords.competitionId, competitionId));
+  if (sellerId) conditions.push(eq(feiRecords.sellerId, sellerId));
+  if (conditions.length > 0) return db.select().from(feiRecords).where(and(...conditions)).orderBy(desc(feiRecords.createdAt));
+  return db.select().from(feiRecords).orderBy(desc(feiRecords.createdAt));
+}
+
+export async function createFeiRecord(data: InsertFeiRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(feiRecords).values(data);
+  return result[0].insertId;
+}
+
+export async function listPendingFeiRecords() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(feiRecords).where(eq(feiRecords.status, 'pending')).orderBy(desc(feiRecords.createdAt));
+}
+
+export async function approveFeiRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record || record.status !== 'pending') throw new Error("Registro F&I não encontrado ou já processado");
+  await db.update(feiRecords).set({ status: 'approved' }).where(eq(feiRecords.id, id));
+  await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  return record;
+}
+
+export async function rejectFeiRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(feiRecords).set({ status: 'rejected' }).where(eq(feiRecords.id, id));
+}
+
+export async function deleteFeiRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Registro não encontrado");
+  if (record.status === 'approved') {
+    await db.update(sellers).set({
+      totalSales: sql`GREATEST(totalSales - 1, 0)`,
+      totalPoints: sql`GREATEST(totalPoints - ${record.points}, 0)`,
+    }).where(eq(sellers.id, record.sellerId));
+    if (record.competitionId) {
+      await db.update(competitionParticipants).set({
+        points: sql`GREATEST(points - ${record.points}, 0)`,
+        salesCount: sql`GREATEST(salesCount - 1, 0)`,
+      }).where(and(
+        eq(competitionParticipants.competitionId, record.competitionId),
+        eq(competitionParticipants.sellerId, record.sellerId),
+      ));
+    }
+  }
+  await db.delete(feiRecords).where(eq(feiRecords.id, id));
+}
+
+// ===== CONSIGNMENT RECORDS =====
+export async function listConsignmentRecords(competitionId?: number, sellerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (competitionId) conditions.push(eq(consignmentRecords.competitionId, competitionId));
+  if (sellerId) conditions.push(eq(consignmentRecords.sellerId, sellerId));
+  if (conditions.length > 0) return db.select().from(consignmentRecords).where(and(...conditions)).orderBy(desc(consignmentRecords.createdAt));
+  return db.select().from(consignmentRecords).orderBy(desc(consignmentRecords.createdAt));
+}
+
+export async function createConsignmentRecord(data: InsertConsignmentRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(consignmentRecords).values(data);
+  return result[0].insertId;
+}
+
+export async function listPendingConsignmentRecords() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(consignmentRecords).where(eq(consignmentRecords.status, 'pending')).orderBy(desc(consignmentRecords.createdAt));
+}
+
+export async function approveConsignmentRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record || record.status !== 'pending') throw new Error("Registro de consignação não encontrado ou já processado");
+  // Verificar se já passou os dias mínimos
+  const daysPassed = Math.floor((Date.now() - record.entryDate) / (1000 * 60 * 60 * 24));
+  const isValid = daysPassed >= record.validAfterDays;
+  await db.update(consignmentRecords).set({ status: 'approved', isValid }).where(eq(consignmentRecords.id, id));
+  if (isValid) {
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  }
+  return { ...record, isValid };
+}
+
+export async function rejectConsignmentRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(consignmentRecords).set({ status: 'rejected' }).where(eq(consignmentRecords.id, id));
+}
+
+export async function validateConsignmentDays() {
+  // Valida consignações aprovadas que completaram os 7 dias
+  const db = await getDb();
+  if (!db) return;
+  const records = await db.select().from(consignmentRecords).where(and(
+    eq(consignmentRecords.status, 'approved'),
+    eq(consignmentRecords.isValid, false),
+  ));
+  for (const record of records) {
+    const daysPassed = Math.floor((Date.now() - record.entryDate) / (1000 * 60 * 60 * 24));
+    if (daysPassed >= record.validAfterDays) {
+      await db.update(consignmentRecords).set({ isValid: true }).where(eq(consignmentRecords.id, record.id));
+      await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+    }
+  }
+}
+
+// ===== DISPATCH RECORDS =====
+export async function listDispatchRecords(competitionId?: number, sellerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (competitionId) conditions.push(eq(dispatchRecords.competitionId, competitionId));
+  if (sellerId) conditions.push(eq(dispatchRecords.sellerId, sellerId));
+  if (conditions.length > 0) return db.select().from(dispatchRecords).where(and(...conditions)).orderBy(desc(dispatchRecords.createdAt));
+  return db.select().from(dispatchRecords).orderBy(desc(dispatchRecords.createdAt));
+}
+
+export async function createDispatchRecord(data: InsertDispatchRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(dispatchRecords).values(data);
+  return result[0].insertId;
+}
+
+export async function listPendingDispatchRecords() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(dispatchRecords).where(eq(dispatchRecords.status, 'pending')).orderBy(desc(dispatchRecords.createdAt));
+}
+
+export async function approveDispatchRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(dispatchRecords).where(eq(dispatchRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record || record.status !== 'pending') throw new Error("Registro de despachante não encontrado ou já processado");
+  await db.update(dispatchRecords).set({ status: 'approved' }).where(eq(dispatchRecords.id, id));
+  const totalPoints = record.points + record.bonusPoints;
+  await updateSaleTotals(record.sellerId, record.competitionId, totalPoints);
+  return record;
+}
+
+export async function rejectDispatchRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(dispatchRecords).set({ status: 'rejected' }).where(eq(dispatchRecords.id, id));
+}
+
+export async function deleteDispatchRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(dispatchRecords).where(eq(dispatchRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Registro não encontrado");
+  if (record.status === 'approved') {
+    const totalPoints = record.points + record.bonusPoints;
+    await db.update(sellers).set({
+      totalSales: sql`GREATEST(totalSales - 1, 0)`,
+      totalPoints: sql`GREATEST(totalPoints - ${totalPoints}, 0)`,
+    }).where(eq(sellers.id, record.sellerId));
+    if (record.competitionId) {
+      await db.update(competitionParticipants).set({
+        points: sql`GREATEST(points - ${totalPoints}, 0)`,
+        salesCount: sql`GREATEST(salesCount - 1, 0)`,
+      }).where(and(
+        eq(competitionParticipants.competitionId, record.competitionId),
+        eq(competitionParticipants.sellerId, record.sellerId),
+      ));
+    }
+  }
+  await db.delete(dispatchRecords).where(eq(dispatchRecords.id, id));
+}
+
+// ===== ALL PENDING (cross-sector) =====
+export async function getAllPendingCount() {
+  const db = await getDb();
+  if (!db) return { sales: 0, fei: 0, consignment: 0, dispatch: 0, total: 0 };
+  const [s] = await db.select({ count: sql<number>`count(*)` }).from(sales).where(eq(sales.status, 'pending'));
+  const [f] = await db.select({ count: sql<number>`count(*)` }).from(feiRecords).where(eq(feiRecords.status, 'pending'));
+  const [c] = await db.select({ count: sql<number>`count(*)` }).from(consignmentRecords).where(eq(consignmentRecords.status, 'pending'));
+  const [d] = await db.select({ count: sql<number>`count(*)` }).from(dispatchRecords).where(eq(dispatchRecords.status, 'pending'));
+  const salesCount = Number(s?.count || 0);
+  const feiCount = Number(f?.count || 0);
+  const consignmentCount = Number(c?.count || 0);
+  const dispatchCount = Number(d?.count || 0);
+  return { sales: salesCount, fei: feiCount, consignment: consignmentCount, dispatch: dispatchCount, total: salesCount + feiCount + consignmentCount + dispatchCount };
 }
 
 // ===== APP SETTINGS =====

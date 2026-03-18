@@ -53,8 +53,8 @@ export default function Home() {
             )}
             <Button size="sm" onClick={() => setLocation("/registrar-venda")} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
               <PlusCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">Registrar Venda</span>
-              <span className="sm:hidden">Venda</span>
+              <span className="hidden sm:inline">Registrar</span>
+              <span className="sm:hidden">+</span>
             </Button>
             {user?.role === "admin" ? (
               <Button size="sm" onClick={() => setLocation("/admin")} className="gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
@@ -139,10 +139,19 @@ export default function Home() {
                   className="racing-card p-5 text-left hover:border-primary/50 transition-all group"
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Flag className="h-5 w-5 text-primary" />
                       <span className="text-xs font-medium uppercase text-primary">
                         {comp.type === "individual" ? "Individual" : comp.type === "team" ? "Equipes" : "Grupos"}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                        comp.category === "fei" ? "bg-green-500/20 text-green-400" :
+                        comp.category === "consignacao" ? "bg-blue-500/20 text-blue-400" :
+                        comp.category === "despachante" ? "bg-purple-500/20 text-purple-400" :
+                        comp.category === "feirao" ? "bg-orange-500/20 text-orange-400" :
+                        "bg-red-500/20 text-red-400"
+                      }`}>
+                        {comp.category === "fei" ? "F&I" : comp.category === "consignacao" ? "Consignação" : comp.category === "despachante" ? "Despachante" : comp.category === "feirao" ? "Feirão" : "Vendas"}
                       </span>
                     </div>
                     <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />

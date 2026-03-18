@@ -24,6 +24,7 @@ export const sellers = mysqlTable("sellers", {
   photoKey: varchar("photoKey", { length: 500 }),
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 320 }),
+  department: varchar("department", { length: 100 }), // vendas, fei, consignacao, despachante
   active: boolean("active").default(true).notNull(),
   totalSales: int("totalSales").default(0).notNull(),
   totalPoints: int("totalPoints").default(0).notNull(),
@@ -34,14 +35,16 @@ export const sellers = mysqlTable("sellers", {
 export type Seller = typeof sellers.$inferSelect;
 export type InsertSeller = typeof sellers.$inferInsert;
 
-// Competições
+// Competições - agora com categoria para multi-setor
 export const competitions = mysqlTable("competitions", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  category: varchar("category", { length: 50 }).default("vendas").notNull(), // vendas, fei, consignacao, despachante, feirao
   type: mysqlEnum("type", ["individual", "team", "group"]).default("individual").notNull(),
   status: mysqlEnum("status", ["draft", "active", "finished"]).default("draft").notNull(),
   pointsPerSale: int("pointsPerSale").default(1).notNull(),
+  goalTarget: int("goalTarget"), // meta (ex: X carros consignados, X transferências)
   startDate: bigint("startDate", { mode: "number" }).notNull(),
   endDate: bigint("endDate", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -76,7 +79,7 @@ export const competitionParticipants = mysqlTable("competition_participants", {
 export type CompetitionParticipant = typeof competitionParticipants.$inferSelect;
 export type InsertCompetitionParticipant = typeof competitionParticipants.$inferInsert;
 
-// Vendas registradas
+// Vendas registradas (vendas de veículos - setor vendas/feirão)
 export const sales = mysqlTable("sales", {
   id: int("id").autoincrement().primaryKey(),
   sellerId: int("sellerId").notNull(),
@@ -91,6 +94,62 @@ export const sales = mysqlTable("sales", {
 
 export type Sale = typeof sales.$inferSelect;
 export type InsertSale = typeof sales.$inferInsert;
+
+// Registros F&I (Financiamento e Seguros)
+export const feiRecords = mysqlTable("fei_records", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  competitionId: int("competitionId"),
+  customerCpf: varchar("customerCpf", { length: 14 }),
+  vehiclePlate: varchar("vehiclePlate", { length: 10 }),
+  bankName: varchar("bankName", { length: 255 }),
+  financedValue: int("financedValue").default(0), // valor financiado em centavos
+  returnType: varchar("returnType", { length: 10 }), // R1, R2, R3, R4, R5
+  returnValue: int("returnValue").default(0), // valor do retorno em centavos
+  points: int("points").default(1).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FeiRecord = typeof feiRecords.$inferSelect;
+export type InsertFeiRecord = typeof feiRecords.$inferInsert;
+
+// Registros de Consignação
+export const consignmentRecords = mysqlTable("consignment_records", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  competitionId: int("competitionId"),
+  vehiclePlate: varchar("vehiclePlate", { length: 10 }),
+  vehicleModel: varchar("vehicleModel", { length: 255 }),
+  ownerName: varchar("ownerName", { length: 255 }),
+  entryDate: bigint("entryDate", { mode: "number" }).notNull(), // data de entrada no pátio
+  validAfterDays: int("validAfterDays").default(7).notNull(), // dias mínimos no pátio
+  isValid: boolean("isValid").default(false).notNull(), // se já completou os 7 dias
+  points: int("points").default(1).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ConsignmentRecord = typeof consignmentRecords.$inferSelect;
+export type InsertConsignmentRecord = typeof consignmentRecords.$inferInsert;
+
+// Registros de Despachante
+export const dispatchRecords = mysqlTable("dispatch_records", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  competitionId: int("competitionId"),
+  vehiclePlate: varchar("vehiclePlate", { length: 10 }),
+  documentType: varchar("documentType", { length: 100 }), // transferência, etc.
+  customerPaid: boolean("customerPaid").default(false).notNull(), // se o cliente pagou (bônus)
+  transferValue: int("transferValue").default(0), // valor da transferência em centavos
+  points: int("points").default(1).notNull(),
+  bonusPoints: int("bonusPoints").default(0).notNull(), // pontos bônus se cliente pagou
+  status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DispatchRecord = typeof dispatchRecords.$inferSelect;
+export type InsertDispatchRecord = typeof dispatchRecords.$inferInsert;
 
 // Mini treinamentos
 export const trainings = mysqlTable("trainings", {
@@ -147,6 +206,7 @@ export const notifications = mysqlTable("notifications", {
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
+
 // Configurações do app (código de acesso, etc.)
 export const appSettings = mysqlTable("app_settings", {
   id: int("id").autoincrement().primaryKey(),

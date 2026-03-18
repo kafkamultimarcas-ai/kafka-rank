@@ -38,7 +38,7 @@
 - [x] Grid de largada como tabela de classificação
 
 ## Testes
-- [x] Testes unitários das rotas tRPC (41 testes passando)
+- [x] Testes unitários das rotas tRPC (63 testes passando)
 
 ## PWA e Acesso Restrito
 - [x] Configurar manifest.json para PWA instalável
@@ -94,3 +94,15 @@
 ## Correções de Navegação
 - [x] Adicionar botão de voltar na tela de Aprovar Vendas (admin fica preso após aprovar tudo)
 - [x] Verificar e corrigir navegação em todas as páginas admin e públicas (AdminApprovals agora usa DashboardLayout com sidebar)
+
+## Novos Tipos de Campanha (Multi-Setor)
+- [x] Expandir competições com campo categoria (vendas, fei, consignacao, despachante, feirao)
+- [x] F&I: registro com placa, CPF, banco, valor financiado, retorno (R1-R5)
+- [x] Consignação: meta mensal, regra de 7 dias no pátio, campanhas de feirão
+- [x] Despachante: transferências realizadas + bônus por documentos pagos pelo cliente
+- [x] Feirão: campanhas especiais temporárias para vendedores
+- [x] Formulários de registro específicos por categoria de campanha
+- [x] Admin: criar/gerenciar campanhas por categoria com campos específicos
+- [x] Dashboard: exibir competições organizadas por categoria com badges coloridos
+- [x] Suporte a múltiplas competições paralelas (validado)
+- [x] Testes dos novos setores (63 testes passando)

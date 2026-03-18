@@ -79,8 +79,10 @@ export const appRouter = router({
     create: adminProcedure.input(z.object({
       name: z.string().min(1),
       description: z.string().optional(),
+      category: z.string().default("vendas"),
       type: z.enum(["individual", "team", "group"]),
       pointsPerSale: z.number().min(1).default(1),
+      goalTarget: z.number().optional(),
       startDate: z.number(),
       endDate: z.number(),
     })).mutation(async ({ input }) => {
@@ -91,8 +93,10 @@ export const appRouter = router({
       id: z.number(),
       name: z.string().optional(),
       description: z.string().optional(),
+      category: z.string().optional(),
       status: z.enum(["draft", "active", "finished"]).optional(),
       pointsPerSale: z.number().optional(),
+      goalTarget: z.number().optional(),
       startDate: z.number().optional(),
       endDate: z.number().optional(),
     })).mutation(async ({ input }) => {
@@ -429,6 +433,174 @@ export const appRouter = router({
     }),
     getVapidKey: publicProcedure.query(() => {
       return { key: process.env.VITE_VAPID_PUBLIC_KEY || "" };
+    }),
+  }),
+
+  // ===== F&I (Financiamento) =====
+  fei: router({
+    list: publicProcedure.input(z.object({
+      competitionId: z.number().optional(),
+      sellerId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listFeiRecords(input?.competitionId, input?.sellerId);
+    }),
+    register: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      competitionId: z.number().optional(),
+      customerCpf: z.string().optional(),
+      vehiclePlate: z.string().optional(),
+      bankName: z.string().min(1),
+      financedValue: z.number().optional(),
+      returnType: z.string().min(1),
+      returnValue: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      const seller = await db.getSellerById(input.sellerId);
+      if (!seller) throw new Error("Colaborador não encontrado");
+      const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
+      const points = comp ? comp.pointsPerSale : 1;
+      const id = await db.createFeiRecord({ ...input, points, status: 'pending' });
+      await notifyOwner({
+        title: `Novo registro F&I para aprovar!`,
+        content: `${seller.name} registrou F&I: Banco ${input.bankName} | ${input.returnType} | R$ ${((input.financedValue || 0) / 100).toLocaleString("pt-BR")}`,
+      });
+      return { id, message: "F&I registrado! Aguardando aprova\u00e7\u00e3o." };
+    }),
+    listPending: adminProcedure.query(async () => {
+      return db.listPendingFeiRecords();
+    }),
+    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const record = await db.approveFeiRecord(input.id);
+      const seller = await db.getSellerById(record.sellerId);
+      if (seller) {
+        await db.createNotification({
+          sellerId: record.sellerId,
+          type: 'fei_approved',
+          title: 'F&I aprovado!',
+          message: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi aprovado!`,
+        });
+      }
+      return { success: true };
+    }),
+    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.rejectFeiRecord(input.id);
+      return { success: true };
+    }),
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteFeiRecord(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ===== CONSIGNA\u00c7\u00c3O =====
+  consignment: router({
+    list: publicProcedure.input(z.object({
+      competitionId: z.number().optional(),
+      sellerId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listConsignmentRecords(input?.competitionId, input?.sellerId);
+    }),
+    register: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      competitionId: z.number().optional(),
+      vehiclePlate: z.string().optional(),
+      vehicleModel: z.string().min(1),
+      ownerName: z.string().min(1),
+      entryDate: z.number(),
+    })).mutation(async ({ input }) => {
+      const seller = await db.getSellerById(input.sellerId);
+      if (!seller) throw new Error("Colaborador não encontrado");
+      const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
+      const points = comp ? comp.pointsPerSale : 1;
+      const id = await db.createConsignmentRecord({ ...input, points, status: 'pending' });
+      await notifyOwner({
+        title: `Nova consigna\u00e7\u00e3o para aprovar!`,
+        content: `${seller.name} registrou consigna\u00e7\u00e3o: ${input.vehicleModel} | Dono: ${input.ownerName} | Placa: ${input.vehiclePlate || 'N/I'}`,
+      });
+      return { id, message: "Consigna\u00e7\u00e3o registrada! Aguardando aprova\u00e7\u00e3o. Lembre-se: o carro precisa ficar 7 dias no p\u00e1tio para contar pontos." };
+    }),
+    listPending: adminProcedure.query(async () => {
+      return db.listPendingConsignmentRecords();
+    }),
+    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const result = await db.approveConsignmentRecord(input.id);
+      const seller = await db.getSellerById(result.sellerId);
+      if (seller) {
+        await db.createNotification({
+          sellerId: result.sellerId,
+          type: 'consignment_approved',
+          title: 'Consigna\u00e7\u00e3o aprovada!',
+          message: result.isValid
+            ? `Sua consigna\u00e7\u00e3o de ${result.vehicleModel} foi aprovada e j\u00e1 conta pontos!`
+            : `Sua consigna\u00e7\u00e3o de ${result.vehicleModel} foi aprovada. Os pontos ser\u00e3o contados ap\u00f3s 7 dias no p\u00e1tio.`,
+        });
+      }
+      return { success: true, isValid: result.isValid };
+    }),
+    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.rejectConsignmentRecord(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ===== DESPACHANTE =====
+  dispatch: router({
+    list: publicProcedure.input(z.object({
+      competitionId: z.number().optional(),
+      sellerId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listDispatchRecords(input?.competitionId, input?.sellerId);
+    }),
+    register: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      competitionId: z.number().optional(),
+      vehiclePlate: z.string().optional(),
+      documentType: z.string().min(1),
+      customerPaid: z.boolean().default(false),
+      transferValue: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      const seller = await db.getSellerById(input.sellerId);
+      if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
+      const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
+      const points = comp ? comp.pointsPerSale : 1;
+      const bonusPoints = input.customerPaid ? Math.max(1, Math.floor(points * 0.5)) : 0;
+      const id = await db.createDispatchRecord({ ...input, points, bonusPoints, status: 'pending' });
+      await notifyOwner({
+        title: `Novo registro de despachante para aprovar!`,
+        content: `${seller.name} registrou: ${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}${input.customerPaid ? ' | CLIENTE PAGOU (b\u00f4nus!)' : ''}`,
+      });
+      return { id, message: "Registro de despachante enviado! Aguardando aprova\u00e7\u00e3o." };
+    }),
+    listPending: adminProcedure.query(async () => {
+      return db.listPendingDispatchRecords();
+    }),
+    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const record = await db.approveDispatchRecord(input.id);
+      const seller = await db.getSellerById(record.sellerId);
+      if (seller) {
+        const totalPts = record.points + record.bonusPoints;
+        await db.createNotification({
+          sellerId: record.sellerId,
+          type: 'dispatch_approved',
+          title: 'Documento aprovado!',
+          message: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos${record.bonusPoints > 0 ? ' (inclui b\u00f4nus por cobran\u00e7a do cliente!)' : ''}.`,
+        });
+      }
+      return { success: true };
+    }),
+    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.rejectDispatchRecord(input.id);
+      return { success: true };
+    }),
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteDispatchRecord(input.id);
+      return { success: true };
+    }),
+  }),
+
+  // ===== PENDING COUNT (all sectors) =====
+  pendingCount: router({
+    getAll: adminProcedure.query(async () => {
+      return db.getAllPendingCount();
     }),
   }),
 

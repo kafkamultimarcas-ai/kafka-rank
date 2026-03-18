@@ -18,8 +18,9 @@ export default function AdminCompetitions() {
   const [participantDialog, setParticipantDialog] = useState<number | null>(null);
   const [teamDialog, setTeamDialog] = useState<number | null>(null);
   const [form, setForm] = useState({
-    name: "", description: "", type: "individual" as "individual" | "team" | "group",
-    pointsPerSale: 1, startDate: "", endDate: "",
+    name: "", description: "", category: "vendas",
+    type: "individual" as "individual" | "team" | "group",
+    pointsPerSale: 1, goalTarget: "", startDate: "", endDate: "",
   });
   const [teamForm, setTeamForm] = useState({ name: "", color: "#EF4444" });
 
@@ -48,7 +49,7 @@ export default function AdminCompetitions() {
   });
 
   function resetForm() {
-    setForm({ name: "", description: "", type: "individual", pointsPerSale: 1, startDate: "", endDate: "" });
+    setForm({ name: "", description: "", category: "vendas", type: "individual", pointsPerSale: 1, goalTarget: "", startDate: "", endDate: "" });
   }
 
   function handleCreate(e: React.FormEvent) {
@@ -56,7 +57,9 @@ export default function AdminCompetitions() {
     if (!form.name.trim() || !form.startDate || !form.endDate) { toast.error("Preencha todos os campos obrigatórios"); return; }
     createComp.mutate({
       name: form.name, description: form.description, type: form.type,
+      category: form.category,
       pointsPerSale: form.pointsPerSale,
+      goalTarget: form.goalTarget ? parseInt(form.goalTarget) : undefined,
       startDate: new Date(form.startDate).getTime(),
       endDate: new Date(form.endDate).getTime(),
     });
@@ -89,6 +92,25 @@ export default function AdminCompetitions() {
                 <div>
                   <Label className="text-foreground">Descrição</Label>
                   <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descrição da competição" className="bg-input border-border text-foreground" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-foreground">Categoria</Label>
+                    <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                      <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vendas">Vendas</SelectItem>
+                        <SelectItem value="fei">F&I</SelectItem>
+                        <SelectItem value="consignacao">Consignação</SelectItem>
+                        <SelectItem value="despachante">Despachante</SelectItem>
+                        <SelectItem value="feirao">Feirão</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-foreground">Meta (opcional)</Label>
+                    <Input type="number" min={1} value={form.goalTarget} onChange={e => setForm({ ...form, goalTarget: e.target.value })} placeholder="Ex: 10" className="bg-input border-border text-foreground" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -184,12 +206,22 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onDelete, onOpenPar
             <span className="text-xs text-muted-foreground">
               {comp.type === "individual" ? "Individual" : comp.type === "team" ? "Equipes" : "Grupos"}
             </span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              comp.category === "fei" ? "bg-green-500/20 text-green-400" :
+              comp.category === "consignacao" ? "bg-blue-500/20 text-blue-400" :
+              comp.category === "despachante" ? "bg-purple-500/20 text-purple-400" :
+              comp.category === "feirao" ? "bg-orange-500/20 text-orange-400" :
+              "bg-red-500/20 text-red-400"
+            }`}>
+              {comp.category === "fei" ? "F&I" : comp.category === "consignacao" ? "Consignação" : comp.category === "despachante" ? "Despachante" : comp.category === "feirao" ? "Feirão" : "Vendas"}
+            </span>
           </div>
           <h3 className="font-heading font-bold text-foreground">{comp.name}</h3>
           {comp.description && <p className="text-sm text-muted-foreground mt-1">{comp.description}</p>}
           <p className="text-xs text-muted-foreground mt-1">
             {new Date(comp.startDate).toLocaleDateString("pt-BR")} — {new Date(comp.endDate).toLocaleDateString("pt-BR")}
-            {" | "}{comp.pointsPerSale} pts/venda
+            {" | "}{comp.pointsPerSale} pts/registro
+            {comp.goalTarget ? ` | Meta: ${comp.goalTarget}` : ''}
           </p>
         </div>
         <div className="flex items-center gap-1">

@@ -53,6 +53,28 @@ vi.mock("./db", () => ({
   markNotificationRead: vi.fn().mockResolvedValue(undefined),
   getAppSetting: vi.fn().mockResolvedValue("kafka2024"),
   setAppSetting: vi.fn().mockResolvedValue(undefined),
+  // F&I
+  listFeiRecords: vi.fn().mockResolvedValue([]),
+  createFeiRecord: vi.fn().mockResolvedValue(1),
+  listPendingFeiRecords: vi.fn().mockResolvedValue([]),
+  approveFeiRecord: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, bankName: 'Santander', returnType: 'R1', points: 1, competitionId: null }),
+  rejectFeiRecord: vi.fn().mockResolvedValue(undefined),
+  deleteFeiRecord: vi.fn().mockResolvedValue(undefined),
+  // Consignment
+  listConsignmentRecords: vi.fn().mockResolvedValue([]),
+  createConsignmentRecord: vi.fn().mockResolvedValue(1),
+  listPendingConsignmentRecords: vi.fn().mockResolvedValue([]),
+  approveConsignmentRecord: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, vehicleModel: 'Corolla', isValid: true, points: 1, competitionId: null }),
+  rejectConsignmentRecord: vi.fn().mockResolvedValue(undefined),
+  // Dispatch
+  listDispatchRecords: vi.fn().mockResolvedValue([]),
+  createDispatchRecord: vi.fn().mockResolvedValue(1),
+  listPendingDispatchRecords: vi.fn().mockResolvedValue([]),
+  approveDispatchRecord: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, documentType: 'Transfer\u00eancia', points: 1, bonusPoints: 0, competitionId: null }),
+  rejectDispatchRecord: vi.fn().mockResolvedValue(undefined),
+  deleteDispatchRecord: vi.fn().mockResolvedValue(undefined),
+  // Pending count
+  getAllPendingCount: vi.fn().mockResolvedValue({ sales: 2, fei: 1, consignment: 0, dispatch: 3, total: 6 }),
 }));
 
 vi.mock("./storage", () => ({
@@ -388,5 +410,157 @@ describe("access control router", () => {
   it("rejects setting access code for public user", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     await expect(caller.access.setCode({ code: "hack" })).rejects.toThrow();
+  });
+});
+
+describe("F&I router", () => {
+  it("lists F&I records publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.fei.list({});
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("registers F&I record publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.fei.register({
+      sellerId: 1, bankName: "Santander", returnType: "R1",
+      financedValue: 5000000, returnValue: 250000,
+    });
+    expect(result.id).toBe(1);
+    expect(result.message).toContain("F&I");
+  });
+
+  it("lists pending F&I as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.fei.listPending();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("rejects listing pending F&I for public", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.fei.listPending()).rejects.toThrow();
+  });
+
+  it("approves F&I as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.fei.approve({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects F&I as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.fei.reject({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects F&I approval for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.fei.approve({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("Consignment router", () => {
+  it("lists consignment records publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.consignment.list({});
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("registers consignment publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.consignment.register({
+      sellerId: 1, vehicleModel: "Corolla 2023", ownerName: "Jo\u00e3o Silva",
+      entryDate: Date.now() - 8 * 24 * 60 * 60 * 1000,
+    });
+    expect(result.id).toBe(1);
+    expect(result.message).toContain("Consigna\u00e7\u00e3o");
+  });
+
+  it("lists pending consignments as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.consignment.listPending();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("approves consignment as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.consignment.approve({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects consignment as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.consignment.reject({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects consignment approval for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.consignment.approve({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("Dispatch router", () => {
+  it("lists dispatch records publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.dispatch.list({});
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("registers dispatch publicly", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.dispatch.register({
+      sellerId: 1, documentType: "Transfer\u00eancia", customerPaid: true,
+    });
+    expect(result.id).toBe(1);
+    expect(result.message).toContain("despachante");
+  });
+
+  it("registers dispatch with bonus when customer paid", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    const result = await caller.dispatch.register({
+      sellerId: 1, documentType: "Transfer\u00eancia", customerPaid: true,
+      vehiclePlate: "ABC1D23", transferValue: 35000,
+    });
+    expect(result.id).toBe(1);
+  });
+
+  it("lists pending dispatch as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.dispatch.listPending();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("approves dispatch as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.dispatch.approve({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects dispatch as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.dispatch.reject({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects dispatch approval for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.dispatch.approve({ id: 1 })).rejects.toThrow();
+  });
+});
+
+describe("Pending count router", () => {
+  it("gets all pending counts as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.pendingCount.getAll();
+    expect(result.total).toBe(6);
+    expect(result.sales).toBe(2);
+    expect(result.fei).toBe(1);
+    expect(result.dispatch).toBe(3);
+  });
+
+  it("rejects pending count for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.pendingCount.getAll()).rejects.toThrow();
   });
 });

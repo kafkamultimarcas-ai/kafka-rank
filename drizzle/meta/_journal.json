@@ -43,6 +43,13 @@
       "when": 1773805237899,
       "tag": "0005_huge_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1773807276231,
+      "tag": "0006_classy_hardball",
+      "breakpoints": true
     }
   ]
 }
