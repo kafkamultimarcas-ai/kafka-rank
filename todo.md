@@ -70,3 +70,7 @@
 ## Excluir Vendas
 - [x] Rota backend para excluir venda (admin) - reverte pontos automaticamente
 - [x] Botão de excluir venda no painel Admin > Vendas com confirmação
+
+## Acesso Admin pelo Celular
+- [x] Adicionar botão de login discreto na Home para admin acessar pelo celular
+- [x] Botão Admin visível após login do dono (amarelo, destaque)

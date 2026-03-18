@@ -1,9 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Flag, Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle } from "lucide-react";
+import { Flag, Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo } from "react";
+import { getLoginUrl } from "@/const";
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
@@ -25,18 +26,24 @@ export default function Home() {
             <Flag className="h-7 w-7 text-primary" />
             <span className="font-heading font-bold text-lg tracking-tight text-foreground">KAFKA RANK</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => setLocation("/registrar-venda")} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
               <PlusCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Registrar Venda</span>
               <span className="sm:hidden">Venda</span>
             </Button>
-            {user?.role === "admin" && (
-              <Button variant="outline" size="sm" onClick={() => setLocation("/admin")} className="gap-2">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Admin</span>
+            {user?.role === "admin" ? (
+              <Button size="sm" onClick={() => setLocation("/admin")} className="gap-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline">Painel Admin</span>
+                <span className="sm:hidden">Admin</span>
               </Button>
-            )}
+            ) : !user && !authLoading ? (
+              <Button variant="ghost" size="sm" onClick={() => window.location.href = getLoginUrl()} className="gap-2 text-muted-foreground hover:text-foreground">
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Gerente</span>
+              </Button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -206,8 +213,17 @@ export default function Home() {
         <div className="container text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Flag className="h-4 w-4 text-primary" />
-        <span className="font-heading text-sm font-bold text-foreground">KAFKA RANK</span>        </div>
+            <span className="font-heading text-sm font-bold text-foreground">KAFKA RANK</span>
+          </div>
           <p className="text-xs text-muted-foreground">Competição de Vendas — Acelere seus resultados</p>
+          {!user && !authLoading && (
+            <button
+              onClick={() => window.location.href = getLoginUrl()}
+              className="mt-4 text-xs text-muted-foreground/50 hover:text-primary transition-colors"
+            >
+              Área do Gerente
+            </button>
+          )}
         </div>
       </footer>
     </div>
