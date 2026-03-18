@@ -114,3 +114,13 @@
 - [x] Cálculo automático dos 7 dias baseado em entrada e saída
 - [x] Consignação: adicionar telefone do proprietário do veículo
 - [x] 65 testes passando após todos os ajustes
+
+## Vídeo nos Treinamentos
+- [x] Adicionar campos videoUrl e videoKey na tabela trainings
+- [x] Suporte a URL externa (YouTube, Vimeo) com player embutido
+- [x] Suporte a upload de vídeo direto para S3
+- [x] Formulário admin com opção de link OU upload de vídeo
+- [x] Exibição do vídeo na página pública de treinamentos
+- [x] Opção de excluir/trocar vídeo sem excluir o treinamento
+- [x] Opção de excluir treinamento inteiro (já existia)
+- [x] 72 testes passando

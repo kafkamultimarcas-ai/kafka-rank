@@ -260,6 +260,64 @@ describe("trainings router", () => {
     const result = await caller.trainings.create({ title: "Técnicas de Fechamento", content: "Conteúdo..." });
     expect(result.id).toBe(1);
   });
+
+  it("creates training with video URL as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.trainings.create({
+      title: "Treinamento com Vídeo",
+      content: "Assista o vídeo abaixo",
+      videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    });
+    expect(result.id).toBe(1);
+  });
+
+  it("uploads video to training as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.trainings.uploadVideo({
+      id: 1,
+      fileName: "treinamento.mp4",
+      fileBase64: "dGVzdA==",
+      mimeType: "video/mp4",
+    });
+    expect(result.success).toBe(true);
+    expect(result.videoUrl).toBe("https://cdn.example.com/photo.jpg");
+  });
+
+  it("removes video from training as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.trainings.removeVideo({ id: 1 });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects video upload for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.trainings.uploadVideo({
+      id: 1, fileName: "test.mp4", fileBase64: "dGVzdA==", mimeType: "video/mp4",
+    })).rejects.toThrow();
+  });
+
+  it("rejects video removal for non-admin", async () => {
+    const caller = appRouter.createCaller(createPublicContext());
+    await expect(caller.trainings.removeVideo({ id: 1 })).rejects.toThrow();
+  });
+
+  it("updates training with video URL as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.trainings.update({
+      id: 1,
+      videoUrl: "https://vimeo.com/123456789",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("removes video URL by setting null as admin", async () => {
+    const caller = appRouter.createCaller(createAdminContext());
+    const result = await caller.trainings.update({
+      id: 1,
+      videoUrl: null,
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("action plans router", () => {

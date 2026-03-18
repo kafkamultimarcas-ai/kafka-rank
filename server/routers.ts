@@ -256,6 +256,7 @@ export const appRouter = router({
       title: z.string().min(1),
       content: z.string().min(1),
       category: z.string().optional(),
+      videoUrl: z.string().optional(), // URL externa (YouTube, Vimeo, etc.)
     })).mutation(async ({ input }) => {
       const id = await db.createTraining(input);
       return { id };
@@ -266,9 +267,29 @@ export const appRouter = router({
       content: z.string().optional(),
       category: z.string().optional(),
       active: z.boolean().optional(),
+      videoUrl: z.string().nullable().optional(), // URL externa ou null para remover
     })).mutation(async ({ input }) => {
       const { id, ...data } = input;
       await db.updateTraining(id, data);
+      return { success: true };
+    }),
+    // Upload de vídeo direto para S3
+    uploadVideo: adminProcedure.input(z.object({
+      id: z.number(),
+      fileName: z.string(),
+      fileBase64: z.string(),
+      mimeType: z.string(),
+    })).mutation(async ({ input }) => {
+      const buffer = Buffer.from(input.fileBase64, 'base64');
+      const ext = input.fileName.split('.').pop() || 'mp4';
+      const key = `trainings/${input.id}-${nanoid(8)}.${ext}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      await db.updateTraining(input.id, { videoUrl: url, videoKey: key });
+      return { success: true, videoUrl: url };
+    }),
+    // Remover vídeo sem excluir o treinamento
+    removeVideo: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.updateTraining(input.id, { videoUrl: null, videoKey: null });
       return { success: true };
     }),
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {

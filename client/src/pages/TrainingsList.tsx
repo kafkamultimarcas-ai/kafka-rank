@@ -1,8 +1,20 @@
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
-import { ArrowLeft, GraduationCap, BookOpen } from "lucide-react";
+import { ArrowLeft, GraduationCap, BookOpen, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+
+function getEmbedUrl(url: string): string | null {
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  return null;
+}
+
+function isDirectVideo(url: string): boolean {
+  return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url);
+}
 
 export default function TrainingsList() {
   const [, setLocation] = useLocation();
@@ -26,31 +38,77 @@ export default function TrainingsList() {
       <div className="container py-6 sm:py-8">
         {trainings && trainings.length > 0 ? (
           <div className="space-y-3 max-w-3xl mx-auto">
-            {trainings.map(training => (
-              <div key={training.id} className="racing-card overflow-hidden">
-                <button
-                  onClick={() => setExpandedId(expandedId === training.id ? null : training.id)}
-                  className="w-full p-4 sm:p-5 flex items-start gap-3 text-left hover:bg-accent/30 transition-colors"
-                >
-                  <BookOpen className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground">{training.title}</h3>
-                    {training.category && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary mt-1 inline-block">
-                        {training.category}
-                      </span>
-                    )}
-                  </div>
-                </button>
-                {expandedId === training.id && (
-                  <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-border">
-                    <div className="pt-4 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                      {training.content}
+            {trainings.map(training => {
+              const embedUrl = training.videoUrl ? getEmbedUrl(training.videoUrl) : null;
+              const isDirect = training.videoUrl ? isDirectVideo(training.videoUrl) : false;
+              const hasVideo = !!training.videoUrl;
+
+              return (
+                <div key={training.id} className="racing-card overflow-hidden">
+                  <button
+                    onClick={() => setExpandedId(expandedId === training.id ? null : training.id)}
+                    className="w-full p-4 sm:p-5 flex items-start gap-3 text-left hover:bg-accent/30 transition-colors"
+                  >
+                    <BookOpen className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground">{training.title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        {training.category && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary inline-block">
+                            {training.category}
+                          </span>
+                        )}
+                        {hasVideo && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 inline-flex items-center gap-1">
+                            <Video className="h-3 w-3" /> Vídeo
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  </button>
+                  {expandedId === training.id && (
+                    <div className="px-4 sm:px-5 pb-4 sm:pb-5 border-t border-border">
+                      {/* Vídeo */}
+                      {training.videoUrl && (
+                        <div className="pt-4 mb-4">
+                          {embedUrl ? (
+                            <div className="aspect-video rounded-lg overflow-hidden bg-black/20">
+                              <iframe
+                                src={embedUrl}
+                                className="w-full h-full"
+                                allowFullScreen
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              />
+                            </div>
+                          ) : isDirect ? (
+                            <video
+                              src={training.videoUrl}
+                              controls
+                              className="w-full rounded-lg"
+                              preload="metadata"
+                              playsInline
+                            />
+                          ) : (
+                            <a
+                              href={training.videoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 underline"
+                            >
+                              <Video className="h-4 w-4" /> Assistir vídeo
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      {/* Conteúdo texto */}
+                      <div className={`text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed ${!training.videoUrl ? "pt-4" : ""}`}>
+                        {training.content}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="racing-card p-12 text-center max-w-md mx-auto">

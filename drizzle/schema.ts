@@ -159,6 +159,8 @@ export const trainings = mysqlTable("trainings", {
   title: varchar("title", { length: 255 }).notNull(),
   content: text("content").notNull(),
   category: varchar("category", { length: 100 }),
+  videoUrl: text("videoUrl"), // URL externa (YouTube, Vimeo, etc.) ou URL do S3
+  videoKey: varchar("videoKey", { length: 500 }), // chave S3 se foi upload direto
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
