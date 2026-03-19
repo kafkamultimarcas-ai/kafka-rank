@@ -17,6 +17,7 @@ import {
   pushSubscriptions, InsertPushSubscription,
   sdrRecords, InsertSdrRecord,
   goals, InsertGoal,
+  managers, InsertManager,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -956,4 +957,52 @@ export async function setAppSetting(key: string, value: string) {
   if (!db) throw new Error("DB not available");
   await db.insert(appSettings).values({ settingKey: key, settingValue: value })
     .onDuplicateKeyUpdate({ set: { settingValue: value } });
+}
+
+
+// ===== MANAGERS (Gerentes com login por senha) =====
+
+export async function createManager(data: { username: string; passwordHash: string; name: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(managers).values(data);
+  return result[0].insertId;
+}
+
+export async function getManagerByUsername(username: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(managers).where(eq(managers.username, username)).limit(1);
+  return result[0] || null;
+}
+
+export async function getManagerById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(managers).where(eq(managers.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function listManagers() {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.select({
+    id: managers.id,
+    username: managers.username,
+    name: managers.name,
+    active: managers.active,
+    createdAt: managers.createdAt,
+  }).from(managers).orderBy(managers.name);
+}
+
+export async function updateManager(id: number, data: { name?: string; passwordHash?: string; active?: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(managers).set(data).where(eq(managers.id, id));
+}
+
+export async function deleteManager(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(managers).where(eq(managers.id, id));
 }

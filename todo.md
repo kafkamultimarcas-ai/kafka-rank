@@ -224,3 +224,12 @@
 - [x] Página AdminAgendamentos no sidebar (listar, editar, excluir todos)
 - [x] Aba Resgate automática: leads 48h+ sem comparecimento
 - [x] Rota no App.tsx e link no DashboardLayout sidebar
+
+## Login Separado para Gerentes
+- [x] Backend: tabela managers (username, password hash, nome, role)
+- [x] Backend: rota de login por senha (gera token JWT)
+- [x] Backend: middleware que aceita tanto OAuth (dono) quanto token de gerente
+- [x] Frontend: tela de login admin por senha (usuário + senha)
+- [x] Frontend: proteger rotas admin com verificação de token gerente ou OAuth
+- [x] Admin: página para criar/editar/excluir contas de gerente (só dono pode)
+- [x] Gerente tem acesso completo ao painel admin (mesma autonomia)

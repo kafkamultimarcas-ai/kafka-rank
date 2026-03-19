@@ -92,6 +92,13 @@
       "when": 1773895722666,
       "tag": "0012_small_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1773937905759,
+      "tag": "0013_superb_boomerang",
+      "breakpoints": true
     }
   ]
 }

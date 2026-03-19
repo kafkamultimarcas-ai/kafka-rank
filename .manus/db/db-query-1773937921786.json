@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `managers` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`username` varchar(100) NOT NULL,\n\t`passwordHash` varchar(255) NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`active` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `managers_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `managers_username_unique` UNIQUE(`username`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute CREATE TABLE `managers` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`username` varchar(100) NOT NULL,\n\t`passwordHash` varchar(255) NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`active` boolean NOT NULL DEFAULT true,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `managers_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `managers_username_unique` UNIQUE(`username`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 221
+}

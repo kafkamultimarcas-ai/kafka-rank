@@ -9,6 +9,9 @@ import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake } from "./pushService";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { ENV } from "./_core/env";
 
 export const appRouter = router({
   system: systemRouter,
@@ -902,6 +905,86 @@ export const appRouter = router({
     }),
     setCode: adminProcedure.input(z.object({ code: z.string().min(1) })).mutation(async ({ input }) => {
       await db.setAppSetting("access_code", input.code);
+      return { success: true };
+    }),
+  }),
+
+  // ===== MANAGERS (Gerentes com login por senha) =====
+  managers: router({
+    // Login por senha - público
+    login: publicProcedure.input(z.object({
+      username: z.string().min(1),
+      password: z.string().min(1),
+    })).mutation(async ({ input, ctx }) => {
+      const manager = await db.getManagerByUsername(input.username);
+      if (!manager || !manager.active) {
+        throw new Error("Usuário ou senha inválidos");
+      }
+      const valid = await bcrypt.compare(input.password, manager.passwordHash);
+      if (!valid) {
+        throw new Error("Usuário ou senha inválidos");
+      }
+      // Gerar JWT e setar cookie
+      const token = jwt.sign(
+        { managerId: manager.id, username: manager.username },
+        ENV.cookieSecret,
+        { expiresIn: "30d" }
+      );
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie("manager_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      return { success: true, name: manager.name };
+    }),
+
+    // Logout gerente
+    logout: publicProcedure.mutation(({ ctx }) => {
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
+      return { success: true };
+    }),
+
+    // Verificar se está logado como gerente
+    me: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) return null;
+      // Se o ID é negativo, é um gerente
+      if (ctx.user.id < 0) {
+        return { id: -ctx.user.id, name: ctx.user.name, role: "manager" as const };
+      }
+      return null;
+    }),
+
+    // CRUD - só dono (user com openId == ownerOpenId) pode gerenciar
+    list: adminProcedure.query(async () => {
+      return db.listManagers();
+    }),
+
+    create: adminProcedure.input(z.object({
+      username: z.string().min(3),
+      password: z.string().min(4),
+      name: z.string().min(1),
+    })).mutation(async ({ input }) => {
+      const existing = await db.getManagerByUsername(input.username);
+      if (existing) throw new Error("Usuário já existe");
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      const id = await db.createManager({ username: input.username, passwordHash, name: input.name });
+      return { id };
+    }),
+
+    update: adminProcedure.input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      password: z.string().min(4).optional(),
+      active: z.boolean().optional(),
+    })).mutation(async ({ input }) => {
+      const data: any = {};
+      if (input.name) data.name = input.name;
+      if (input.password) data.passwordHash = await bcrypt.hash(input.password, 10);
+      if (input.active !== undefined) data.active = input.active;
+      await db.updateManager(input.id, data);
+      return { success: true };
+    }),
+
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteManager(input.id);
       return { success: true };
     }),
   }),

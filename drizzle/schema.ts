@@ -268,6 +268,20 @@ export const goals = mysqlTable("goals", {
 export type Goal = typeof goals.$inferSelect;
 export type InsertGoal = typeof goals.$inferInsert;
 
+// Gerentes (login por senha separado)
+export const managers = mysqlTable("managers", {
+  id: int("id").autoincrement().primaryKey(),
+  username: varchar("username", { length: 100 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Manager = typeof managers.$inferSelect;
+export type InsertManager = typeof managers.$inferInsert;
+
 // Push Subscriptions para notificações push
 export const pushSubscriptions = mysqlTable("push_subscriptions", {
   id: int("id").autoincrement().primaryKey(),

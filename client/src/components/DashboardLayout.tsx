@@ -21,11 +21,13 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, Eye, EyeOff, UserCog } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { toast } from "sonner";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Painel Geral", path: "/admin" },
@@ -39,6 +41,11 @@ const menuItems = [
   { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
   { icon: Gift, label: "Sorteio Feirão", path: "/admin/sorteio" },
   { icon: Settings, label: "Configurações", path: "/admin/configuracoes" },
+];
+
+// Items only visible to owner (not managers)
+const ownerOnlyItems = [
+  { icon: UserCog, label: "Gerentes", path: "/admin/gerentes" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -56,79 +63,166 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
+  const managerQuery = trpc.managers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const isManagerLoading = managerQuery.isLoading;
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading) {
+  if (loading || isManagerLoading) {
     return <DashboardLayoutSkeleton />
   }
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-4">
-            <Flag className="h-16 w-16 text-primary" />
-            <h1 className="text-2xl font-heading font-bold tracking-tight text-center text-foreground">
-              Kafka Rank
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Faça login para acessar o painel administrativo da competição de vendas.
-            </p>
-          </div>
-          <Button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            size="lg"
-            className="w-full racing-gradient text-white font-semibold shadow-lg hover:shadow-xl transition-all"
-          >
-            Entrar
-          </Button>
-        </div>
-      </div>
-    );
+  // Owner logged in via OAuth
+  const isOwner = user && user.role === "admin" && (user.id > 0);
+  // Manager logged in via password
+  const isManager = managerQuery.data && managerQuery.data.role === "manager";
+
+  if (!isOwner && !isManager) {
+    return <ManagerLoginScreen />;
   }
 
-  if (user.role !== "admin") {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-6 p-8 max-w-md w-full text-center">
-          <Flag className="h-16 w-16 text-destructive" />
-          <h1 className="text-2xl font-heading font-bold text-foreground">Acesso Restrito</h1>
-          <p className="text-muted-foreground">Apenas administradores podem acessar este painel.</p>
-          <Button onClick={() => { window.location.href = "/"; }} variant="outline">
-            Voltar ao Dashboard
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const displayName = isOwner ? (user?.name || "Admin") : (managerQuery.data?.name || "Gerente");
+  const displayEmail = isOwner ? (user?.email || "") : "Gerente";
+  const showOwnerItems = !!isOwner;
 
   return (
     <SidebarProvider
       style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
+      <DashboardLayoutContent
+        setSidebarWidth={setSidebarWidth}
+        displayName={displayName}
+        displayEmail={displayEmail}
+        showOwnerItems={showOwnerItems}
+        isManager={!!isManager}
+      >
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
   );
 }
 
+function ManagerLoginScreen() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const loginMutation = trpc.managers.login.useMutation();
+  const utils = trpc.useUtils();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) return;
+    setIsLoading(true);
+    try {
+      await loginMutation.mutateAsync({ username: username.trim(), password });
+      await utils.managers.me.invalidate();
+      await utils.auth.me.invalidate();
+      toast.success("Login realizado com sucesso!");
+    } catch (err: any) {
+      toast.error(err.message || "Usuário ou senha inválidos");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <Lock className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-heading font-bold tracking-tight text-center text-foreground">
+            Painel Administrativo
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            Faça login para acessar o gerenciamento da competição de vendas.
+          </p>
+        </div>
+
+        <form onSubmit={handleLogin} className="w-full space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Usuário</label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Digite seu usuário"
+              className="w-full h-11 px-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              autoComplete="username"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Senha</label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Digite sua senha"
+                className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <Button
+            type="submit"
+            disabled={isLoading || !username.trim() || !password.trim()}
+            size="lg"
+            className="w-full racing-gradient text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+          >
+            {isLoading ? "Entrando..." : "Entrar"}
+          </Button>
+        </form>
+
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>ou</span>
+          </div>
+          <Button
+            onClick={() => { window.location.href = getLoginUrl(); }}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            Login como Proprietário (Manus)
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type DashboardLayoutContentProps = {
   children: React.ReactNode;
   setSidebarWidth: (width: number) => void;
+  displayName: string;
+  displayEmail: string;
+  showOwnerItems: boolean;
+  isManager: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutContentProps) {
-  const { user, logout } = useAuth();
+function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager }: DashboardLayoutContentProps) {
+  const { logout: oauthLogout } = useAuth();
+  const managerLogout = trpc.managers.logout.useMutation();
+  const utils = trpc.useUtils();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const allItems = showOwnerItems ? [...menuItems, ...ownerOnlyItems] : menuItems;
+  const activeMenuItem = allItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -156,6 +250,17 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
       document.body.style.userSelect = "";
     };
   }, [isResizing, setSidebarWidth]);
+
+  const handleLogout = async () => {
+    if (isManager) {
+      await managerLogout.mutateAsync();
+      await utils.managers.me.invalidate();
+      await utils.auth.me.invalidate();
+      toast.success("Logout realizado!");
+    } else {
+      await oauthLogout();
+    }
+  };
 
   return (
     <>
@@ -194,7 +299,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <div className="my-2 border-t border-border" />
-              {menuItems.map(item => {
+              {allItems.map(item => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
@@ -219,17 +324,17 @@ function DashboardLayoutContent({ children, setSidebarWidth }: DashboardLayoutCo
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <Avatar className="h-9 w-9 border shrink-0">
                     <AvatarFallback className="text-xs font-medium bg-primary text-primary-foreground">
-                      {user?.name?.charAt(0).toUpperCase()}
+                      {displayName?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none text-foreground">{user?.name || "-"}</p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">{user?.email || "-"}</p>
+                    <p className="text-sm font-medium truncate leading-none text-foreground">{displayName}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-1.5">{displayEmail}</p>
                   </div>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sair</span>
                 </DropdownMenuItem>

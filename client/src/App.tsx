@@ -22,6 +22,7 @@ import AdminApprovals from "./pages/admin/AdminApprovals";
 import AdminGoals from "./pages/admin/AdminGoals";
 import AdminSorteio from "./pages/admin/AdminSorteio";
 import AdminAgendamentos from "./pages/admin/AdminAgendamentos";
+import AdminGerentes from "./pages/admin/AdminGerentes";
 import TVMode from "./pages/TVMode";
 import MeusAgendamentos from "./pages/MeusAgendamentos";
 import LiveAlerts from "./components/LiveAlerts";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/admin/metas" component={AdminGoals} />
       <Route path="/admin/agendamentos" component={AdminAgendamentos} />
       <Route path="/admin/sorteio" component={AdminSorteio} />
+      <Route path="/admin/gerentes" component={AdminGerentes} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
