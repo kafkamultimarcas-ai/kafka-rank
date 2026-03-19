@@ -898,6 +898,32 @@ export async function deleteSdrRecord(id: number) {
   await db.delete(sdrRecords).where(eq(sdrRecords.id, id));
 }
 
+// ===== UPDATE SDR RECORD (admin edit) =====
+export async function updateSdrRecord(id: number, data: {
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  vehicleInterest?: string | null;
+  scheduledDate?: number | null;
+  notes?: string | null;
+  attendanceStatus?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const updateData: any = {};
+  if (data.customerName !== undefined) updateData.customerName = data.customerName;
+  if (data.customerPhone !== undefined) updateData.customerPhone = data.customerPhone;
+  if (data.customerEmail !== undefined) updateData.customerEmail = data.customerEmail;
+  if (data.vehicleInterest !== undefined) updateData.vehicleInterest = data.vehicleInterest;
+  if (data.scheduledDate !== undefined) updateData.scheduledDate = data.scheduledDate;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.attendanceStatus !== undefined) updateData.attendanceStatus = data.attendanceStatus;
+  if (Object.keys(updateData).length > 0) {
+    await db.update(sdrRecords).set(updateData).where(eq(sdrRecords.id, id));
+  }
+  return { success: true };
+}
+
 // ===== ALL PENDING (cross-sector) =====
 export async function getAllPendingCount() {
   const db = await getDb();

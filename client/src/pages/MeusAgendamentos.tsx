@@ -64,7 +64,7 @@ function formatCountdown(ms: number): string {
   return `${minutes}min ${seconds}s`;
 }
 
-type AppointmentStatus = "upcoming" | "arriving_soon" | "expected_now" | "overdue" | "no_show" | "attended" | "confirmed" | "past";
+type AppointmentStatus = "upcoming" | "arriving_soon" | "expected_now" | "overdue" | "no_show" | "rescue_48h" | "attended" | "confirmed" | "past";
 
 function getAppointmentVisualStatus(apt: any, now: number): AppointmentStatus {
   // If already has a final attendance status
@@ -81,7 +81,9 @@ function getAppointmentVisualStatus(apt: any, now: number): AppointmentStatus {
   if (diff > thirtyMin) return "upcoming"; // mais de 30min
   if (diff > 0) return "arriving_soon"; // menos de 30min, ainda não chegou
   if (diff > -oneHour) return "expected_now"; // horário passou, dentro de 1h
-  return "overdue"; // passou mais de 1h → não compareceu
+  const fortyEightHours = 48 * 60 * 60 * 1000;
+  if (diff > -fortyEightHours) return "overdue"; // passou mais de 1h mas menos de 48h
+  return "rescue_48h"; // passou mais de 48h → resgate urgente
 }
 
 const VISUAL_STATUS_CONFIG: Record<AppointmentStatus, { label: string; border: string; bg: string; textColor: string; pulse?: boolean }> = {
@@ -90,6 +92,7 @@ const VISUAL_STATUS_CONFIG: Record<AppointmentStatus, { label: string; border: s
   expected_now: { label: "CLIENTE ESPERADO AGORA", border: "border-amber-500 border-2", bg: "bg-amber-500/15", textColor: "text-amber-400", pulse: true },
   overdue: { label: "NÃO COMPARECEU", border: "border-red-500 border-2", bg: "bg-red-500/10", textColor: "text-red-400" },
   no_show: { label: "NÃO COMPARECEU - TENTE RESGATE", border: "border-orange-500 border-2", bg: "bg-orange-500/10", textColor: "text-orange-400" },
+  rescue_48h: { label: "RESGATE URGENTE (48h+)", border: "border-red-600 border-2", bg: "bg-red-600/15", textColor: "text-red-400", pulse: true },
   attended: { label: "COMPARECEU - AGUARDANDO GERENTE", border: "border-blue-500", bg: "bg-blue-500/10", textColor: "text-blue-400" },
   confirmed: { label: "COMPARECIMENTO CONFIRMADO", border: "border-emerald-500", bg: "bg-emerald-500/10", textColor: "text-emerald-400" },
   past: { label: "", border: "border-border opacity-60", bg: "", textColor: "" },
@@ -203,7 +206,7 @@ export default function MeusAgendamentos() {
 
     agendamentos.forEach((apt: any) => {
       const vs = getAppointmentVisualStatus(apt, now);
-      if (vs === "no_show" || vs === "overdue") {
+      if (vs === "no_show" || vs === "overdue" || vs === "rescue_48h") {
         noShow.push(apt);
       } else if (vs === "confirmed") {
         completed.push(apt);
@@ -249,7 +252,7 @@ export default function MeusAgendamentos() {
     const vs: string = getAppointmentVisualStatus(apt, now);
     const visualCfg = VISUAL_STATUS_CONFIG[vs as AppointmentStatus] || VISUAL_STATUS_CONFIG.upcoming;
     const canMarkAttendance = apt.status === "approved" && (apt.attendanceStatus === "pending");
-    const isOverdue = vs === "overdue" || vs === "no_show";
+    const isOverdue = vs === "overdue" || vs === "no_show" || vs === "rescue_48h";
     const isExpectedNow = vs === "expected_now";
     const isArrivingSoon = vs === "arriving_soon";
     const scheduled = apt.scheduledDate ? Number(apt.scheduledDate) : null;

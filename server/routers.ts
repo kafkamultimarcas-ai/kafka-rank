@@ -769,6 +769,21 @@ export const appRouter = router({
       await db.rescheduleSdrRecord(input.id, input.newDate, input.notes);
       return { success: true, message: 'Cliente reagendado com sucesso!' };
     }),
+    // Admin edita agendamento
+    update: adminProcedure.input(z.object({
+      id: z.number(),
+      customerName: z.string().optional(),
+      customerPhone: z.string().optional(),
+      customerEmail: z.string().optional(),
+      vehicleInterest: z.string().optional(),
+      scheduledDate: z.number().optional(),
+      notes: z.string().optional(),
+      attendanceStatus: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await db.updateSdrRecord(id, data);
+      return { success: true };
+    }),
     // Listar agendamentos aprovados para sorteio
     approvedAppointments: adminProcedure.input(z.object({
       competitionId: z.number().optional(),

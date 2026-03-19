@@ -206,16 +206,21 @@
 - [x] Testes das novas funcionalidades (72 testes passando, 0 erros TS)
 
 ## Refatoração Agendamentos
-- [ ] Backend: auto-aprovar agendamentos (sem necessidade de aprovação do admin)
-- [ ] Backend: rota admin para listar todos os agendamentos e excluir
-- [ ] Frontend: aba Agendamentos visível na Home para vendedores (com relógio/tempo)
-- [ ] Frontend: remover botão excluir do vendedor (só admin pode excluir)
+- [x] Backend: auto-aprovar agendamentos (sem necessidade de aprovação do admin)
+- [x] Backend: rota admin para listar todos os agendamentos e excluir
+- [x] Frontend: aba Agendamentos visível na Home para vendedores (com relógio/tempo)
+- [x] Frontend: remover botão excluir do vendedor (só admin pode excluir)
 - [x] Frontend: remover mensagem "Aguardando aprovação" do registro de agendamento
-- [ ] Admin: página Agendamentos no sidebar com visão geral de todos
-- [ ] Admin: botão excluir agendamento na página admin
+- [x] Admin: página Agendamentos no sidebar com visão geral de todos
+- [x] Admin: botão excluir agendamento na página admin
 
 ## Correções Urgentes
 - [x] Agendamento auto-aprovado (sem aprovação do admin)
 - [x] Aba Agendamentos visível na Home para vendedores (card destacado com borda vermelha)
 - [x] Só admin pode excluir agendamentos (vendedor não tem botão excluir)
 - [x] Verificar e corrigir alertas de vendas entre vendedores (fix polling bug)
+
+## Admin Agendamentos + Resgate 48h
+- [x] Página AdminAgendamentos no sidebar (listar, editar, excluir todos)
+- [x] Aba Resgate automática: leads 48h+ sem comparecimento
+- [x] Rota no App.tsx e link no DashboardLayout sidebar
