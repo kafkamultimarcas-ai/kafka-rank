@@ -283,3 +283,8 @@
 - [x] Ranking continua público/geral para todos
 - [x] Rota backend protegida: metas individuais filtradas por sellerId do vendedor logado
 - [x] Rota backend protegida: agendamentos com dados de cliente só retornam para o vendedor dono
+
+## Ranking Mensal de Vendas (Meta da Loja)
+- [x] Rota backend para ranking mensal: vendas aprovadas por vendedor no mês atual
+- [x] Componente de ranking mensal que abre ao clicar na meta da loja
+- [x] Ranking separado da campanha criada - baseado apenas em vendas aprovadas do mês

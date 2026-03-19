@@ -44,6 +44,13 @@ export default function Home() {
   const finishedComps = useMemo(() => (allCompetitions || []).filter(c => c.status === "finished"), [allCompetitions]);
   const storeGoals = useMemo(() => (goals || []).filter(g => g.type === "store"), [goals]);
 
+  // Ranking mensal de vendas
+  const [showMonthlyRanking, setShowMonthlyRanking] = useState<string | null>(null);
+  const { data: monthlyRanking } = trpc.goals.monthlyRanking.useQuery(
+    { month: now.getMonth() + 1, year: now.getFullYear() },
+    { enabled: showMonthlyRanking !== null }
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -176,37 +183,130 @@ export default function Home() {
               {storeGoals.map(goal => {
                 const pct = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
                 return (
-                  <div key={goal.id} className="racing-card p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[goal.category] || CATEGORY_COLORS.vendas}`}>
-                        {CATEGORY_LABELS[goal.category] || goal.category}
-                      </span>
-                      {goal.achieved && (
-                        <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
-                          <Award className="h-3 w-3" /> META BATIDA!
+                  <div key={goal.id}>
+                    <div
+                      className="racing-card p-4 cursor-pointer hover:ring-1 hover:ring-primary/50 transition-all"
+                      onClick={() => setShowMonthlyRanking(showMonthlyRanking === goal.category ? null : goal.category)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[goal.category] || CATEGORY_COLORS.vendas}`}>
+                          {CATEGORY_LABELS[goal.category] || goal.category}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-end justify-between mb-2">
-                      <div>
-                        <span className="font-heading font-bold text-2xl text-foreground">{goal.currentValue}</span>
-                        <span className="text-muted-foreground text-sm">/{goal.targetValue}</span>
+                        <div className="flex items-center gap-2">
+                          {goal.achieved && (
+                            <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
+                              <Award className="h-3 w-3" /> META BATIDA!
+                            </span>
+                          )}
+                          <Trophy className={`h-4 w-4 transition-colors ${showMonthlyRanking === goal.category ? 'text-yellow-400' : 'text-muted-foreground/50'}`} />
+                        </div>
                       </div>
-                      <span className="text-sm font-bold text-primary">{pct}%</span>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="w-full h-3 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ease-out ${goal.achieved ? "bg-emerald-500" : "bg-primary"}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    {goal.bonusDescription && (
-                      <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
-                        <Award className="h-3 w-3" />
-                        Bônus: {goal.bonusDescription}
-                        {goal.bonusValue ? ` — R$ ${goal.bonusValue.toLocaleString("pt-BR")}` : ""}
+                      <div className="flex items-end justify-between mb-2">
+                        <div>
+                          <span className="font-heading font-bold text-2xl text-foreground">{goal.currentValue}</span>
+                          <span className="text-muted-foreground text-sm">/{goal.targetValue}</span>
+                        </div>
+                        <span className="text-sm font-bold text-primary">{pct}%</span>
+                      </div>
+                      {/* Progress Bar */}
+                      <div className="w-full h-3 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ease-out ${goal.achieved ? "bg-emerald-500" : "bg-primary"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      {goal.bonusDescription && (
+                        <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
+                          <Award className="h-3 w-3" />
+                          B\u00f4nus: {goal.bonusDescription}
+                          {goal.bonusValue ? ` \u2014 R$ ${goal.bonusValue.toLocaleString("pt-BR")}` : ""}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                        {showMonthlyRanking === goal.category ? '\u25B2 Fechar ranking' : '\u25BC Toque para ver ranking do m\u00eas'}
                       </p>
+                    </div>
+                    {/* Ranking Mensal Expandido */}
+                    {showMonthlyRanking === goal.category && monthlyRanking && (
+                      <div className="mt-2 racing-card p-4 border-t-2 border-primary/30">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Trophy className="h-5 w-5 text-yellow-400" />
+                          <h3 className="font-heading font-bold text-sm text-foreground">
+                            RANKING {(CATEGORY_LABELS[goal.category] || goal.category).toUpperCase()} \u2014 {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                          </h3>
+                        </div>
+                        {/* Pódio top 3 */}
+                        {monthlyRanking.length >= 3 && (
+                          <div className="flex items-end justify-center gap-3 mb-4">
+                            {/* 2° lugar */}
+                            <div className="text-center">
+                              {monthlyRanking[1]?.seller?.photoUrl ? (
+                                <img src={monthlyRanking[1].seller.photoUrl} className="w-10 h-10 rounded-full mx-auto ring-2 ring-gray-400 object-cover" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full mx-auto bg-gray-700 ring-2 ring-gray-400 flex items-center justify-center text-xs font-bold text-gray-300">2</div>
+                              )}
+                              <p className="text-xs font-bold text-foreground mt-1 truncate max-w-[70px]">{monthlyRanking[1]?.seller?.nickname || monthlyRanking[1]?.seller?.name}</p>
+                              <p className="text-[10px] text-primary font-bold">{monthlyRanking[1]?.salesCount} vendas</p>
+                            </div>
+                            {/* 1° lugar */}
+                            <div className="text-center -mt-2">
+                              <div className="text-yellow-400 text-lg mb-0.5">\uD83C\uDFC6</div>
+                              {monthlyRanking[0]?.seller?.photoUrl ? (
+                                <img src={monthlyRanking[0].seller.photoUrl} className="w-14 h-14 rounded-full mx-auto ring-2 ring-yellow-400 object-cover" />
+                              ) : (
+                                <div className="w-14 h-14 rounded-full mx-auto bg-yellow-900/30 ring-2 ring-yellow-400 flex items-center justify-center text-lg font-bold text-yellow-400">1</div>
+                              )}
+                              <p className="text-sm font-bold text-foreground mt-1 truncate max-w-[80px]">{monthlyRanking[0]?.seller?.nickname || monthlyRanking[0]?.seller?.name}</p>
+                              <p className="text-xs text-yellow-400 font-bold">{monthlyRanking[0]?.salesCount} vendas</p>
+                            </div>
+                            {/* 3° lugar */}
+                            <div className="text-center">
+                              {monthlyRanking[2]?.seller?.photoUrl ? (
+                                <img src={monthlyRanking[2].seller.photoUrl} className="w-10 h-10 rounded-full mx-auto ring-2 ring-amber-600 object-cover" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full mx-auto bg-amber-900/30 ring-2 ring-amber-600 flex items-center justify-center text-xs font-bold text-amber-400">3</div>
+                              )}
+                              <p className="text-xs font-bold text-foreground mt-1 truncate max-w-[70px]">{monthlyRanking[2]?.seller?.nickname || monthlyRanking[2]?.seller?.name}</p>
+                              <p className="text-[10px] text-amber-400 font-bold">{monthlyRanking[2]?.salesCount} vendas</p>
+                            </div>
+                          </div>
+                        )}
+                        {/* Lista completa */}
+                        <div className="space-y-1.5">
+                          {monthlyRanking.map((entry: any, idx: number) => (
+                            <div key={entry.seller?.id || idx} className={`flex items-center gap-3 p-2 rounded-lg ${idx < 3 ? 'bg-primary/5' : 'bg-muted/30'}`}>
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                idx === 0 ? 'bg-yellow-500/20 text-yellow-400' :
+                                idx === 1 ? 'bg-gray-400/20 text-gray-300' :
+                                idx === 2 ? 'bg-amber-600/20 text-amber-400' :
+                                'bg-muted text-muted-foreground'
+                              }`}>{idx + 1}</span>
+                              {entry.seller?.photoUrl ? (
+                                <img src={entry.seller.photoUrl} className="w-7 h-7 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center">
+                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate">{entry.seller?.nickname || entry.seller?.name}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-primary">{entry.salesCount}</p>
+                                <p className="text-[9px] text-muted-foreground">vendas</p>
+                              </div>
+                              {entry.totalValue > 0 && (
+                                <div className="text-right">
+                                  <p className="text-[10px] text-emerald-400 font-semibold">R$ {(entry.totalValue / 1000).toFixed(0)}k</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {monthlyRanking.length === 0 && (
+                          <p className="text-center text-xs text-muted-foreground py-4">Nenhuma venda registrada neste m\u00eas ainda.</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

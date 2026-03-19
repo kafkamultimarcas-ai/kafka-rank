@@ -1062,6 +1062,13 @@ export const appRouter = router({
       await db.deleteGoal(input.id);
       return { success: true };
     }),
+    // Ranking mensal de vendas (separado da campanha)
+    monthlyRanking: publicProcedure.input(z.object({
+      month: z.number().min(1).max(12),
+      year: z.number(),
+    })).query(async ({ input }) => {
+      return db.getMonthlyRanking(input.month, input.year);
+    }),
   }),
 
   // ===== PENDING COUNT (all sectors) =====

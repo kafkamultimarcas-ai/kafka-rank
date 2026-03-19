@@ -1117,3 +1117,66 @@ export async function deleteManager(id: number) {
   if (!db) throw new Error("DB not available");
   await db.delete(managers).where(eq(managers.id, id));
 }
+
+// ===== RANKING MENSAL DE VENDAS (sem campanha) =====
+export async function getMonthlyRanking(month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  // Calcular início e fim do mês em timestamp
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+  
+  // Buscar todas as vendas aprovadas do mês
+  const monthSales = await db.select().from(sales)
+    .where(and(
+      eq(sales.status, 'approved'),
+      sql`${sales.createdAt} >= ${startDate}`,
+      sql`${sales.createdAt} < ${endDate}`,
+    ));
+  
+  // Agrupar por vendedor
+  const sellerMap = new Map<number, { count: number; totalValue: number; points: number }>();
+  for (const sale of monthSales) {
+    const existing = sellerMap.get(sale.sellerId) || { count: 0, totalValue: 0, points: 0 };
+    existing.count += 1;
+    existing.totalValue += sale.value || 0;
+    existing.points += sale.points || 1;
+    sellerMap.set(sale.sellerId, existing);
+  }
+  
+  // Buscar dados dos vendedores
+  const sellerIds = Array.from(sellerMap.keys());
+  if (sellerIds.length === 0) {
+    // Retornar todos os vendedores do departamento vendas com 0 vendas
+    const allSellers = await db.select().from(sellers).where(eq(sellers.department, 'vendas')).orderBy(sellers.name);
+    return allSellers.map((s, idx) => ({
+      position: idx + 1,
+      seller: s,
+      salesCount: 0,
+      totalValue: 0,
+      points: 0,
+    }));
+  }
+  
+  // Buscar todos os vendedores do departamento vendas
+  const allSellers = await db.select().from(sellers).where(eq(sellers.department, 'vendas'));
+  
+  // Montar ranking
+  const ranking = allSellers.map(s => {
+    const stats = sellerMap.get(s.id) || { count: 0, totalValue: 0, points: 0 };
+    return {
+      seller: s,
+      salesCount: stats.count,
+      totalValue: stats.totalValue,
+      points: stats.points,
+    };
+  });
+  
+  // Ordenar por quantidade de vendas (decrescente)
+  ranking.sort((a, b) => b.salesCount - a.salesCount || b.totalValue - a.totalValue);
+  
+  return ranking.map((r, idx) => ({
+    position: idx + 1,
+    ...r,
+  }));
+}
