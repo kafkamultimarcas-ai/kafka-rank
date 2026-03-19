@@ -850,6 +850,18 @@ export async function markNoShow(id: number) {
   await db.update(sdrRecords).set({ attendanceStatus: 'no_show' }).where(eq(sdrRecords.id, id));
 }
 
+// Reagendar agendamento (vendedor tenta resgate)
+export async function rescheduleSdrRecord(id: number, newDate: number, notes?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const updateData: any = {
+    scheduledDate: newDate,
+    attendanceStatus: 'pending',
+  };
+  if (notes) updateData.notes = notes;
+  await db.update(sdrRecords).set(updateData).where(eq(sdrRecords.id, id));
+}
+
 // Listar agendamentos aprovados para sorteio
 export async function listApprovedAppointments(competitionId?: number) {
   const db = await getDb();

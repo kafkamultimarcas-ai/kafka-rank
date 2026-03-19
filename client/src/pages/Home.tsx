@@ -1,9 +1,9 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award } from "lucide-react";
+import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus } from "lucide-react";
 import { useLocation } from "wouter";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
@@ -131,6 +131,23 @@ export default function Home() {
                 <Tv className="h-4 w-4" /> Modo TV
               </Button>
             </div>
+
+            {/* Agendamentos - Seletor de vendedor */}
+            {sellers && sellers.length > 0 && (
+              <div className="mt-6 max-w-sm mx-auto">
+                <label className="text-xs text-muted-foreground block mb-2 text-center">Acessar meus agendamentos:</label>
+                <select
+                  onChange={e => { if (e.target.value) setLocation(`/agendamentos/${e.target.value}`); }}
+                  defaultValue=""
+                  className="w-full rounded-lg border border-border bg-background/80 px-4 py-2.5 text-sm text-foreground"
+                >
+                  <option value="" disabled>Selecione seu nome...</option>
+                  {sellers.map(s => (
+                    <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       </section>

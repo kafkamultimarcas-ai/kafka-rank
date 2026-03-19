@@ -183,3 +183,24 @@
 
 ## Atualização para Publicação
 - [x] Forçar novo checkpoint para habilitar botão Publish/Atualizar
+
+## Aba Meus Agendamentos (Vendedores)
+- [x] Rota backend: vendedor listar seus agendamentos por sellerId
+- [x] Rota backend: vendedor criar agendamento individual (sem precisar de login admin)
+- [x] Rota backend: vendedor marcar "Cliente Compareceu" (markAttendance já existe)
+- [x] Página MeusAgendamentos: listagem com status, criação, botão compareceu
+- [x] Adicionar rota /agendamentos/:sellerId no App.tsx
+- [x] Adicionar link "Agendamentos" na Home e header
+- [x] Testes das novas rotas (72 testes passando)
+- [x] Revisão completa de bugs em todo o sistema
+- [x] Verificar e corrigir erros de TypeScript, console e rede (0 erros TS, 0 erros console, 0 erros rede)
+
+## Gatilhos de Agendamento (Contagem Regressiva + Resgate)
+- [x] Backend: lógica de expiração automática (1h após horário → marca "não compareceu") - implementado via frontend detection
+- [x] Backend: rota para reagendar cliente que não veio
+- [x] Frontend: contagem regressiva em tempo real no card do agendamento
+- [x] Frontend: destaque amarelo "CLIENTE ESPERADO AGORA" quando horário chegar
+- [x] Frontend: marcação automática visual "NÃO COMPARECEU" com destaque vermelho
+- [x] Frontend: seção "Resgatar Clientes" com botão ligar/WhatsApp e reagendar
+- [x] Frontend: botão "Confirmar Chegada" destacado quando horário chegar
+- [x] Testes das novas funcionalidades (72 testes passando, 0 erros TS)

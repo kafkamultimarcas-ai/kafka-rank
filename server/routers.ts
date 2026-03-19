@@ -629,6 +629,49 @@ export const appRouter = router({
 
   // ===== SDR / PRÉ-VENDAS / AGENDAMENTOS =====
   sdr: router({
+    // Rota pública: vendedor lista seus próprios agendamentos
+    myAppointments: publicProcedure.input(z.object({
+      sellerId: z.number(),
+    })).query(async ({ input }) => {
+      return db.listSdrRecords(undefined, input.sellerId);
+    }),
+    // Rota pública: vendedor cria agendamento individual
+    createAppointment: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      competitionId: z.number().optional(),
+      customerName: z.string().min(1),
+      customerPhone: z.string().optional(),
+      customerEmail: z.string().optional(),
+      vehicleInterest: z.string().optional(),
+      scheduledDate: z.number().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const result = await db.createSdrRecord({
+        sellerId: input.sellerId,
+        competitionId: input.competitionId ?? null,
+        type: 'agendamento',
+        customerName: input.customerName,
+        customerPhone: input.customerPhone ?? null,
+        customerEmail: input.customerEmail ?? null,
+        vehicleInterest: input.vehicleInterest ?? null,
+        source: null,
+        scheduledDate: input.scheduledDate ?? null,
+        converted: false,
+        notes: input.notes ?? null,
+        points: 1,
+      });
+      return { id: result.id, ticketNumber: result.ticketNumber, message: `Agendamento ${result.ticketNumber || ''} criado! Aguardando aprovação.` };
+    }),
+    // Rota pública: vendedor marca que cliente compareceu (sem precisar de login admin)
+    markAttendancePublic: publicProcedure.input(z.object({ id: z.number(), sellerId: z.number() })).mutation(async ({ input }) => {
+      // Verificar que o agendamento pertence ao vendedor
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento não encontrado ou não pertence a este vendedor');
+      if (record.attendanceStatus !== 'pending') throw new Error('Este agendamento já foi marcado');
+      const result = await db.markAttendance(input.id);
+      return { success: true, record: result };
+    }),
     register: protectedProcedure.input(z.object({
       sellerId: z.number(),
       competitionId: z.number().optional(),
@@ -703,6 +746,21 @@ export const appRouter = router({
     markNoShow: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.markNoShow(input.id);
       return { success: true };
+    }),
+    // Rota pública: vendedor reagenda cliente que não veio
+    reschedule: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+      newDate: z.number(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      // Verificar que o agendamento pertence ao vendedor
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento não encontrado');
+      if (record.attendanceStatus !== 'no_show' && record.attendanceStatus !== 'pending') throw new Error('Só é possível reagendar agendamentos pendentes ou não comparecidos');
+      await db.rescheduleSdrRecord(input.id, input.newDate, input.notes);
+      return { success: true, message: 'Cliente reagendado com sucesso!' };
     }),
     // Listar agendamentos aprovados para sorteio
     approvedAppointments: adminProcedure.input(z.object({

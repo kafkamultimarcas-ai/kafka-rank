@@ -22,6 +22,7 @@ import AdminApprovals from "./pages/admin/AdminApprovals";
 import AdminGoals from "./pages/admin/AdminGoals";
 import AdminSorteio from "./pages/admin/AdminSorteio";
 import TVMode from "./pages/TVMode";
+import MeusAgendamentos from "./pages/MeusAgendamentos";
 import LiveAlerts from "./components/LiveAlerts";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/treinamentos" component={TrainingsList} />
       <Route path="/registrar-venda" component={RegisterSale} />
       <Route path="/tv" component={TVMode} />
+      <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/vendedores" component={AdminSellers} />
       <Route path="/admin/competicoes" component={AdminCompetitions} />
