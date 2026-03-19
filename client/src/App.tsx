@@ -19,6 +19,9 @@ import TrainingsList from "./pages/TrainingsList";
 import RaceTrack from "./pages/RaceTrack";
 import RegisterSale from "./pages/RegisterSale";
 import AdminApprovals from "./pages/admin/AdminApprovals";
+import AdminGoals from "./pages/admin/AdminGoals";
+import AdminSorteio from "./pages/admin/AdminSorteio";
+import TVMode from "./pages/TVMode";
 import LiveAlerts from "./components/LiveAlerts";
 
 function Router() {
@@ -30,6 +33,7 @@ function Router() {
       <Route path="/vendedor/:id" component={SellerProfile} />
       <Route path="/treinamentos" component={TrainingsList} />
       <Route path="/registrar-venda" component={RegisterSale} />
+      <Route path="/tv" component={TVMode} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/vendedores" component={AdminSellers} />
       <Route path="/admin/competicoes" component={AdminCompetitions} />
@@ -38,6 +42,8 @@ function Router() {
       <Route path="/admin/planos" component={AdminActionPlans} />
       <Route path="/admin/configuracoes" component={AdminSettings} />
       <Route path="/admin/aprovacoes" component={AdminApprovals} />
+      <Route path="/admin/metas" component={AdminGoals} />
+      <Route path="/admin/sorteio" component={AdminSorteio} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

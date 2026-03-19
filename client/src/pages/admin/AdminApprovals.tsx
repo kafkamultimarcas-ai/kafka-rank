@@ -4,10 +4,10 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones } from "lucide-react";
+import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck } from "lucide-react";
 import { useLocation } from "wouter";
 
-type Tab = "vendas" | "fei" | "consignacao" | "despachante" | "sdr";
+type Tab = "vendas" | "fei" | "consignacao" | "despachante" | "sdr" | "comparecimento";
 
 export default function AdminApprovals() {
   const [, setLocation] = useLocation();
@@ -18,6 +18,7 @@ export default function AdminApprovals() {
   const { data: pendingConsignment, isLoading: loadingConsignment, refetch: refetchConsignment } = trpc.consignment.listPending.useQuery();
   const { data: pendingDispatch, isLoading: loadingDispatch, refetch: refetchDispatch } = trpc.dispatch.listPending.useQuery();
   const { data: pendingSdr, isLoading: loadingSdr, refetch: refetchSdr } = trpc.sdr.pending.useQuery();
+  const { data: pendingAttendance, isLoading: loadingAttendance, refetch: refetchAttendance } = trpc.sdr.pendingAttendance.useQuery();
   const { data: sellers } = trpc.sellers.list.useQuery();
   const { data: competitions } = trpc.competitions.list.useQuery();
 
@@ -31,6 +32,8 @@ export default function AdminApprovals() {
   const rejectDispatch = trpc.dispatch.reject.useMutation();
   const approveSdr = trpc.sdr.approve.useMutation();
   const rejectSdr = trpc.sdr.reject.useMutation();
+  const approveAttendance = trpc.sdr.approveAttendance.useMutation();
+  const rejectAttendance = trpc.sdr.rejectAttendance.useMutation();
 
   const getSeller = (id: number) => sellers?.find(s => s.id === id);
   const getCompetition = (id: number | null) => id ? competitions?.find(c => c.id === id) : null;
@@ -41,8 +44,9 @@ export default function AdminApprovals() {
     consignacao: pendingConsignment?.length || 0,
     despachante: pendingDispatch?.length || 0,
     sdr: pendingSdr?.length || 0,
+    comparecimento: pendingAttendance?.length || 0,
   };
-  const totalPending = counts.vendas + counts.fei + counts.consignacao + counts.despachante + counts.sdr;
+  const totalPending = counts.vendas + counts.fei + counts.consignacao + counts.despachante + counts.sdr + counts.comparecimento;
 
   const tabs: { value: Tab; label: string; icon: typeof Car; color: string }[] = [
     { value: "vendas", label: "Vendas", icon: Car, color: "text-red-400" },
@@ -50,6 +54,7 @@ export default function AdminApprovals() {
     { value: "consignacao", label: "Consignação", icon: Warehouse, color: "text-blue-400" },
     { value: "despachante", label: "Despachante", icon: FileText, color: "text-purple-400" },
     { value: "sdr", label: "SDR", icon: Headphones, color: "text-orange-400" },
+    { value: "comparecimento", label: "Compareceu", icon: UserCheck, color: "text-cyan-400" },
   ];
 
   const handleApprove = async (type: Tab, id: number) => {
@@ -60,6 +65,7 @@ export default function AdminApprovals() {
         case "consignacao": await approveConsignment.mutateAsync({ id }); refetchConsignment(); break;
         case "despachante": await approveDispatch.mutateAsync({ id }); refetchDispatch(); break;
         case "sdr": await approveSdr.mutateAsync({ id }); refetchSdr(); break;
+        case "comparecimento": await approveAttendance.mutateAsync({ id }); refetchAttendance(); break;
       }
       toast.success("Aprovado com sucesso!");
     } catch (err: any) {
@@ -75,6 +81,7 @@ export default function AdminApprovals() {
         case "consignacao": await rejectConsignment.mutateAsync({ id }); refetchConsignment(); break;
         case "despachante": await rejectDispatch.mutateAsync({ id }); refetchDispatch(); break;
         case "sdr": await rejectSdr.mutateAsync({ id }); refetchSdr(); break;
+        case "comparecimento": await rejectAttendance.mutateAsync({ id }); refetchAttendance(); break;
       }
       toast.info("Rejeitado.");
     } catch (err: any) {
@@ -82,7 +89,7 @@ export default function AdminApprovals() {
     }
   };
 
-  const isLoading = loadingSales || loadingFei || loadingConsignment || loadingDispatch || loadingSdr;
+  const isLoading = loadingSales || loadingFei || loadingConsignment || loadingDispatch || loadingSdr || loadingAttendance;
 
   const renderSdrCard = (record: any) => {
     const seller = getSeller(record.sellerId);
@@ -348,7 +355,62 @@ export default function AdminApprovals() {
       case "consignacao": return pendingConsignment || [];
       case "despachante": return pendingDispatch || [];
       case "sdr": return pendingSdr || [];
+      case "comparecimento": return pendingAttendance || [];
     }
+  };
+
+  const renderAttendanceCard = (record: any) => {
+    const seller = getSeller(record.sellerId);
+    return (
+      <Card key={`attend-${record.id}`} className="bg-card border-cyan-500/20 hover:border-cyan-500/40 transition-colors">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              {seller?.photoUrl ? (
+                <img src={seller.photoUrl} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-cyan-500/50" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xl">
+                  {seller?.name?.charAt(0) || '?'}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-foreground font-bold text-lg">{seller?.name || 'Vendedor'}</span>
+                <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <UserCheck className="w-3 h-3" /> Cliente Compareceu
+                </span>
+                {record.ticketNumber && (
+                  <span className="bg-yellow-500/20 text-yellow-400 text-xs px-2 py-0.5 rounded-full font-mono">
+                    #{record.ticketNumber}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-foreground mb-1">
+                <Headphones className="w-4 h-4 text-cyan-400" />
+                <span className="font-semibold">{record.customerName || 'Cliente'}</span>
+              </div>
+              <div className="flex flex-wrap gap-3 text-sm">
+                {record.customerPhone && <span className="text-muted-foreground">Tel: <span className="text-foreground">{record.customerPhone}</span></span>}
+                {record.vehicleInterest && <span className="text-muted-foreground">Interesse: <span className="text-foreground">{record.vehicleInterest}</span></span>}
+              </div>
+              {record.scheduledDate && (
+                <p className="text-yellow-400 text-sm mt-1">Agendado: {new Date(Number(record.scheduledDate)).toLocaleString("pt-BR")}</p>
+              )}
+              <p className="text-muted-foreground/60 text-xs mt-1">{new Date(record.createdAt).toLocaleString("pt-BR")}</p>
+            </div>
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              <Button size="sm" onClick={() => handleApprove("comparecimento", record.id)} disabled={approveAttendance.isPending} className="bg-green-600 hover:bg-green-700 text-white font-bold px-4">
+                <Check className="w-4 h-4 mr-1" /> Confirmar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleReject("comparecimento", record.id)} disabled={rejectAttendance.isPending} className="border-red-500/50 text-red-400 hover:bg-red-500/10 font-bold px-4">
+                <X className="w-4 h-4 mr-1" /> Não Veio
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   const renderCurrentTab = () => {
@@ -375,6 +437,7 @@ export default function AdminApprovals() {
         {tab === "consignacao" && items.map(renderConsignmentCard)}
         {tab === "despachante" && items.map(renderDispatchCard)}
         {tab === "sdr" && items.map(renderSdrCard)}
+        {tab === "comparecimento" && items.map(renderAttendanceCard)}
       </div>
     );
   };

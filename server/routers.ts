@@ -627,7 +627,7 @@ export const appRouter = router({
     }),
   }),
 
-  // ===== SDR / PRÉ-VENDAS =====
+  // ===== SDR / PRÉ-VENDAS / AGENDAMENTOS =====
   sdr: router({
     register: protectedProcedure.input(z.object({
       sellerId: z.number(),
@@ -635,18 +635,20 @@ export const appRouter = router({
       type: z.enum(["agendamento", "lead_convertido"]),
       customerName: z.string().optional(),
       customerPhone: z.string().optional(),
+      customerEmail: z.string().optional(),
       vehicleInterest: z.string().optional(),
       source: z.string().optional(),
       scheduledDate: z.number().optional(),
       converted: z.boolean().optional(),
       notes: z.string().optional(),
     })).mutation(async ({ input }) => {
-      const id = await db.createSdrRecord({
+      const result = await db.createSdrRecord({
         sellerId: input.sellerId,
         competitionId: input.competitionId ?? null,
         type: input.type,
         customerName: input.customerName ?? null,
         customerPhone: input.customerPhone ?? null,
+        customerEmail: input.customerEmail ?? null,
         vehicleInterest: input.vehicleInterest ?? null,
         source: input.source ?? null,
         scheduledDate: input.scheduledDate ?? null,
@@ -654,7 +656,8 @@ export const appRouter = router({
         notes: input.notes ?? null,
         points: input.type === 'lead_convertido' ? 3 : 1,
       });
-      return { id, message: input.type === 'lead_convertido' ? 'Lead convertido registrado! Aguardando aprovação.' : 'Agendamento registrado! Aguardando aprovação.' };
+      const msg = input.type === 'lead_convertido' ? 'Lead convertido registrado!' : `Agendamento ${result.ticketNumber || ''} registrado!`;
+      return { id: result.id, ticketNumber: result.ticketNumber, message: msg + ' Aguardando aprovação.' };
     }),
     list: adminProcedure.input(z.object({
       competitionId: z.number().optional(),
@@ -675,6 +678,126 @@ export const appRouter = router({
     }),
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteSdrRecord(input.id);
+      return { success: true };
+    }),
+    // Vendedor marca que cliente compareceu
+    markAttendance: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const record = await db.markAttendance(input.id);
+      return { success: true, record };
+    }),
+    // Listar agendamentos pendentes de aprovação de comparecimento
+    pendingAttendance: adminProcedure.query(async () => {
+      return db.listPendingAttendance();
+    }),
+    // Gerente aprova comparecimento
+    approveAttendance: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const record = await db.approveAttendance(input.id);
+      return { success: true, record };
+    }),
+    // Gerente reprova comparecimento
+    rejectAttendance: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.rejectAttendance(input.id);
+      return { success: true };
+    }),
+    // Gerente marca como não compareceu
+    markNoShow: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.markNoShow(input.id);
+      return { success: true };
+    }),
+    // Listar agendamentos aprovados para sorteio
+    approvedAppointments: adminProcedure.input(z.object({
+      competitionId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listApprovedAppointments(input?.competitionId);
+    }),
+  }),
+
+  // ===== VOZ - Reconhecimento de voz com IA =====
+  voice: router({
+    parseVoice: publicProcedure.input(z.object({
+      transcript: z.string(),
+      category: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um assistente que extrai dados de vendas de veículos a partir de fala transcrita. Extraia os campos disponíveis do texto. Retorne JSON com os campos encontrados. Campos possíveis: vehicleModel (modelo do carro), value (valor em centavos, ex: 45000 reais = 4500000), customerName (nome do cliente), vehiclePlate (placa), description (descrição), bankName (banco), customerPhone (telefone), customerEmail (email), customerCpf (CPF). Se não encontrar um campo, não inclua no JSON. Sempre retorne JSON válido.`
+          },
+          { role: 'user', content: input.transcript }
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'voice_sale_data',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: {
+                vehicleModel: { type: 'string', description: 'Modelo do veículo' },
+                value: { type: 'number', description: 'Valor em centavos' },
+                customerName: { type: 'string', description: 'Nome do cliente' },
+                vehiclePlate: { type: 'string', description: 'Placa do veículo' },
+                description: { type: 'string', description: 'Descrição da venda' },
+                bankName: { type: 'string', description: 'Nome do banco' },
+                customerPhone: { type: 'string', description: 'Telefone' },
+                customerEmail: { type: 'string', description: 'Email' },
+                customerCpf: { type: 'string', description: 'CPF' },
+              },
+              required: [],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+      const rawContent = response.choices?.[0]?.message?.content;
+      const content = typeof rawContent === 'string' ? rawContent : '{}';
+      try {
+        return { success: true, data: JSON.parse(content) };
+      } catch {
+        return { success: true, data: {} };
+      }
+    }),
+  }),
+
+  // ===== GOALS (METAS) =====
+  goals: router({
+    list: publicProcedure.input(z.object({
+      month: z.number().optional(),
+      year: z.number().optional(),
+      type: z.string().optional(),
+      sellerId: z.number().optional(),
+      category: z.string().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listGoals(input || {});
+    }),
+    create: adminProcedure.input(z.object({
+      type: z.enum(["store", "individual"]),
+      sellerId: z.number().optional(),
+      month: z.number().min(1).max(12),
+      year: z.number(),
+      category: z.string().default("vendas"),
+      targetValue: z.number().min(1),
+      bonusDescription: z.string().optional(),
+      bonusValue: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      const id = await db.createGoal(input);
+      return { id, message: "Meta criada!" };
+    }),
+    update: adminProcedure.input(z.object({
+      id: z.number(),
+      targetValue: z.number().optional(),
+      currentValue: z.number().optional(),
+      bonusDescription: z.string().optional(),
+      bonusValue: z.number().optional(),
+      achieved: z.boolean().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await db.updateGoal(id, data);
+      return { success: true };
+    }),
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteGoal(input.id);
       return { success: true };
     }),
   }),

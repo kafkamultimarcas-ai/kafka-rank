@@ -222,19 +222,24 @@ export const appSettings = mysqlTable("app_settings", {
 export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
 
-// Registros de Pré-Vendas / SDR
+// Registros de Pré-Vendas / SDR / Agendamentos
 export const sdrRecords = mysqlTable("sdr_records", {
   id: int("id").autoincrement().primaryKey(),
   sellerId: int("sellerId").notNull(),
   competitionId: int("competitionId"),
-  type: mysqlEnum("type", ["agendamento", "lead_convertido"]).notNull(), // tipo de registro
-  customerName: varchar("customerName", { length: 255 }), // nome do cliente/lead
-  customerPhone: varchar("customerPhone", { length: 20 }), // telefone do lead
-  vehicleInterest: varchar("vehicleInterest", { length: 255 }), // veículo de interesse
-  source: varchar("source", { length: 100 }), // origem: OLX, Instagram, site, indicacao, etc.
-  scheduledDate: bigint("scheduledDate", { mode: "number" }), // data agendada para visita/test drive
-  converted: boolean("converted").default(false).notNull(), // se o lead converteu em venda
-  notes: text("notes"), // observações
+  type: mysqlEnum("type", ["agendamento", "lead_convertido"]).notNull(),
+  ticketNumber: varchar("ticketNumber", { length: 20 }), // número automático #A001, #A002...
+  customerName: varchar("customerName", { length: 255 }),
+  customerPhone: varchar("customerPhone", { length: 20 }),
+  customerEmail: varchar("customerEmail", { length: 320 }), // email opcional
+  vehicleInterest: varchar("vehicleInterest", { length: 255 }),
+  source: varchar("source", { length: 100 }),
+  scheduledDate: bigint("scheduledDate", { mode: "number" }),
+  converted: boolean("converted").default(false).notNull(),
+  notes: text("notes"),
+  // Fluxo de comparecimento
+  attendanceStatus: mysqlEnum("attendanceStatus", ["pending", "attended", "no_show", "approved", "rejected"]).default("pending"), // pending=aguardando, attended=vendedor marcou que veio, no_show=não compareceu, approved=gerente aprovou, rejected=gerente reprovou
+  attendanceMarkedAt: bigint("attendanceMarkedAt", { mode: "number" }), // quando vendedor marcou comparecimento
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -242,6 +247,26 @@ export const sdrRecords = mysqlTable("sdr_records", {
 
 export type SdrRecord = typeof sdrRecords.$inferSelect;
 export type InsertSdrRecord = typeof sdrRecords.$inferInsert;
+
+// Metas da Loja e Individuais
+export const goals = mysqlTable("goals", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["store", "individual"]).notNull(), // loja geral ou individual
+  sellerId: int("sellerId"), // null para meta da loja, preenchido para individual
+  month: int("month").notNull(), // 1-12
+  year: int("year").notNull(),
+  category: varchar("category", { length: 50 }).default("vendas").notNull(), // vendas, fei, consignacao, despachante, pre_vendas
+  targetValue: int("targetValue").notNull(), // meta (ex: 10 carros, 5 fichas)
+  currentValue: int("currentValue").default(0).notNull(), // progresso atual
+  bonusDescription: varchar("bonusDescription", { length: 500 }), // ex: "R$ 500 bônus"
+  bonusValue: int("bonusValue").default(0), // valor do bônus em centavos
+  achieved: boolean("achieved").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Goal = typeof goals.$inferSelect;
+export type InsertGoal = typeof goals.$inferInsert;
 
 // Push Subscriptions para notificações push
 export const pushSubscriptions = mysqlTable("push_subscriptions", {

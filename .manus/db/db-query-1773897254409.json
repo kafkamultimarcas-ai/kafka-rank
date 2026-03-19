@@ -1,0 +1,66 @@
+{
+  "query": "SELECT id, name, nickname, active, totalSales, totalPoints FROM sellers ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, nickname, active, totalSales, totalPoints FROM sellers ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "nickname": "Leo",
+      "active": "0",
+      "totalSales": "1",
+      "totalPoints": "1"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "nickname": "Gabriel",
+      "active": "1",
+      "totalSales": "1",
+      "totalPoints": "1"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "nickname": "Matheus",
+      "active": "1",
+      "totalSales": "0",
+      "totalPoints": "0"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "nickname": "Wesley",
+      "active": "1",
+      "totalSales": "1",
+      "totalPoints": "1"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "nickname": "Petherson",
+      "active": "1",
+      "totalSales": "0",
+      "totalPoints": "0"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "nickname": "Lucas",
+      "active": "1",
+      "totalSales": "0",
+      "totalPoints": "0"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "nickname": "Emanuel",
+      "active": "1",
+      "totalSales": "0",
+      "totalPoints": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tnickname\tactive\ttotalSales\ttotalPoints\n1\tLeonardo\tLeo\t0\t1\t1\n2\tGabriel\tGabriel\t1\t1\t1\n3\tMatheus\tMatheus\t1\t0\t0\n4\tWesley\tWesley\t1\t1\t1\n5\tPetherson\tPetherson\t1\t0\t0\n6\tLucas\tLucas\t1\t0\t0\n7\tEmanuel\tEmanuel\t1\t0\t0\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

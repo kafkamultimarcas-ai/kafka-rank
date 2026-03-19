@@ -151,3 +151,32 @@
 - [x] Auto-selecionar competição quando só tem uma ativa na categoria
 - [x] Categoria Pré-Vendas adicionada na criação de competições
 - [x] 72 testes passando
+
+## Grande Atualização - Funcionalidades das Screenshots
+- [x] Modo Painel TV: tela cheia para TV da loja com ranking, pódio, pista, alertas ao vivo (/tv)
+- [x] Alertas teatrais: ULTRAPASSAGEM e NOVA LIDERANÇA com animações (LiveAlerts + useLiveFeed)
+- [x] Barra de progresso da meta: visual com porcentagem na pista e Home
+- [x] Agendamentos para vendedores: cadastro completo (nome, telefone, email, descrição, carro)
+- [x] Número automático de agendamento (#A001, #A002...)
+- [x] Botão "Cliente compareceu" no agendamento
+- [x] Aprovação de comparecimento pelo gerente (aprovar, reprovar, não compareceu)
+- [x] Só gera ponto quando gerente aprova comparecimento
+- [x] Sorteio no feirão: sortear prêmios pelo número do agendamento (AdminSorteio)
+- [x] Agenda do feirão na TV: total de agendamentos + ranking
+- [x] Treinamentos visíveis para vendedor na Home (link rápido)
+- [x] Padronizar nomenclatura: Corrida → Competição em toda a UI
+- [x] Botão de voz para registrar venda falando (reconhecimento de voz + IA preenche campos)
+
+## Metas da Loja e Individuais
+- [x] Tabela de metas no banco (loja geral + individual por vendedor)
+- [x] Admin: criar/editar metas mensais da loja e individuais (AdminGoals)
+- [x] Admin: definir bônus por atingir meta
+- [x] Todos veem: meta da loja, meta individual, barra de progresso na Home
+- [x] Alerta visual quando meta é atingida (badge verde + confete)
+
+## Pista de Corrida Animada
+- [x] Pista horizontal com carros posicionados por pontos (RaceTrack reescrito)
+- [x] Animação: carro avança com transição suave de 1.5s
+- [x] Alerta "ULTRAPASSAGEM!" via LiveAlerts com som
+- [x] Funciona no celular e no Modo TV
+- [x] Criar nova logo/branding profissional para Kafka Rank (K com bandeira quadriculada)

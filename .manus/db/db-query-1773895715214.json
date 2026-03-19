@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `goals` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `type` enum('store','individual') NOT NULL,\n  `sellerId` int,\n  `month` int NOT NULL,\n  `year` int NOT NULL,\n  `category` varchar(50) NOT NULL DEFAULT 'vendas',\n  `targetValue` int NOT NULL,\n  `currentValue` int NOT NULL DEFAULT 0,\n  `bonusDescription` varchar(500),\n  `bonusValue` int DEFAULT 0,\n  `achieved` boolean NOT NULL DEFAULT false,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute CREATE TABLE IF NOT EXISTS `goals` (\n  `id` int AUTO_INCREMENT PRIMARY KEY,\n  `type` enum('store','individual') NOT NULL,\n  `sellerId` int,\n  `month` int NOT NULL,\n  `year` int NOT NULL,\n  `category` varchar(50) NOT NULL DEFAULT 'vendas',\n  `targetValue` int NOT NULL,\n  `currentValue` int NOT NULL DEFAULT 0,\n  `bonusDescription` varchar(500),\n  `bonusValue` int DEFAULT 0,\n  `achieved` boolean NOT NULL DEFAULT false,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 625
+}

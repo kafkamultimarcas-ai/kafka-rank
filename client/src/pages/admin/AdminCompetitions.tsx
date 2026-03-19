@@ -183,7 +183,7 @@ export default function AdminCompetitions() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading font-bold text-xl text-foreground">Competições</h1>
-            <p className="text-muted-foreground text-sm mt-1">Crie e gerencie corridas de vendas</p>
+            <p className="text-muted-foreground text-sm mt-1">Crie e gerencie competições de vendas</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>

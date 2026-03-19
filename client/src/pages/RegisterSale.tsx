@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones } from "lucide-react";
+import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles } from "lucide-react";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -53,30 +53,37 @@ export default function RegisterSale() {
   const [customerPaid, setCustomerPaid] = useState(false);
   const [transferValue, setTransferValue] = useState("");
 
-  const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
-  const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
-
   // SDR fields
   const [sdrType, setSdrType] = useState<"agendamento" | "lead_convertido">("agendamento");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [vehicleInterest, setVehicleInterest] = useState("");
   const [leadSource, setLeadSource] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [sdrNotes, setSdrNotes] = useState("");
+
+  // Voice
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+  const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
 
   const registerSale = trpc.sales.registerBySeller.useMutation();
   const registerFei = trpc.fei.register.useMutation();
   const registerConsignment = trpc.consignment.register.useMutation();
   const registerDispatch = trpc.dispatch.register.useMutation();
   const registerSdr = trpc.sdr.register.useMutation();
+  const parseVoice = trpc.voice.parseVoice.useMutation();
 
   const selectedSeller = useMemo(() => {
     if (!sellerId || !sellers) return null;
     return sellers.find(s => s.id === parseInt(sellerId));
   }, [sellerId, sellers]);
 
-  // Filtrar competições pela categoria selecionada
   const filteredCompetitions = useMemo(() => {
     if (!competitions) return [];
     return competitions.filter(c => {
@@ -86,7 +93,6 @@ export default function RegisterSale() {
     });
   }, [competitions, category]);
 
-  // Auto-selecionar competição quando só tem uma ativa na categoria
   useEffect(() => {
     if (filteredCompetitions.length === 1 && !competitionId) {
       setCompetitionId(filteredCompetitions[0].id.toString());
@@ -102,8 +108,97 @@ export default function RegisterSale() {
     setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setPaymentDate("");
     setConsignModel(""); setConsignPlate(""); setOwnerName(""); setOwnerPhone(""); setEntryDate("");
     setDispatchPlate(""); setDocumentType(""); setCustomerPaid(false); setTransferValue("");
-    setSdrType("agendamento"); setCustomerName(""); setCustomerPhone(""); setVehicleInterest(""); setLeadSource(""); setScheduledDate(""); setSdrNotes("");
-    setSubmitted(false); setSubmittedMessage("");
+    setSdrType("agendamento"); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setVehicleInterest(""); setLeadSource(""); setScheduledDate(""); setSdrNotes("");
+    setSubmitted(false); setSubmittedMessage(""); setVoiceTranscript("");
+  };
+
+  // ===== VOICE RECOGNITION =====
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Seu navegador não suporta reconhecimento de voz. Use o Chrome.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-BR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    let finalTranscript = "";
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + " ";
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setVoiceTranscript(finalTranscript + interim);
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      toast.error("Erro no reconhecimento de voz. Tente novamente.");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+    toast.info("Fale os dados da venda...");
+  };
+
+  const stopListening = async () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+
+    if (!voiceTranscript.trim()) return;
+
+    setIsProcessingVoice(true);
+    try {
+      const result = await parseVoice.mutateAsync({
+        transcript: voiceTranscript,
+        category,
+      });
+      if (result.success && result.data) {
+        const d = result.data as any;
+        // Preencher campos baseado na categoria
+        if (category === "vendas") {
+          if (d.vehicleModel) setVehicleModel(d.vehicleModel);
+          if (d.value) setValue(String(Math.round(d.value / 100)));
+          if (d.description) setDescription(d.description);
+        } else if (category === "fei") {
+          if (d.vehiclePlate) setVehiclePlate(d.vehiclePlate);
+          if (d.customerCpf) setCustomerCpf(d.customerCpf);
+          if (d.bankName) setBankName(d.bankName);
+          if (d.value) setFinancedValue(String(Math.round(d.value / 100)));
+        } else if (category === "consignacao") {
+          if (d.vehicleModel) setConsignModel(d.vehicleModel);
+          if (d.vehiclePlate) setConsignPlate(d.vehiclePlate);
+          if (d.customerName) setOwnerName(d.customerName);
+          if (d.customerPhone) setOwnerPhone(d.customerPhone);
+        } else if (category === "despachante") {
+          if (d.vehiclePlate) setDispatchPlate(d.vehiclePlate);
+          if (d.value) setTransferValue(String(Math.round(d.value / 100)));
+        } else if (category === "pre_vendas") {
+          if (d.customerName) setCustomerName(d.customerName);
+          if (d.customerPhone) setCustomerPhone(d.customerPhone);
+          if (d.customerEmail) setCustomerEmail(d.customerEmail);
+          if (d.vehicleModel) setVehicleInterest(d.vehicleModel);
+        }
+        toast.success("Dados preenchidos pela voz! Confira e ajuste se necessário.");
+      }
+    } catch {
+      toast.error("Erro ao processar voz. Preencha manualmente.");
+    } finally {
+      setIsProcessingVoice(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -159,6 +254,7 @@ export default function RegisterSale() {
             type: sdrType,
             customerName: customerName || undefined,
             customerPhone: customerPhone || undefined,
+            customerEmail: customerEmail || undefined,
             vehicleInterest: vehicleInterest || undefined,
             source: leadSource || undefined,
             scheduledDate: scheduledDate ? new Date(scheduledDate).getTime() : undefined,
@@ -223,7 +319,7 @@ export default function RegisterSale() {
         </div>
 
         {/* Category Tabs */}
-        <div className="grid grid-cols-4 gap-1 bg-gray-900/80 rounded-lg p-1 border border-gray-800">
+        <div className="grid grid-cols-5 gap-1 bg-gray-900/80 rounded-lg p-1 border border-gray-800">
           {CATEGORIES.map(cat => (
             <button
               key={cat.value}
@@ -289,7 +385,7 @@ export default function RegisterSale() {
               <div className="space-y-2">
                 <Label className="text-gray-300 font-semibold flex items-center gap-2">
                   <Trophy className="w-4 h-4 text-yellow-400" />
-                  Campanha (opcional)
+                  Campanha
                 </Label>
                 <Select value={competitionId} onValueChange={setCompetitionId}>
                   <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
@@ -306,6 +402,45 @@ export default function RegisterSale() {
                 </Select>
               </div>
             )}
+
+            {/* ===== BOTÃO DE VOZ ===== */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={isListening ? stopListening : startListening}
+                disabled={isProcessingVoice}
+                className={`w-full flex items-center justify-center gap-3 py-4 rounded-xl border-2 font-bold text-sm transition-all ${
+                  isListening
+                    ? "border-red-500 bg-red-500/20 text-red-400 animate-pulse"
+                    : isProcessingVoice
+                    ? "border-yellow-500/50 bg-yellow-500/10 text-yellow-400"
+                    : "border-dashed border-gray-600 bg-gray-800/50 text-gray-400 hover:border-gray-500 hover:text-gray-300"
+                }`}
+              >
+                {isProcessingVoice ? (
+                  <>
+                    <Sparkles className="w-5 h-5 animate-spin" />
+                    IA processando sua fala...
+                  </>
+                ) : isListening ? (
+                  <>
+                    <MicOff className="w-5 h-5" />
+                    PARAR E PREENCHER
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-5 h-5" />
+                    REGISTRAR POR VOZ
+                  </>
+                )}
+              </button>
+              {voiceTranscript && !isProcessingVoice && (
+                <div className="mt-2 bg-gray-800/50 rounded-lg p-3 border border-gray-700/50">
+                  <p className="text-gray-400 text-xs mb-1">Transcrição:</p>
+                  <p className="text-gray-300 text-sm italic">"{voiceTranscript.trim()}"</p>
+                </div>
+              )}
+            </div>
 
             {/* ===== CAMPOS POR CATEGORIA ===== */}
 
@@ -440,7 +575,7 @@ export default function RegisterSale() {
                           : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
                       }`}
                     >
-                      📅 Agendamento
+                      Agendamento
                     </button>
                     <button
                       type="button"
@@ -451,7 +586,7 @@ export default function RegisterSale() {
                           : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
                       }`}
                     >
-                      ✅ Lead Convertido
+                      Lead Convertido
                     </button>
                   </div>
                 </div>
@@ -470,7 +605,19 @@ export default function RegisterSale() {
                       placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Origem do lead</Label>
+                    <Label className="text-gray-300 font-semibold text-sm">E-mail</Label>
+                    <Input value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                      placeholder="email@exemplo.com" type="email" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Veículo de interesse</Label>
+                    <Input value={vehicleInterest} onChange={e => setVehicleInterest(e.target.value)}
+                      placeholder="Ex: HB20, Civic..." className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Origem</Label>
                     <Select value={leadSource} onValueChange={setLeadSource}>
                       <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
                         <SelectValue placeholder="Origem" />
@@ -483,11 +630,6 @@ export default function RegisterSale() {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 font-semibold">Veículo de interesse</Label>
-                  <Input value={vehicleInterest} onChange={e => setVehicleInterest(e.target.value)}
-                    placeholder="Ex: SUV, Sedan, HB20..." className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
-                </div>
                 {sdrType === "agendamento" && (
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">Data do agendamento</Label>
@@ -496,7 +638,7 @@ export default function RegisterSale() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label className="text-gray-300 font-semibold">Observações</Label>
+                  <Label className="text-gray-300 font-semibold">Descrição / Observações</Label>
                   <Textarea value={sdrNotes} onChange={e => setSdrNotes(e.target.value)}
                     placeholder="Detalhes do atendimento..." className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 resize-none" rows={2} />
                 </div>
@@ -510,7 +652,7 @@ export default function RegisterSale() {
                   }`}>
                     {sdrType === "lead_convertido"
                       ? "Lead convertido vale 3 pontos na competição!"
-                      : "Agendamento vale 1 ponto na competição."}
+                      : "Agendamento vale 1 ponto. Quando o cliente comparecer e for aprovado, ganha +1 ponto extra!"}
                   </p>
                 </div>
               </>

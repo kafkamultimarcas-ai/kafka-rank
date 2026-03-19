@@ -91,7 +91,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
               className="w-full racing-gradient text-white h-12 font-heading font-bold tracking-wider"
               disabled={verifyMutation.isPending}
             >
-              {verifyMutation.isPending ? "VERIFICANDO..." : "ENTRAR NA CORRIDA"}
+              {verifyMutation.isPending ? "VERIFICANDO..." : "ENTRAR NA COMPETIÇÃO"}
             </Button>
           </form>
 

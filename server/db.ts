@@ -16,6 +16,7 @@ import {
   notifications, InsertNotification,
   pushSubscriptions, InsertPushSubscription,
   sdrRecords, InsertSdrRecord,
+  goals, InsertGoal,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -442,6 +443,54 @@ export async function deletePushSubscription(endpoint: string) {
   await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
 }
 
+// ===== GOALS (METAS) =====
+export async function listGoals(filters?: { month?: number; year?: number; type?: string; sellerId?: number; category?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters?.month) conditions.push(eq(goals.month, filters.month));
+  if (filters?.year) conditions.push(eq(goals.year, filters.year));
+  if (filters?.type) conditions.push(eq(goals.type, filters.type as any));
+  if (filters?.sellerId) conditions.push(eq(goals.sellerId, filters.sellerId));
+  if (filters?.category) conditions.push(eq(goals.category, filters.category));
+  if (conditions.length > 0) return db.select().from(goals).where(and(...conditions)).orderBy(desc(goals.createdAt));
+  return db.select().from(goals).orderBy(desc(goals.createdAt));
+}
+
+export async function createGoal(data: InsertGoal) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(goals).values(data);
+  return result[0].insertId;
+}
+
+export async function updateGoal(id: number, data: Partial<InsertGoal>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(goals).set(data).where(eq(goals.id, id));
+}
+
+export async function deleteGoal(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(goals).where(eq(goals.id, id));
+}
+
+export async function incrementGoalProgress(goalId: number, amount: number = 1) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(goals).set({
+    currentValue: sql`currentValue + ${amount}`,
+  }).where(eq(goals.id, goalId));
+  // Check if achieved
+  const [goal] = await db.select().from(goals).where(eq(goals.id, goalId)).limit(1);
+  if (goal && goal.currentValue >= goal.targetValue && !goal.achieved) {
+    await db.update(goals).set({ achieved: true }).where(eq(goals.id, goalId));
+    return { achieved: true, goal };
+  }
+  return { achieved: false, goal };
+}
+
 // ===== RANKING / DASHBOARD =====
 export async function getCompetitionRanking(competitionId: number) {
   const db = await getDb();
@@ -695,12 +744,24 @@ export async function deleteDispatchRecord(id: number) {
   await db.delete(dispatchRecords).where(eq(dispatchRecords.id, id));
 }
 
-// ===== SDR / PRÉ-VENDAS =====
+// ===== SDR / PRÉ-VENDAS / AGENDAMENTOS =====
+export async function getNextTicketNumber() {
+  const db = await getDb();
+  if (!db) return '#A001';
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(sdrRecords).where(eq(sdrRecords.type, 'agendamento'));
+  const num = Number(result?.count || 0) + 1;
+  return `#A${String(num).padStart(3, '0')}`;
+}
+
 export async function createSdrRecord(data: InsertSdrRecord) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
+  // Gerar ticket number automático para agendamentos
+  if (data.type === 'agendamento' && !data.ticketNumber) {
+    data.ticketNumber = await getNextTicketNumber();
+  }
   const result = await db.insert(sdrRecords).values(data);
-  return result[0].insertId;
+  return { id: result[0].insertId, ticketNumber: data.ticketNumber };
 }
 
 export async function listSdrRecords(competitionId?: number, sellerId?: number) {
@@ -734,6 +795,71 @@ export async function rejectSdrRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(sdrRecords).set({ status: 'rejected' }).where(eq(sdrRecords.id, id));
+}
+
+// Vendedor marca que cliente compareceu
+export async function markAttendance(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Agendamento não encontrado");
+  await db.update(sdrRecords).set({
+    attendanceStatus: 'attended',
+    attendanceMarkedAt: Date.now(),
+  }).where(eq(sdrRecords.id, id));
+  return record;
+}
+
+// Listar agendamentos pendentes de aprovação de comparecimento
+export async function listPendingAttendance() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sdrRecords).where(
+    eq(sdrRecords.attendanceStatus, 'attended')
+  ).orderBy(desc(sdrRecords.createdAt));
+}
+
+// Gerente aprova comparecimento
+export async function approveAttendance(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Agendamento não encontrado");
+  await db.update(sdrRecords).set({ attendanceStatus: 'approved' }).where(eq(sdrRecords.id, id));
+  // Só gera ponto quando gerente aprova comparecimento
+  if (record.status === 'approved') {
+    // Já estava aprovado como registro, agora aprova comparecimento = ponto extra
+    await updateSaleTotals(record.sellerId, record.competitionId, 1);
+  }
+  return record;
+}
+
+// Gerente reprova comparecimento
+export async function rejectAttendance(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(sdrRecords).set({ attendanceStatus: 'rejected' }).where(eq(sdrRecords.id, id));
+}
+
+// Gerente marca como não compareceu
+export async function markNoShow(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(sdrRecords).set({ attendanceStatus: 'no_show' }).where(eq(sdrRecords.id, id));
+}
+
+// Listar agendamentos aprovados para sorteio
+export async function listApprovedAppointments(competitionId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [
+    eq(sdrRecords.type, 'agendamento'),
+    eq(sdrRecords.status, 'approved'),
+  ];
+  if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
+  return db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.createdAt));
 }
 
 export async function deleteSdrRecord(id: number) {

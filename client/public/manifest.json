@@ -10,46 +10,15 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-72x72_16d98b9a.png",
-      "sizes": "72x72",
-      "type": "image/png"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-96x96_0ee98729.png",
-      "sizes": "96x96",
-      "type": "image/png"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-128x128_d4a12bac.png",
-      "sizes": "128x128",
-      "type": "image/png"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-144x144_6b842c7d.png",
-      "sizes": "144x144",
-      "type": "image/png"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-152x152_da19b1db.png",
-      "sizes": "152x152",
-      "type": "image/png"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-192x192_870d632d.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-384x384_f06b87df.png",
-      "sizes": "384x384",
-      "type": "image/png"
-    },
-    {
-      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/icon-512x512_3c50f26f.png",
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-EnFS9DEmks7vQ4SZGVGZXb.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp",
+      "sizes": "512x512",
+      "type": "image/webp"
     }
   ]
 }
