@@ -233,3 +233,36 @@
 - [x] Frontend: proteger rotas admin com verificação de token gerente ou OAuth
 - [x] Admin: página para criar/editar/excluir contas de gerente (só dono pode)
 - [x] Gerente tem acesso completo ao painel admin (mesma autonomia)
+
+## Meta Automática ao Aprovar Vendas
+- [x] Backend: ao aprovar venda, incrementar automaticamente a meta da loja na categoria correspondente
+- [x] Vendas "Sem campanha" contam só na meta geral, vendas com campanha contam na meta + competição
+- [x] Decrementar meta se venda for rejeitada/excluída após aprovação
+
+## Origem do Lead (Controle de Fonte)
+- [x] Adicionar campo leadSource na tabela sales (lead_loja, lead_vendedor)
+- [x] Campo obrigatório no formulário de registro de venda
+- [ ] Exibir origem do lead no painel admin de aprovações
+- [ ] Estatísticas de origem de leads para o admin
+
+## Sistema de Notificações Avançado
+- [x] Notificação persistente para admin/gerente quando vendedor registra venda/F&I/consignação/despachante
+- [x] Notificação para vendedor quando agendamento está expirando
+- [x] Notificação para vendedor quando é ultrapassado na competição
+- [x] Alerta de inatividade: vendedor que não acessa há 8h recebe push
+- [x] Sons de alerta nas notificações push (vibração + som no celular)
+- [x] Centro de notificações no app (sino com badge de contagem)
+- [x] Corrigir bug do registro por voz (strict:true com required:[])
+- [ ] Corrigir bug do LiveAlerts (hooks condicionais)
+
+## Bug: Agendamento contando no ranking de vendas
+- [x] Separar pontos de agendamento/SDR dos pontos de vendas no ranking
+- [x] Agendamento só registra quantidade, não gera pontos automaticamente
+- [x] Ponto de agendamento só conta quando gerente aprova comparecimento do cliente
+
+## Login Individual para Vendedores
+- [x] Adicionar campos username e passwordHash na tabela sellers
+- [x] Rota de login por senha para vendedores (gera token JWT)
+- [x] Tela de login para vendedores (usuário + senha)
+- [x] Isolamento de dados: vendedor só vê seus próprios agendamentos/dados de clientes
+- [x] Admin pode criar/resetar senha de vendedor

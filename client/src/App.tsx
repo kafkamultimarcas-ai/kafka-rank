@@ -26,6 +26,8 @@ import AdminGerentes from "./pages/admin/AdminGerentes";
 import TVMode from "./pages/TVMode";
 import MeusAgendamentos from "./pages/MeusAgendamentos";
 import LiveAlerts from "./components/LiveAlerts";
+import SellerLogin from "./pages/SellerLogin";
+import MinhaArea from "./pages/MinhaArea";
 
 function Router() {
   return (
@@ -38,6 +40,8 @@ function Router() {
       <Route path="/registrar-venda" component={RegisterSale} />
       <Route path="/tv" component={TVMode} />
       <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
+      <Route path="/login-vendedor" component={SellerLogin} />
+      <Route path="/minha-area/:sellerId" component={MinhaArea} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/vendedores" component={AdminSellers} />
       <Route path="/admin/competicoes" component={AdminCompetitions} />

@@ -12,6 +12,7 @@ vi.mock("./db", () => ({
   approveSale: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, vehicleModel: 'Civic', points: 1, status: 'approved', competitionId: 1 }),
   rejectSale: vi.fn().mockResolvedValue(undefined),
   deleteSale: vi.fn().mockResolvedValue(undefined),
+  autoUpdateStoreGoal: vi.fn().mockResolvedValue({ goalId: 1, newValue: 1, achieved: false }),
   createNotification: vi.fn().mockResolvedValue(1),
   listSellers: vi.fn().mockResolvedValue([
     { id: 1, name: "João", nickname: "Trovão", active: true, totalSales: 5, totalPoints: 50, photoUrl: null, photoKey: null, phone: null, email: null, createdAt: new Date() },
@@ -76,6 +77,17 @@ vi.mock("./db", () => ({
   deleteDispatchRecord: vi.fn().mockResolvedValue(undefined),
   // Pending count
   getAllPendingCount: vi.fn().mockResolvedValue({ sales: 2, fei: 1, consignment: 0, dispatch: 3, total: 6 }),
+  // Seller login
+  getSellerByUsername: vi.fn().mockResolvedValue({ id: 1, name: "Jo\u00e3o", nickname: "Trov\u00e3o", active: true, username: "joao", passwordHash: "$2a$10$hash", totalSales: 5, totalPoints: 50 }),
+  updateSellerLastAccess: vi.fn().mockResolvedValue(undefined),
+  // Notifications advanced
+  listNotificationsAdmin: vi.fn().mockResolvedValue([]),
+  listNotificationsSeller: vi.fn().mockResolvedValue([]),
+  getUnreadCountAdmin: vi.fn().mockResolvedValue(0),
+  getUnreadCountSeller: vi.fn().mockResolvedValue(0),
+  markAllNotificationsRead: vi.fn().mockResolvedValue(undefined),
+  markAllNotificationsReadSeller: vi.fn().mockResolvedValue(undefined),
+  getInactiveSellers: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("./storage", () => ({
@@ -97,6 +109,14 @@ vi.mock("./pushService", () => ({
   sendPushSaleApproved: vi.fn().mockResolvedValue(undefined),
   sendPushOvertake: vi.fn().mockResolvedValue(undefined),
   sendPushNewCompetition: vi.fn().mockResolvedValue(undefined),
+  sendPushPendingSale: vi.fn().mockResolvedValue(undefined),
+  sendPushPendingRecord: vi.fn().mockResolvedValue(undefined),
+  sendPushAppointmentExpiring: vi.fn().mockResolvedValue(undefined),
+  sendPushRescueAlert: vi.fn().mockResolvedValue(undefined),
+  sendPushInactivityAlert: vi.fn().mockResolvedValue(undefined),
+  sendPushAttendanceApproved: vi.fn().mockResolvedValue(undefined),
+  sendPushToAll: vi.fn().mockResolvedValue(undefined),
+  sendPushToSeller: vi.fn().mockResolvedValue(undefined),
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;

@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
+import NotificationCenter from "@/components/NotificationCenter";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
@@ -73,6 +74,7 @@ export default function Home() {
                 <BellRing className="h-3.5 w-3.5" />
               </div>
             )}
+            <NotificationCenter isAdmin={user?.role === 'admin'} />
             <Button size="sm" variant="outline" onClick={() => setLocation("/treinamentos")} className="gap-1.5">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Treinar</span>
@@ -81,6 +83,10 @@ export default function Home() {
               <PlusCircle className="h-4 w-4" />
               <span className="hidden sm:inline">Registrar</span>
               <span className="sm:hidden">+</span>
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setLocation("/login-vendedor")} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
+              <LogIn className="h-4 w-4" />
+              <span className="hidden sm:inline">Minha \u00c1rea</span>
             </Button>
             {user?.role === "admin" ? (
               <Button size="sm" onClick={() => setLocation("/admin")} className="gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">

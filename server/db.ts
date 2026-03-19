@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -80,6 +80,19 @@ export async function getSellerById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(sellers).where(eq(sellers.id, id)).limit(1);
   return result[0];
+}
+
+export async function getSellerByUsername(username: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(sellers).where(eq(sellers.username, username)).limit(1);
+  return result[0];
+}
+
+export async function updateSellerLastAccess(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(sellers).set({ lastAccess: Date.now() }).where(eq(sellers.id, id));
 }
 
 export async function createSeller(data: InsertSeller) {
@@ -396,8 +409,51 @@ export async function getLatestQuote() {
 export async function listNotifications(sellerId?: number) {
   const db = await getDb();
   if (!db) return [];
-  if (sellerId) return db.select().from(notifications).where(eq(notifications.sellerId, sellerId)).orderBy(desc(notifications.createdAt)).limit(50);
+  if (sellerId) {
+    return db.select().from(notifications)
+      .where(or(
+        eq(notifications.sellerId, sellerId),
+        eq(notifications.targetType, 'all')
+      ))
+      .orderBy(desc(notifications.createdAt)).limit(50);
+  }
   return db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(50);
+}
+
+export async function listAdminNotifications() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(notifications)
+    .where(or(
+      eq(notifications.targetType, 'admin'),
+      eq(notifications.targetType, 'all')
+    ))
+    .orderBy(desc(notifications.createdAt)).limit(100);
+}
+
+export async function countUnreadAdminNotifications() {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`count(*)` }).from(notifications)
+    .where(and(
+      or(eq(notifications.targetType, 'admin'), eq(notifications.targetType, 'all')),
+      eq(notifications.read, false)
+    ));
+  return result[0]?.count ?? 0;
+}
+
+export async function countUnreadSellerNotifications(sellerId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`count(*)` }).from(notifications)
+    .where(and(
+      or(
+        eq(notifications.sellerId, sellerId),
+        eq(notifications.targetType, 'all')
+      ),
+      eq(notifications.read, false)
+    ));
+  return result[0]?.count ?? 0;
 }
 
 export async function createNotification(data: InsertNotification) {
@@ -411,6 +467,34 @@ export async function markNotificationRead(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+}
+
+export async function markAllNotificationsRead(targetType: string, sellerId?: number) {
+  const db = await getDb();
+  if (!db) return;
+  if (targetType === 'admin') {
+    await db.update(notifications).set({ read: true })
+      .where(and(
+        or(eq(notifications.targetType, 'admin'), eq(notifications.targetType, 'all')),
+        eq(notifications.read, false)
+      ));
+  } else if (sellerId) {
+    await db.update(notifications).set({ read: true })
+      .where(and(
+        or(
+          eq(notifications.sellerId, sellerId),
+          eq(notifications.targetType, 'all')
+        ),
+        eq(notifications.read, false)
+      ));
+  }
+}
+
+// Push subscriptions por vendedor
+export async function getPushSubscriptionsBySeller(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.sellerId, sellerId));
 }
 
 // ===== PUSH SUBSCRIPTIONS =====
@@ -490,6 +574,30 @@ export async function incrementGoalProgress(goalId: number, amount: number = 1) 
     return { achieved: true, goal };
   }
   return { achieved: false, goal };
+}
+
+// Auto-incrementar meta da loja quando venda é aprovada
+// Determina a categoria da venda pela competição associada ou default "vendas"
+export async function autoUpdateStoreGoal(saleCategory: string, month: number, year: number, amount: number = 1) {
+  const db = await getDb();
+  if (!db) return;
+  // Buscar meta da loja do mês/ano/categoria
+  const [goal] = await db.select().from(goals)
+    .where(and(
+      eq(goals.type, 'store'),
+      eq(goals.month, month),
+      eq(goals.year, year),
+      eq(goals.category, saleCategory)
+    ))
+    .limit(1);
+  if (!goal) return; // Sem meta cadastrada para essa categoria/mês
+  const newValue = Math.max(0, goal.currentValue + amount);
+  const achieved = newValue >= goal.targetValue;
+  await db.update(goals).set({
+    currentValue: newValue,
+    achieved,
+  }).where(eq(goals.id, goal.id));
+  return { goalId: goal.id, newValue, achieved };
 }
 
 // ===== RANKING / DASHBOARD =====
@@ -788,7 +896,11 @@ export async function approveSdrRecord(id: number) {
   const record = result[0];
   if (!record || record.status !== 'pending') throw new Error("Registro SDR não encontrado ou já processado");
   await db.update(sdrRecords).set({ status: 'approved' }).where(eq(sdrRecords.id, id));
-  await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  // Para agendamentos: NÃO dar pontos aqui. Pontos só são dados quando gerente aprova comparecimento (approveAttendance).
+  // Para lead_convertido: dar pontos na aprovação do registro.
+  if (record.type !== 'agendamento') {
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  }
   return record;
 }
 
@@ -828,12 +940,11 @@ export async function approveAttendance(id: number) {
   const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
   const record = result[0];
   if (!record) throw new Error("Agendamento não encontrado");
+  if (record.attendanceStatus === 'approved') throw new Error("Comparecimento já foi aprovado");
   await db.update(sdrRecords).set({ attendanceStatus: 'approved' }).where(eq(sdrRecords.id, id));
-  // Só gera ponto quando gerente aprova comparecimento
-  if (record.status === 'approved') {
-    // Já estava aprovado como registro, agora aprova comparecimento = ponto extra
-    await updateSaleTotals(record.sellerId, record.competitionId, 1);
-  }
+  // Só gera ponto quando gerente aprova comparecimento do cliente
+  // Para agendamentos: este é o único momento que dá ponto (1pt)
+  await updateSaleTotals(record.sellerId, record.competitionId, record.points || 1);
   return record;
 }
 

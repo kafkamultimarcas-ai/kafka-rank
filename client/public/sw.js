@@ -1,4 +1,4 @@
-const CACHE_NAME = "kafka-rank-v3";
+const CACHE_NAME = "kafka-rank-v4";
 const OFFLINE_URL = "/";
 
 // Install
@@ -36,6 +36,10 @@ self.addEventListener("push", (event) => {
     tag: "kafka-rank",
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
+    requireInteraction: false,
+    vibrate: [200, 100, 200, 100, 200],
+    url: "/",
+    actions: [],
   };
 
   if (event.data) {
@@ -46,6 +50,42 @@ self.addEventListener("push", (event) => {
       data.tag = payload.tag || data.tag;
       if (payload.icon) data.icon = payload.icon;
       if (payload.badge) data.badge = payload.badge;
+      if (payload.requireInteraction) data.requireInteraction = true;
+      if (payload.vibrate) data.vibrate = payload.vibrate;
+      if (payload.data && payload.data.url) data.url = payload.data.url;
+      if (payload.data && payload.data.type) {
+        // Customize actions based on notification type
+        switch (payload.data.type) {
+          case "pending_sale":
+          case "pending_record":
+            data.actions = [
+              { action: "approve", title: "Aprovar" },
+              { action: "open", title: "Ver Detalhes" },
+            ];
+            break;
+          case "appointment_expiring":
+          case "rescue":
+            data.actions = [
+              { action: "open", title: "Ver Agendamento" },
+              { action: "call", title: "Ligar" },
+            ];
+            break;
+          case "overtake":
+            data.actions = [
+              { action: "open", title: "Ver Ranking" },
+            ];
+            break;
+          case "inactivity":
+            data.actions = [
+              { action: "open", title: "Acessar App" },
+            ];
+            break;
+          default:
+            data.actions = [
+              { action: "open", title: "Abrir" },
+            ];
+        }
+      }
     } catch (e) {
       data.body = event.data.text();
     }
@@ -55,29 +95,32 @@ self.addEventListener("push", (event) => {
     body: data.body,
     icon: data.icon,
     badge: data.badge,
-    vibrate: [200, 100, 200, 100, 200],
+    vibrate: data.vibrate,
     tag: data.tag,
     renotify: true,
-    requireInteraction: false,
+    requireInteraction: data.requireInteraction,
+    silent: false,
     data: {
-      url: "/",
+      url: data.url,
     },
-    actions: [
-      {
-        action: "open",
-        title: "Ver Ranking",
-      },
-    ],
+    actions: data.actions,
   };
 
   event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
-// Notification click - open the app
+// Notification click - open the app at the right URL
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || "/";
+  let urlToOpen = event.notification.data?.url || "/";
+
+  // Handle action clicks
+  if (event.action === "approve") {
+    urlToOpen = "/admin/aprovacoes";
+  } else if (event.action === "open") {
+    // Use the URL from notification data
+  }
 
   event.waitUntil(
     clients
@@ -98,13 +141,12 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-// Handle push subscription change (e.g., when browser refreshes keys)
+// Handle push subscription change
 self.addEventListener("pushsubscriptionchange", (event) => {
   event.waitUntil(
     self.registration.pushManager
       .subscribe(event.oldSubscription.options)
       .then((subscription) => {
-        // Re-register with server
         return fetch("/api/trpc/push.subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

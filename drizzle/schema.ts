@@ -28,6 +28,9 @@ export const sellers = mysqlTable("sellers", {
   active: boolean("active").default(true).notNull(),
   totalSales: int("totalSales").default(0).notNull(),
   totalPoints: int("totalPoints").default(0).notNull(),
+  username: varchar("username", { length: 100 }),
+  passwordHash: varchar("passwordHash", { length: 255 }),
+  lastAccess: bigint("lastAccess", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -87,6 +90,7 @@ export const sales = mysqlTable("sales", {
   description: varchar("description", { length: 500 }),
   vehicleModel: varchar("vehicleModel", { length: 255 }),
   value: int("value").default(0),
+  leadSource: varchar("leadSource", { length: 50 }), // 'lead_loja' ou 'lead_vendedor'
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -200,11 +204,13 @@ export type InsertMotivationalQuote = typeof motivationalQuotes.$inferInsert;
 // Notificações
 export const notifications = mysqlTable("notifications", {
   id: int("id").autoincrement().primaryKey(),
-  sellerId: int("sellerId"),
+  sellerId: int("sellerId"), // null = notificação para admin/gerente
+  targetType: varchar("targetType", { length: 20 }).default("seller").notNull(), // 'seller', 'admin', 'all'
   type: varchar("type", { length: 50 }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
   read: boolean("read").default(false).notNull(),
+  actionUrl: varchar("actionUrl", { length: 500 }), // URL para ação direta
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

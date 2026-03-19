@@ -8,7 +8,7 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
-import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake } from "./pushService";
+import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
@@ -68,6 +68,65 @@ export const appRouter = router({
       const { url } = await storagePut(fileKey, buffer, input.mimeType);
       await db.updateSeller(input.id, { photoUrl: url, photoKey: fileKey });
       return { url };
+    }),
+
+    // === LOGIN DE VENDEDOR POR SENHA ===
+    login: publicProcedure.input(z.object({
+      username: z.string().min(1),
+      password: z.string().min(1),
+    })).mutation(async ({ input, ctx }) => {
+      const seller = await db.getSellerByUsername(input.username);
+      if (!seller || !seller.active || !seller.passwordHash) {
+        throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
+      }
+      const valid = await bcrypt.compare(input.password, seller.passwordHash);
+      if (!valid) {
+        throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
+      }
+      // Atualizar lastAccess
+      await db.updateSellerLastAccess(seller.id);
+      // Gerar JWT e setar cookie
+      const token = jwt.sign(
+        { sellerId: seller.id, username: seller.username },
+        ENV.cookieSecret,
+        { expiresIn: "30d" }
+      );
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname };
+    }),
+
+    logout: publicProcedure.mutation(({ ctx }) => {
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+      return { success: true };
+    }),
+
+    // Verificar se est\u00e1 logado como vendedor
+    me: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user || ctx.user.loginMethod !== 'seller_password') return null;
+      const sellerId = -(ctx.user.id + 1000000);
+      const seller = await db.getSellerById(sellerId);
+      if (!seller) return null;
+      // Atualizar lastAccess
+      await db.updateSellerLastAccess(sellerId);
+      return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department };
+    }),
+
+    // Admin define/reseta senha de vendedor
+    setPassword: adminProcedure.input(z.object({
+      id: z.number(),
+      username: z.string().min(3),
+      password: z.string().min(4),
+    })).mutation(async ({ input }) => {
+      // Verificar se username j\u00e1 existe em outro vendedor
+      const existing = await db.getSellerByUsername(input.username);
+      if (existing && existing.id !== input.id) {
+        throw new Error("Este nome de usu\u00e1rio j\u00e1 est\u00e1 em uso por outro vendedor");
+      }
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      await db.updateSeller(input.id, { username: input.username, passwordHash });
+      return { success: true };
     }),
   }),
 
@@ -184,6 +243,11 @@ export const appRouter = router({
       points: z.number().default(1),
     })).mutation(async ({ input }) => {
       const id = await db.createSale({ ...input, status: 'approved' });
+      // Auto-incrementar meta da loja (venda criada pelo admin já é aprovada)
+      const now = new Date();
+      const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
+      const saleCategory = comp?.category || 'vendas';
+      await db.autoUpdateStoreGoal(saleCategory, now.getMonth() + 1, now.getFullYear(), 1);
       const seller = await db.getSellerById(input.sellerId);
       if (seller && input.value && input.value >= 50000) {
         await notifyOwner({
@@ -200,6 +264,7 @@ export const appRouter = router({
       vehicleModel: z.string().min(1),
       value: z.number().optional(),
       description: z.string().optional(),
+      leadSource: z.enum(['lead_loja', 'lead_vendedor']),
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
@@ -211,8 +276,17 @@ export const appRouter = router({
         title: `Nova venda para aprovar!`,
         content: `${seller.name} registrou uma venda: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''}. Acesse o painel para aprovar.`,
       });
-      // Push notification para todos
-      sendPushNewSale(seller.name, input.vehicleModel, input.value || 0).catch(console.error);
+      const leadLabel = input.leadSource === 'lead_loja' ? 'Lead Loja' : 'Lead Vendedor';
+      // Notificação persistente para admin/gerente
+      await db.createNotification({
+        targetType: 'admin',
+        type: 'pending_sale',
+        title: 'Nova venda para aprovar!',
+        message: `${seller.name} registrou: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''} | ${leadLabel}`,
+        actionUrl: '/admin/aprovacoes',
+      });
+      // Push notification para admin/gerente
+      sendPushPendingSale(seller.name, input.vehicleModel, 'Venda').catch(console.error);
       return { id, message: "Venda registrada! Aguardando aprovação do gerente." };
     }),
     // Listar vendas pendentes (admin)
@@ -223,6 +297,11 @@ export const appRouter = router({
     approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const sale = await db.approveSale(input.id);
       const seller = await db.getSellerById(sale.sellerId);
+      // Auto-incrementar meta da loja
+      const saleDate = new Date(sale.createdAt);
+      const comp = sale.competitionId ? await db.getCompetitionById(sale.competitionId) : null;
+      const saleCategory = comp?.category || 'vendas';
+      await db.autoUpdateStoreGoal(saleCategory, saleDate.getMonth() + 1, saleDate.getFullYear(), 1);
       // Criar notificação para o vendedor
       if (seller) {
         await db.createNotification({
@@ -243,8 +322,17 @@ export const appRouter = router({
       await db.rejectSale(input.id);
       return { success: true };
     }),
-    // Excluir venda (admin) - reverte pontos se aprovada
+    // Excluir venda (admin) - reverte pontos e meta se aprovada
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      // Buscar venda antes de deletar para decrementar meta
+      const salesList = await db.listSales(undefined, undefined);
+      const sale = salesList.find((s: any) => s.id === input.id);
+      if (sale && sale.status === 'approved') {
+        const saleDate = new Date(sale.createdAt);
+        const comp = sale.competitionId ? await db.getCompetitionById(sale.competitionId) : null;
+        const saleCategory = comp?.category || 'vendas';
+        await db.autoUpdateStoreGoal(saleCategory, saleDate.getMonth() + 1, saleDate.getFullYear(), -1);
+      }
       await db.deleteSale(input.id);
       return { success: true };
     }),
@@ -406,8 +494,26 @@ export const appRouter = router({
     list: publicProcedure.input(z.object({ sellerId: z.number().optional() }).optional()).query(async ({ input }) => {
       return db.listNotifications(input?.sellerId);
     }),
+    adminList: adminProcedure.query(async () => {
+      return db.listAdminNotifications();
+    }),
+    unreadCountAdmin: adminProcedure.query(async () => {
+      const count = await db.countUnreadAdminNotifications();
+      return { count };
+    }),
+    unreadCountSeller: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
+      const count = await db.countUnreadSellerNotifications(input.sellerId);
+      return { count };
+    }),
     markRead: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.markNotificationRead(input.id);
+      return { success: true };
+    }),
+    markAllRead: protectedProcedure.input(z.object({
+      targetType: z.string(),
+      sellerId: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      await db.markAllNotificationsRead(input.targetType, input.sellerId);
       return { success: true };
     }),
   }),
@@ -487,7 +593,16 @@ export const appRouter = router({
         title: `Novo registro F&I para aprovar!`,
         content: `${seller.name} registrou F&I: Banco ${input.bankName} | ${input.returnType} | R$ ${((input.financedValue || 0) / 100).toLocaleString("pt-BR")}`,
       });
-      return { id, message: "F&I registrado! Aguardando aprova\u00e7\u00e3o." };
+      // Notificação persistente para admin
+      await db.createNotification({
+        targetType: 'admin',
+        type: 'pending_fei',
+        title: 'Novo F&I para aprovar!',
+        message: `${seller.name}: Banco ${input.bankName} | ${input.returnType}`,
+        actionUrl: '/admin/aprovacoes',
+      });
+      sendPushPendingRecord(seller.name, 'F&I', `Banco ${input.bankName} | ${input.returnType}`).catch(console.error);
+      return { id, message: "F&I registrado! Aguardando aprovação." };
     }),
     listPending: adminProcedure.query(async () => {
       return db.listPendingFeiRecords();
@@ -536,12 +651,20 @@ export const appRouter = router({
       if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
-      const id = await db.createConsignmentRecord({ ...input, points, status: 'pending' });
+        const id = await db.createConsignmentRecord({ ...input, points, status: 'pending' });
       await notifyOwner({
-        title: `Nova consigna\u00e7\u00e3o para aprovar!`,
-        content: `${seller.name} registrou consigna\u00e7\u00e3o: ${input.vehicleModel} | Dono: ${input.ownerName} | Tel: ${input.ownerPhone || 'N/I'} | Placa: ${input.vehiclePlate || 'N/I'}`,
+        title: `Nova consignação para aprovar!`,
+        content: `${seller.name} registrou consignação: ${input.vehicleModel} | Dono: ${input.ownerName} | Tel: ${input.ownerPhone || 'N/I'} | Placa: ${input.vehiclePlate || 'N/I'}`,
       });
-      return { id, message: "Consigna\u00e7\u00e3o registrada! Aguardando aprova\u00e7\u00e3o. Lembre-se: o carro precisa ficar 7 dias no p\u00e1tio para contar pontos." };
+      await db.createNotification({
+        targetType: 'admin',
+        type: 'pending_consignment',
+        title: 'Nova consignação para aprovar!',
+        message: `${seller.name}: ${input.vehicleModel} | Dono: ${input.ownerName}`,
+        actionUrl: '/admin/aprovacoes',
+      });
+      sendPushPendingRecord(seller.name, 'Consignação', `${input.vehicleModel} | Dono: ${input.ownerName}`).catch(console.error);
+      return { id, message: "Consignação registrada! Aguardando aprovação. Lembre-se: o carro precisa ficar 7 dias no pátio para contar pontos." };
     }),
     listPending: adminProcedure.query(async () => {
       return db.listPendingConsignmentRecords();
@@ -599,9 +722,17 @@ export const appRouter = router({
       const id = await db.createDispatchRecord({ ...input, points, bonusPoints, status: 'pending' });
       await notifyOwner({
         title: `Novo registro de despachante para aprovar!`,
-        content: `${seller.name} registrou: ${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}${input.customerPaid ? ' | CLIENTE PAGOU (b\u00f4nus!)' : ''}`,
+        content: `${seller.name} registrou: ${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}${input.customerPaid ? ' | CLIENTE PAGOU (bônus!)' : ''}`,
       });
-      return { id, message: "Registro de despachante enviado! Aguardando aprova\u00e7\u00e3o." };
+      await db.createNotification({
+        targetType: 'admin',
+        type: 'pending_dispatch',
+        title: 'Novo despachante para aprovar!',
+        message: `${seller.name}: ${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`,
+        actionUrl: '/admin/aprovacoes',
+      });
+      sendPushPendingRecord(seller.name, 'Despachante', `${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`).catch(console.error);
+      return { id, message: "Registro de despachante enviado! Aguardando aprovação." };
     }),
     listPending: adminProcedure.query(async () => {
       return db.listPendingDispatchRecords();
@@ -745,6 +876,10 @@ export const appRouter = router({
     // Gerente aprova comparecimento
     approveAttendance: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const record = await db.approveAttendance(input.id);
+      // Push para vendedor que comparecimento foi aprovado
+      if (record && record.sellerId) {
+        sendPushAttendanceApproved(record.sellerId, record.customerName || 'Cliente').catch(console.error);
+      }
       return { success: true, record };
     }),
     // Gerente reprova comparecimento
@@ -805,7 +940,7 @@ export const appRouter = router({
         messages: [
           {
             role: 'system',
-            content: `Você é um assistente que extrai dados de vendas de veículos a partir de fala transcrita. Extraia os campos disponíveis do texto. Retorne JSON com os campos encontrados. Campos possíveis: vehicleModel (modelo do carro), value (valor em centavos, ex: 45000 reais = 4500000), customerName (nome do cliente), vehiclePlate (placa), description (descrição), bankName (banco), customerPhone (telefone), customerEmail (email), customerCpf (CPF). Se não encontrar um campo, não inclua no JSON. Sempre retorne JSON válido.`
+            content: `Você é um assistente que extrai dados de vendas de veículos a partir de fala transcrita. Extraia os campos disponíveis do texto. Retorne JSON com os campos encontrados. Use null para campos não encontrados. Campos: vehicleModel (modelo do carro), value (valor em centavos, ex: 45000 reais = 4500000), customerName (nome do cliente), vehiclePlate (placa), description (descrição), bankName (banco), customerPhone (telefone), customerEmail (email), customerCpf (CPF). Sempre retorne JSON válido com todos os campos (use null se não encontrar).`
           },
           { role: 'user', content: input.transcript }
         ],
@@ -817,17 +952,17 @@ export const appRouter = router({
             schema: {
               type: 'object',
               properties: {
-                vehicleModel: { type: 'string', description: 'Modelo do veículo' },
-                value: { type: 'number', description: 'Valor em centavos' },
-                customerName: { type: 'string', description: 'Nome do cliente' },
-                vehiclePlate: { type: 'string', description: 'Placa do veículo' },
-                description: { type: 'string', description: 'Descrição da venda' },
-                bankName: { type: 'string', description: 'Nome do banco' },
-                customerPhone: { type: 'string', description: 'Telefone' },
-                customerEmail: { type: 'string', description: 'Email' },
-                customerCpf: { type: 'string', description: 'CPF' },
+                vehicleModel: { type: ['string', 'null'], description: 'Modelo do veículo' },
+                value: { type: ['number', 'null'], description: 'Valor em centavos' },
+                customerName: { type: ['string', 'null'], description: 'Nome do cliente' },
+                vehiclePlate: { type: ['string', 'null'], description: 'Placa do veículo' },
+                description: { type: ['string', 'null'], description: 'Descrição da venda' },
+                bankName: { type: ['string', 'null'], description: 'Nome do banco' },
+                customerPhone: { type: ['string', 'null'], description: 'Telefone' },
+                customerEmail: { type: ['string', 'null'], description: 'Email' },
+                customerCpf: { type: ['string', 'null'], description: 'CPF' },
               },
-              required: [],
+              required: ['vehicleModel', 'value', 'customerName', 'vehiclePlate', 'description', 'bankName', 'customerPhone', 'customerEmail', 'customerCpf'],
               additionalProperties: false,
             },
           },
@@ -836,7 +971,13 @@ export const appRouter = router({
       const rawContent = response.choices?.[0]?.message?.content;
       const content = typeof rawContent === 'string' ? rawContent : '{}';
       try {
-        return { success: true, data: JSON.parse(content) };
+        const parsed = JSON.parse(content);
+        // Remover campos null para manter compatibilidade
+        const cleaned: Record<string, any> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v !== null && v !== undefined) cleaned[k] = v;
+        }
+        return { success: true, data: cleaned };
       } catch {
         return { success: true, data: {} };
       }
@@ -986,6 +1127,44 @@ export const appRouter = router({
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteManager(input.id);
       return { success: true };
+    }),
+  }),
+
+  // ===== ALERTAS AUTOMÁTICOS =====
+  alerts: router({
+    // Verificar agendamentos expirando (chamado pelo frontend periodicamente)
+    checkExpiringAppointments: publicProcedure.input(z.object({
+      sellerId: z.number(),
+    })).query(async ({ input }) => {
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const now = Date.now();
+      const expiring: { id: number; customerName: string; minutesLeft: number; status: string }[] = [];
+      for (const r of records) {
+        if (!r.scheduledDate || r.attendanceStatus !== 'pending') continue;
+        const diff = r.scheduledDate - now;
+        const minutesLeft = Math.floor(diff / 60000);
+        // Alertar se faltam menos de 30 minutos ou já passou
+        if (minutesLeft <= 30) {
+          expiring.push({
+            id: r.id,
+            customerName: r.customerName || 'Cliente',
+            minutesLeft,
+            status: minutesLeft <= 0 ? 'expired' : 'expiring',
+          });
+        }
+      }
+      return expiring;
+    }),
+    // Verificar se vendedor está inativo (chamado pelo backend scheduler)
+    checkInactivity: adminProcedure.query(async () => {
+      // Retorna vendedores ativos para o admin poder ver quem está inativo
+      const allSellers = await db.listSellers(true);
+      return allSellers.map(s => ({
+        id: s.id,
+        name: s.nickname || s.name,
+        totalPoints: s.totalPoints,
+        totalSales: s.totalSales,
+      }));
     }),
   }),
 });

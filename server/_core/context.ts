@@ -3,7 +3,7 @@ import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import jwt from "jsonwebtoken";
 import { ENV } from "./env";
-import { getManagerById } from "../db";
+import { getManagerById, getSellerById } from "../db";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -47,6 +47,33 @@ export async function createContext(
       }
     } catch (error) {
       // Invalid or expired manager token, ignore
+    }
+  }
+
+  // 3) If no OAuth user and no manager, try seller JWT cookie
+  if (!user) {
+    try {
+      const sellerToken = opts.req.cookies?.seller_session;
+      if (sellerToken) {
+        const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
+        const seller = await getSellerById(payload.sellerId);
+        if (seller && seller.active) {
+          // Create a virtual user object with "seller" role
+          user = {
+            id: -(1000000 + seller.id), // large negative offset to distinguish from managers
+            openId: `seller_${seller.id}`,
+            name: seller.name,
+            email: seller.email,
+            loginMethod: "seller_password",
+            role: "user",
+            createdAt: seller.createdAt,
+            updatedAt: seller.updatedAt,
+            lastSignedIn: new Date(),
+          } as User;
+        }
+      }
+    } catch (error) {
+      // Invalid or expired seller token, ignore
     }
   }
 

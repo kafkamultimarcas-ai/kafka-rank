@@ -31,6 +31,7 @@ export default function RegisterSale() {
   const [vehicleModel, setVehicleModel] = useState("");
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
+  const [saleLeadSource, setSaleLeadSource] = useState<string>("");
 
   // F&I fields
   const [customerCpf, setCustomerCpf] = useState("");
@@ -104,7 +105,7 @@ export default function RegisterSale() {
   const isPending = registerSale.isPending || registerFei.isPending || registerConsignment.isPending || registerDispatch.isPending || registerSdr.isPending;
 
   const resetForm = () => {
-    setVehicleModel(""); setValue(""); setDescription("");
+    setVehicleModel(""); setValue(""); setDescription(""); setSaleLeadSource("");
     setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setPaymentDate("");
     setConsignModel(""); setConsignPlate(""); setOwnerName(""); setOwnerPhone(""); setEntryDate("");
     setDispatchPlate(""); setDocumentType(""); setCustomerPaid(false); setTransferValue("");
@@ -211,10 +212,12 @@ export default function RegisterSale() {
       switch (category) {
         case "vendas":
           if (!vehicleModel) { toast.error("Informe o modelo do veículo!"); return; }
+          if (!saleLeadSource) { toast.error("Selecione a origem do lead!"); return; }
           result = await registerSale.mutateAsync({
             sellerId: sid, competitionId: cid, vehicleModel,
             value: value ? parseInt(value.replace(/\D/g, "")) : undefined,
             description: description || undefined,
+            leadSource: saleLeadSource as 'lead_loja' | 'lead_vendedor',
           });
           break;
         case "fei":
@@ -454,6 +457,40 @@ export default function RegisterSale() {
             {/* VENDAS */}
             {category === "vendas" && (
               <>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold flex items-center gap-2">
+                    <Flag className="w-4 h-4 text-yellow-400" />
+                    Origem do Lead *
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSaleLeadSource('lead_loja')}
+                      className={`py-3 px-4 rounded-lg border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                        saleLeadSource === 'lead_loja'
+                          ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                          : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      <span className="text-lg">\uD83C\uDFEA</span>
+                      <span>Lead Loja</span>
+                      <span className="text-[10px] text-gray-500 font-normal">Plataformas da loja</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSaleLeadSource('lead_vendedor')}
+                      className={`py-3 px-4 rounded-lg border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                        saleLeadSource === 'lead_vendedor'
+                          ? 'border-green-500 bg-green-500/20 text-green-400'
+                          : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      <span className="text-lg">\uD83D\uDC64</span>
+                      <span>Lead Vendedor</span>
+                      <span className="text-[10px] text-gray-500 font-normal">Facebook, anúncio próprio</span>
+                    </button>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">
                     <Car className="w-4 h-4 text-blue-400" />

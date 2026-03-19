@@ -99,6 +99,12 @@ export default function AccessGate({ children }: { children: ReactNode }) {
             <Flag className="h-3 w-3" />
             <span>Acesso exclusivo para equipe Kafka Rank</span>
           </div>
+
+          <div className="pt-2 border-t border-gray-800">
+            <a href="/login-vendedor" onClick={(e) => { e.preventDefault(); localStorage.setItem(ACCESS_KEY, 'true'); setGranted(true); setTimeout(() => { window.location.href = '/login-vendedor'; }, 100); }} className="text-xs text-blue-400 hover:text-blue-300 underline">
+              Entrar com login de vendedor
+            </a>
+          </div>
         </div>
       </div>
     </div>

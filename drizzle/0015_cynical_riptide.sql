@@ -1,0 +1,1 @@
+ALTER TABLE `sales` ADD `leadSource` varchar(50);

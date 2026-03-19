@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Filter } from "lucide-react";
+import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Filter, Key } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
 
@@ -30,6 +30,8 @@ export default function AdminSellers() {
   const [filterDept, setFilterDept] = useState<string>("todos");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
+  const [passwordForm, setPasswordForm] = useState({ username: "", password: "" });
 
   const filteredSellers = useMemo(() => {
     if (!sellers) return [];
@@ -69,6 +71,11 @@ export default function AdminSellers() {
 
   const toggleActive = trpc.sellers.update.useMutation({
     onSuccess: () => { utils.sellers.list.invalidate(); toast.success("Status atualizado!"); },
+  });
+
+  const setPasswordMutation = trpc.sellers.setPassword.useMutation({
+    onSuccess: () => { setPasswordDialog({ open: false, seller: null }); setPasswordForm({ username: "", password: "" }); toast.success("Login definido com sucesso!"); },
+    onError: (err) => toast.error(err.message || "Erro ao definir login."),
   });
 
   function resetForm() {
@@ -256,6 +263,14 @@ export default function AdminSellers() {
                     >
                       {seller.active ? <UserCheck className="h-4 w-4 text-green-400" /> : <UserX className="h-4 w-4 text-muted-foreground" />}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => { setPasswordDialog({ open: true, seller }); setPasswordForm({ username: (seller as any).username || "", password: "" }); }}
+                      title="Definir login/senha"
+                    >
+                      <Key className={`h-4 w-4 ${(seller as any).username ? 'text-blue-400' : 'text-muted-foreground'}`} />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(seller)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -280,6 +295,35 @@ export default function AdminSellers() {
             </p>
           </div>
         )}
+
+        {/* Dialog para definir senha */}
+        <Dialog open={passwordDialog.open} onOpenChange={(open) => { setPasswordDialog({ open, seller: open ? passwordDialog.seller : null }); if (!open) setPasswordForm({ username: "", password: "" }); }}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-foreground flex items-center gap-2">
+                <Key className="h-5 w-5 text-blue-400" />
+                Login do Vendedor: {passwordDialog.seller?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={(e) => { e.preventDefault(); if (!passwordForm.username.trim() || !passwordForm.password.trim()) { toast.error("Preencha usu\u00e1rio e senha"); return; } setPasswordMutation.mutate({ id: passwordDialog.seller!.id, username: passwordForm.username.trim(), password: passwordForm.password.trim() }); }} className="space-y-4">
+              <div>
+                <Label className="text-foreground">Nome de usu\u00e1rio *</Label>
+                <Input value={passwordForm.username} onChange={e => setPasswordForm({ ...passwordForm, username: e.target.value })} placeholder="Ex: joao.silva" className="bg-input border-border text-foreground" />
+                <p className="text-xs text-muted-foreground mt-1">M\u00ednimo 3 caracteres. Ser\u00e1 usado para login.</p>
+              </div>
+              <div>
+                <Label className="text-foreground">Senha *</Label>
+                <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} placeholder="M\u00ednimo 4 caracteres" className="bg-input border-border text-foreground" />
+              </div>
+              {(passwordDialog.seller as any)?.username && (
+                <p className="text-xs text-blue-400">Este vendedor j\u00e1 possui login: <strong>{(passwordDialog.seller as any).username}</strong>. Definir nova senha ir\u00e1 substituir a anterior.</p>
+              )}
+              <Button type="submit" className="w-full racing-gradient text-white" disabled={setPasswordMutation.isPending}>
+                {setPasswordMutation.isPending ? "Salvando..." : "Definir Login"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Hidden file input for photo upload */}
         <input

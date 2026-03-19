@@ -1,0 +1,252 @@
+{
+  "query": "SELECT s.id, s.sellerId, s.competitionId, s.vehicleModel, s.value, s.points, s.status, s.createdAt, c.category as compCategory FROM sales s LEFT JOIN competitions c ON s.competitionId = c.id WHERE s.status = 'approved' AND MONTH(s.createdAt) = 3 AND YEAR(s.createdAt) = 2026 ORDER BY s.createdAt;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.sellerId, s.competitionId, s.vehicleModel, s.value, s.points, s.status, s.createdAt, c.category as compCategory FROM sales s LEFT JOIN competitions c ON s.competitionId = c.id WHERE s.status = 'approved' AND MONTH(s.createdAt) = 3 AND YEAR(s.createdAt) = 2026 ORDER BY s.createdAt;",
+  "rows": [
+    {
+      "id": "120004",
+      "sellerId": "7",
+      "competitionId": "1",
+      "vehicleModel": "Civic 2014",
+      "value": "75000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 17:00:06",
+      "compCategory": "vendas"
+    },
+    {
+      "id": "150001",
+      "sellerId": "2",
+      "competitionId": "1",
+      "vehicleModel": "Marea 2001",
+      "value": "75000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:34:37",
+      "compCategory": "vendas"
+    },
+    {
+      "id": "150002",
+      "sellerId": "7",
+      "competitionId": "1",
+      "vehicleModel": "Honda Fit ",
+      "value": "43990",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:35:34",
+      "compCategory": "vendas"
+    },
+    {
+      "id": "150008",
+      "sellerId": "6",
+      "competitionId": "NULL",
+      "vehicleModel": "FIAT 500",
+      "value": "40000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:41:45",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150009",
+      "sellerId": "4",
+      "competitionId": "NULL",
+      "vehicleModel": "Punto ",
+      "value": "46000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:41:47",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150010",
+      "sellerId": "4",
+      "competitionId": "NULL",
+      "vehicleModel": "Sentra Azul 2014 ",
+      "value": "55990",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:42:24",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150011",
+      "sellerId": "7",
+      "competitionId": "NULL",
+      "vehicleModel": "Fiesta 2011 ",
+      "value": "11500",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:43:00",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150012",
+      "sellerId": "6",
+      "competitionId": "NULL",
+      "vehicleModel": "CRUZE 1.4 LTZ 2018",
+      "value": "94990",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:43:13",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150013",
+      "sellerId": "4",
+      "competitionId": "NULL",
+      "vehicleModel": "T-cross",
+      "value": "111000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:43:26",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150014",
+      "sellerId": "6",
+      "competitionId": "NULL",
+      "vehicleModel": "408",
+      "value": "47000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:43:48",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150015",
+      "sellerId": "3",
+      "competitionId": "NULL",
+      "vehicleModel": "Honda Civic 2014",
+      "value": "77900",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:43:57",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150016",
+      "sellerId": "7",
+      "competitionId": "NULL",
+      "vehicleModel": "Civic ",
+      "value": "54990",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:44:00",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150017",
+      "sellerId": "6",
+      "competitionId": "NULL",
+      "vehicleModel": "Kicks 2020 ",
+      "value": "83000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:44:28",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150018",
+      "sellerId": "3",
+      "competitionId": "NULL",
+      "vehicleModel": "Renault Sandero",
+      "value": "34900",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:45:59",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150019",
+      "sellerId": "5",
+      "competitionId": "NULL",
+      "vehicleModel": "Nivus 1.0 2022",
+      "value": "122990",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:47:44",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150020",
+      "sellerId": "1",
+      "competitionId": "NULL",
+      "vehicleModel": "Etios branco 2015",
+      "value": "0",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:48:06",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150021",
+      "sellerId": "5",
+      "competitionId": "NULL",
+      "vehicleModel": "Sandero 1.0 2012",
+      "value": "32000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:49:37",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150022",
+      "sellerId": "1",
+      "competitionId": "NULL",
+      "vehicleModel": "Etios Vermelho 2013",
+      "value": "0",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:49:44",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150024",
+      "sellerId": "1",
+      "competitionId": "NULL",
+      "vehicleModel": "Cronos",
+      "value": "0",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:50:31",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150025",
+      "sellerId": "1",
+      "competitionId": "NULL",
+      "vehicleModel": "Gol 2011",
+      "value": "27500",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:50:55",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150026",
+      "sellerId": "1",
+      "competitionId": "NULL",
+      "vehicleModel": "Peugeot 308",
+      "value": "42000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:52:21",
+      "compCategory": "NULL"
+    },
+    {
+      "id": "150027",
+      "sellerId": "1",
+      "competitionId": "NULL",
+      "vehicleModel": "Tiida",
+      "value": "46000",
+      "points": "1",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:53:00",
+      "compCategory": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsellerId\tcompetitionId\tvehicleModel\tvalue\tpoints\tstatus\tcreatedAt\tcompCategory\n120004\t7\t1\tCivic 2014\t75000\t1\tapproved\t2026-03-19 17:00:06\tvendas\n150001\t2\t1\tMarea 2001\t75000\t1\tapproved\t2026-03-19 18:34:37\tvendas\n150002\t7\t1\tHonda Fit \t43990\t1\tapproved\t2026-03-19 18:35:34\tvendas\n150008\t6\tNULL\tFIAT 500\t40000\t1\tapproved\t2026-03-19 18:41:45\tNULL\n150009\t4\tNULL\tPunto \t46000\t1\tapproved\t2026-03-19 18:41:47\tNULL\n150010\t4\tNULL\tSentra Azul 2014 \t55990\t1\tapproved\t2026-03-19 18:42:24\tNULL\n150011\t7\tNULL\tFiesta 2011 \t11500\t1\tapproved\t2026-03-19 18:43:00\tNULL\n150012\t6\tNULL\tCRUZE 1.4 LTZ 2018\t94990\t1\tapproved\t2026-03-19 18:43:13\tNULL\n150013\t4\tNULL\tT-cross\t111000\t1\tapproved\t2026-03-19 18:43:26\tNULL\n150014\t6\tNULL\t408\t47000\t1\tapproved\t2026-03-19 18:43:48\tNULL\n150015\t3\tNULL\tHonda Civic 2014\t77900\t1\tapproved\t2026-03-19 18:43:57\tNULL\n150016\t7\tNULL\tCivic \t54990\t1\tapproved\t2026-03-19 18:44:00\tNULL\n150017\t6\tNULL\tKicks 2020 \t83000\t1\tapproved\t2026-03-19 18:44:28\tNULL\n150018\t3\tNULL\tRenault Sandero\t34900\t1\tapproved\t2026-03-19 18:45:59\tNULL\n150019\t5\tNULL\tNivus 1.0 2022\t122990\t1\tapproved\t2026-03-19 18:47:44\tNULL\n150020\t1\tNULL\tEtios branco 2015\t0\t1\tapproved\t2026-03-19 18:48:06\tNULL\n150021\t5\tNULL\tSandero 1.0 2012\t32000\t1\tapproved\t2026-03-19 18:49:37\tNULL\n150022\t1\tNULL\tEtios Vermelho 2013\t0\t1\tapproved\t2026-03-19 18:49:44\tNULL\n150024\t1\tNULL\tCronos\t0\t1\tapproved\t2026-03-19 18:50:31\tNULL\n150025\t1\tNULL\tGol 2011\t27500\t1\tapproved\t2026-03-19 18:50:55\tNULL\n150026\t1\tNULL\tPeugeot 308\t42000\t1\tapproved\t2026-03-19 18:52:21\tNULL\n150027\t1\tNULL\tTiida\t46000\t1\tapproved\t2026-03-19 18:53:00\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}
