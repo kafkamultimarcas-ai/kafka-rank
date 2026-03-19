@@ -230,7 +230,12 @@ export const appRouter = router({
     list: publicProcedure.input(z.object({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
-    }).optional()).query(async ({ input }) => {
+    }).optional()).query(async ({ input, ctx }) => {
+      // Vendedor logado só vê seus próprios registros
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        const loggedSellerId = -(ctx.user.id + 1000000);
+        return db.listSales(input?.competitionId, loggedSellerId);
+      }
       return db.listSales(input?.competitionId, input?.sellerId);
     }),
     // Admin cria vendas já aprovadas
@@ -571,7 +576,12 @@ export const appRouter = router({
     list: publicProcedure.input(z.object({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
-    }).optional()).query(async ({ input }) => {
+    }).optional()).query(async ({ input, ctx }) => {
+      // Vendedor logado só vê seus próprios registros
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        const loggedSellerId = -(ctx.user.id + 1000000);
+        return db.listFeiRecords(input?.competitionId, loggedSellerId);
+      }
       return db.listFeiRecords(input?.competitionId, input?.sellerId);
     }),
     register: publicProcedure.input(z.object({
@@ -635,7 +645,12 @@ export const appRouter = router({
     list: publicProcedure.input(z.object({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
-    }).optional()).query(async ({ input }) => {
+    }).optional()).query(async ({ input, ctx }) => {
+      // Vendedor logado só vê seus próprios registros
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        const loggedSellerId = -(ctx.user.id + 1000000);
+        return db.listConsignmentRecords(input?.competitionId, loggedSellerId);
+      }
       return db.listConsignmentRecords(input?.competitionId, input?.sellerId);
     }),
     register: publicProcedure.input(z.object({
@@ -703,7 +718,12 @@ export const appRouter = router({
     list: publicProcedure.input(z.object({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
-    }).optional()).query(async ({ input }) => {
+    }).optional()).query(async ({ input, ctx }) => {
+      // Vendedor logado só vê seus próprios registros
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        const loggedSellerId = -(ctx.user.id + 1000000);
+        return db.listDispatchRecords(input?.competitionId, loggedSellerId);
+      }
       return db.listDispatchRecords(input?.competitionId, input?.sellerId);
     }),
     register: publicProcedure.input(z.object({
@@ -763,10 +783,17 @@ export const appRouter = router({
 
   // ===== SDR / PRÉ-VENDAS / AGENDAMENTOS =====
   sdr: router({
-    // Rota pública: vendedor lista seus próprios agendamentos
+    // Rota protegida: vendedor lista APENAS seus próprios agendamentos
     myAppointments: publicProcedure.input(z.object({
       sellerId: z.number(),
-    })).query(async ({ input }) => {
+    })).query(async ({ input, ctx }) => {
+      // Se vendedor logado, só pode ver seus próprios dados
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        const loggedSellerId = -(ctx.user.id + 1000000);
+        if (input.sellerId !== loggedSellerId) {
+          throw new Error('Voc\u00ea s\u00f3 pode acessar seus pr\u00f3prios agendamentos');
+        }
+      }
       return db.listSdrRecords(undefined, input.sellerId);
     }),
     // Rota pública: vendedor cria agendamento individual
@@ -992,8 +1019,19 @@ export const appRouter = router({
       type: z.string().optional(),
       sellerId: z.number().optional(),
       category: z.string().optional(),
-    }).optional()).query(async ({ input }) => {
-      return db.listGoals(input || {});
+    }).optional()).query(async ({ input, ctx }) => {
+      const allGoals = await db.listGoals(input || {});
+      // Se o usuário é vendedor logado, filtrar: mostra metas da loja + apenas a meta individual dele
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        const loggedSellerId = -(ctx.user.id + 1000000);
+        return allGoals.filter((g: any) => g.type === 'store' || (g.type === 'individual' && g.sellerId === loggedSellerId));
+      }
+      // Se não é admin/gerente, esconder metas individuais (ranking público)
+      if (!ctx.user || ctx.user.role !== 'admin') {
+        return allGoals.filter((g: any) => g.type === 'store');
+      }
+      // Admin vê tudo
+      return allGoals;
     }),
     create: adminProcedure.input(z.object({
       type: z.enum(["store", "individual"]),

@@ -266,3 +266,20 @@
 - [x] Tela de login para vendedores (usuário + senha)
 - [x] Isolamento de dados: vendedor só vê seus próprios agendamentos/dados de clientes
 - [x] Admin pode criar/resetar senha de vendedor
+
+## Login Individual por Setor (Todos os Colaboradores)
+- [x] Login funciona para todos os setores: Vendas, Pré-Vendas/SDR, F&I, Consignação, Despachante
+- [x] Minha Área mostra dados específicos do setor do colaborador logado
+- [x] F&I logado vê seus registros de F&I (fichas, bancos, retornos)
+- [x] Consignação logado vê seus registros de consignação (veículos no pátio, datas)
+- [x] Despachante logado vê seus registros de despachante (transferências, documentos)
+- [x] Pré-Vendas/SDR logado vê seus agendamentos e leads
+- [x] Vendas logado vê seus agendamentos e vendas
+- [x] Cada colaborador vê apenas seus próprios dados, sem acesso aos dados dos outros
+
+## Privacidade de Dados por Vendedor
+- [x] Metas individuais privadas: vendedor só vê a meta dele (por questão de bônus)
+- [x] Dados de clientes isolados: agendamentos com telefone/email só visíveis para o vendedor que criou
+- [x] Ranking continua público/geral para todos
+- [x] Rota backend protegida: metas individuais filtradas por sellerId do vendedor logado
+- [x] Rota backend protegida: agendamentos com dados de cliente só retornam para o vendedor dono
