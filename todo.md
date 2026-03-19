@@ -180,3 +180,6 @@
 - [x] Alerta "ULTRAPASSAGEM!" via LiveAlerts com som
 - [x] Funciona no celular e no Modo TV
 - [x] Criar nova logo/branding profissional para Kafka Rank (K com bandeira quadriculada)
+
+## Atualização para Publicação
+- [x] Forçar novo checkpoint para habilitar botão Publish/Atualizar

@@ -336,6 +336,7 @@ export default function Home() {
             <span className="font-heading text-sm font-bold text-foreground">KAFKA RANK</span>
           </div>
           <p className="text-xs text-muted-foreground">Competição de Vendas — Acelere seus resultados</p>
+          <p className="text-xs text-muted-foreground/50 mt-1">v2.0</p>
           {!user && !authLoading && (
             <button
               onClick={() => window.location.href = getLoginUrl()}
