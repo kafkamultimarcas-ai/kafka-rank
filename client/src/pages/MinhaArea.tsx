@@ -256,8 +256,8 @@ export default function MinhaArea() {
                   {goal.bonusDescription && (
                     <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
                       <Award className="w-3 h-3" />
-                      B\u00f4nus: {goal.bonusDescription}
-                      {goal.bonusValue ? ` \u2014 R$ ${goal.bonusValue.toLocaleString('pt-BR')}` : ''}
+                      Bônus: {goal.bonusDescription}
+                      {goal.bonusValue ? ` — R$ ${goal.bonusValue.toLocaleString('pt-BR')}` : ''}
                     </p>
                   )}
                 </div>

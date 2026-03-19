@@ -305,18 +305,18 @@ export default function AdminSellers() {
                 Login do Vendedor: {passwordDialog.seller?.name}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); if (!passwordForm.username.trim() || !passwordForm.password.trim()) { toast.error("Preencha usu\u00e1rio e senha"); return; } setPasswordMutation.mutate({ id: passwordDialog.seller!.id, username: passwordForm.username.trim(), password: passwordForm.password.trim() }); }} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); if (!passwordForm.username.trim() || !passwordForm.password.trim()) { toast.error("Preencha usuário e senha"); return; } setPasswordMutation.mutate({ id: passwordDialog.seller!.id, username: passwordForm.username.trim(), password: passwordForm.password.trim() }); }} className="space-y-4">
               <div>
-                <Label className="text-foreground">Nome de usu\u00e1rio *</Label>
+                <Label className="text-foreground">Nome de usuário *</Label>
                 <Input value={passwordForm.username} onChange={e => setPasswordForm({ ...passwordForm, username: e.target.value })} placeholder="Ex: joao.silva" className="bg-input border-border text-foreground" />
-                <p className="text-xs text-muted-foreground mt-1">M\u00ednimo 3 caracteres. Ser\u00e1 usado para login.</p>
+                <p className="text-xs text-muted-foreground mt-1">Mínimo 3 caracteres. Será usado para login.</p>
               </div>
               <div>
                 <Label className="text-foreground">Senha *</Label>
-                <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} placeholder="M\u00ednimo 4 caracteres" className="bg-input border-border text-foreground" />
+                <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} placeholder="Mínimo 4 caracteres" className="bg-input border-border text-foreground" />
               </div>
               {(passwordDialog.seller as any)?.username && (
-                <p className="text-xs text-blue-400">Este vendedor j\u00e1 possui login: <strong>{(passwordDialog.seller as any).username}</strong>. Definir nova senha ir\u00e1 substituir a anterior.</p>
+                <p className="text-xs text-blue-400">Este vendedor já possui login: <strong>{(passwordDialog.seller as any).username}</strong>. Definir nova senha irá substituir a anterior.</p>
               )}
               <Button type="submit" className="w-full racing-gradient text-white" disabled={setPasswordMutation.isPending}>
                 {setPasswordMutation.isPending ? "Salvando..." : "Definir Login"}

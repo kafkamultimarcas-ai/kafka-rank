@@ -97,14 +97,14 @@ export default function AppointmentAlerts({ sellerId }: AppointmentAlertsProps) 
                     <p className={`text-xs font-bold uppercase tracking-wider ${
                       alert.status === 'expired' ? 'text-red-400' : 'text-orange-400'
                     }`}>
-                      {alert.status === 'expired' ? 'Cliente n\u00e3o veio!' : 'Agendamento em breve!'}
+                      {alert.status === 'expired' ? 'Cliente não veio!' : 'Agendamento em breve!'}
                     </p>
                     <p className="text-sm font-semibold text-white mt-0.5">
                       {alert.customerName}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {alert.minutesLeft <= 0
-                        ? `Hor\u00e1rio passou h\u00e1 ${Math.abs(alert.minutesLeft)} min - Ligue agora!`
+                        ? `Horário passou há ${Math.abs(alert.minutesLeft)} min - Ligue agora!`
                         : `Chega em ${alert.minutesLeft} minutos`
                       }
                     </p>

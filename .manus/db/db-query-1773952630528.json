@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE competition_participants cp SET \n  salesCount = (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND competitionId = cp.competitionId AND status = 'approved'),\n  points = (SELECT COALESCE(SUM(points), 0) FROM sales WHERE sellerId = cp.sellerId AND competitionId = cp.competitionId AND status = 'approved');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute UPDATE competition_participants cp SET \n  salesCount = (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND competitionId = cp.competitionId AND status = 'approved'),\n  points = (SELECT COALESCE(SUM(points), 0) FROM sales WHERE sellerId = cp.sellerId AND competitionId = cp.competitionId AND status = 'approved');",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 67
+}

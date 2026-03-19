@@ -1,0 +1,73 @@
+{
+  "query": "SELECT cp.id, cp.sellerId, s.name, cp.points, cp.salesCount, cp.competitionId,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND competitionId = cp.competitionId AND status = 'approved') as realCompSales\nFROM competition_participants cp \nJOIN sellers s ON s.id = cp.sellerId\nORDER BY cp.competitionId, cp.points DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT cp.id, cp.sellerId, s.name, cp.points, cp.salesCount, cp.competitionId,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND competitionId = cp.competitionId AND status = 'approved') as realCompSales\nFROM competition_participants cp \nJOIN sellers s ON s.id = cp.sellerId\nORDER BY cp.competitionId, cp.points DESC;",
+  "rows": [
+    {
+      "id": "1",
+      "sellerId": "1",
+      "name": "Leonardo",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "0"
+    },
+    {
+      "id": "30002",
+      "sellerId": "2",
+      "name": "Gabriel",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "1"
+    },
+    {
+      "id": "3",
+      "sellerId": "3",
+      "name": "Matheus",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "0"
+    },
+    {
+      "id": "4",
+      "sellerId": "4",
+      "name": "Wesley",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "0"
+    },
+    {
+      "id": "5",
+      "sellerId": "5",
+      "name": "Petherson",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "0"
+    },
+    {
+      "id": "6",
+      "sellerId": "6",
+      "name": "Lucas",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "0"
+    },
+    {
+      "id": "30001",
+      "sellerId": "7",
+      "name": "Emanuel",
+      "points": "0",
+      "salesCount": "0",
+      "competitionId": "1",
+      "realCompSales": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsellerId\tname\tpoints\tsalesCount\tcompetitionId\trealCompSales\n1\t1\tLeonardo\t0\t0\t1\t0\n30002\t2\tGabriel\t0\t0\t1\t1\n3\t3\tMatheus\t0\t0\t1\t0\n4\t4\tWesley\t0\t0\t1\t0\n5\t5\tPetherson\t0\t0\t1\t0\n6\t6\tLucas\t0\t0\t1\t0\n30001\t7\tEmanuel\t0\t0\t1\t0\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

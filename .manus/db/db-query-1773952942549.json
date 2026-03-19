@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, sellerId, status, createdAt FROM sales WHERE status = 'approved' AND createdAt >= '2026-03-01 00:00:00' AND createdAt < '2026-04-01 00:00:00' LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, sellerId, status, createdAt FROM sales WHERE status = 'approved' AND createdAt >= '2026-03-01 00:00:00' AND createdAt < '2026-04-01 00:00:00' LIMIT 5;",
+  "rows": [
+    {
+      "id": "150001",
+      "sellerId": "2",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:34:37"
+    },
+    {
+      "id": "150008",
+      "sellerId": "6",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:41:45"
+    },
+    {
+      "id": "150009",
+      "sellerId": "4",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:41:47"
+    },
+    {
+      "id": "150010",
+      "sellerId": "4",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:42:24"
+    },
+    {
+      "id": "150011",
+      "sellerId": "7",
+      "status": "approved",
+      "createdAt": "2026-03-19 18:43:00"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsellerId\tstatus\tcreatedAt\n150001\t2\tapproved\t2026-03-19 18:34:37\n150008\t6\tapproved\t2026-03-19 18:41:45\n150009\t4\tapproved\t2026-03-19 18:41:47\n150010\t4\tapproved\t2026-03-19 18:42:24\n150011\t7\tapproved\t2026-03-19 18:43:00\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

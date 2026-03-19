@@ -288,3 +288,9 @@
 - [x] Rota backend para ranking mensal: vendas aprovadas por vendedor no mês atual
 - [x] Componente de ranking mensal que abre ao clicar na meta da loja
 - [x] Ranking separado da campanha criada - baseado apenas em vendas aprovadas do mês
+
+## Bugs Reportados (19/03 - Urgente)
+- [x] BUG: Vendas duplicadas no perfil - Emanuel tem 2 vendas mas mostra 4 vendas/4 pontos (recalculado no banco)
+- [x] BUG: Ranking mensal mostrando "nenhuma venda" mesmo com 22 vendas registradas (corrigido CAST timestamp)
+- [x] BUG: Caracteres unicode quebrados no texto (corrigido em todos os arquivos)
+- [x] BUG: Vendas aprovadas não gerando pontos no ranking da competição (vinculadas à competição 1, pontos recalculados)

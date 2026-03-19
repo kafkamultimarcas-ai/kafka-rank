@@ -1,0 +1,59 @@
+{
+  "query": "SELECT s.id, s.name, s.totalSales, s.totalPoints,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as realSales\nFROM sellers s ORDER BY s.name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, s.totalSales, s.totalPoints,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as realSales\nFROM sellers s ORDER BY s.name;",
+  "rows": [
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "realSales": "2"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "totalSales": "1",
+      "totalPoints": "1",
+      "realSales": "1"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "totalSales": "6",
+      "totalPoints": "6",
+      "realSales": "6"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "totalSales": "4",
+      "totalPoints": "4",
+      "realSales": "4"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "realSales": "2"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "realSales": "2"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "totalSales": "3",
+      "totalPoints": "3",
+      "realSales": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttotalSales\ttotalPoints\trealSales\n7\tEmanuel\t2\t2\t2\n2\tGabriel\t1\t1\t1\n1\tLeonardo\t6\t6\t6\n6\tLucas\t4\t4\t4\n3\tMatheus\t2\t2\t2\n5\tPetherson\t2\t2\t2\n4\tWesley\t3\t3\t3\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}

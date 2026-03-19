@@ -1,0 +1,59 @@
+{
+  "query": "SELECT cp.sellerId, s.name, cp.points, cp.salesCount,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND competitionId = 1 AND status = 'approved') as realSales\nFROM competition_participants cp \nJOIN sellers s ON s.id = cp.sellerId\nWHERE cp.competitionId = 1\nORDER BY cp.points DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT cp.sellerId, s.name, cp.points, cp.salesCount,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND competitionId = 1 AND status = 'approved') as realSales\nFROM competition_participants cp \nJOIN sellers s ON s.id = cp.sellerId\nWHERE cp.competitionId = 1\nORDER BY cp.points DESC;",
+  "rows": [
+    {
+      "sellerId": "1",
+      "name": "Leonardo",
+      "points": "6",
+      "salesCount": "6",
+      "realSales": "6"
+    },
+    {
+      "sellerId": "6",
+      "name": "Lucas",
+      "points": "4",
+      "salesCount": "4",
+      "realSales": "4"
+    },
+    {
+      "sellerId": "4",
+      "name": "Wesley",
+      "points": "3",
+      "salesCount": "3",
+      "realSales": "3"
+    },
+    {
+      "sellerId": "3",
+      "name": "Matheus",
+      "points": "2",
+      "salesCount": "2",
+      "realSales": "2"
+    },
+    {
+      "sellerId": "5",
+      "name": "Petherson",
+      "points": "2",
+      "salesCount": "2",
+      "realSales": "2"
+    },
+    {
+      "sellerId": "7",
+      "name": "Emanuel",
+      "points": "2",
+      "salesCount": "2",
+      "realSales": "2"
+    },
+    {
+      "sellerId": "2",
+      "name": "Gabriel",
+      "points": "1",
+      "salesCount": "1",
+      "realSales": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "sellerId\tname\tpoints\tsalesCount\trealSales\n1\tLeonardo\t6\t6\t6\n6\tLucas\t4\t4\t4\n4\tWesley\t3\t3\t3\n3\tMatheus\t2\t2\t2\n5\tPetherson\t2\t2\t2\n7\tEmanuel\t2\t2\t2\n2\tGabriel\t1\t1\t1\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

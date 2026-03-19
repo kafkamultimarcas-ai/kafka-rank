@@ -41,10 +41,10 @@ export default function SellerLogin() {
           <div className="flex flex-col items-center mb-6">
             <img src={LOGO_URL} alt="Kafka Rank" className="h-16 w-auto mb-3" />
             <h1 className="text-xl font-black text-white tracking-wider uppercase">
-              Minha \u00c1rea
+              Minha Área
             </h1>
             <p className="text-sm text-gray-400 mt-1 text-center">
-              Fa\u00e7a login para acessar seus dados e registros
+              Faça login para acessar seus dados e registros
             </p>
           </div>
 
@@ -105,8 +105,8 @@ export default function SellerLogin() {
           </div>
 
           <p className="text-xs text-gray-600 text-center mt-4">
-            Pe\u00e7a seu login ao gerente ou administrador.
-            Cada colaborador tem acesso apenas aos seus pr\u00f3prios dados.
+            Peça seu login ao gerente ou administrador.
+            Cada colaborador tem acesso apenas aos seus próprios dados.
           </p>
         </div>
       </div>

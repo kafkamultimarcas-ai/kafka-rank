@@ -1,0 +1,157 @@
+{
+  "query": "SELECT id, sellerId, competitionId, status, vehicleModel FROM sales ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, sellerId, competitionId, status, vehicleModel FROM sales ORDER BY id;",
+  "rows": [
+    {
+      "id": "150001",
+      "sellerId": "2",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Marea 2001"
+    },
+    {
+      "id": "150008",
+      "sellerId": "6",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "FIAT 500"
+    },
+    {
+      "id": "150009",
+      "sellerId": "4",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Punto "
+    },
+    {
+      "id": "150010",
+      "sellerId": "4",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Sentra Azul 2014 "
+    },
+    {
+      "id": "150011",
+      "sellerId": "7",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Fiesta 2011 "
+    },
+    {
+      "id": "150012",
+      "sellerId": "6",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "CRUZE 1.4 LTZ 2018"
+    },
+    {
+      "id": "150013",
+      "sellerId": "4",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "T-cross"
+    },
+    {
+      "id": "150014",
+      "sellerId": "6",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "408"
+    },
+    {
+      "id": "150015",
+      "sellerId": "3",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Honda Civic 2014"
+    },
+    {
+      "id": "150016",
+      "sellerId": "7",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Civic "
+    },
+    {
+      "id": "150017",
+      "sellerId": "6",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Kicks 2020 "
+    },
+    {
+      "id": "150018",
+      "sellerId": "3",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Renault Sandero"
+    },
+    {
+      "id": "150019",
+      "sellerId": "5",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Nivus 1.0 2022"
+    },
+    {
+      "id": "150020",
+      "sellerId": "1",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Etios branco 2015"
+    },
+    {
+      "id": "150021",
+      "sellerId": "5",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Sandero 1.0 2012"
+    },
+    {
+      "id": "150022",
+      "sellerId": "1",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Etios Vermelho 2013"
+    },
+    {
+      "id": "150023",
+      "sellerId": "5",
+      "competitionId": "1",
+      "status": "rejected",
+      "vehicleModel": "Fiesta sedan 2008"
+    },
+    {
+      "id": "150024",
+      "sellerId": "1",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Cronos"
+    },
+    {
+      "id": "150025",
+      "sellerId": "1",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Gol 2011"
+    },
+    {
+      "id": "150026",
+      "sellerId": "1",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Peugeot 308"
+    },
+    {
+      "id": "150027",
+      "sellerId": "1",
+      "competitionId": "1",
+      "status": "approved",
+      "vehicleModel": "Tiida"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsellerId\tcompetitionId\tstatus\tvehicleModel\n150001\t2\t1\tapproved\tMarea 2001\n150008\t6\t1\tapproved\tFIAT 500\n150009\t4\t1\tapproved\tPunto \n150010\t4\t1\tapproved\tSentra Azul 2014 \n150011\t7\t1\tapproved\tFiesta 2011 \n150012\t6\t1\tapproved\tCRUZE 1.4 LTZ 2018\n150013\t4\t1\tapproved\tT-cross\n150014\t6\t1\tapproved\t408\n150015\t3\t1\tapproved\tHonda Civic 2014\n150016\t7\t1\tapproved\tCivic \n150017\t6\t1\tapproved\tKicks 2020 \n150018\t3\t1\tapproved\tRenault Sandero\n150019\t5\t1\tapproved\tNivus 1.0 2022\n150020\t1\t1\tapproved\tEtios branco 2015\n150021\t5\t1\tapproved\tSandero 1.0 2012\n150022\t1\t1\tapproved\tEtios Vermelho 2013\n150023\t5\t1\trejected\tFiesta sedan 2008\n150024\t1\t1\tapproved\tCronos\n150025\t1\t1\tapproved\tGol 2011\n150026\t1\t1\tapproved\tPeugeot 308\n150027\t1\t1\tapproved\tTiida\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

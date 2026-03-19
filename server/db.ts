@@ -1122,16 +1122,18 @@ export async function deleteManager(id: number) {
 export async function getMonthlyRanking(month: number, year: number) {
   const db = await getDb();
   if (!db) return [];
-  // Calcular início e fim do mês em timestamp
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 1);
+  // Calcular início e fim do mês como strings para MySQL
+  const startStr = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
+  const endMonth = month === 12 ? 1 : month + 1;
+  const endYear = month === 12 ? year + 1 : year;
+  const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
   
   // Buscar todas as vendas aprovadas do mês
   const monthSales = await db.select().from(sales)
     .where(and(
       eq(sales.status, 'approved'),
-      sql`${sales.createdAt} >= ${startDate}`,
-      sql`${sales.createdAt} < ${endDate}`,
+      sql`CAST(${sales.createdAt} AS CHAR) >= ${startStr}`,
+      sql`CAST(${sales.createdAt} AS CHAR) < ${endStr}`,
     ));
   
   // Agrupar por vendedor
@@ -1147,8 +1149,8 @@ export async function getMonthlyRanking(month: number, year: number) {
   // Buscar dados dos vendedores
   const sellerIds = Array.from(sellerMap.keys());
   if (sellerIds.length === 0) {
-    // Retornar todos os vendedores do departamento vendas com 0 vendas
-    const allSellers = await db.select().from(sellers).where(eq(sellers.department, 'vendas')).orderBy(sellers.name);
+    // Retornar todos os vendedores ativos com 0 vendas
+    const allSellers = await db.select().from(sellers).where(eq(sellers.active, true)).orderBy(sellers.name);
     return allSellers.map((s, idx) => ({
       position: idx + 1,
       seller: s,
@@ -1158,8 +1160,8 @@ export async function getMonthlyRanking(month: number, year: number) {
     }));
   }
   
-  // Buscar todos os vendedores do departamento vendas
-  const allSellers = await db.select().from(sellers).where(eq(sellers.department, 'vendas'));
+  // Buscar todos os vendedores ativos
+  const allSellers = await db.select().from(sellers).where(eq(sellers.active, true));
   
   // Montar ranking
   const ranking = allSellers.map(s => {

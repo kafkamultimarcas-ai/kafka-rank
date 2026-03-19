@@ -37,7 +37,7 @@ export default function Home() {
   const { data: allCompetitions } = trpc.competitions.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const { data: quote } = trpc.quotes.latest.useQuery();
-  const now = new Date();
+  const [now] = useState(() => new Date());
   const { data: goals } = trpc.goals.list.useQuery({ month: now.getMonth() + 1, year: now.getFullYear() });
 
   const activeComps = competitions || [];
@@ -93,7 +93,7 @@ export default function Home() {
             </Button>
             <Button size="sm" variant="outline" onClick={() => setLocation("/login-vendedor")} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
               <LogIn className="h-4 w-4" />
-              <span className="hidden sm:inline">Minha \u00c1rea</span>
+              <span className="hidden sm:inline">Minha Área</span>
             </Button>
             {user?.role === "admin" ? (
               <Button size="sm" onClick={() => setLocation("/admin")} className="gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
@@ -218,12 +218,12 @@ export default function Home() {
                       {goal.bonusDescription && (
                         <p className="text-xs text-yellow-500 mt-2 flex items-center gap-1">
                           <Award className="h-3 w-3" />
-                          B\u00f4nus: {goal.bonusDescription}
-                          {goal.bonusValue ? ` \u2014 R$ ${goal.bonusValue.toLocaleString("pt-BR")}` : ""}
+                          Bônus: {goal.bonusDescription}
+                          {goal.bonusValue ? ` — R$ ${goal.bonusValue.toLocaleString("pt-BR")}` : ""}
                         </p>
                       )}
                       <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                        {showMonthlyRanking === goal.category ? '\u25B2 Fechar ranking' : '\u25BC Toque para ver ranking do m\u00eas'}
+                        {showMonthlyRanking === goal.category ? '▲ Fechar ranking' : '▼ Toque para ver ranking do mês'}
                       </p>
                     </div>
                     {/* Ranking Mensal Expandido */}
@@ -232,7 +232,7 @@ export default function Home() {
                         <div className="flex items-center gap-2 mb-4">
                           <Trophy className="h-5 w-5 text-yellow-400" />
                           <h3 className="font-heading font-bold text-sm text-foreground">
-                            RANKING {(CATEGORY_LABELS[goal.category] || goal.category).toUpperCase()} \u2014 {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                            RANKING {(CATEGORY_LABELS[goal.category] || goal.category).toUpperCase()} — {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
                           </h3>
                         </div>
                         {/* Pódio top 3 */}
@@ -250,7 +250,7 @@ export default function Home() {
                             </div>
                             {/* 1° lugar */}
                             <div className="text-center -mt-2">
-                              <div className="text-yellow-400 text-lg mb-0.5">\uD83C\uDFC6</div>
+                              <div className="text-yellow-400 text-lg mb-0.5">🏆</div>
                               {monthlyRanking[0]?.seller?.photoUrl ? (
                                 <img src={monthlyRanking[0].seller.photoUrl} className="w-14 h-14 rounded-full mx-auto ring-2 ring-yellow-400 object-cover" />
                               ) : (
@@ -304,7 +304,7 @@ export default function Home() {
                           ))}
                         </div>
                         {monthlyRanking.length === 0 && (
-                          <p className="text-center text-xs text-muted-foreground py-4">Nenhuma venda registrada neste m\u00eas ainda.</p>
+                          <p className="text-center text-xs text-muted-foreground py-4">Nenhuma venda registrada neste mês ainda.</p>
                         )}
                       </div>
                     )}

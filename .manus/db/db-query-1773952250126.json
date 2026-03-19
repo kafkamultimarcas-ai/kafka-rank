@@ -1,0 +1,66 @@
+{
+  "query": "SELECT s.id, s.name, s.totalSales, s.totalPoints, \n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as realApprovedSales,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id) as totalSalesInTable\nFROM sellers s ORDER BY s.name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, s.totalSales, s.totalPoints, \n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as realApprovedSales,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id) as totalSalesInTable\nFROM sellers s ORDER BY s.name;",
+  "rows": [
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "totalSales": "4",
+      "totalPoints": "4",
+      "realApprovedSales": "2",
+      "totalSalesInTable": "2"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "totalSales": "1",
+      "totalPoints": "1",
+      "realApprovedSales": "1",
+      "totalSalesInTable": "1"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "totalSales": "6",
+      "totalPoints": "6",
+      "realApprovedSales": "6",
+      "totalSalesInTable": "6"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "totalSales": "4",
+      "totalPoints": "4",
+      "realApprovedSales": "4",
+      "totalSalesInTable": "4"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "realApprovedSales": "2",
+      "totalSalesInTable": "2"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "realApprovedSales": "2",
+      "totalSalesInTable": "3"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "totalSales": "4",
+      "totalPoints": "4",
+      "realApprovedSales": "3",
+      "totalSalesInTable": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttotalSales\ttotalPoints\trealApprovedSales\ttotalSalesInTable\n7\tEmanuel\t4\t4\t2\t2\n2\tGabriel\t1\t1\t1\t1\n1\tLeonardo\t6\t6\t6\t6\n6\tLucas\t4\t4\t4\t4\n3\tMatheus\t2\t2\t2\t2\n5\tPetherson\t2\t2\t2\t3\n4\tWesley\t4\t4\t3\t3\n",
+  "stderr": "",
+  "execution_time_ms": 118
+}
