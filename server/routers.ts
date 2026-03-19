@@ -660,7 +660,9 @@ export const appRouter = router({
         notes: input.notes ?? null,
         points: 1,
       });
-      return { id: result.id, ticketNumber: result.ticketNumber, message: `Agendamento ${result.ticketNumber || ''} criado! Aguardando aprovação.` };
+      // Auto-aprovar agendamento (não precisa de aprovação do admin)
+      await db.approveSdrRecord(result.id);
+      return { id: result.id, ticketNumber: result.ticketNumber, message: `Agendamento ${result.ticketNumber || ''} criado com sucesso!` };
     }),
     // Rota pública: vendedor marca que cliente compareceu (sem precisar de login admin)
     markAttendancePublic: publicProcedure.input(z.object({ id: z.number(), sellerId: z.number() })).mutation(async ({ input }) => {
@@ -700,7 +702,12 @@ export const appRouter = router({
         points: input.type === 'lead_convertido' ? 3 : 1,
       });
       const msg = input.type === 'lead_convertido' ? 'Lead convertido registrado!' : `Agendamento ${result.ticketNumber || ''} registrado!`;
-      return { id: result.id, ticketNumber: result.ticketNumber, message: msg + ' Aguardando aprovação.' };
+      // Auto-aprovar agendamentos (não precisa de aprovação do admin)
+      if (input.type === 'agendamento') {
+        await db.approveSdrRecord(result.id);
+      }
+      const msg2 = input.type === 'lead_convertido' ? 'Lead convertido registrado! Aguardando aprovação.' : `Agendamento ${result.ticketNumber || ''} criado com sucesso!`;
+      return { id: result.id, ticketNumber: result.ticketNumber, message: msg2 };
     }),
     list: adminProcedure.input(z.object({
       competitionId: z.number().optional(),

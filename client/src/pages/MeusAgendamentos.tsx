@@ -31,7 +31,7 @@ const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9Y
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
-  approved: { label: "Aprovado", color: "text-emerald-400 bg-emerald-500/20", icon: CheckCircle2 },
+  approved: { label: "Ativo", color: "text-emerald-400 bg-emerald-500/20", icon: CheckCircle2 },
   rejected: { label: "Rejeitado", color: "text-red-400 bg-red-500/20", icon: XCircle },
 };
 

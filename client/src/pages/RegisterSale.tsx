@@ -283,10 +283,17 @@ export default function RegisterSale() {
             <div>
               <h2 className="text-2xl font-bold text-white font-racing mb-2">REGISTRADO!</h2>
               <p className="text-gray-400">{submittedMessage}</p>
-              <p className="text-yellow-400 text-sm mt-2 flex items-center justify-center gap-1">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Aguardando aprovação...
-              </p>
+              {category === "pre_vendas" ? (
+                <p className="text-emerald-400 text-sm mt-2 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Agendamento confirmado!
+                </p>
+              ) : (
+                <p className="text-yellow-400 text-sm mt-2 flex items-center justify-center gap-1">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Aguardando aprovação...
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-3">
               <Button onClick={resetForm} className="bg-red-600 hover:bg-red-700 text-white font-bold">

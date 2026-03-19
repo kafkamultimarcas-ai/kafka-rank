@@ -22,7 +22,6 @@ function playSound(type: "sale" | "overtake") {
     gainNode.connect(ctx.destination);
 
     if (type === "sale") {
-      // Short cheerful beep for new sale
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(880, ctx.currentTime);
       oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
@@ -32,7 +31,6 @@ function playSound(type: "sale" | "overtake") {
       oscillator.start(ctx.currentTime);
       oscillator.stop(ctx.currentTime + 0.4);
     } else {
-      // Racing engine rev sound for overtake
       oscillator.type = "sawtooth";
       oscillator.frequency.setValueAtTime(200, ctx.currentTime);
       oscillator.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.3);
@@ -49,13 +47,16 @@ function playSound(type: "sale" | "overtake") {
 
 export function useLiveFeed() {
   const [alerts, setAlerts] = useState<FeedAlert[]>([]);
-  const lastCheckRef = useRef(Date.now() - 60000); // Start checking from 1 min ago
-  const previousRankingRef = useRef<Map<number, number>>(new Map());
   const seenSaleIdsRef = useRef<Set<number>>(new Set());
+  const previousRankingRef = useRef<Map<number, number>>(new Map());
+  const initializedRef = useRef(false);
+
+  // Always fetch sales from last 5 minutes - stable input using useState
+  const [sinceTime] = useState(() => Date.now() - 5 * 60 * 1000);
 
   // Poll for recent sales every 10 seconds
   const { data: recentSales } = trpc.feed.recent.useQuery(
-    { since: lastCheckRef.current },
+    { since: sinceTime },
     {
       refetchInterval: 10000,
       refetchIntervalInBackground: false,
@@ -71,6 +72,15 @@ export function useLiveFeed() {
   // Process new sales
   useEffect(() => {
     if (!recentSales || recentSales.length === 0) return;
+
+    // On first load, mark all existing sales as "seen" so we don't spam alerts
+    if (!initializedRef.current) {
+      for (const sale of recentSales) {
+        seenSaleIdsRef.current.add(sale.id);
+      }
+      initializedRef.current = true;
+      return;
+    }
 
     const newAlerts: FeedAlert[] = [];
 
@@ -112,7 +122,6 @@ export function useLiveFeed() {
         if (prevPos && currentPos < prevPos) {
           const seller = sellersList.find(s => s.id === sellerId);
           if (seller) {
-            const overtakenSeller = sorted[currentPos]; // The one who was overtaken
             const alertId = Date.now() + sellerId;
             if (!seenSaleIdsRef.current.has(alertId)) {
               seenSaleIdsRef.current.add(alertId);

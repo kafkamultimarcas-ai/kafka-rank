@@ -132,20 +132,26 @@ export default function Home() {
               </Button>
             </div>
 
-            {/* Agendamentos - Seletor de vendedor */}
+            {/* Agendamentos - Seção destacada */}
             {sellers && sellers.length > 0 && (
-              <div className="mt-6 max-w-sm mx-auto">
-                <label className="text-xs text-muted-foreground block mb-2 text-center">Acessar meus agendamentos:</label>
-                <select
-                  onChange={e => { if (e.target.value) setLocation(`/agendamentos/${e.target.value}`); }}
-                  defaultValue=""
-                  className="w-full rounded-lg border border-border bg-background/80 px-4 py-2.5 text-sm text-foreground"
-                >
-                  <option value="" disabled>Selecione seu nome...</option>
-                  {sellers.map(s => (
-                    <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
-                  ))}
-                </select>
+              <div className="mt-8 max-w-md mx-auto">
+                <div className="racing-card p-5 border-2 border-primary/40 bg-primary/5">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <CalendarPlus className="h-6 w-6 text-primary" />
+                    <h3 className="font-heading font-bold text-lg text-foreground">MEUS AGENDAMENTOS</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4 text-center">Gerencie seus agendamentos, acompanhe clientes e confirme comparecimentos</p>
+                  <select
+                    onChange={e => { if (e.target.value) setLocation(`/agendamentos/${e.target.value}`); }}
+                    defaultValue=""
+                    className="w-full rounded-lg border-2 border-primary/30 bg-background px-4 py-3 text-sm text-foreground font-medium mb-3 focus:border-primary focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="" disabled>Selecione seu nome para acessar...</option>
+                    {sellers.map(s => (
+                      <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
           </div>
