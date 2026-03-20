@@ -374,3 +374,7 @@
 - [x] Estrutura para futura integração WhatsApp Business API
 - [x] Estrutura para futura leitura de e-mails (leads OLX, Webmotors, SóCarrão)
 - [x] Testes automatizados do CRM (23 testes passando, 106 total)
+
+## Bug: Setor do vendedor não salva como SDR
+- [x] Bug: ao editar vendedor e mudar setor para SDR/Pré-Vendas, salva como Vendas
+- [x] Corrigir lógica de update do setor no backend (campo department faltava no input do sellers.update)

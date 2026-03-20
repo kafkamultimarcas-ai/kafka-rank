@@ -48,6 +48,7 @@ export const appRouter = router({
       nickname: z.string().optional(),
       phone: z.string().optional(),
       email: z.string().optional(),
+      department: z.string().optional(),
       active: z.boolean().optional(),
     })).mutation(async ({ input }) => {
       const { id, ...data } = input;
