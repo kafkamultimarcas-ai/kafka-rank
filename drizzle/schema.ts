@@ -300,3 +300,147 @@ export const pushSubscriptions = mysqlTable("push_subscriptions", {
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+// ===== CRM MODULE =====
+
+// Admins (login próprio, independente do Manus OAuth)
+export const admins = mysqlTable("admins", {
+  id: int("id").autoincrement().primaryKey(),
+  username: varchar("username", { length: 100 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  role: mysqlEnum("role", ["owner", "admin"]).default("admin").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Admin = typeof admins.$inferSelect;
+export type InsertAdmin = typeof admins.$inferInsert;
+
+// CRM Leads - clientes/prospects
+export const crmLeads = mysqlTable("crm_leads", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(), // vendedor responsável
+  department: varchar("department", { length: 50 }).default("vendas").notNull(), // vendas, pre_vendas, fei, consignacao
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  vehicleInterest: varchar("vehicleInterest", { length: 255 }), // veículo de interesse
+  vehiclePlate: varchar("vehiclePlate", { length: 10 }), // placa do veículo atual (troca)
+  source: varchar("source", { length: 100 }).default("manual").notNull(), // manual, whatsapp, olx, webmotors, socarrao, facebook, instagram, trafego_pago, indicacao, loja
+  stage: varchar("stage", { length: 100 }).default("novo").notNull(), // etapa do pipeline
+  score: mysqlEnum("score", ["hot", "warm", "cold"]).default("warm").notNull(), // temperatura do lead
+  notes: text("notes"), // observações gerais
+  nextContactDate: bigint("nextContactDate", { mode: "number" }), // data do próximo contato agendado
+  lastContactDate: bigint("lastContactDate", { mode: "number" }), // último contato
+  archived: boolean("archived").default(false).notNull(),
+  convertedToSale: boolean("convertedToSale").default(false).notNull(),
+  saleValue: int("saleValue").default(0), // valor da venda em centavos (quando convertido)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrmLead = typeof crmLeads.$inferSelect;
+export type InsertCrmLead = typeof crmLeads.$inferInsert;
+
+// CRM Pipeline Stages - etapas configuráveis por departamento
+export const crmPipelineStages = mysqlTable("crm_pipeline_stages", {
+  id: int("id").autoincrement().primaryKey(),
+  department: varchar("department", { length: 50 }).notNull(), // vendas, pre_vendas, fei, consignacao
+  name: varchar("name", { length: 100 }).notNull(),
+  displayOrder: int("displayOrder").notNull(),
+  color: varchar("color", { length: 20 }).default("#3B82F6").notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(), // etapa inicial padrão
+  isFinal: boolean("isFinal").default(false).notNull(), // etapa final (venda fechada, convertido, etc.)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrmPipelineStage = typeof crmPipelineStages.$inferSelect;
+export type InsertCrmPipelineStage = typeof crmPipelineStages.$inferInsert;
+
+// CRM Activities - timeline de atividades do lead
+export const crmActivities = mysqlTable("crm_activities", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  sellerId: int("sellerId").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // ligacao, whatsapp, visita, email, observacao, mudanca_etapa, agendamento
+  description: text("description"),
+  metadata: text("metadata"), // JSON com dados extras (ex: etapa anterior/nova, resultado da ligação)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrmActivity = typeof crmActivities.$inferSelect;
+export type InsertCrmActivity = typeof crmActivities.$inferInsert;
+
+// CRM Inventory - estoque de veículos
+export const crmInventory = mysqlTable("crm_inventory", {
+  id: int("id").autoincrement().primaryKey(),
+  brand: varchar("brand", { length: 100 }).notNull(), // marca
+  model: varchar("model", { length: 255 }).notNull(), // modelo
+  year: varchar("year", { length: 10 }), // ano (ex: "2023/2024")
+  plate: varchar("plate", { length: 10 }),
+  color: varchar("color", { length: 50 }),
+  mileage: int("mileage").default(0), // quilometragem
+  fuelType: varchar("fuelType", { length: 50 }), // flex, gasolina, diesel, elétrico, híbrido
+  transmission: varchar("transmission", { length: 50 }), // manual, automático, CVT
+  price: int("price").default(0).notNull(), // preço em centavos
+  costPrice: int("costPrice").default(0), // preço de custo em centavos
+  photoUrl: text("photoUrl"),
+  photoKey: varchar("photoKey", { length: 500 }),
+  status: mysqlEnum("status", ["available", "reserved", "sold", "consigned"]).default("available").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrmInventory = typeof crmInventory.$inferSelect;
+export type InsertCrmInventory = typeof crmInventory.$inferInsert;
+
+// CRM Inventory Alerts - alertas quando veículo entra e tem cliente interessado
+export const crmInventoryAlerts = mysqlTable("crm_inventory_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  inventoryId: int("inventoryId").notNull(),
+  leadId: int("leadId").notNull(),
+  sellerId: int("sellerId").notNull(),
+  notified: boolean("notified").default(false).notNull(),
+  dismissed: boolean("dismissed").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrmInventoryAlert = typeof crmInventoryAlerts.$inferSelect;
+export type InsertCrmInventoryAlert = typeof crmInventoryAlerts.$inferInsert;
+
+// CRM Integration Config - configurações de integrações externas
+export const crmIntegrations = mysqlTable("crm_integrations", {
+  id: int("id").autoincrement().primaryKey(),
+  type: varchar("type", { length: 50 }).notNull(), // whatsapp, email_parser, sig, olx, webmotors, socarrao, facebook, webhook
+  name: varchar("name", { length: 255 }).notNull(),
+  config: text("config"), // JSON com configurações (tokens, URLs, etc.)
+  apiToken: varchar("apiToken", { length: 500 }), // token de autenticação para API pública
+  active: boolean("active").default(true).notNull(),
+  lastSync: bigint("lastSync", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrmIntegration = typeof crmIntegrations.$inferSelect;
+export type InsertCrmIntegration = typeof crmIntegrations.$inferInsert;
+
+// CRM Campaigns - campanhas de disparo (WhatsApp, SMS)
+export const crmCampaigns = mysqlTable("crm_campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  message: text("message").notNull(), // mensagem com variáveis {nome}, {veiculo}
+  filters: text("filters"), // JSON com filtros (origem, período, interesse, etc.)
+  channel: varchar("channel", { length: 50 }).default("whatsapp").notNull(), // whatsapp, sms
+  status: mysqlEnum("status", ["draft", "scheduled", "sending", "sent", "cancelled"]).default("draft").notNull(),
+  scheduledDate: bigint("scheduledDate", { mode: "number" }),
+  sentCount: int("sentCount").default(0).notNull(),
+  totalTargets: int("totalTargets").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrmCampaign = typeof crmCampaigns.$inferSelect;
+export type InsertCrmCampaign = typeof crmCampaigns.$inferInsert;

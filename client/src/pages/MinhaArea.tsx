@@ -22,6 +22,7 @@ import {
   Users,
   TrendingUp,
   PlusCircle,
+  LayoutGrid,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Award, Target } from "lucide-react";
@@ -415,6 +416,20 @@ export default function MinhaArea() {
                  "Registrar Agendamento"}
               </p>
               <p className="text-gray-400 text-sm">Enviar para aprovação do gerente</p>
+            </div>
+          </button>
+
+          {/* CRM - Meus Clientes */}
+          <button
+            onClick={() => navigate("/crm")}
+            className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
+          >
+            <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <LayoutGrid className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div className="text-left flex-1">
+              <p className="text-white font-bold">CRM - Meus Clientes</p>
+              <p className="text-gray-400 text-sm">Gerenciar leads, pipeline e contatos</p>
             </div>
           </button>
 

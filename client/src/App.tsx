@@ -28,6 +28,11 @@ import MeusAgendamentos from "./pages/MeusAgendamentos";
 import LiveAlerts from "./components/LiveAlerts";
 import SellerLogin from "./pages/SellerLogin";
 import MinhaArea from "./pages/MinhaArea";
+import CrmCommandCenter from "./pages/crm/CrmCommandCenter";
+import CrmLeadDetail from "./pages/crm/CrmLeadDetail";
+import CrmPipeline from "./pages/crm/CrmPipeline";
+import CrmAdminLogin from "./pages/crm/CrmAdminLogin";
+import CrmAdminDashboard from "./pages/crm/CrmAdminDashboard";
 
 function Router() {
   return (
@@ -54,6 +59,12 @@ function Router() {
       <Route path="/admin/agendamentos" component={AdminAgendamentos} />
       <Route path="/admin/sorteio" component={AdminSorteio} />
       <Route path="/admin/gerentes" component={AdminGerentes} />
+      {/* CRM Routes */}
+      <Route path="/crm" component={CrmCommandCenter} />
+      <Route path="/crm/lead/:id" component={CrmLeadDetail} />
+      <Route path="/crm/pipeline" component={CrmPipeline} />
+      <Route path="/crm/admin/login" component={CrmAdminLogin} />
+      <Route path="/crm/admin" component={CrmAdminDashboard} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

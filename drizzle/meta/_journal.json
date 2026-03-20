@@ -120,6 +120,13 @@
       "when": 1773948884766,
       "tag": "0016_crazy_kulan_gath",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1773982369815,
+      "tag": "0017_powerful_wild_child",
+      "breakpoints": true
     }
   ]
 }

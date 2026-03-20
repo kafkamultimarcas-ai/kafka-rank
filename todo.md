@@ -294,3 +294,83 @@
 - [x] BUG: Ranking mensal mostrando "nenhuma venda" mesmo com 22 vendas registradas (corrigido CAST timestamp)
 - [x] BUG: Caracteres unicode quebrados no texto (corrigido em todos os arquivos)
 - [x] BUG: Vendas aprovadas não gerando pontos no ranking da competição (vinculadas à competição 1, pontos recalculados)
+
+## CRM - Módulo Completo
+
+### Login Admin Próprio (Independente da Manus)
+- [x] Tabela admins no banco (username, passwordHash, nome, role=owner, permissions)
+- [x] Rota de login admin por senha (gera JWT com role=owner)
+- [x] Tela de login admin em /crm/admin/login (independente do OAuth Manus)
+- [x] Admin owner tem acesso total: equipe, competições, CRM, integrações, configurações
+- [x] Manter login Manus como super-admin para manutenção técnica
+
+### Schema CRM - Banco de Dados
+- [x] Tabela crm_leads (id, sellerId, tenantId, nome, telefone, email, veiculoInteresse, origem, etapa, score, observacoes, createdAt, updatedAt)
+- [x] Tabela crm_pipeline_stages (id, departamento, nome, ordem, cor)
+- [x] Tabela crm_activities (id, leadId, sellerId, tipo, descricao, createdAt)
+- [x] Tabela crm_inventory (id, marca, modelo, ano, placa, cor, preco, status, fotos, createdAt)
+- [x] Tabela crm_inventory_alerts (id, inventoryId, leadId, sellerId, notificado, createdAt)
+- [x] Tabela crm_campaigns (id, nome, mensagem, filtros, status, enviadoCount, createdAt)
+- [x] Tabela crm_integrations (id, tipo, config, status, lastSync)
+- [x] Migração SQL para todas as tabelas
+
+### Backend CRM - Rotas tRPC
+- [x] CRUD leads (criar, editar, listar, buscar, mover etapa, arquivar)
+- [x] Busca rápida de leads (por nome, telefone, placa, veículo)
+- [x] Atividades do lead (timeline: ligação, WhatsApp, visita, observação)
+- [x] Registro de observação por voz (transcrição automática)
+- [x] CRUD estoque de veículos (cadastrar, editar, vender, remover)
+- [x] Busca inteligente: carro novo no estoque → achar clientes interessados
+- [x] Score automático de lead (quente/morno/frio baseado em atividade)
+- [x] Alertas de follow-up (leads sem contato há 48h)
+- [x] Dashboard marketing (leads por origem, conversão, custo)
+- [x] Dashboard financeiro (negócios em andamento, valores, comissões)
+
+### Frontend CRM - Centro de Comando (Mobile-First)
+- [x] Tela única "Centro de Comando" para vendedor: leads do dia, agendamentos, notificações
+- [x] Barra de busca rápida no topo (nome, telefone, placa)
+- [x] Card de lead com ações diretas: WhatsApp, Ligar, Mudar Etapa, Agendar, Observação
+- [x] Botão WhatsApp abre wa.me/numero com mensagem pré-formatada
+- [x] Botão Ligar abre tel:numero
+- [x] Mudar etapa com 2 toques no mobile
+- [x] Registro de observação por voz (microfone)
+- [x] Design mobile-first: funciona perfeitamente no celular
+
+### Frontend CRM - Pipeline Visual por Setor
+- [x] Pipeline Vendas: Lead → Contato → Visita Agendada → Negociação → Proposta → Venda Fechada
+- [x] Pipeline SDR: Lead Recebido → Qualificado → Agendamento → Compareceu → Convertido
+- [x] Pipeline Consignação: Veículo Recebido → Avaliado → Anunciado → Negociação → Vendido
+- [x] Pipeline F&I: Cliente → Análise Crédito → Aprovado → Contrato
+- [x] Drag-and-drop no desktop, toque para mover no mobile
+- [x] Cada vendedor vê só seus leads, gerente vê todos
+
+### Frontend CRM - Visões por Setor
+- [x] Visão Vendedor: Centro de Comando + seus leads + agendamentos
+- [x] Visão SDR: leads para qualificar + agendamentos + transferir para vendedor
+- [x] Visão Consignação: veículos consignados + interessados + status
+- [x] Visão Gerente: funil completo da equipe + aprovações + métricas
+- [x] Visão Marketing: dashboard origens + conversão + gráficos
+- [x] Visão Financeiro: negócios em crédito/contrato + valores + comissões
+
+### Busca Inteligente de Estoque
+- [x] Cadastro de veículos no estoque (marca, modelo, ano, placa, preço, fotos)
+- [x] Quando veículo entra no estoque, buscar leads com interesse compatível
+- [x] Notificar vendedor: "Entrou [veículo] - você tem X clientes interessados!"
+- [x] Botão direto para WhatsApp com mensagem personalizada sobre o veículo
+
+### Score e Alertas de Follow-up
+- [x] Score automático: quente (respondeu rápido, agendou), morno (sem contato 24-48h), frio (sem contato 72h+)
+- [x] Indicador visual de temperatura no card do lead (vermelho/amarelo/azul)
+- [x] Alerta: "Você tem X clientes sem contato há 48h" com destaque
+- [x] Alerta de follow-up programado (vendedor define "ligar amanhã às 14h")
+
+### Estrutura de Integração (API)
+- [x] API REST pública com autenticação por token para integrações externas
+- [x] Endpoint POST /api/webhooks/lead - receber leads de plataformas externas
+- [x] Endpoint POST /api/webhooks/leads/bulk - importar leads em massa
+- [x] Endpoint POST /api/webhooks/sig/sale - sincronizar vendas do SIG
+- [x] Endpoint POST /api/webhooks/whatsapp - webhook WhatsApp
+- [x] Documentação da API em /api/webhooks/docs
+- [x] Estrutura para futura integração WhatsApp Business API
+- [x] Estrutura para futura leitura de e-mails (leads OLX, Webmotors, SóCarrão)
+- [x] Testes automatizados do CRM (23 testes passando, 106 total)

@@ -8,6 +8,7 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
+import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter } from "./routers/crmRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1211,7 +1212,16 @@ export const appRouter = router({
         totalSales: s.totalSales,
       }));
     }),
-  }),
-});
+   }),
 
+  // ===== CRM MODULE =====
+  adminAuth: adminAuthRouter,
+  crmLeads: crmLeadsRouter,
+  crmPipeline: crmPipelineRouter,
+  crmInventory: crmInventoryRouter,
+  crmIntegrations: crmIntegrationsRouter,
+  crmCampaigns: crmCampaignsRouter,
+  crmMarketing: crmMarketingRouter,
+  crmVoice: crmVoiceRouter,
+});
 export type AppRouter = typeof appRouter;
