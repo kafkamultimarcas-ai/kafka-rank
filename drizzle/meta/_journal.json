@@ -127,6 +127,20 @@
       "when": 1773982369815,
       "tag": "0017_powerful_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1774072309861,
+      "tag": "0018_wandering_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1774072822428,
+      "tag": "0019_wonderful_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

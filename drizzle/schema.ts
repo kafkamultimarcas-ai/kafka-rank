@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, bigint, decimal } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -310,6 +310,7 @@ export const admins = mysqlTable("admins", {
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   role: mysqlEnum("role", ["owner", "admin"]).default("admin").notNull(),
+  permissions: text("permissions"), // JSON: {vendas:true, pre_vendas:true, consignacao:false, fei:false, marketing:false, financeiro:false, estoque:false, configuracoes:false, gerenciar_admins:false}
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -444,3 +445,85 @@ export const crmCampaigns = mysqlTable("crm_campaigns", {
 
 export type CrmCampaign = typeof crmCampaigns.$inferSelect;
 export type InsertCrmCampaign = typeof crmCampaigns.$inferInsert;
+
+// CRM Message Templates - templates de mensagem WhatsApp
+export const crmMessageTemplates = mysqlTable("crm_message_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // primeiro_contato, follow_up, feirao, veiculo_disponivel, pos_venda, aniversario
+  message: text("message").notNull(), // com variáveis {nome}, {veiculo}, {vendedor}, {loja}
+  department: varchar("department", { length: 50 }).default("vendas").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrmMessageTemplate = typeof crmMessageTemplates.$inferSelect;
+export type InsertCrmMessageTemplate = typeof crmMessageTemplates.$inferInsert;
+
+// CRM Follow-up Sequences - sequências automáticas de follow-up
+export const crmFollowUpTasks = mysqlTable("crm_follow_up_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  sellerId: int("sellerId").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // whatsapp, ligacao, visita, email
+  description: text("description"),
+  dueDate: bigint("dueDate", { mode: "number" }).notNull(), // timestamp de quando deve ser feito
+  completed: boolean("completed").default(false).notNull(),
+  completedAt: bigint("completedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrmFollowUpTask = typeof crmFollowUpTasks.$inferSelect;
+export type InsertCrmFollowUpTask = typeof crmFollowUpTasks.$inferInsert;
+
+// CRM Lead Distribution - configuração de distribuição round-robin
+export const crmLeadDistribution = mysqlTable("crm_lead_distribution", {
+  id: int("id").autoincrement().primaryKey(),
+  department: varchar("department", { length: 50 }).notNull().unique(),
+  enabled: boolean("enabled").default(false).notNull(),
+  lastAssignedSellerId: int("lastAssignedSellerId"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrmLeadDistribution = typeof crmLeadDistribution.$inferSelect;
+export type InsertCrmLeadDistribution = typeof crmLeadDistribution.$inferInsert;
+
+// ===== MÓDULO FINANCEIRO =====
+
+// Categorias financeiras (personalizáveis)
+export const finCategories = mysqlTable("fin_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  type: mysqlEnum("type", ["expense", "income"]).notNull(),
+  icon: varchar("icon", { length: 50 }).default("receipt"),
+  color: varchar("color", { length: 20 }).default("#6b7280"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type FinCategory = typeof finCategories.$inferSelect;
+export type InsertFinCategory = typeof finCategories.$inferInsert;
+
+// Transações financeiras (contas a pagar e receber)
+export const finTransactions = mysqlTable("fin_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["payable", "receivable"]).notNull(),
+  description: varchar("description", { length: 500 }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: bigint("dueDate", { mode: "number" }).notNull(), // timestamp vencimento
+  paidDate: bigint("paidDate", { mode: "number" }), // timestamp pagamento
+  status: mysqlEnum("status", ["pending", "paid", "overdue", "cancelled"]).default("pending").notNull(),
+  categoryId: int("categoryId"),
+  supplier: varchar("supplier", { length: 255 }), // fornecedor ou cliente
+  barcode: varchar("barcode", { length: 100 }), // código de barras do boleto
+  notes: text("notes"),
+  receiptUrl: text("receiptUrl"), // URL do comprovante no S3
+  receiptKey: varchar("receiptKey", { length: 500 }),
+  recurrence: mysqlEnum("recurrence", ["none", "monthly", "weekly", "yearly"]).default("none"),
+  installmentNumber: int("installmentNumber"), // parcela atual
+  installmentTotal: int("installmentTotal"), // total de parcelas
+  createdBy: int("createdBy"), // admin que criou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type FinTransaction = typeof finTransactions.$inferSelect;
+export type InsertFinTransaction = typeof finTransactions.$inferInsert;

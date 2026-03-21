@@ -9,6 +9,8 @@ import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter } from "./routers/crmRouter";
+import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
+import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1224,5 +1226,14 @@ export const appRouter = router({
   crmCampaigns: crmCampaignsRouter,
   crmMarketing: crmMarketingRouter,
   crmVoice: crmVoiceRouter,
+  crmTemplates: crmTemplatesRouter,
+  crmFollowUp: crmFollowUpRouter,
+  crmDistribution: crmDistributionRouter,
+  crmTimeAlerts: crmTimeAlertsRouter,
+  crmPermissions: crmPermissionsRouter,
+  crmFipe: crmFipeRouter,
+  crmSellerStats: crmSellerStatsRouter,
+  finCategories: finCategoriesRouter,
+  finTransactions: finTransactionsRouter,
 });
 export type AppRouter = typeof appRouter;

@@ -29,7 +29,7 @@ export async function getAdminById(id: number) {
   return rows[0] || null;
 }
 
-export async function createAdmin(data: { username: string; passwordHash: string; name: string; role?: "owner" | "admin" }) {
+export async function createAdmin(data: { username: string; passwordHash: string; name: string; role?: "owner" | "admin"; permissions?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(admins).values({
@@ -37,6 +37,7 @@ export async function createAdmin(data: { username: string; passwordHash: string
     passwordHash: data.passwordHash,
     name: data.name,
     role: data.role || "admin",
+    permissions: data.permissions || JSON.stringify({vendas:true,pre_vendas:false,consignacao:false,fei:false,marketing:false,financeiro:false,estoque:false,configuracoes:false,gerenciar_admins:false}),
   });
   return Number(result[0].insertId);
 }
@@ -44,10 +45,10 @@ export async function createAdmin(data: { username: string; passwordHash: string
 export async function listAdmins() {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: admins.id, username: admins.username, name: admins.name, role: admins.role, active: admins.active, createdAt: admins.createdAt }).from(admins).orderBy(desc(admins.createdAt));
+  return db.select({ id: admins.id, username: admins.username, name: admins.name, role: admins.role, active: admins.active, permissions: admins.permissions, createdAt: admins.createdAt }).from(admins).orderBy(desc(admins.createdAt));
 }
 
-export async function updateAdmin(id: number, data: Partial<{ name: string; passwordHash: string; active: boolean; role: "owner" | "admin" }>) {
+export async function updateAdmin(id: number, data: Partial<{ name: string; passwordHash: string; active: boolean; role: "owner" | "admin"; permissions: string }>) {
   const db = await getDb();
   if (!db) return;
   await db.update(admins).set(data).where(eq(admins.id, id));

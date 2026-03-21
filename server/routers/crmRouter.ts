@@ -52,9 +52,10 @@ export const adminAuthRouter = router({
     password: z.string().min(4),
     name: z.string().min(1),
     role: z.enum(["owner", "admin"]).optional(),
+    permissions: z.string().optional(),
   })).mutation(async ({ input }) => {
     const hash = await bcrypt.hash(input.password, 10);
-    const id = await crmDb.createAdmin({ username: input.username, passwordHash: hash, name: input.name, role: input.role });
+    const id = await crmDb.createAdmin({ username: input.username, passwordHash: hash, name: input.name, role: input.role, permissions: input.permissions });
     return { id };
   }),
 

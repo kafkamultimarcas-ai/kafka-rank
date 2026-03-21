@@ -378,3 +378,75 @@
 ## Bug: Setor do vendedor não salva como SDR
 - [x] Bug: ao editar vendedor e mudar setor para SDR/Pré-Vendas, salva como Vendas
 - [x] Corrigir lógica de update do setor no backend (campo department faltava no input do sellers.update)
+
+## Melhorias CRM - Análise de Mercado
+
+### Prioridade 1 - Corrigir cards de setor no Admin
+- [x] Cards de setor clicáveis no Painel Geral (filtrar leads ao clicar)
+- [x] Navegação para lista de leads filtrada por departamento
+
+### Prioridade 2 - Templates de mensagem WhatsApp
+- [x] Tabela de templates no banco (crm_message_templates)
+- [x] Templates padrão por situação (primeiro contato, follow-up, feirão, veículo disponível)
+- [x] Seletor de template ao clicar WhatsApp no card do lead
+- [x] Variáveis dinâmicas ({nome}, {veiculo}, {vendedor})
+
+### Prioridade 3 - Dashboard individual do vendedor
+- [x] Mini-dashboard no topo do CRM do vendedor
+- [x] Métricas: leads ativos, quentes, convertidos no mês, taxa de conversão
+- [x] Alertas de tempo (5min urgente, 20min transferência)
+
+### Prioridade 4 - Permissões granulares para admins
+- [x] Campo permissions (JSON) na tabela admins
+- [x] Checkboxes de permissão ao criar/editar admin
+- [x] Filtrar visão do admin baseado nas permissões
+- [x] Admin Principal (owner) tem todas as permissões
+
+### Prioridade 5 - Sequência de follow-up automática
+- [x] Tabela crm_follow_up_tasks no banco
+- [x] Ao criar lead, gerar tarefas automáticas baseadas na sequência
+- [x] Exibir próxima ação programada no card do lead
+
+### Prioridade 6 - Distribuição automática de leads (round robin)
+- [x] Configuração de round robin por departamento
+- [x] Ao receber lead via webhook, distribuir para próximo vendedor
+- [x] Registro de quem recebeu e quando
+
+### Prioridade 7 - Notificações do CRM
+- [x] Notificação de novo lead atribuído (alerta 5min)
+- [x] Notificação de follow-up atrasado (alertas visuais)
+- [x] Notificação de veículo novo que bate com interesse
+
+### Prioridade 8 - Tabela FIPE integrada
+- [x] Busca de preço FIPE por marca/modelo/ano
+- [x] Exibir preço FIPE no cadastro de estoque
+- [x] Comparativo preço loja vs FIPE
+
+## Melhorias CRM v2 - Alertas de Tempo + Visual
+
+- [x] Alerta 5 minutos: vendedor recebe alerta urgente se não respondeu lead novo
+- [x] Transferência automática 20 minutos: lead sem resposta transfere para próximo vendedor
+- [x] Cards de setor clicáveis no admin (filtrar leads ao clicar)
+- [x] Templates de mensagem WhatsApp com variáveis dinâmicas
+- [x] Dashboard individual do vendedor (métricas pessoais)
+- [x] Permissões granulares para admins (checkboxes por módulo)
+- [x] Sequência de follow-up automática com tarefas programadas
+- [x] Distribuição round-robin de leads por departamento
+- [x] Tabela FIPE integrada no estoque
+- [x] Revisão completa de bugs
+
+## Módulo Financeiro Completo
+- [x] Tabela fin_transactions (contas a pagar e receber)
+- [x] Tabela fin_categories (categorias personalizáveis)
+- [x] Contas a Pagar (cadastro, vencimento, status, categorias)
+- [x] Contas a Receber (cadastro, vencimento, status, categorias)
+- [x] Leitor de câmera para boletos (OCR via LLM Vision)
+- [x] Leitor de câmera para notas fiscais (OCR via LLM Vision)
+- [x] Leitor de câmera para contas (luz, água, etc)
+- [x] Dashboard financeiro (resumo, fluxo de caixa, vencimentos próximos)
+- [x] Categorias de despesas/receitas (personalizáveis)
+- [x] Filtros por período, categoria, status
+- [x] Alertas de vencimento (contas próximas do vencimento)
+- [x] Marcar como pago/recebido em 1 toque
+- [x] Anexar comprovantes (foto/arquivo via S3)
+- [x] Relatório mensal simplificado

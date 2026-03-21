@@ -42,6 +42,13 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
+      headers() {
+        const adminToken = localStorage.getItem("crm_admin_token");
+        if (adminToken) {
+          return { Authorization: `Bearer ${adminToken}` };
+        }
+        return {};
+      },
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),
