@@ -505,3 +505,6 @@
 - [x] Destaque para veículos que completaram 7 dias (meta consignação)
 - [x] Histórico de veículos que já saíram
 - [x] Visibilidade restrita: apenas admin, gerente e setor consignação
+
+## Bug - Erro de Publicação
+- [x] Corrigir erro que impede publicação da versão recente (aplicado code-splitting para reduzir bundle)
