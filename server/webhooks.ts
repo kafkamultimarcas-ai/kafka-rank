@@ -1,21 +1,26 @@
 import type { Express, Request, Response } from "express";
 import * as crmDb from "./crmDb";
+import { getDb } from "./db";
+import { sellers, crmLeadDistribution } from "../drizzle/schema";
+import { eq, and, asc } from "drizzle-orm";
 
 /**
  * Public webhook endpoints for external integrations.
- * Each endpoint validates the API token from the `x-api-token` header
- * against the crm_integrations table.
+ * Validates API token from `x-api-token` header against crm_integrations table.
  * 
- * Endpoints:
- *   POST /api/webhooks/lead       — Create a new lead from any platform
- *   POST /api/webhooks/whatsapp   — Receive WhatsApp messages (future)
- *   GET  /api/webhooks/health     — Health check
- * 
- * Usage:
- *   curl -X POST https://your-domain/api/webhooks/lead \
- *     -H "Content-Type: application/json" \
- *     -H "x-api-token: kafka_xxxxxxxxxxxx" \
- *     -d '{"name":"João","phone":"11999999999","source":"olx","vehicleInterest":"HB20 2023","department":"vendas"}'
+ * ENDPOINTS:
+ *   POST /api/webhooks/lead                — Create lead (generic)
+ *   POST /api/webhooks/leads/bulk          — Bulk create leads (max 100)
+ *   POST /api/webhooks/meta/leadgen        — Meta Lead Ads (Instagram/Facebook)
+ *   POST /api/webhooks/google/lead         — Google Ads Lead Form
+ *   POST /api/webhooks/generic             — Generic webhook (any platform/chatbot)
+ *   POST /api/webhooks/email-parser        — Parse forwarded emails from OLX/Webmotors/etc
+ *   POST /api/webhooks/whatsapp            — WhatsApp messages
+ *   POST /api/webhooks/sig/sale            — SIG Web sale sync
+ *   POST /api/webhooks/widget/lead         — Widget/landing page form (NO auth needed)
+ *   GET  /api/webhooks/meta/verify         — Meta webhook verification
+ *   GET  /api/webhooks/health              — Health check
+ *   GET  /api/webhooks/docs                — API documentation
  */
 
 async function validateToken(req: Request, res: Response): Promise<boolean> {
@@ -32,27 +37,108 @@ async function validateToken(req: Request, res: Response): Promise<boolean> {
   return true;
 }
 
+// Auto-assign lead to next seller via round-robin
+async function autoAssignLead(leadId: number, department: string): Promise<{ sellerId: number | null; sellerName: string | null }> {
+  try {
+    const database = await getDb();
+    if (!database) return { sellerId: null, sellerName: null };
+
+    const [config] = await database.select().from(crmLeadDistribution)
+      .where(eq(crmLeadDistribution.department, department)).limit(1);
+    if (!config || !config.enabled) return { sellerId: null, sellerName: null };
+
+    const deptSellers = await database.select().from(sellers)
+      .where(and(eq(sellers.department, department), eq(sellers.active, true)))
+      .orderBy(asc(sellers.id));
+
+    if (deptSellers.length === 0) return { sellerId: null, sellerName: null };
+
+    let nextSeller;
+    if (config.lastAssignedSellerId) {
+      const idx = deptSellers.findIndex(s => s.id === config.lastAssignedSellerId);
+      nextSeller = deptSellers[(idx + 1) % deptSellers.length];
+    } else {
+      nextSeller = deptSellers[0];
+    }
+
+    await crmDb.updateLead(leadId, { sellerId: nextSeller.id });
+    await database.update(crmLeadDistribution)
+      .set({ lastAssignedSellerId: nextSeller.id })
+      .where(eq(crmLeadDistribution.department, department));
+
+    return { sellerId: nextSeller.id, sellerName: nextSeller.name };
+  } catch {
+    return { sellerId: null, sellerName: null };
+  }
+}
+
+// Detect source from email body
+function detectEmailSource(body: string, subject: string): string {
+  const text = (body + " " + subject).toLowerCase();
+  if (text.includes("olx")) return "olx";
+  if (text.includes("webmotors")) return "webmotors";
+  if (text.includes("socarrao") || text.includes("só carrão") || text.includes("socarrão")) return "socarrao";
+  if (text.includes("icarros")) return "icarros";
+  if (text.includes("mercadolivre") || text.includes("mercado livre")) return "olx";
+  if (text.includes("facebook")) return "facebook";
+  if (text.includes("instagram")) return "instagram";
+  return "email";
+}
+
+// Parse name and phone from email body
+function parseLeadFromEmail(body: string): { name: string | null; phone: string | null; email: string | null; vehicle: string | null } {
+  const result: any = { name: null, phone: null, email: null, vehicle: null };
+
+  // Try to extract phone
+  const phoneMatch = body.match(/(?:tel|fone|telefone|whatsapp|celular)[:\s]*[(\s]*(\d{2})[)\s]*[\s.-]*(\d{4,5})[\s.-]*(\d{4})/i)
+    || body.match(/\((\d{2})\)\s*(\d{4,5})-?(\d{4})/)
+    || body.match(/(\d{2})\s*(\d{4,5})\s*-?\s*(\d{4})/);
+  if (phoneMatch) {
+    result.phone = phoneMatch[1] + phoneMatch[2] + phoneMatch[3];
+  }
+
+  // Try to extract email
+  const emailMatch = body.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+  if (emailMatch) result.email = emailMatch[0];
+
+  // Try to extract name
+  const nameMatch = body.match(/(?:nome|name|cliente|interessado)[:\s]*([A-ZÀ-Ú][a-zà-ú]+(?: [A-ZÀ-Ú][a-zà-ú]+)*)/i)
+    || body.match(/(?:de|from)[:\s]*([A-ZÀ-Ú][a-zà-ú]+(?: [A-ZÀ-Ú][a-zà-ú]+)*)/i);
+  if (nameMatch) result.name = nameMatch[1].trim();
+
+  // Try to extract vehicle
+  const vehicleMatch = body.match(/(?:veiculo|veículo|carro|interesse|modelo|anuncio|anúncio)[:\s]*([^\n,]+)/i);
+  if (vehicleMatch) result.vehicle = vehicleMatch[1].trim().substring(0, 200);
+
+  return result;
+}
+
 export function registerWebhookRoutes(app: Express) {
-  // Health check - no auth needed
+  // ===== HEALTH CHECK =====
   app.get("/api/webhooks/health", (_req: Request, res: Response) => {
-    res.json({ status: "ok", timestamp: Date.now(), version: "1.0.0" });
+    res.json({ status: "ok", timestamp: Date.now(), version: "2.0.0" });
   });
 
-  // Create lead from external platform
+  // ===== GENERIC LEAD CREATION (with token) =====
   app.post("/api/webhooks/lead", async (req: Request, res: Response) => {
     try {
       if (!(await validateToken(req, res))) return;
 
-      const { name, phone, email, vehicleInterest, vehiclePlate, source, department, notes, sellerId } = req.body;
+      const { name, phone, email, vehicleInterest, vehiclePlate, source, department, notes, sellerId, score, utmSource, utmMedium, utmCampaign } = req.body;
 
       if (!name) {
         res.status(400).json({ error: "Campo 'name' e obrigatorio." });
         return;
       }
 
-      // Get default stage for the department
       const dept = department || "vendas";
       const defaultStage = await crmDb.getDefaultStage(dept);
+
+      // Build notes with UTM data if present
+      let fullNotes = notes || "";
+      if (utmSource || utmMedium || utmCampaign) {
+        fullNotes += `${fullNotes ? "\n" : ""}[UTM] source=${utmSource || ""} medium=${utmMedium || ""} campaign=${utmCampaign || ""}`;
+      }
 
       const leadId = await crmDb.createLead({
         name,
@@ -63,20 +149,24 @@ export function registerWebhookRoutes(app: Express) {
         source: source || "api",
         department: dept,
         stage: defaultStage?.name || "Novo Lead",
-        score: "warm",
-        sellerId: sellerId || null,
-        notes: notes || null,
+        score: score || "warm",
+        sellerId: sellerId || 0,
+        notes: fullNotes || null,
       });
 
-      // Create initial activity
       await crmDb.createActivity({
         leadId,
-        sellerId: sellerId || null,
+        sellerId: sellerId || 0,
         type: "criacao",
         description: `Lead criado via API (${source || "api"})`,
       });
 
-      // If vehicle interest was provided, check for matching inventory
+      // Auto-assign if no sellerId provided
+      let assignment = { sellerId: sellerId || null, sellerName: null as string | null };
+      if (!sellerId) {
+        assignment = await autoAssignLead(leadId, dept);
+      }
+
       let matchingVehicles = 0;
       if (vehicleInterest) {
         const inventory = await crmDb.listInventory({ search: vehicleInterest });
@@ -86,8 +176,10 @@ export function registerWebhookRoutes(app: Express) {
       res.status(201).json({
         success: true,
         leadId,
+        assignedTo: assignment.sellerName,
+        assignedSellerId: assignment.sellerId,
         matchingVehicles,
-        message: `Lead '${name}' criado com sucesso.${matchingVehicles > 0 ? ` ${matchingVehicles} veiculo(s) no estoque correspondem ao interesse.` : ""}`,
+        message: `Lead '${name}' criado com sucesso.`,
       });
     } catch (err: any) {
       console.error("Webhook lead error:", err);
@@ -95,7 +187,7 @@ export function registerWebhookRoutes(app: Express) {
     }
   });
 
-  // Bulk create leads
+  // ===== BULK LEAD CREATION =====
   app.post("/api/webhooks/leads/bulk", async (req: Request, res: Response) => {
     try {
       if (!(await validateToken(req, res))) return;
@@ -126,15 +218,16 @@ export function registerWebhookRoutes(app: Express) {
             department: dept,
             stage: defaultStage?.name || "Novo Lead",
             score: lead.score || "warm",
-            sellerId: lead.sellerId || null,
+            sellerId: lead.sellerId || 0,
             notes: lead.notes || null,
           });
           await crmDb.createActivity({
             leadId,
-            sellerId: lead.sellerId || null,
+            sellerId: lead.sellerId || 0,
             type: "criacao",
             description: `Lead criado via API bulk (${lead.source || "api"})`,
           });
+          if (!lead.sellerId) await autoAssignLead(leadId, dept);
           results.push({ name: lead.name, leadId, success: true });
         } catch (err: any) {
           results.push({ name: lead.name, success: false, error: err.message });
@@ -154,21 +247,380 @@ export function registerWebhookRoutes(app: Express) {
     }
   });
 
-  // WhatsApp webhook (placeholder for future integration)
+  // ===== META LEAD ADS (Instagram/Facebook) =====
+  // Verification endpoint for Meta webhook setup
+  app.get("/api/webhooks/meta/verify", (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    // The verify token should match one stored in integration config
+    // For simplicity, accept any token during setup - admin should configure in Meta
+    if (mode === "subscribe" && token) {
+      console.log("Meta webhook verified");
+      res.status(200).send(challenge);
+    } else {
+      res.status(403).json({ error: "Verification failed" });
+    }
+  });
+
+  // Receive leads from Meta Lead Ads
+  app.post("/api/webhooks/meta/leadgen", async (req: Request, res: Response) => {
+    try {
+      // Meta sends a specific structure for leadgen webhooks
+      const body = req.body;
+
+      // Meta webhook format: { object: "page", entry: [{ id, time, changes: [{ field: "leadgen", value: { ... } }] }] }
+      if (body.object === "page" && body.entry) {
+        for (const entry of body.entry) {
+          if (entry.changes) {
+            for (const change of entry.changes) {
+              if (change.field === "leadgen") {
+                const leadData = change.value;
+                // Meta leadgen value: { form_id, leadgen_id, created_time, page_id, ad_id, ad_group_id, campaign_id }
+                // The actual lead data needs to be fetched from Meta API using leadgen_id
+                // For now, store the webhook event and let admin fetch details
+                const dept = "vendas";
+                const defaultStage = await crmDb.getDefaultStage(dept);
+
+                const leadId = await crmDb.createLead({
+                  name: `Meta Lead #${leadData.leadgen_id || Date.now()}`,
+                  phone: null,
+                  email: null,
+                  vehicleInterest: null,
+                  vehiclePlate: null,
+                  source: leadData.ad_id ? "instagram_ads" : "facebook_ads",
+                  department: dept,
+                  stage: defaultStage?.name || "Novo Lead",
+                  score: "hot",
+                  sellerId: 0,
+                  notes: `Meta Lead Ads\nForm ID: ${leadData.form_id || "N/A"}\nLead ID: ${leadData.leadgen_id || "N/A"}\nCampaign: ${leadData.campaign_id || "N/A"}\nAd: ${leadData.ad_id || "N/A"}\nAd Group: ${leadData.ad_group_id || "N/A"}`,
+                });
+
+                await crmDb.createActivity({
+                  leadId,
+                  sellerId: 0,
+                  type: "criacao",
+                  description: "Lead recebido do Meta Lead Ads (Instagram/Facebook)",
+                });
+
+                await autoAssignLead(leadId, dept);
+              }
+            }
+          }
+        }
+      }
+
+      // Meta also supports direct lead data format (from Zapier, Make, etc)
+      if (body.name || body.full_name || body.first_name) {
+        const name = body.name || body.full_name || `${body.first_name || ""} ${body.last_name || ""}`.trim();
+        const phone = body.phone || body.phone_number || body.tel || null;
+        const email = body.email || null;
+        const vehicle = body.vehicle || body.vehicleInterest || body.car || null;
+        const adSource = body.platform === "instagram" ? "instagram_ads" : "facebook_ads";
+
+        const dept = body.department || "vendas";
+        const defaultStage = await crmDb.getDefaultStage(dept);
+
+        const leadId = await crmDb.createLead({
+          name,
+          phone,
+          email,
+          vehicleInterest: vehicle,
+          vehiclePlate: null,
+          source: body.source || adSource,
+          department: dept,
+          stage: defaultStage?.name || "Novo Lead",
+          score: "hot",
+          sellerId: 0,
+          notes: body.notes || `Via Meta Ads${body.campaign_name ? ` - Campanha: ${body.campaign_name}` : ""}${body.ad_name ? ` - Anuncio: ${body.ad_name}` : ""}`,
+        });
+
+        await crmDb.createActivity({
+          leadId,
+          sellerId: 0,
+          type: "criacao",
+          description: `Lead recebido do ${adSource === "instagram_ads" ? "Instagram" : "Facebook"} Ads`,
+        });
+
+        const assignment = await autoAssignLead(leadId, dept);
+
+        res.status(201).json({
+          success: true,
+          leadId,
+          assignedTo: assignment.sellerName,
+          message: `Lead '${name}' criado via Meta Ads.`,
+        });
+        return;
+      }
+
+      // Always respond 200 to Meta webhooks
+      res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("Meta webhook error:", err);
+      // Still respond 200 to prevent Meta from retrying
+      res.status(200).json({ success: false, error: err.message });
+    }
+  });
+
+  // ===== GOOGLE ADS LEAD FORM =====
+  app.post("/api/webhooks/google/lead", async (req: Request, res: Response) => {
+    try {
+      // Google Ads sends lead form data via webhook
+      // Format varies: direct from Google or via Zapier/Make
+      const body = req.body;
+
+      const name = body.name || body.full_name || body["user_column_data"]?.find?.((c: any) => c.column_id === "FULL_NAME")?.string_value || `Google Lead #${Date.now()}`;
+      const phone = body.phone || body.phone_number || body["user_column_data"]?.find?.((c: any) => c.column_id === "PHONE_NUMBER")?.string_value || null;
+      const email = body.email || body["user_column_data"]?.find?.((c: any) => c.column_id === "EMAIL")?.string_value || null;
+      const vehicle = body.vehicle || body.vehicleInterest || null;
+
+      const dept = body.department || "vendas";
+      const defaultStage = await crmDb.getDefaultStage(dept);
+
+      const leadId = await crmDb.createLead({
+        name,
+        phone,
+        email,
+        vehicleInterest: vehicle,
+        vehiclePlate: null,
+        source: "google_ads",
+        department: dept,
+        stage: defaultStage?.name || "Novo Lead",
+        score: "hot",
+        sellerId: 0,
+        notes: `Via Google Ads${body.campaign_name ? ` - Campanha: ${body.campaign_name}` : ""}${body.form_id ? ` - Form: ${body.form_id}` : ""}`,
+      });
+
+      await crmDb.createActivity({
+        leadId,
+        sellerId: 0,
+        type: "criacao",
+        description: "Lead recebido do Google Ads",
+      });
+
+      const assignment = await autoAssignLead(leadId, dept);
+
+      res.status(201).json({
+        success: true,
+        leadId,
+        assignedTo: assignment.sellerName,
+        message: `Lead '${name}' criado via Google Ads.`,
+      });
+    } catch (err: any) {
+      console.error("Google Ads webhook error:", err);
+      res.status(500).json({ error: "Erro interno.", details: err.message });
+    }
+  });
+
+  // ===== GENERIC WEBHOOK (any platform, chatbot, Manychat, etc) =====
+  app.post("/api/webhooks/generic", async (req: Request, res: Response) => {
+    try {
+      if (!(await validateToken(req, res))) return;
+
+      const body = req.body;
+
+      // Flexible field mapping - accepts many common field names
+      const name = body.name || body.full_name || body.nome || body.customer_name || body.lead_name || body.first_name || "Lead sem nome";
+      const phone = body.phone || body.phone_number || body.telefone || body.celular || body.whatsapp || body.tel || null;
+      const email = body.email || body.e_mail || body.mail || null;
+      const vehicle = body.vehicle || body.vehicleInterest || body.veiculo || body.carro || body.interesse || body.car || null;
+      const source = body.source || body.origem || body.platform || body.canal || "webhook";
+      const dept = body.department || body.setor || body.departamento || "vendas";
+      const notes = body.notes || body.observacao || body.mensagem || body.message || body.comentario || null;
+
+      const defaultStage = await crmDb.getDefaultStage(dept);
+
+      // Build UTM notes
+      let fullNotes = notes || "";
+      if (body.utm_source || body.utm_medium || body.utm_campaign) {
+        fullNotes += `${fullNotes ? "\n" : ""}[UTM] source=${body.utm_source || ""} medium=${body.utm_medium || ""} campaign=${body.utm_campaign || ""}`;
+      }
+
+      const leadId = await crmDb.createLead({
+        name,
+        phone,
+        email,
+        vehicleInterest: vehicle,
+        vehiclePlate: body.plate || body.placa || null,
+        source,
+        department: dept,
+        stage: defaultStage?.name || "Novo Lead",
+        score: body.score || "warm",
+        sellerId: 0,
+        notes: fullNotes || null,
+      });
+
+      await crmDb.createActivity({
+        leadId,
+        sellerId: 0,
+        type: "criacao",
+        description: `Lead recebido via webhook generico (${source})`,
+      });
+
+      const assignment = await autoAssignLead(leadId, dept);
+
+      res.status(201).json({
+        success: true,
+        leadId,
+        assignedTo: assignment.sellerName,
+        assignedSellerId: assignment.sellerId,
+        message: `Lead '${name}' criado com sucesso.`,
+      });
+    } catch (err: any) {
+      console.error("Generic webhook error:", err);
+      res.status(500).json({ error: "Erro interno.", details: err.message });
+    }
+  });
+
+  // ===== EMAIL PARSER (OLX, Webmotors, SóCarrão, iCarros) =====
+  app.post("/api/webhooks/email-parser", async (req: Request, res: Response) => {
+    try {
+      if (!(await validateToken(req, res))) return;
+
+      const { subject, body: emailBody, from: senderEmail, html } = req.body;
+
+      if (!emailBody && !html && !subject) {
+        res.status(400).json({ error: "Envie pelo menos 'subject' ou 'body' do email." });
+        return;
+      }
+
+      const textContent = emailBody || html?.replace(/<[^>]*>/g, " ") || "";
+      const source = detectEmailSource(textContent, subject || "");
+      const parsed = parseLeadFromEmail(textContent);
+
+      const name = parsed.name || `Lead ${source.toUpperCase()} - ${new Date().toLocaleDateString("pt-BR")}`;
+      const dept = "vendas";
+      const defaultStage = await crmDb.getDefaultStage(dept);
+
+      const leadId = await crmDb.createLead({
+        name,
+        phone: parsed.phone,
+        email: parsed.email || senderEmail || null,
+        vehicleInterest: parsed.vehicle,
+        vehiclePlate: null,
+        source,
+        department: dept,
+        stage: defaultStage?.name || "Novo Lead",
+        score: "warm",
+        sellerId: 0,
+        notes: `Origem: Email de ${source.toUpperCase()}\nAssunto: ${subject || "N/A"}\n\n--- Email original ---\n${textContent.substring(0, 1000)}`,
+      });
+
+      await crmDb.createActivity({
+        leadId,
+        sellerId: 0,
+        type: "criacao",
+        description: `Lead parseado de email (${source})`,
+      });
+
+      const assignment = await autoAssignLead(leadId, dept);
+
+      res.status(201).json({
+        success: true,
+        leadId,
+        source,
+        parsedData: { name, phone: parsed.phone, email: parsed.email, vehicle: parsed.vehicle },
+        assignedTo: assignment.sellerName,
+        message: `Lead parseado do email (${source}) com sucesso.`,
+      });
+    } catch (err: any) {
+      console.error("Email parser webhook error:", err);
+      res.status(500).json({ error: "Erro interno.", details: err.message });
+    }
+  });
+
+  // ===== WIDGET / LANDING PAGE FORM (NO auth required) =====
+  app.post("/api/webhooks/widget/lead", async (req: Request, res: Response) => {
+    try {
+      // CORS headers for widget embeds
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.header("Access-Control-Allow-Headers", "Content-Type");
+
+      const { name, phone, email, vehicleInterest, notes, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, pageUrl, formId } = req.body;
+
+      if (!name) {
+        res.status(400).json({ error: "Campo 'name' e obrigatorio." });
+        return;
+      }
+
+      const dept = "vendas";
+      const defaultStage = await crmDb.getDefaultStage(dept);
+
+      let fullNotes = notes || "";
+      const utmParts = [];
+      if (utmSource) utmParts.push(`source=${utmSource}`);
+      if (utmMedium) utmParts.push(`medium=${utmMedium}`);
+      if (utmCampaign) utmParts.push(`campaign=${utmCampaign}`);
+      if (utmContent) utmParts.push(`content=${utmContent}`);
+      if (utmTerm) utmParts.push(`term=${utmTerm}`);
+      if (utmParts.length > 0) {
+        fullNotes += `${fullNotes ? "\n" : ""}[UTM] ${utmParts.join(" ")}`;
+      }
+      if (pageUrl) {
+        fullNotes += `${fullNotes ? "\n" : ""}[Pagina] ${pageUrl}`;
+      }
+
+      const source = utmSource === "google" ? "google_ads"
+        : utmSource === "facebook" || utmSource === "fb" ? "facebook_ads"
+        : utmSource === "instagram" || utmSource === "ig" ? "instagram_ads"
+        : "landing_page";
+
+      const leadId = await crmDb.createLead({
+        name,
+        phone: phone || null,
+        email: email || null,
+        vehicleInterest: vehicleInterest || null,
+        vehiclePlate: null,
+        source,
+        department: dept,
+        stage: defaultStage?.name || "Novo Lead",
+        score: "hot",
+        sellerId: 0,
+        notes: fullNotes || null,
+      });
+
+      await crmDb.createActivity({
+        leadId,
+        sellerId: 0,
+        type: "criacao",
+        description: `Lead via landing page/widget${utmSource ? ` (${utmSource})` : ""}`,
+      });
+
+      const assignment = await autoAssignLead(leadId, dept);
+
+      res.status(201).json({
+        success: true,
+        leadId,
+        message: "Obrigado! Entraremos em contato em breve.",
+      });
+    } catch (err: any) {
+      console.error("Widget lead error:", err);
+      res.status(500).json({ error: "Erro interno.", details: err.message });
+    }
+  });
+
+  // CORS preflight for widget
+  app.options("/api/webhooks/widget/lead", (_req: Request, res: Response) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
+    res.status(204).send();
+  });
+
+  // ===== WHATSAPP WEBHOOK =====
   app.post("/api/webhooks/whatsapp", async (req: Request, res: Response) => {
     try {
       if (!(await validateToken(req, res))) return;
 
-      // Placeholder: log the incoming message
       const { from, message, timestamp } = req.body;
       console.log(`WhatsApp webhook: from=${from}, message=${message}, ts=${timestamp}`);
 
-      // Try to find existing lead by phone
       if (from) {
         const phone = from.replace(/\D/g, "");
         const existingLeads = await crmDb.searchLeads(phone);
         if (existingLeads.length > 0) {
-          // Add activity to existing lead
           await crmDb.createActivity({
             leadId: existingLeads[0].id,
             sellerId: existingLeads[0].sellerId,
@@ -178,16 +630,42 @@ export function registerWebhookRoutes(app: Express) {
           res.json({ success: true, action: "activity_added", leadId: existingLeads[0].id });
           return;
         }
+
+        // Create new lead from WhatsApp
+        const dept = "vendas";
+        const defaultStage = await crmDb.getDefaultStage(dept);
+        const leadId = await crmDb.createLead({
+          name: `WhatsApp ${phone}`,
+          phone,
+          email: null,
+          vehicleInterest: null,
+          vehiclePlate: null,
+          source: "whatsapp",
+          department: dept,
+          stage: defaultStage?.name || "Novo Lead",
+          score: "warm",
+          sellerId: 0,
+          notes: message ? `Primeira mensagem: ${message.substring(0, 500)}` : null,
+        });
+        await crmDb.createActivity({
+          leadId,
+          sellerId: 0,
+          type: "whatsapp",
+          description: `Lead criado via WhatsApp. Msg: ${(message || "").substring(0, 200)}`,
+        });
+        const assignment = await autoAssignLead(leadId, dept);
+        res.json({ success: true, action: "lead_created", leadId, assignedTo: assignment.sellerName });
+        return;
       }
 
-      res.json({ success: true, action: "logged", message: "Mensagem recebida. Nenhum lead correspondente encontrado." });
+      res.json({ success: true, action: "logged" });
     } catch (err: any) {
       console.error("WhatsApp webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
     }
   });
 
-  // SIG Web sync endpoint
+  // ===== SIG WEB SYNC =====
   app.post("/api/webhooks/sig/sale", async (req: Request, res: Response) => {
     try {
       if (!(await validateToken(req, res))) return;
@@ -195,7 +673,6 @@ export function registerWebhookRoutes(app: Express) {
       const { leadId, vehicleModel, saleValue, sigId } = req.body;
 
       if (leadId) {
-        // Update lead stage to "Venda Fechada" or equivalent
         const lead = await crmDb.getLeadById(leadId);
         if (lead) {
           await crmDb.updateLead(leadId, { stage: "Venda Fechada", archived: true });
@@ -215,16 +692,52 @@ export function registerWebhookRoutes(app: Express) {
     }
   });
 
-  // Get API documentation
+  // ===== SIG WEB INVENTORY SYNC =====
+  app.post("/api/webhooks/sig/inventory", async (req: Request, res: Response) => {
+    try {
+      if (!(await validateToken(req, res))) return;
+
+      const { brand, model, year, plate, color, mileage, fuelType, transmission, price, costPrice, status } = req.body;
+
+      if (!brand || !model) {
+        res.status(400).json({ error: "Campos 'brand' e 'model' sao obrigatorios." });
+        return;
+      }
+
+      const id = await crmDb.createInventoryItem({
+        brand, model, year, plate, color, mileage, fuelType, transmission,
+        price: price || 0, costPrice, notes: `Sincronizado do SIG Web`,
+      });
+
+      // Check for matching leads
+      const searchTerm = `${brand} ${model}`;
+      const matchingLeads = await crmDb.getLeadsByVehicleInterest(searchTerm);
+      for (const lead of matchingLeads) {
+        await crmDb.createInventoryAlert({ inventoryId: id, leadId: lead.id, sellerId: lead.sellerId });
+      }
+
+      res.status(201).json({
+        success: true,
+        inventoryId: id,
+        matchingLeads: matchingLeads.length,
+        message: `Veiculo '${brand} ${model}' adicionado ao estoque.`,
+      });
+    } catch (err: any) {
+      console.error("SIG inventory webhook error:", err);
+      res.status(500).json({ error: "Erro interno.", details: err.message });
+    }
+  });
+
+  // ===== API DOCUMENTATION =====
   app.get("/api/webhooks/docs", (_req: Request, res: Response) => {
     res.json({
-      title: "Kafka CRM API",
-      version: "1.0.0",
-      description: "API para integracao com o CRM Kafka Rank. Use o token de API gerado no painel admin.",
+      title: "Kafka CRM API v2",
+      version: "2.0.0",
+      description: "API completa para integracao com o CRM Kafka Rank. Use o token de API gerado no painel admin para endpoints autenticados.",
       authentication: {
         type: "API Token",
         header: "x-api-token",
-        description: "Token gerado nas configuracoes de integracao do CRM Admin.",
+        description: "Token gerado nas configuracoes de integracao do CRM Admin. Alguns endpoints (widget, Meta verify) nao precisam de token.",
       },
       endpoints: [
         {
@@ -236,19 +749,24 @@ export function registerWebhookRoutes(app: Express) {
         {
           method: "POST",
           path: "/api/webhooks/lead",
-          description: "Criar um novo lead.",
+          description: "Criar um novo lead (generico, com token).",
           auth: true,
           body: {
             name: { type: "string", required: true, description: "Nome do cliente" },
-            phone: { type: "string", required: false, description: "Telefone (ex: 11999999999)" },
+            phone: { type: "string", required: false, description: "Telefone (ex: 47999999999)" },
             email: { type: "string", required: false, description: "Email" },
             vehicleInterest: { type: "string", required: false, description: "Veiculo de interesse" },
             vehiclePlate: { type: "string", required: false, description: "Placa do veiculo atual" },
-            source: { type: "string", required: false, description: "Origem: manual, whatsapp, olx, webmotors, socarrao, facebook, instagram, trafego_pago, indicacao, loja, api" },
+            source: { type: "string", required: false, description: "Origem: manual, whatsapp, olx, webmotors, socarrao, icarros, facebook, instagram, instagram_ads, facebook_ads, google_ads, trafego_pago, indicacao, loja, landing_page, api" },
             department: { type: "string", required: false, description: "Setor: vendas, pre_vendas, consignacao, fei. Default: vendas" },
-            sellerId: { type: "number", required: false, description: "ID do vendedor responsavel" },
+            sellerId: { type: "number", required: false, description: "ID do vendedor responsavel. Se nao informado, usa round-robin." },
+            score: { type: "string", required: false, description: "Temperatura: hot, warm, cold. Default: warm" },
             notes: { type: "string", required: false, description: "Observacoes" },
+            utmSource: { type: "string", required: false, description: "UTM source (para tracking)" },
+            utmMedium: { type: "string", required: false, description: "UTM medium" },
+            utmCampaign: { type: "string", required: false, description: "UTM campaign" },
           },
+          example: `curl -X POST https://kafkarank.com/api/webhooks/lead -H "Content-Type: application/json" -H "x-api-token: SEU_TOKEN" -d '{"name":"Joao Silva","phone":"47999999999","source":"olx","vehicleInterest":"HB20 2023"}'`,
         },
         {
           method: "POST",
@@ -260,9 +778,94 @@ export function registerWebhookRoutes(app: Express) {
           },
         },
         {
+          method: "GET",
+          path: "/api/webhooks/meta/verify",
+          description: "Verificacao do webhook Meta (Instagram/Facebook). Configure esta URL no Meta Business.",
+          auth: false,
+        },
+        {
+          method: "POST",
+          path: "/api/webhooks/meta/leadgen",
+          description: "Receber leads do Meta Lead Ads (Instagram/Facebook Ads). Aceita formato nativo Meta e formato simplificado (via Zapier/Make).",
+          auth: false,
+          body: {
+            name: { type: "string", description: "Nome (formato simplificado)" },
+            phone: { type: "string", description: "Telefone" },
+            email: { type: "string", description: "Email" },
+            vehicle: { type: "string", description: "Veiculo de interesse" },
+            platform: { type: "string", description: "instagram ou facebook" },
+            campaign_name: { type: "string", description: "Nome da campanha" },
+          },
+          note: "Tambem aceita formato nativo Meta (object: page, entry: [...]).",
+        },
+        {
+          method: "POST",
+          path: "/api/webhooks/google/lead",
+          description: "Receber leads do Google Ads Lead Form Extensions.",
+          auth: false,
+          body: {
+            name: { type: "string", description: "Nome do lead" },
+            phone: { type: "string", description: "Telefone" },
+            email: { type: "string", description: "Email" },
+            vehicle: { type: "string", description: "Veiculo de interesse" },
+            campaign_name: { type: "string", description: "Nome da campanha" },
+          },
+        },
+        {
+          method: "POST",
+          path: "/api/webhooks/generic",
+          description: "Webhook generico - aceita qualquer formato. Ideal para chatbots (Manychat), automacoes (Zapier, Make, n8n), ou qualquer plataforma.",
+          auth: true,
+          body: {
+            name: { type: "string", description: "Nome (aceita: name, full_name, nome, customer_name, lead_name)" },
+            phone: { type: "string", description: "Telefone (aceita: phone, phone_number, telefone, celular, whatsapp)" },
+            email: { type: "string", description: "Email (aceita: email, e_mail, mail)" },
+            vehicle: { type: "string", description: "Veiculo (aceita: vehicle, vehicleInterest, veiculo, carro, interesse)" },
+            source: { type: "string", description: "Origem (aceita: source, origem, platform, canal)" },
+            department: { type: "string", description: "Setor (aceita: department, setor, departamento)" },
+            notes: { type: "string", description: "Notas (aceita: notes, observacao, mensagem, message)" },
+            utm_source: { type: "string", description: "UTM source" },
+            utm_medium: { type: "string", description: "UTM medium" },
+            utm_campaign: { type: "string", description: "UTM campaign" },
+          },
+          example: `curl -X POST https://kafkarank.com/api/webhooks/generic -H "Content-Type: application/json" -H "x-api-token: SEU_TOKEN" -d '{"nome":"Maria","telefone":"47988887777","origem":"manychat","carro":"Civic 2024"}'`,
+        },
+        {
+          method: "POST",
+          path: "/api/webhooks/email-parser",
+          description: "Parsear emails encaminhados de OLX, Webmotors, SoCarrao, iCarros. Detecta automaticamente a plataforma e extrai nome/telefone/veiculo.",
+          auth: true,
+          body: {
+            subject: { type: "string", description: "Assunto do email" },
+            body: { type: "string", description: "Corpo do email (texto)" },
+            html: { type: "string", description: "Corpo do email (HTML) - alternativa ao body" },
+            from: { type: "string", description: "Email do remetente" },
+          },
+          example: `curl -X POST https://kafkarank.com/api/webhooks/email-parser -H "Content-Type: application/json" -H "x-api-token: SEU_TOKEN" -d '{"subject":"Novo interesse - OLX","body":"Nome: Joao\\nTelefone: (47) 99999-9999\\nVeiculo: HB20 2023","from":"noreply@olx.com.br"}'`,
+        },
+        {
+          method: "POST",
+          path: "/api/webhooks/widget/lead",
+          description: "Receber leads do widget/formulario embeddable em landing pages. NAO precisa de token (publico).",
+          auth: false,
+          body: {
+            name: { type: "string", required: true, description: "Nome do cliente" },
+            phone: { type: "string", description: "Telefone" },
+            email: { type: "string", description: "Email" },
+            vehicleInterest: { type: "string", description: "Veiculo de interesse" },
+            notes: { type: "string", description: "Mensagem/observacoes" },
+            utmSource: { type: "string", description: "UTM source (capturado automaticamente pelo widget)" },
+            utmMedium: { type: "string", description: "UTM medium" },
+            utmCampaign: { type: "string", description: "UTM campaign" },
+            utmContent: { type: "string", description: "UTM content" },
+            utmTerm: { type: "string", description: "UTM term" },
+            pageUrl: { type: "string", description: "URL da pagina onde o formulario foi preenchido" },
+          },
+        },
+        {
           method: "POST",
           path: "/api/webhooks/whatsapp",
-          description: "Receber mensagens do WhatsApp (webhook).",
+          description: "Receber mensagens do WhatsApp (Z-API, Evolution API, Twilio). Cria lead automaticamente se telefone nao existe.",
           auth: true,
           body: {
             from: { type: "string", description: "Numero do remetente" },
@@ -282,7 +885,181 @@ export function registerWebhookRoutes(app: Express) {
             sigId: { type: "string", description: "ID da venda no SIG" },
           },
         },
+        {
+          method: "POST",
+          path: "/api/webhooks/sig/inventory",
+          description: "Sincronizar estoque do SIG Web. Adiciona veiculo e notifica vendedores com clientes interessados.",
+          auth: true,
+          body: {
+            brand: { type: "string", required: true, description: "Marca (ex: Hyundai)" },
+            model: { type: "string", required: true, description: "Modelo (ex: HB20)" },
+            year: { type: "string", description: "Ano (ex: 2023/2024)" },
+            plate: { type: "string", description: "Placa" },
+            color: { type: "string", description: "Cor" },
+            mileage: { type: "number", description: "Quilometragem" },
+            fuelType: { type: "string", description: "Combustivel" },
+            transmission: { type: "string", description: "Cambio" },
+            price: { type: "number", description: "Preco de venda" },
+            costPrice: { type: "number", description: "Preco de custo" },
+          },
+        },
       ],
+      widget: {
+        description: "Codigo JavaScript para colar em qualquer landing page. O formulario captura automaticamente UTM parameters da URL.",
+        embedCode: `<script src="https://kafkarank.com/api/webhooks/widget.js" data-kafka-crm></script>`,
+        note: "O widget cria um botao flutuante e formulario de contato. Captura UTMs automaticamente.",
+      },
     });
   });
+
+  // ===== WIDGET JAVASCRIPT (embeddable) =====
+  app.get("/api/webhooks/widget.js", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(getWidgetScript());
+  });
+}
+
+function getWidgetScript(): string {
+  return `
+(function() {
+  'use strict';
+  
+  // Get UTM params from URL
+  function getUTM() {
+    var params = new URLSearchParams(window.location.search);
+    return {
+      utmSource: params.get('utm_source') || '',
+      utmMedium: params.get('utm_medium') || '',
+      utmCampaign: params.get('utm_campaign') || '',
+      utmContent: params.get('utm_content') || '',
+      utmTerm: params.get('utm_term') || '',
+      pageUrl: window.location.href
+    };
+  }
+
+  // Create styles
+  var style = document.createElement('style');
+  style.textContent = \`
+    #kafka-crm-widget { position: fixed; bottom: 20px; right: 20px; z-index: 99999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    #kafka-crm-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #dc2626, #ef4444); color: white; border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(220,38,38,0.4); display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+    #kafka-crm-btn:hover { transform: scale(1.1); }
+    #kafka-crm-btn svg { width: 28px; height: 28px; }
+    #kafka-crm-form { display: none; position: fixed; bottom: 90px; right: 20px; width: 340px; max-width: calc(100vw - 40px); background: #1a1a2e; border: 1px solid #333; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); overflow: hidden; z-index: 99999; }
+    #kafka-crm-form.open { display: block; animation: kafkaSlideUp 0.3s ease; }
+    @keyframes kafkaSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    #kafka-crm-form .kf-header { background: linear-gradient(135deg, #dc2626, #b91c1c); padding: 16px; color: white; }
+    #kafka-crm-form .kf-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+    #kafka-crm-form .kf-header p { margin: 4px 0 0; font-size: 12px; opacity: 0.85; }
+    #kafka-crm-form .kf-body { padding: 16px; }
+    #kafka-crm-form .kf-field { margin-bottom: 12px; }
+    #kafka-crm-form .kf-field label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; font-weight: 500; }
+    #kafka-crm-form .kf-field input, #kafka-crm-form .kf-field textarea { width: 100%; padding: 10px 12px; border: 1px solid #333; border-radius: 8px; background: #0f0f23; color: #fff; font-size: 14px; box-sizing: border-box; outline: none; transition: border-color 0.2s; }
+    #kafka-crm-form .kf-field input:focus, #kafka-crm-form .kf-field textarea:focus { border-color: #dc2626; }
+    #kafka-crm-form .kf-field textarea { height: 60px; resize: none; }
+    #kafka-crm-form .kf-submit { width: 100%; padding: 12px; background: linear-gradient(135deg, #dc2626, #ef4444); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: opacity 0.2s; }
+    #kafka-crm-form .kf-submit:hover { opacity: 0.9; }
+    #kafka-crm-form .kf-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    #kafka-crm-form .kf-success { text-align: center; padding: 30px 16px; color: #4ade80; }
+    #kafka-crm-form .kf-success svg { width: 48px; height: 48px; margin: 0 auto 12px; }
+    #kafka-crm-form .kf-success h4 { margin: 0 0 8px; font-size: 18px; color: white; }
+    #kafka-crm-form .kf-success p { margin: 0; font-size: 13px; color: #aaa; }
+    #kafka-crm-form .kf-close { position: absolute; top: 12px; right: 12px; background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 20px; line-height: 1; padding: 4px; }
+    #kafka-crm-form .kf-close:hover { color: white; }
+  \`;
+  document.head.appendChild(style);
+
+  // Create widget HTML
+  var widget = document.createElement('div');
+  widget.id = 'kafka-crm-widget';
+  widget.innerHTML = \`
+    <button id="kafka-crm-btn" aria-label="Fale conosco">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+    </button>
+    <div id="kafka-crm-form">
+      <button class="kf-close" onclick="document.getElementById('kafka-crm-form').classList.remove('open')">&times;</button>
+      <div class="kf-header">
+        <h3>Kafka Multimarcas</h3>
+        <p>Preencha e entraremos em contato!</p>
+      </div>
+      <div class="kf-body" id="kafka-crm-fields">
+        <div class="kf-field">
+          <label>Nome *</label>
+          <input type="text" id="kf-name" placeholder="Seu nome completo" required>
+        </div>
+        <div class="kf-field">
+          <label>Telefone / WhatsApp *</label>
+          <input type="tel" id="kf-phone" placeholder="(47) 99999-9999">
+        </div>
+        <div class="kf-field">
+          <label>Veiculo de Interesse</label>
+          <input type="text" id="kf-vehicle" placeholder="Ex: HB20, Hilux, Civic...">
+        </div>
+        <div class="kf-field">
+          <label>Mensagem</label>
+          <textarea id="kf-notes" placeholder="Como podemos ajudar?"></textarea>
+        </div>
+        <button class="kf-submit" id="kf-submit" onclick="kafkaCrmSubmit()">Enviar</button>
+      </div>
+    </div>
+  \`;
+  document.body.appendChild(widget);
+
+  // Toggle form
+  document.getElementById('kafka-crm-btn').addEventListener('click', function() {
+    var form = document.getElementById('kafka-crm-form');
+    form.classList.toggle('open');
+  });
+
+  // Submit handler
+  window.kafkaCrmSubmit = function() {
+    var name = document.getElementById('kf-name').value.trim();
+    var phone = document.getElementById('kf-phone').value.trim();
+    var vehicle = document.getElementById('kf-vehicle').value.trim();
+    var notes = document.getElementById('kf-notes').value.trim();
+    var btn = document.getElementById('kf-submit');
+
+    if (!name) { alert('Por favor, informe seu nome.'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    var utm = getUTM();
+    var payload = {
+      name: name,
+      phone: phone || undefined,
+      vehicleInterest: vehicle || undefined,
+      notes: notes || undefined,
+      utmSource: utm.utmSource || undefined,
+      utmMedium: utm.utmMedium || undefined,
+      utmCampaign: utm.utmCampaign || undefined,
+      utmContent: utm.utmContent || undefined,
+      utmTerm: utm.utmTerm || undefined,
+      pageUrl: utm.pageUrl
+    };
+
+    fetch(window.kafkaCrmApiUrl || (document.querySelector('[data-kafka-crm]')?.src?.replace('/api/webhooks/widget.js', '') || '') + '/api/webhooks/widget/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        document.getElementById('kafka-crm-fields').innerHTML = '<div class="kf-success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><h4>Obrigado!</h4><p>Entraremos em contato em breve.</p></div>';
+        setTimeout(function() { document.getElementById('kafka-crm-form').classList.remove('open'); }, 3000);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Enviar';
+        alert('Erro ao enviar. Tente novamente.');
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+      alert('Erro de conexao. Tente novamente.');
+    });
+  };
+})();
+`;
 }

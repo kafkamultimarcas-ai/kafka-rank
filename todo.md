@@ -450,3 +450,30 @@
 - [x] Marcar como pago/recebido em 1 toque
 - [x] Anexar comprovantes (foto/arquivo via S3)
 - [x] Relatório mensal simplificado
+
+## CRM Tela Principal do Vendedor + Integrações
+
+### CRM como tela principal do vendedor
+- [x] Ao logar, vendedor vê painel de leads direto (não precisa navegar)
+- [x] Leads novos em destaque com badge de origem (OLX, Webmotors, Instagram, etc)
+- [x] Indicador visual de qual plataforma o lead veio
+
+### Webhooks de Integração
+- [x] Webhook Meta Lead Ads (Instagram/Facebook Ads)
+- [x] Webhook Google Ads (formulário de lead)
+- [x] Webhook genérico (qualquer plataforma/chatbot)
+- [x] Parser de e-mail para leads de OLX/Webmotors/SóCarrão/iCarros
+- [x] Identificação automática da origem do lead
+
+### Widget/Formulário Embeddable
+- [x] Widget JavaScript embeddable para landing pages
+- [x] Formulário captura nome, telefone, interesse, veículo
+- [x] Tracking de UTM (utm_source, utm_medium, utm_campaign)
+- [x] Lead cai no CRM com origem "Landing Page" + dados da campanha
+
+### Documentação de Integração
+- [x] Documentação completa com passo a passo para cada integração
+- [x] Guia Meta Business (Instagram/Facebook Lead Ads)
+- [x] Guia Google Ads
+- [x] Guia plataformas (OLX, Webmotors, etc)
+- [x] Guia landing pages (como colar o widget)

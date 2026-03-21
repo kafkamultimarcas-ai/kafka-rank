@@ -8,7 +8,7 @@ import { toast } from "sonner";
 const ACCESS_KEY = "kafka_access_granted";
 
 // Routes that bypass the access gate (no access code needed)
-const BYPASS_ROUTES = ["/crm/admin"];
+const BYPASS_ROUTES = ["/crm/admin", "/login-vendedor", "/crm", "/crm/integracoes"];
 
 export default function AccessGate({ children }: { children: ReactNode }) {
   const [granted, setGranted] = useState(false);

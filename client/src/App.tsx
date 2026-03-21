@@ -33,6 +33,7 @@ import CrmLeadDetail from "./pages/crm/CrmLeadDetail";
 import CrmPipeline from "./pages/crm/CrmPipeline";
 import CrmAdminLogin from "./pages/crm/CrmAdminLogin";
 import CrmAdminDashboard from "./pages/crm/CrmAdminDashboard";
+import IntegrationDocs from "./pages/crm/IntegrationDocs";
 
 function Router() {
   return (
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/crm/pipeline" component={CrmPipeline} />
       <Route path="/crm/admin/login" component={CrmAdminLogin} />
       <Route path="/crm/admin" component={CrmAdminDashboard} />
+      <Route path="/crm/integracoes" component={IntegrationDocs} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

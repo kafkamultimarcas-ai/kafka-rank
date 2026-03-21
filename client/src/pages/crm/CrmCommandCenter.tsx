@@ -12,10 +12,24 @@ import {
   MessageSquare, Send, X, ChevronDown, FileText
 } from "lucide-react";
 
-const SOURCE_LABELS: Record<string, string> = {
-  manual: "Manual", whatsapp: "WhatsApp", olx: "OLX", webmotors: "Webmotors",
-  socarrao: "SóCarrão", facebook: "Facebook", instagram: "Instagram",
-  trafego_pago: "Tráfego Pago", indicacao: "Indicação", loja: "Loja",
+const SOURCE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  manual: { label: "Manual", color: "text-gray-400", bg: "bg-gray-500/20" },
+  whatsapp: { label: "WhatsApp", color: "text-green-400", bg: "bg-green-500/20" },
+  olx: { label: "OLX", color: "text-orange-400", bg: "bg-orange-500/20" },
+  webmotors: { label: "Webmotors", color: "text-blue-400", bg: "bg-blue-500/20" },
+  socarrao: { label: "SóCarrão", color: "text-yellow-400", bg: "bg-yellow-500/20" },
+  facebook: { label: "Facebook", color: "text-blue-500", bg: "bg-blue-600/20" },
+  instagram: { label: "Instagram", color: "text-pink-400", bg: "bg-pink-500/20" },
+  instagram_ads: { label: "Insta Ads", color: "text-pink-400", bg: "bg-pink-500/20" },
+  facebook_ads: { label: "FB Ads", color: "text-blue-500", bg: "bg-blue-600/20" },
+  google_ads: { label: "Google Ads", color: "text-emerald-400", bg: "bg-emerald-500/20" },
+  trafego_pago: { label: "Tráfego Pago", color: "text-purple-400", bg: "bg-purple-500/20" },
+  indicacao: { label: "Indicação", color: "text-cyan-400", bg: "bg-cyan-500/20" },
+  loja: { label: "Loja", color: "text-amber-400", bg: "bg-amber-500/20" },
+  landing_page: { label: "Landing Page", color: "text-indigo-400", bg: "bg-indigo-500/20" },
+  icarros: { label: "iCarros", color: "text-red-400", bg: "bg-red-500/20" },
+  manychat: { label: "ManyChat", color: "text-blue-300", bg: "bg-blue-400/20" },
+  webhook: { label: "API", color: "text-violet-400", bg: "bg-violet-500/20" },
 };
 
 const SCORE_CONFIG = {
@@ -50,8 +64,9 @@ export default function CrmCommandCenter() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [filterScore, setFilterScore] = useState<string | null>(null);
+  const [filterSource, setFilterSource] = useState<string | null>(null);
   const [showNewLead, setShowNewLead] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabView>("dashboard");
+  const [activeTab, setActiveTab] = useState<TabView>("leads");
   const [showTemplates, setShowTemplates] = useState<number | null>(null);
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
@@ -106,9 +121,10 @@ export default function CrmCommandCenter() {
 
     let all = [...urgent, ...warning, ...normal];
     if (filterScore) all = all.filter(l => l.score === filterScore);
+    if (filterSource) all = all.filter(l => l.source === filterSource);
 
     return { urgentLeads: urgent, warningLeads: warning, normalLeads: normal, filteredLeads: all };
-  }, [leads, searchResults, searchQuery, filterScore]);
+  }, [leads, searchResults, searchQuery, filterScore, filterSource]);
 
   const moveStage = trpc.crmLeads.moveStage.useMutation({
     onSuccess: () => { refetchLeads(); toast.success("Etapa atualizada!"); },
@@ -279,6 +295,23 @@ export default function CrmCommandCenter() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="Buscar nome, telefone, placa..." className="pl-9 h-9 text-sm bg-accent/50 border-border" />
+          </div>
+
+          {/* Source filters */}
+          <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar">
+            <button onClick={() => setFilterSource(null)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all ${!filterSource ? "bg-primary/20 border-primary/40 text-primary" : "bg-accent/50 border-border text-muted-foreground"}`}>
+              Todas origens
+            </button>
+            {Object.entries(SOURCE_LABELS).filter(([key]) => {
+              if (!leads) return false;
+              return leads.some((l: any) => l.source === key);
+            }).map(([key, cfg]) => (
+              <button key={key} onClick={() => setFilterSource(filterSource === key ? null : key)}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all ${filterSource === key ? `${cfg.bg} ${cfg.color} border-current` : "bg-accent/50 border-border text-muted-foreground"}`}>
+                {cfg.label}
+              </button>
+            ))}
           </div>
 
           {/* Score filters */}
@@ -564,9 +597,9 @@ function LeadCard({ lead, stages, sellerId, templates, onWhatsApp, onCall, onMov
             <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
               <Clock className="w-2.5 h-2.5" /> {timeAgo(lead.lastContactDate)}
             </span>
-            {lead.source && lead.source !== "manual" && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground">
-                {SOURCE_LABELS[lead.source] || lead.source}
+            {lead.source && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${(SOURCE_LABELS[lead.source]?.bg || 'bg-accent')} ${(SOURCE_LABELS[lead.source]?.color || 'text-muted-foreground')}`}>
+                {SOURCE_LABELS[lead.source]?.label || lead.source}
               </span>
             )}
           </div>
@@ -705,8 +738,13 @@ function NewLeadModal({ sellerId, department, onClose, onCreated }: {
               <option value="olx">OLX</option>
               <option value="webmotors">Webmotors</option>
               <option value="socarrao">SóCarrão</option>
+              <option value="icarros">iCarros</option>
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
+              <option value="instagram_ads">Instagram Ads</option>
+              <option value="facebook_ads">Facebook Ads</option>
+              <option value="google_ads">Google Ads</option>
+              <option value="landing_page">Landing Page</option>
               <option value="indicacao">Indicação</option>
               <option value="loja">Loja (presencial)</option>
             </select>

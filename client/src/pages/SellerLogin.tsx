@@ -16,8 +16,8 @@ export default function SellerLogin() {
   const loginMutation = trpc.sellers.login.useMutation({
     onSuccess: (data) => {
       toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
-      // Redirecionar para os agendamentos do vendedor
-      navigate(`/minha-area/${data.sellerId}`);
+      // Redirecionar direto para o CRM do vendedor (leads como primeira tela)
+      navigate(`/crm`);
     },
     onError: (err) => {
       toast.error(err.message || "Usuário ou senha inválidos");
