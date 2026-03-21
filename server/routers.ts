@@ -658,33 +658,63 @@ export const appRouter = router({
       }
       return db.listConsignmentRecords(input?.competitionId, input?.sellerId);
     }),
+    // Verificar placa antes de registrar (duplicidade 60 dias)
+    checkPlate: publicProcedure.input(z.object({
+      plate: z.string().min(1),
+    })).query(async ({ input }) => {
+      return db.checkConsignmentPlate(input.plate);
+    }),
+    // Listar veículos no pátio (sem saída)
+    yard: publicProcedure.query(async () => {
+      return db.listVehiclesInYard();
+    }),
+    // Listar veículos que completaram 7 dias
+    completed7Days: publicProcedure.input(z.object({
+      month: z.number().optional(),
+      year: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listVehiclesCompleted7Days(input?.month, input?.year);
+    }),
+    // Listar veículos que já saíram (histórico)
+    exited: publicProcedure.input(z.object({
+      month: z.number().optional(),
+      year: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listVehiclesExited(input?.month, input?.year);
+    }),
     register: publicProcedure.input(z.object({
       sellerId: z.number(),
       competitionId: z.number().optional(),
-      vehiclePlate: z.string().optional(),
+      vehiclePlate: z.string().min(1, "Placa é obrigatória"),
       vehicleModel: z.string().min(1),
       ownerName: z.string().min(1),
       ownerPhone: z.string().optional(),
       entryDate: z.number(),
     })).mutation(async ({ input }) => {
+      // Verificar duplicidade de placa
+      const plateCheck = await db.checkConsignmentPlate(input.vehiclePlate);
+      if (plateCheck.blocked) {
+        throw new Error(plateCheck.message);
+      }
       const seller = await db.getSellerById(input.sellerId);
-      if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
+      if (!seller) throw new Error("Colaborador não encontrado");
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
-        const id = await db.createConsignmentRecord({ ...input, points, status: 'pending' });
+      const id = await db.createConsignmentRecord({ ...input, points, status: 'pending' });
+      const warningMsg = plateCheck.warning ? ` \u26a0️ ${plateCheck.message}` : '';
       await notifyOwner({
         title: `Nova consignação para aprovar!`,
-        content: `${seller.name} registrou consignação: ${input.vehicleModel} | Dono: ${input.ownerName} | Tel: ${input.ownerPhone || 'N/I'} | Placa: ${input.vehiclePlate || 'N/I'}`,
+        content: `${seller.name} registrou consignação: ${input.vehicleModel} | Dono: ${input.ownerName} | Tel: ${input.ownerPhone || 'N/I'} | Placa: ${input.vehiclePlate}${warningMsg}`,
       });
       await db.createNotification({
         targetType: 'admin',
         type: 'pending_consignment',
         title: 'Nova consignação para aprovar!',
-        message: `${seller.name}: ${input.vehicleModel} | Dono: ${input.ownerName}`,
+        message: `${seller.name}: ${input.vehicleModel} | Dono: ${input.ownerName} | Placa: ${input.vehiclePlate}`,
         actionUrl: '/admin/aprovacoes',
       });
       sendPushPendingRecord(seller.name, 'Consignação', `${input.vehicleModel} | Dono: ${input.ownerName}`).catch(console.error);
-      return { id, message: "Consignação registrada! Aguardando aprovação. Lembre-se: o carro precisa ficar 7 dias no pátio para contar pontos." };
+      return { id, message: `Consignação registrada! Aguardando aprovação. O carro precisa ficar 7 dias no pátio para contar pontos.${warningMsg}` };
     }),
     listPending: adminProcedure.query(async () => {
       return db.listPendingConsignmentRecords();

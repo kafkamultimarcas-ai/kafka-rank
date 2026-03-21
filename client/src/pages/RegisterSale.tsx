@@ -48,6 +48,8 @@ export default function RegisterSale() {
   const [ownerName, setOwnerName] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [entryDate, setEntryDate] = useState("");
+  const [plateCheckResult, setPlateCheckResult] = useState<{ blocked: boolean; warning: boolean; message: string } | null>(null);
+  const [isCheckingPlate, setIsCheckingPlate] = useState(false);
 
   // Despachante fields
   const [dispatchPlate, setDispatchPlate] = useState("");
@@ -77,6 +79,10 @@ export default function RegisterSale() {
   const registerSale = trpc.sales.registerBySeller.useMutation();
   const registerFei = trpc.fei.register.useMutation();
   const registerConsignment = trpc.consignment.register.useMutation();
+  const checkPlateMutation = trpc.consignment.checkPlate.useQuery(
+    { plate: consignPlate },
+    { enabled: consignPlate.length >= 6 && category === 'consignacao' }
+  );
   const registerDispatch = trpc.dispatch.register.useMutation();
   const registerSdr = trpc.sdr.register.useMutation();
   const parseVoice = trpc.voice.parseVoice.useMutation();
@@ -234,10 +240,12 @@ export default function RegisterSale() {
           });
           break;
         case "consignacao":
+          if (!consignPlate || consignPlate.length < 6) { toast.error("Informe a placa do veículo!"); return; }
           if (!consignModel || !ownerName || !entryDate) { toast.error("Informe o modelo, dono e data de entrada!"); return; }
+          if (checkPlateMutation.data?.blocked) { toast.error(checkPlateMutation.data.message); return; }
           result = await registerConsignment.mutateAsync({
             sellerId: sid, competitionId: cid,
-            vehiclePlate: consignPlate || undefined,
+            vehiclePlate: consignPlate,
             vehicleModel: consignModel, ownerName,
             ownerPhone: ownerPhone || undefined,
             entryDate: new Date(entryDate).getTime(),
@@ -573,6 +581,39 @@ export default function RegisterSale() {
             {/* CONSIGNAÇÃO */}
             {category === "consignacao" && (
               <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm flex items-center gap-1">
+                      Placa do veículo *
+                    </Label>
+                    <Input value={consignPlate} onChange={e => setConsignPlate(e.target.value.toUpperCase())}
+                      placeholder="ABC1D23" maxLength={7}
+                      className={`bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 ${
+                        checkPlateMutation.data?.blocked ? 'border-red-500 ring-1 ring-red-500' :
+                        checkPlateMutation.data?.warning ? 'border-yellow-500 ring-1 ring-yellow-500' : ''
+                      }`} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Data entrada *</Label>
+                    <Input value={entryDate} onChange={e => setEntryDate(e.target.value)}
+                      type="date" className="bg-gray-800 border-gray-700 text-white" />
+                  </div>
+                </div>
+                {/* Alerta de placa duplicada */}
+                {checkPlateMutation.data?.blocked && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                    <p className="text-red-400 text-xs font-semibold">
+                      ⛔ {checkPlateMutation.data.message}
+                    </p>
+                  </div>
+                )}
+                {checkPlateMutation.data?.warning && !checkPlateMutation.data?.blocked && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                    <p className="text-yellow-400 text-xs font-semibold">
+                      ⚠️ {checkPlateMutation.data.message}
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">
                     <Car className="w-4 h-4 text-blue-400" />
@@ -580,18 +621,6 @@ export default function RegisterSale() {
                   </Label>
                   <Input value={consignModel} onChange={e => setConsignModel(e.target.value)}
                     placeholder="Ex: Toyota Corolla 2023" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Placa</Label>
-                    <Input value={consignPlate} onChange={e => setConsignPlate(e.target.value.toUpperCase())}
-                      placeholder="ABC1D23" maxLength={7} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Data entrada *</Label>
-                    <Input value={entryDate} onChange={e => setEntryDate(e.target.value)}
-                      type="date" className="bg-gray-800 border-gray-700 text-white" />
-                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Nome do proprietário *</Label>
@@ -605,7 +634,7 @@ export default function RegisterSale() {
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-blue-400 text-xs">
-                    <strong>Regra:</strong> O veículo precisa ficar no mínimo 7 dias no pátio para que a consignação conte pontos na competição.
+                    <strong>Regra:</strong> O veículo precisa ficar no mínimo 7 dias no pátio para contar pontos. Placa é obrigatória e não pode duplicar em 60 dias.
                   </p>
                 </div>
               </>

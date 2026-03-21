@@ -725,6 +725,110 @@ export async function listConsignmentRecords(competitionId?: number, sellerId?: 
   return db.select().from(consignmentRecords).orderBy(desc(consignmentRecords.createdAt));
 }
 
+// Verificar se placa já está no pátio (sem saída) ou foi consignada nos últimos 60 dias
+export async function checkConsignmentPlate(plate: string): Promise<{ blocked: boolean; warning: boolean; message: string; previousDate?: number }> {
+  const db = await getDb();
+  if (!db) return { blocked: false, warning: false, message: '' };
+  if (!plate || plate.trim().length === 0) return { blocked: false, warning: false, message: '' };
+  
+  const normalizedPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  
+  // Buscar todos os registros com essa placa (não rejeitados)
+  const records = await db.select().from(consignmentRecords)
+    .where(and(
+      sql`UPPER(REPLACE(${consignmentRecords.vehiclePlate}, '-', '')) = ${normalizedPlate}`,
+      sql`${consignmentRecords.status} != 'rejected'`,
+    ))
+    .orderBy(desc(consignmentRecords.createdAt));
+  
+  if (records.length === 0) return { blocked: false, warning: false, message: '' };
+  
+  const latest = records[0];
+  const daysSinceLast = Math.floor((Date.now() - latest.entryDate) / (1000 * 60 * 60 * 24));
+  
+  // Se o carro ainda está no pátio (sem saída e aprovado/pendente), bloqueia
+  if (!latest.exitDate && (latest.status === 'approved' || latest.status === 'pending')) {
+    return {
+      blocked: true,
+      warning: false,
+      message: `Este veículo já está no pátio! Placa registrada em ${new Date(latest.entryDate).toLocaleDateString('pt-BR')}. Dê saída primeiro antes de registrar novamente.`,
+      previousDate: latest.entryDate,
+    };
+  }
+  
+  // Se foi consignado nos últimos 60 dias, bloqueia
+  if (daysSinceLast < 60) {
+    return {
+      blocked: true,
+      warning: false,
+      message: `Este veículo foi consignado há ${daysSinceLast} dias (${new Date(latest.entryDate).toLocaleDateString('pt-BR')}). Só pode ser consignado novamente após 60 dias.`,
+      previousDate: latest.entryDate,
+    };
+  }
+  
+  // Após 60 dias, permite mas com aviso
+  return {
+    blocked: false,
+    warning: true,
+    message: `Atenção: este veículo já foi consignado anteriormente. Primeira consignação em ${new Date(records[records.length - 1].entryDate).toLocaleDateString('pt-BR')}. Última em ${new Date(latest.entryDate).toLocaleDateString('pt-BR')}.`,
+    previousDate: latest.entryDate,
+  };
+}
+
+// Listar veículos atualmente no pátio (aprovados, sem saída)
+export async function listVehiclesInYard() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(consignmentRecords)
+    .where(and(
+      eq(consignmentRecords.status, 'approved'),
+      sql`${consignmentRecords.exitDate} IS NULL`,
+    ))
+    .orderBy(consignmentRecords.entryDate);
+}
+
+// Listar veículos que completaram 7 dias (meta consignação)
+export async function listVehiclesCompleted7Days(month?: number, year?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [
+    eq(consignmentRecords.status, 'approved'),
+    eq(consignmentRecords.isValid, true),
+  ];
+  if (month && year) {
+    const startStr = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
+    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) >= ${startStr}`);
+    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) < ${endStr}`);
+  }
+  return db.select().from(consignmentRecords)
+    .where(and(...conditions))
+    .orderBy(desc(consignmentRecords.createdAt));
+}
+
+// Listar veículos que já saíram do pátio (histórico)
+export async function listVehiclesExited(month?: number, year?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [
+    eq(consignmentRecords.status, 'approved'),
+    sql`${consignmentRecords.exitDate} IS NOT NULL`,
+  ];
+  if (month && year) {
+    const startStr = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
+    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) >= ${startStr}`);
+    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) < ${endStr}`);
+  }
+  return db.select().from(consignmentRecords)
+    .where(and(...conditions))
+    .orderBy(desc(consignmentRecords.exitDate));
+}
+
 export async function createConsignmentRecord(data: InsertConsignmentRecord) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");

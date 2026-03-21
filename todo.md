@@ -490,3 +490,18 @@
 
 ### Novas funcionalidades
 - [x] Ranking de agendamentos (quem mais agendou e quem compareceu)
+
+## Controle de Consignação Completo
+
+### Regras de Negócio
+- [x] Data de entrada obrigatória no registro de consignação
+- [x] Verificação de duplicidade por placa: bloqueia se mesmo carro em menos de 60 dias
+- [x] Após 60 dias: permite registrar mas mostra aviso com data da primeira consignação
+- [x] Dar saída do pátio (não exclui, mantém registro histórico)
+- [x] Controle automático dos 7 dias no pátio
+
+### Aba de Controle de Pátio
+- [x] Aba separada com veículos atualmente no pátio (contagem de dias)
+- [x] Destaque para veículos que completaram 7 dias (meta consignação)
+- [x] Histórico de veículos que já saíram
+- [x] Visibilidade restrita: apenas admin, gerente e setor consignação
