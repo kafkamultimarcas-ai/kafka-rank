@@ -110,6 +110,7 @@ export const feiRecords = mysqlTable("fei_records", {
   financedValue: int("financedValue").default(0), // valor financiado em centavos
   returnType: varchar("returnType", { length: 10 }), // R1, R2, R3, R4, R5
   paymentDate: bigint("paymentDate", { mode: "number" }), // data que o banco pagou a ficha
+  notes: text("notes"), // observações do F&I
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

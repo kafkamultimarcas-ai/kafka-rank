@@ -169,7 +169,7 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 top-12 z-50 w-80 sm:w-96 max-h-[70vh] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden"
+              className="fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0 top-16 sm:top-12 z-50 sm:w-96 max-h-[75vh] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 bg-gray-800/50">

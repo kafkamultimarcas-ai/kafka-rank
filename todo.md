@@ -477,3 +477,16 @@
 - [x] Guia Google Ads
 - [x] Guia plataformas (OLX, Webmotors, etc)
 - [x] Guia landing pages (como colar o widget)
+
+## Bugs e Melhorias - Março 2026
+
+### Bugs
+- [x] Agendamentos contando como venda no ranking
+- [x] Outros setores (F&I, Despachante, etc) aparecendo no ranking de vendedores - filtrar só vendedores
+- [x] Rank da meta misturado com rank da competição - separar claramente
+- [x] Alertas/notificações cortando a tela (não cabe, corta a imagem)
+- [x] F&I sem opção "Retorno 0" no campo de retorno
+- [x] F&I sem campo de observação para anotações
+
+### Novas funcionalidades
+- [x] Ranking de agendamentos (quem mais agendou e quem compareceu)

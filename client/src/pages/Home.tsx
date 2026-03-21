@@ -47,9 +47,22 @@ export default function Home() {
   // Ranking mensal de vendas
   const [showMonthlyRanking, setShowMonthlyRanking] = useState<string | null>(null);
   const { data: monthlyRanking } = trpc.goals.monthlyRanking.useQuery(
-    { month: now.getMonth() + 1, year: now.getFullYear() },
+    { month: now.getMonth() + 1, year: now.getFullYear(), category: showMonthlyRanking || undefined },
     { enabled: showMonthlyRanking !== null }
   );
+
+  // Ranking de agendamentos
+  const [showAppointmentRanking, setShowAppointmentRanking] = useState(false);
+  const { data: appointmentRanking } = trpc.goals.appointmentRanking.useQuery(
+    { month: now.getMonth() + 1, year: now.getFullYear() },
+    { enabled: showAppointmentRanking }
+  );
+
+  // Filtrar apenas vendedores (department = vendas) para o ranking principal
+  const vendedores = useMemo(() => {
+    if (!sellers) return [];
+    return sellers.filter(s => !s.department || s.department === 'vendas');
+  }, [sellers]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -383,16 +396,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Top Sellers */}
-      {sellers && sellers.length > 0 && (
+      {/* Top Vendedores - apenas department vendas */}
+      {vendedores.length > 0 && (
         <section className="py-12 sm:py-16 border-t border-border">
           <div className="container">
             <div className="flex items-center gap-3 mb-8">
               <Users className="h-6 w-6 text-primary" />
-              <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">PARTICIPANTES</h2>
+              <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">TOP VENDEDORES</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {sellers.map((seller, idx) => (
+              {vendedores.map((seller, idx) => (
                 <button
                   key={seller.id}
                   onClick={() => setLocation(`/vendedor/${seller.id}`)}
@@ -424,6 +437,81 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* Ranking de Agendamentos */}
+      <section className="py-12 sm:py-16 border-t border-border">
+        <div className="container">
+          <button
+            onClick={() => setShowAppointmentRanking(!showAppointmentRanking)}
+            className="flex items-center gap-3 mb-6 w-full text-left"
+          >
+            <CalendarPlus className="h-6 w-6 text-cyan-400" />
+            <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">RANKING DE AGENDAMENTOS</h2>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {showAppointmentRanking ? '▲ Fechar' : '▼ Ver ranking'}
+            </span>
+          </button>
+          {!showAppointmentRanking && (
+            <p className="text-sm text-muted-foreground">Toque acima para ver quem mais agendou e quem teve mais comparecimentos no mês.</p>
+          )}
+          {showAppointmentRanking && (
+            <div className="racing-card p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarPlus className="h-5 w-5 text-cyan-400" />
+                <h3 className="font-heading font-bold text-sm text-foreground">
+                  AGENDAMENTOS — {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                </h3>
+              </div>
+              {!appointmentRanking || appointmentRanking.length === 0 ? (
+                <p className="text-center text-xs text-muted-foreground py-4">Nenhum agendamento aprovado neste mês.</p>
+              ) : (
+                <div className="space-y-2">
+                  {/* Header */}
+                  <div className="grid grid-cols-12 gap-2 text-[10px] text-muted-foreground font-semibold px-2 pb-1 border-b border-border">
+                    <div className="col-span-1">#</div>
+                    <div className="col-span-5">Vendedor</div>
+                    <div className="col-span-2 text-center">Agendou</div>
+                    <div className="col-span-2 text-center">Compareceu</div>
+                    <div className="col-span-2 text-center">Taxa</div>
+                  </div>
+                  {appointmentRanking.map((entry: any, idx: number) => (
+                    <div key={entry.seller?.id || idx} className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${
+                      idx === 0 ? 'bg-cyan-500/10 border border-cyan-500/20' :
+                      idx < 3 ? 'bg-primary/5' : 'bg-muted/30'
+                    }`}>
+                      <span className={`col-span-1 text-xs font-bold ${
+                        idx === 0 ? 'text-cyan-400' : idx < 3 ? 'text-primary' : 'text-muted-foreground'
+                      }`}>{idx + 1}</span>
+                      <div className="col-span-5 flex items-center gap-2 min-w-0">
+                        {entry.seller?.photoUrl ? (
+                          <img src={entry.seller.photoUrl} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Users className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                        )}
+                        <p className="text-xs font-semibold text-foreground truncate">{entry.seller?.nickname || entry.seller?.name}</p>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-sm font-bold text-cyan-400">{entry.scheduledCount}</span>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-sm font-bold text-emerald-400">{entry.attendedCount}</span>
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className={`text-xs font-bold ${
+                          entry.conversionRate >= 80 ? 'text-emerald-400' :
+                          entry.conversionRate >= 50 ? 'text-yellow-400' : 'text-red-400'
+                        }`}>{entry.conversionRate}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Finished Competitions */}
       {finishedComps.length > 0 && (

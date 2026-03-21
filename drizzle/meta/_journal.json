@@ -141,6 +141,13 @@
       "when": 1774072822428,
       "tag": "0019_wonderful_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1774129687512,
+      "tag": "0020_typical_captain_cross",
+      "breakpoints": true
     }
   ]
 }

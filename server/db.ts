@@ -220,17 +220,25 @@ export async function createSale(data: InsertSale) {
   return result[0].insertId;
 }
 
-async function updateSaleTotals(sellerId: number, competitionId: number | null | undefined, points: number) {
+// incrementSales = true para vendas reais, false para agendamentos/SDR que não devem contar como venda
+async function updateSaleTotals(sellerId: number, competitionId: number | null | undefined, points: number, incrementSales: boolean = true) {
   const db = await getDb();
   if (!db) return;
-  await db.update(sellers).set({
-    totalSales: sql`totalSales + 1`,
-    totalPoints: sql`totalPoints + ${points}`,
-  }).where(eq(sellers.id, sellerId));
+  if (incrementSales) {
+    await db.update(sellers).set({
+      totalSales: sql`totalSales + 1`,
+      totalPoints: sql`totalPoints + ${points}`,
+    }).where(eq(sellers.id, sellerId));
+  } else {
+    // Apenas pontos, sem incrementar totalSales (para agendamentos)
+    await db.update(sellers).set({
+      totalPoints: sql`totalPoints + ${points}`,
+    }).where(eq(sellers.id, sellerId));
+  }
   if (competitionId) {
     await db.update(competitionParticipants).set({
       points: sql`points + ${points}`,
-      salesCount: sql`salesCount + 1`,
+      salesCount: incrementSales ? sql`salesCount + 1` : sql`salesCount`,
     }).where(and(
       eq(competitionParticipants.competitionId, competitionId),
       eq(competitionParticipants.sellerId, sellerId),
@@ -898,8 +906,9 @@ export async function approveSdrRecord(id: number) {
   await db.update(sdrRecords).set({ status: 'approved' }).where(eq(sdrRecords.id, id));
   // Para agendamentos: NÃO dar pontos aqui. Pontos só são dados quando gerente aprova comparecimento (approveAttendance).
   // Para lead_convertido: dar pontos na aprovação do registro.
+  // incrementSales=false pois SDR/pré-vendas NÃO são vendas de veículos
   if (record.type !== 'agendamento') {
-    await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
   }
   return record;
 }
@@ -944,7 +953,8 @@ export async function approveAttendance(id: number) {
   await db.update(sdrRecords).set({ attendanceStatus: 'approved' }).where(eq(sdrRecords.id, id));
   // Só gera ponto quando gerente aprova comparecimento do cliente
   // Para agendamentos: este é o único momento que dá ponto (1pt)
-  await updateSaleTotals(record.sellerId, record.competitionId, record.points || 1);
+  // incrementSales=false pois agendamento NÃO é venda
+  await updateSaleTotals(record.sellerId, record.competitionId, record.points || 1, false);
   return record;
 }
 
@@ -1119,7 +1129,7 @@ export async function deleteManager(id: number) {
 }
 
 // ===== RANKING MENSAL DE VENDAS (sem campanha) =====
-export async function getMonthlyRanking(month: number, year: number) {
+export async function getMonthlyRanking(month: number, year: number, category?: string) {
   const db = await getDb();
   if (!db) return [];
   // Calcular início e fim do mês como strings para MySQL
@@ -1146,24 +1156,20 @@ export async function getMonthlyRanking(month: number, year: number) {
     sellerMap.set(sale.sellerId, existing);
   }
   
-  // Buscar dados dos vendedores
-  const sellerIds = Array.from(sellerMap.keys());
-  if (sellerIds.length === 0) {
-    // Retornar todos os vendedores ativos com 0 vendas
-    const allSellers = await db.select().from(sellers).where(eq(sellers.active, true)).orderBy(sellers.name);
-    return allSellers.map((s, idx) => ({
-      position: idx + 1,
-      seller: s,
-      salesCount: 0,
-      totalValue: 0,
-      points: 0,
-    }));
+  // Determinar qual departamento filtrar baseado na categoria da meta
+  // vendas e feirao = department vendas; fei = department fei; etc.
+  const deptFilter = (!category || category === 'vendas' || category === 'feirao') ? 'vendas' : category;
+  
+  // Buscar vendedores ativos filtrados por departamento
+  const allSellers = await db.select().from(sellers).where(
+    and(eq(sellers.active, true), eq(sellers.department, deptFilter))
+  );
+  
+  if (allSellers.length === 0) {
+    return [];
   }
   
-  // Buscar todos os vendedores ativos
-  const allSellers = await db.select().from(sellers).where(eq(sellers.active, true));
-  
-  // Montar ranking
+  // Montar ranking apenas com vendedores do departamento correto
   const ranking = allSellers.map(s => {
     const stats = sellerMap.get(s.id) || { count: 0, totalValue: 0, points: 0 };
     return {
@@ -1176,6 +1182,61 @@ export async function getMonthlyRanking(month: number, year: number) {
   
   // Ordenar por quantidade de vendas (decrescente)
   ranking.sort((a, b) => b.salesCount - a.salesCount || b.totalValue - a.totalValue);
+  
+  return ranking.map((r, idx) => ({
+    position: idx + 1,
+    ...r,
+  }));
+}
+
+// ===== RANKING DE AGENDAMENTOS =====
+export async function getAppointmentRanking(month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const startStr = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
+  const endMonth = month === 12 ? 1 : month + 1;
+  const endYear = month === 12 ? year + 1 : year;
+  const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
+  
+  // Buscar todos os agendamentos do mês (aprovados pelo gerente)
+  const monthAppointments = await db.select().from(sdrRecords)
+    .where(and(
+      eq(sdrRecords.type, 'agendamento'),
+      eq(sdrRecords.status, 'approved'),
+      sql`CAST(${sdrRecords.createdAt} AS CHAR) >= ${startStr}`,
+      sql`CAST(${sdrRecords.createdAt} AS CHAR) < ${endStr}`,
+    ));
+  
+  // Agrupar por vendedor: total agendados e total comparecidos
+  const sellerMap = new Map<number, { scheduled: number; attended: number }>();
+  for (const appt of monthAppointments) {
+    const existing = sellerMap.get(appt.sellerId) || { scheduled: 0, attended: 0 };
+    existing.scheduled += 1;
+    if (appt.attendanceStatus === 'approved') {
+      existing.attended += 1;
+    }
+    sellerMap.set(appt.sellerId, existing);
+  }
+  
+  // Buscar vendedores ativos do departamento pré-vendas ou vendas
+  const allSellers = await db.select().from(sellers).where(eq(sellers.active, true));
+  
+  // Montar ranking com todos que têm agendamentos
+  const ranking = allSellers
+    .filter(s => sellerMap.has(s.id))
+    .map(s => {
+      const stats = sellerMap.get(s.id)!;
+      return {
+        seller: s,
+        scheduledCount: stats.scheduled,
+        attendedCount: stats.attended,
+        conversionRate: stats.scheduled > 0 ? Math.round((stats.attended / stats.scheduled) * 100) : 0,
+      };
+    });
+  
+  // Ordenar por comparecidos (decrescente), depois por agendados
+  ranking.sort((a, b) => b.attendedCount - a.attendedCount || b.scheduledCount - a.scheduledCount);
   
   return ranking.map((r, idx) => ({
     position: idx + 1,

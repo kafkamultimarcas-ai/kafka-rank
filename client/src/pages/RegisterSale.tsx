@@ -40,6 +40,7 @@ export default function RegisterSale() {
   const [financedValue, setFinancedValue] = useState("");
   const [returnType, setReturnType] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
+  const [feiNotes, setFeiNotes] = useState("");
 
   // Consignação fields
   const [consignModel, setConsignModel] = useState("");
@@ -106,7 +107,7 @@ export default function RegisterSale() {
 
   const resetForm = () => {
     setVehicleModel(""); setValue(""); setDescription(""); setSaleLeadSource("");
-    setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setPaymentDate("");
+    setCustomerCpf(""); setVehiclePlate(""); setBankName(""); setFinancedValue(""); setReturnType(""); setPaymentDate(""); setFeiNotes("");
     setConsignModel(""); setConsignPlate(""); setOwnerName(""); setOwnerPhone(""); setEntryDate("");
     setDispatchPlate(""); setDocumentType(""); setCustomerPaid(false); setTransferValue("");
     setSdrType("agendamento"); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); setVehicleInterest(""); setLeadSource(""); setScheduledDate(""); setSdrNotes("");
@@ -229,6 +230,7 @@ export default function RegisterSale() {
             bankName, returnType,
             financedValue: financedValue ? Math.round(parseFloat(financedValue) * 100) : undefined,
             paymentDate: paymentDate ? new Date(paymentDate).getTime() : undefined,
+            notes: feiNotes || undefined,
           });
           break;
         case "consignacao":
@@ -548,7 +550,7 @@ export default function RegisterSale() {
                         <SelectValue placeholder="Tipo" />
                       </SelectTrigger>
                       <SelectContent className="bg-gray-800 border-gray-700">
-                        {["R1", "R2", "R3", "R4", "R5"].map(r => (
+                        {["R0", "R1", "R2", "R3", "R4", "R5"].map(r => (
                           <SelectItem key={r} value={r} className="text-white hover:bg-gray-700">{r}</SelectItem>
                         ))}
                       </SelectContent>
@@ -559,6 +561,11 @@ export default function RegisterSale() {
                     <Input value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
                       type="date" className="bg-gray-800 border-gray-700 text-white" />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold">Observação</Label>
+                  <Textarea value={feiNotes} onChange={e => setFeiNotes(e.target.value)}
+                    placeholder="Anotações sobre a ficha..." className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 resize-none" rows={2} />
                 </div>
               </>
             )}

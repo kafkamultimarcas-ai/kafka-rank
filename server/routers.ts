@@ -597,6 +597,7 @@ export const appRouter = router({
       financedValue: z.number().optional(),
       returnType: z.string().min(1),
       paymentDate: z.number().optional(),
+      notes: z.string().optional(),
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
@@ -1070,8 +1071,16 @@ export const appRouter = router({
     monthlyRanking: publicProcedure.input(z.object({
       month: z.number().min(1).max(12),
       year: z.number(),
+      category: z.string().optional(),
     })).query(async ({ input }) => {
-      return db.getMonthlyRanking(input.month, input.year);
+      return db.getMonthlyRanking(input.month, input.year, input.category);
+    }),
+    // Ranking de agendamentos (quem mais agendou e compareceu)
+    appointmentRanking: publicProcedure.input(z.object({
+      month: z.number().min(1).max(12),
+      year: z.number(),
+    })).query(async ({ input }) => {
+      return db.getAppointmentRanking(input.month, input.year);
     }),
   }),
 
