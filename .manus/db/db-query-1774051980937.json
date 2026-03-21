@@ -1,0 +1,52 @@
+{
+  "query": "SELECT id, username, name, role, active FROM admins;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, username, name, role, active FROM admins;",
+  "rows": [
+    {
+      "id": "1",
+      "username": "testadmin_1773983410049",
+      "name": "Test Admin",
+      "role": "admin",
+      "active": "1"
+    },
+    {
+      "id": "2",
+      "username": "testadmin_1773983418966",
+      "name": "Test Admin",
+      "role": "admin",
+      "active": "1"
+    },
+    {
+      "id": "3",
+      "username": "testadmin_1773983479906",
+      "name": "Test Admin",
+      "role": "admin",
+      "active": "1"
+    },
+    {
+      "id": "4",
+      "username": "testadmin_1773983642303",
+      "name": "Test Admin",
+      "role": "admin",
+      "active": "1"
+    },
+    {
+      "id": "30001",
+      "username": "kafka",
+      "name": "Kafka Admin",
+      "role": "owner",
+      "active": "1"
+    },
+    {
+      "id": "60001",
+      "username": "testadmin_1774032820054",
+      "name": "Test Admin",
+      "role": "admin",
+      "active": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tusername\tname\trole\tactive\n1\ttestadmin_1773983410049\tTest Admin\tadmin\t1\n2\ttestadmin_1773983418966\tTest Admin\tadmin\t1\n3\ttestadmin_1773983479906\tTest Admin\tadmin\t1\n4\ttestadmin_1773983642303\tTest Admin\tadmin\t1\n30001\tkafka\tKafka Admin\towner\t1\n60001\ttestadmin_1774032820054\tTest Admin\tadmin\t1\n",
+  "stderr": "",
+  "execution_time_ms": 67
+}
