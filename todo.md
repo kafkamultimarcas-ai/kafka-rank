@@ -533,3 +533,10 @@
 - [x] Vendas pendentes com destaque visual (borda amarela)
 - [x] Alerta de impacto ao mudar status (aviso sobre pontos)
 - [x] 13 testes passando para edição de vendas
+
+## Bugs e Melhorias - Equipe (22/03)
+- [x] Bug: Botão de ativar/desativar colaborador - adicionado diálogo de confirmação para evitar cliques acidentais
+- [x] Adicionar tooltips nos ícones do card de colaborador (explicar o que cada ícone faz)
+- [x] Reativar Andréia Vieegas (F&I) que foi desativada acidentalmente
+- [x] Badge "Inativo" visível quando colaborador está desativado
+- [x] Borda vermelha no card de colaboradores inativos
