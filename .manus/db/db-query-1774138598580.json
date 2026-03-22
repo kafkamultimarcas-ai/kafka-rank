@@ -1,0 +1,109 @@
+{
+  "query": "SELECT s.id, s.name, s.department, s.totalSales, s.totalPoints,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as vendas_reais,\n  s.totalSales - (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as diferenca_vendas\nFROM sellers s WHERE s.active = true ORDER BY diferenca_vendas DESC, s.name",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, s.department, s.totalSales, s.totalPoints,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as vendas_reais,\n  s.totalSales - (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as diferenca_vendas\nFROM sellers s WHERE s.active = true ORDER BY diferenca_vendas DESC, s.name",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "Andréia Vieegas",
+      "department": "fei",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "vendas_reais": "0",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "vendas_reais": "2",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "vendas_reais": "2",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "60002",
+      "name": "Jordana claudino",
+      "department": "consignacao",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "vendas_reais": "0",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "department": "vendas",
+      "totalSales": "8",
+      "totalPoints": "8",
+      "vendas_reais": "8",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "30001",
+      "name": "Letícia ",
+      "department": "pre_vendas",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "vendas_reais": "0",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "department": "vendas",
+      "totalSales": "5",
+      "totalPoints": "5",
+      "vendas_reais": "5",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "vendas_reais": "2",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "vendas_reais": "2",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "60003",
+      "name": "Rafaela Simões ",
+      "department": "despachante",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "vendas_reais": "0",
+      "diferenca_vendas": "0"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "department": "vendas",
+      "totalSales": "7",
+      "totalPoints": "7",
+      "vendas_reais": "7",
+      "diferenca_vendas": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tdepartment\ttotalSales\ttotalPoints\tvendas_reais\tdiferenca_vendas\n60001\tAndréia Vieegas\tfei\t0\t0\t0\t0\n7\tEmanuel\tvendas\t2\t2\t2\t0\n2\tGabriel\tvendas\t2\t2\t2\t0\n60002\tJordana claudino\tconsignacao\t0\t0\t0\t0\n1\tLeonardo\tvendas\t8\t8\t8\t0\n30001\tLetícia \tpre_vendas\t0\t0\t0\t0\n6\tLucas\tvendas\t5\t5\t5\t0\n3\tMatheus\tvendas\t2\t2\t2\t0\n5\tPetherson\tvendas\t2\t2\t2\t0\n60003\tRafaela Simões \tdespachante\t0\t0\t0\t0\n4\tWesley\tvendas\t7\t7\t7\t0\n",
+  "stderr": "",
+  "execution_time_ms": 68
+}

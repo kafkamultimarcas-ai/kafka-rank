@@ -1,0 +1,82 @@
+{
+  "query": "SELECT id, vehicleModel, value, points, status, competitionId, createdAt FROM sales WHERE sellerId = 1 AND status = 'approved' ORDER BY createdAt DESC",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, vehicleModel, value, points, status, competitionId, createdAt FROM sales WHERE sellerId = 1 AND status = 'approved' ORDER BY createdAt DESC",
+  "rows": [
+    {
+      "id": "300006",
+      "vehicleModel": "Kangoo",
+      "value": "55000",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "NULL",
+      "createdAt": "2026-03-21 23:48:53"
+    },
+    {
+      "id": "300003",
+      "vehicleModel": "Etios sedan",
+      "value": "46000",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "NULL",
+      "createdAt": "2026-03-21 22:04:45"
+    },
+    {
+      "id": "150027",
+      "vehicleModel": "Tiida",
+      "value": "46000",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "1",
+      "createdAt": "2026-03-19 18:53:00"
+    },
+    {
+      "id": "150026",
+      "vehicleModel": "Peugeot 308",
+      "value": "42000",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "1",
+      "createdAt": "2026-03-19 18:52:21"
+    },
+    {
+      "id": "150025",
+      "vehicleModel": "Gol 2011",
+      "value": "27500",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "1",
+      "createdAt": "2026-03-19 18:50:55"
+    },
+    {
+      "id": "150024",
+      "vehicleModel": "Cronos",
+      "value": "0",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "1",
+      "createdAt": "2026-03-19 18:50:31"
+    },
+    {
+      "id": "150022",
+      "vehicleModel": "Etios Vermelho 2013",
+      "value": "0",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "1",
+      "createdAt": "2026-03-19 18:49:44"
+    },
+    {
+      "id": "150020",
+      "vehicleModel": "Etios branco 2015",
+      "value": "0",
+      "points": "1",
+      "status": "approved",
+      "competitionId": "1",
+      "createdAt": "2026-03-19 18:48:06"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tvehicleModel\tvalue\tpoints\tstatus\tcompetitionId\tcreatedAt\n300006\tKangoo\t55000\t1\tapproved\tNULL\t2026-03-21 23:48:53\n300003\tEtios sedan\t46000\t1\tapproved\tNULL\t2026-03-21 22:04:45\n150027\tTiida\t46000\t1\tapproved\t1\t2026-03-19 18:53:00\n150026\tPeugeot 308\t42000\t1\tapproved\t1\t2026-03-19 18:52:21\n150025\tGol 2011\t27500\t1\tapproved\t1\t2026-03-19 18:50:55\n150024\tCronos\t0\t1\tapproved\t1\t2026-03-19 18:50:31\n150022\tEtios Vermelho 2013\t0\t1\tapproved\t1\t2026-03-19 18:49:44\n150020\tEtios branco 2015\t0\t1\tapproved\t1\t2026-03-19 18:48:06\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

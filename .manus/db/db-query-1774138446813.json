@@ -1,0 +1,80 @@
+{
+  "query": "SELECT s.id, s.name, s.totalSales, s.totalPoints,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as aprovadas,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'pending') as pendentes,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'rejected') as rejeitadas,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id) as total_registros\nFROM sellers s WHERE s.active = true AND s.department = 'vendas' ORDER BY s.name",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, s.totalSales, s.totalPoints,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved') as aprovadas,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'pending') as pendentes,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'rejected') as rejeitadas,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = s.id) as total_registros\nFROM sellers s WHERE s.active = true AND s.department = 'vendas' ORDER BY s.name",
+  "rows": [
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "aprovadas": "2",
+      "pendentes": "0",
+      "rejeitadas": "0",
+      "total_registros": "2"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "aprovadas": "2",
+      "pendentes": "0",
+      "rejeitadas": "0",
+      "total_registros": "2"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "totalSales": "8",
+      "totalPoints": "8",
+      "aprovadas": "8",
+      "pendentes": "0",
+      "rejeitadas": "0",
+      "total_registros": "8"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "totalSales": "5",
+      "totalPoints": "5",
+      "aprovadas": "5",
+      "pendentes": "0",
+      "rejeitadas": "0",
+      "total_registros": "5"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "aprovadas": "2",
+      "pendentes": "0",
+      "rejeitadas": "0",
+      "total_registros": "2"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "totalSales": "2",
+      "totalPoints": "2",
+      "aprovadas": "2",
+      "pendentes": "0",
+      "rejeitadas": "1",
+      "total_registros": "3"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "totalSales": "7",
+      "totalPoints": "7",
+      "aprovadas": "7",
+      "pendentes": "0",
+      "rejeitadas": "0",
+      "total_registros": "7"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttotalSales\ttotalPoints\taprovadas\tpendentes\trejeitadas\ttotal_registros\n7\tEmanuel\t2\t2\t2\t0\t0\t2\n2\tGabriel\t2\t2\t2\t0\t0\t2\n1\tLeonardo\t8\t8\t8\t0\t0\t8\n6\tLucas\t5\t5\t5\t0\t0\t5\n3\tMatheus\t2\t2\t2\t0\t0\t2\n5\tPetherson\t2\t2\t2\t0\t1\t3\n4\tWesley\t7\t7\t7\t0\t0\t7\n",
+  "stderr": "",
+  "execution_time_ms": 67
+}

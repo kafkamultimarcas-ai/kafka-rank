@@ -1,0 +1,73 @@
+{
+  "query": "SELECT cp.sellerId, s.name, cp.points, cp.salesCount, cp.competitionId,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND status = 'approved' AND competitionId = cp.competitionId) as vendas_competicao,\n  (SELECT COALESCE(SUM(points), 0) FROM sales WHERE sellerId = cp.sellerId AND status = 'approved' AND competitionId = cp.competitionId) as pontos_competicao\nFROM competition_participants cp\nJOIN sellers s ON s.id = cp.sellerId\nORDER BY cp.points DESC",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT cp.sellerId, s.name, cp.points, cp.salesCount, cp.competitionId,\n  (SELECT COUNT(*) FROM sales WHERE sellerId = cp.sellerId AND status = 'approved' AND competitionId = cp.competitionId) as vendas_competicao,\n  (SELECT COALESCE(SUM(points), 0) FROM sales WHERE sellerId = cp.sellerId AND status = 'approved' AND competitionId = cp.competitionId) as pontos_competicao\nFROM competition_participants cp\nJOIN sellers s ON s.id = cp.sellerId\nORDER BY cp.points DESC",
+  "rows": [
+    {
+      "sellerId": "4",
+      "name": "Wesley",
+      "points": "7",
+      "salesCount": "7",
+      "competitionId": "1",
+      "vendas_competicao": "7",
+      "pontos_competicao": "7"
+    },
+    {
+      "sellerId": "1",
+      "name": "Leonardo",
+      "points": "6",
+      "salesCount": "6",
+      "competitionId": "1",
+      "vendas_competicao": "6",
+      "pontos_competicao": "6"
+    },
+    {
+      "sellerId": "6",
+      "name": "Lucas",
+      "points": "5",
+      "salesCount": "5",
+      "competitionId": "1",
+      "vendas_competicao": "5",
+      "pontos_competicao": "5"
+    },
+    {
+      "sellerId": "2",
+      "name": "Gabriel",
+      "points": "2",
+      "salesCount": "2",
+      "competitionId": "1",
+      "vendas_competicao": "2",
+      "pontos_competicao": "2"
+    },
+    {
+      "sellerId": "3",
+      "name": "Matheus",
+      "points": "2",
+      "salesCount": "2",
+      "competitionId": "1",
+      "vendas_competicao": "2",
+      "pontos_competicao": "2"
+    },
+    {
+      "sellerId": "5",
+      "name": "Petherson",
+      "points": "2",
+      "salesCount": "2",
+      "competitionId": "1",
+      "vendas_competicao": "2",
+      "pontos_competicao": "2"
+    },
+    {
+      "sellerId": "7",
+      "name": "Emanuel",
+      "points": "2",
+      "salesCount": "2",
+      "competitionId": "1",
+      "vendas_competicao": "2",
+      "pontos_competicao": "2"
+    }
+  ],
+  "messages": [],
+  "stdout": "sellerId\tname\tpoints\tsalesCount\tcompetitionId\tvendas_competicao\tpontos_competicao\n4\tWesley\t7\t7\t1\t7\t7\n1\tLeonardo\t6\t6\t1\t6\t6\n6\tLucas\t5\t5\t1\t5\t5\n2\tGabriel\t2\t2\t1\t2\t2\n3\tMatheus\t2\t2\t1\t2\t2\n5\tPetherson\t2\t2\t1\t2\t2\n7\tEmanuel\t2\t2\t1\t2\t2\n",
+  "stderr": "",
+  "execution_time_ms": 158
+}

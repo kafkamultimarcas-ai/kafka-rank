@@ -66,9 +66,9 @@ export default function SellerProfile() {
               <ShoppingCart className="h-5 w-5 text-primary" />
               <h3 className="font-heading font-bold text-foreground">VENDAS RECENTES</h3>
             </div>
-            {salesList && salesList.length > 0 ? (
+            {salesList && salesList.filter((s: any) => s.status === 'approved').length > 0 ? (
               <div className="space-y-2">
-                {salesList.slice(0, 10).map(sale => (
+                {salesList.filter((s: any) => s.status === 'approved').slice(0, 10).map((sale: any) => (
                   <div key={sale.id} className="racing-card p-3 flex items-center gap-3">
                     <TrendingUp className="h-4 w-4 text-primary shrink-0" />
                     <div className="flex-1 min-w-0">

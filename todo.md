@@ -514,3 +514,11 @@
 - [x] Vendas não estão indo para a meta mensal corretamente (corrigido: meta recalculada para 28 vendas reais)
 - [x] Total de vendas no painel geral filtrado para apenas vendedores (department=vendas)
 - [x] Garantir que apenas vendas de veículos contem no ranking de vendas e na meta (F&I/SDR/Desp/Consig não incrementam totalSales)
+
+## Auditoria Completa do Sistema (21/03 noite)
+- [x] Recalcular totalSales de TODOS os vendedores baseado em vendas reais aprovadas
+- [x] Recalcular totalPoints de TODOS os vendedores (vendas + F&I + SDR + consignação + despachante)
+- [x] Recalcular pontos dos participantes de competições
+- [x] Recalcular currentValue da meta de vendas (28/50)
+- [x] Verificar perfil de cada vendedor - filtrar apenas aprovadas na lista de vendas recentes
+- [x] Garantir que ranking mensal, competição e meta estejam sincronizados
