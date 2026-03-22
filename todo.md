@@ -540,3 +540,14 @@
 - [x] Reativar Andréia Vieegas (F&I) que foi desativada acidentalmente
 - [x] Badge "Inativo" visível quando colaborador está desativado
 - [x] Borda vermelha no card de colaboradores inativos
+
+## Painel Visual F&I para Colaboradores (22/03)
+- [x] Colaborador F&I vê todos os seus registros na Minha Área com abas de filtro
+- [x] Separar registros por status: Todas, Aprovadas, Pendentes, Rejeitadas com abas
+- [x] Visual claro com badges de status (verde=aprovado, amarelo=pendente, vermelho=rejeitado)
+- [x] Cards coloridos por status com borda lateral e detalhes completos
+- [x] Contadores de resumo (total aprovadas, pendentes, rejeitadas) para F&I na Minha Área
+- [x] Admin tem página dedicada F&I (/admin/fei) no sidebar com filtros e ações
+- [x] Admin pode aprovar/rejeitar/re-aprovar direto da página F&I
+- [x] Filtro por colaborador na página admin F&I
+- [x] Mostrar detalhes de cada registro (placa, CPF, banco, valor, retorno, data, observações)

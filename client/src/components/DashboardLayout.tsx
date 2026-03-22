@@ -22,7 +22,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, Eye, EyeOff, UserCog, LayoutGrid, Warehouse } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, Eye, EyeOff, UserCog, LayoutGrid, Warehouse, Banknote } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -35,6 +35,7 @@ const menuItems = [
   { icon: Users, label: "Vendedores", path: "/admin/vendedores" },
   { icon: Trophy, label: "Competições", path: "/admin/competicoes" },
   { icon: ShoppingCart, label: "Vendas", path: "/admin/vendas" },
+  { icon: Banknote, label: "F&I", path: "/admin/fei" },
   { icon: GraduationCap, label: "Treinamentos", path: "/admin/treinamentos" },
   { icon: ClipboardList, label: "Planos de Ação", path: "/admin/planos" },
   { icon: Target, label: "Metas", path: "/admin/metas" },

@@ -23,6 +23,7 @@ import {
   TrendingUp,
   PlusCircle,
   LayoutGrid,
+  Filter,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Award, Target } from "lucide-react";
@@ -43,7 +44,29 @@ function formatDate(ts: number | string | Date | null | undefined) {
 
 function formatCurrency(v: number | null | undefined) {
   if (!v) return "—";
-  return `R$ ${v.toLocaleString("pt-BR")}`;
+  return `R$ ${(v / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "approved") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold">
+        <CheckCircle2 className="w-3 h-3" /> Aprovado
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 font-semibold">
+        <Clock className="w-3 h-3" /> Pendente
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">
+      <XCircle className="w-3 h-3" /> Rejeitado
+    </span>
+  );
 }
 
 export default function MinhaArea() {
@@ -58,6 +81,9 @@ export default function MinhaArea() {
 
   const dept = sellerSession?.department || "vendas";
   const deptInfo = DEPT_CONFIG[dept] || DEPT_CONFIG.vendas;
+
+  // Filter state for F&I records
+  const [feiFilter, setFeiFilter] = useState<"todos" | "approved" | "pending" | "rejected">("todos");
 
   // Buscar dados específicos do setor
   const { data: appointments } = trpc.sdr.myAppointments.useQuery(
@@ -81,7 +107,7 @@ export default function MinhaArea() {
     { enabled: sellerId > 0 && dept === "despachante" }
   );
 
-  // Buscar metas individuais do vendedor logado (só retorna a dele por causa da proteção no backend)
+  // Buscar metas individuais do vendedor logado
   const now = useMemo(() => new Date(), []);
   const { data: myGoals } = trpc.goals.list.useQuery(
     { month: now.getMonth() + 1, year: now.getFullYear() },
@@ -133,8 +159,15 @@ export default function MinhaArea() {
   const approvedSales = (mySales || []).filter((s: any) => s.status === 'approved');
   const pendingSales = (mySales || []).filter((s: any) => s.status === 'pending');
 
-  const approvedFei = (myFei || []).filter((r: any) => r.status === 'approved');
-  const pendingFei = (myFei || []).filter((r: any) => r.status === 'pending');
+  const allFei = myFei || [];
+  const approvedFei = allFei.filter((r: any) => r.status === 'approved');
+  const pendingFei = allFei.filter((r: any) => r.status === 'pending');
+  const rejectedFei = allFei.filter((r: any) => r.status === 'rejected');
+
+  const filteredFei = useMemo(() => {
+    if (feiFilter === "todos") return allFei;
+    return allFei.filter((r: any) => r.status === feiFilter);
+  }, [allFei, feiFilter]);
 
   const approvedConsignment = (myConsignment || []).filter((r: any) => r.status === 'approved');
   const pendingConsignment = (myConsignment || []).filter((r: any) => r.status === 'pending');
@@ -192,7 +225,7 @@ export default function MinhaArea() {
 
       {/* Content */}
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Stats Cards - variam por setor */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3 text-center">
             <DeptIcon className={`w-5 h-5 ${deptInfo.color} mx-auto mb-1`} />
@@ -205,7 +238,7 @@ export default function MinhaArea() {
             </p>
             <p className="text-xs text-gray-500">
               {dept === "vendas" ? "Vendas" :
-               dept === "fei" ? "Fichas" :
+               dept === "fei" ? "Aprovadas" :
                dept === "consignacao" ? "Consignações" :
                dept === "despachante" ? "Documentos" :
                "Agendamentos"}
@@ -223,6 +256,27 @@ export default function MinhaArea() {
           </div>
         </div>
 
+        {/* F&I Extra Stats */}
+        {dept === "fei" && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3 text-center">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-emerald-400">{approvedFei.length}</p>
+              <p className="text-[10px] text-emerald-400/70">Aprovadas</p>
+            </div>
+            <div className="bg-yellow-950/30 border border-yellow-500/30 rounded-xl p-3 text-center">
+              <Clock className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-yellow-400">{pendingFei.length}</p>
+              <p className="text-[10px] text-yellow-400/70">Pendentes</p>
+            </div>
+            <div className="bg-red-950/30 border border-red-500/30 rounded-xl p-3 text-center">
+              <XCircle className="w-4 h-4 text-red-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-red-400">{rejectedFei.length}</p>
+              <p className="text-[10px] text-red-400/70">Rejeitadas</p>
+            </div>
+          </div>
+        )}
+
         {/* Meta Individual */}
         {individualGoals.length > 0 && (
           <div className="space-y-3">
@@ -236,8 +290,8 @@ export default function MinhaArea() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-gray-400 uppercase font-semibold">{goal.category}</span>
                     {goal.achieved && (
-                      <span className="flex items-center gap-1 text-xs text-emerald-400 font-bold">
-                        <Award className="w-3 h-3" /> META BATIDA!
+                      <span className="flex items-center gap-1 text-xs text-emerald-400 font-semibold">
+                        <CheckCircle2 className="w-3 h-3" /> Meta atingida!
                       </span>
                     )}
                   </div>
@@ -267,7 +321,7 @@ export default function MinhaArea() {
           </div>
         )}
 
-        {/* Pendentes */}
+        {/* Pendentes - Vendas */}
         {dept === "vendas" && pendingSales.length > 0 && (
           <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4">
             <h3 className="text-orange-400 font-bold text-sm mb-2 flex items-center gap-2">
@@ -282,20 +336,121 @@ export default function MinhaArea() {
           </div>
         )}
 
-        {dept === "fei" && pendingFei.length > 0 && (
-          <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4">
-            <h3 className="text-orange-400 font-bold text-sm mb-2 flex items-center gap-2">
-              <Clock className="w-4 h-4" /> Fichas F&I aguardando aprovação ({pendingFei.length})
-            </h3>
-            {pendingFei.slice(0, 5).map((r: any) => (
-              <div key={r.id} className="text-sm text-gray-300 py-1 flex justify-between">
-                <span>{r.bankName} - {r.returnType}</span>
-                <span className="text-gray-500">{formatCurrency(r.financedValue)}</span>
+        {/* ===== PAINEL COMPLETO F&I ===== */}
+        {dept === "fei" && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <DollarSign className="w-4 h-4" /> Minhas Fichas F&I
+            </h2>
+
+            {/* Abas de filtro */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { key: "todos" as const, label: "Todas", count: allFei.length, color: "bg-gray-600" },
+                { key: "approved" as const, label: "Aprovadas", count: approvedFei.length, color: "bg-emerald-600" },
+                { key: "pending" as const, label: "Pendentes", count: pendingFei.length, color: "bg-yellow-600" },
+                { key: "rejected" as const, label: "Rejeitadas", count: rejectedFei.length, color: "bg-red-600" },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setFeiFilter(tab.key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    feiFilter === tab.key
+                      ? `${tab.color} text-white shadow-lg`
+                      : "bg-gray-800/60 text-gray-400 hover:bg-gray-700/60"
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    feiFilter === tab.key ? "bg-white/20" : "bg-gray-700"
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Lista de fichas F&I */}
+            {filteredFei.length > 0 ? (
+              <div className="space-y-2">
+                {filteredFei.map((r: any) => (
+                  <div
+                    key={r.id}
+                    className={`rounded-xl p-4 border transition-all ${
+                      r.status === 'approved'
+                        ? 'bg-emerald-950/20 border-emerald-500/30'
+                        : r.status === 'pending'
+                        ? 'bg-yellow-950/20 border-yellow-500/30'
+                        : 'bg-red-950/20 border-red-500/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-white font-bold text-sm">{r.bankName}</p>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {r.returnType} • Registrado em {formatDate(r.createdAt)}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <p className={`text-sm font-bold ${
+                          r.status === 'approved' ? 'text-emerald-400' :
+                          r.status === 'pending' ? 'text-yellow-400' : 'text-red-400'
+                        }`}>
+                          {formatCurrency(r.financedValue)}
+                        </p>
+                        {r.status === 'approved' && (
+                          <p className="text-[10px] text-yellow-500 font-semibold">+{r.points} pts</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Detalhes extras */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 pt-2 border-t border-gray-800/50">
+                      {r.vehiclePlate && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-600">Placa:</span>
+                          <span className="text-[10px] text-gray-400 font-medium">{r.vehiclePlate}</span>
+                        </div>
+                      )}
+                      {r.customerCpf && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-600">CPF:</span>
+                          <span className="text-[10px] text-gray-400 font-medium">{r.customerCpf}</span>
+                        </div>
+                      )}
+                      {r.paymentDate && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-600">Pgto banco:</span>
+                          <span className="text-[10px] text-gray-400 font-medium">{formatDate(r.paymentDate)}</span>
+                        </div>
+                      )}
+                      {r.notes && (
+                        <div className="col-span-2 flex items-center gap-1">
+                          <span className="text-[10px] text-gray-600">Obs:</span>
+                          <span className="text-[10px] text-gray-400">{r.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-8 text-center">
+                <Filter className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">
+                  {feiFilter === "todos"
+                    ? "Nenhuma ficha F&I registrada ainda."
+                    : `Nenhuma ficha ${feiFilter === "approved" ? "aprovada" : feiFilter === "pending" ? "pendente" : "rejeitada"}.`}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
+        {/* Pendentes - Consignação */}
         {dept === "consignacao" && pendingConsignment.length > 0 && (
           <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4">
             <h3 className="text-orange-400 font-bold text-sm mb-2 flex items-center gap-2">
@@ -448,120 +603,104 @@ export default function MinhaArea() {
           </button>
         </div>
 
-        {/* Histórico de registros aprovados */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            Meu Histórico
-          </h2>
+        {/* Histórico de registros aprovados (para setores que NÃO são F&I, pois F&I já tem painel completo acima) */}
+        {dept !== "fei" && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+              Meu Histórico
+            </h2>
 
-          {dept === "vendas" && approvedSales.length > 0 && (
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-              {approvedSales.slice(0, 10).map((s: any) => (
-                <div key={s.id} className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white font-medium">{s.vehicleModel}</p>
-                    <p className="text-xs text-gray-500">{formatDate(s.createdAt)} {s.leadSource ? `• ${s.leadSource === 'lead_loja' ? 'Lead Loja' : 'Lead Vendedor'}` : ''}</p>
+            {dept === "vendas" && approvedSales.length > 0 && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
+                {approvedSales.slice(0, 10).map((s: any) => (
+                  <div key={s.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white font-medium">{s.vehicleModel}</p>
+                      <p className="text-xs text-gray-500">{formatDate(s.createdAt)} {s.leadSource ? `• ${s.leadSource === 'lead_loja' ? 'Lead Loja' : 'Lead Vendedor'}` : ''}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-emerald-400 font-bold">{formatCurrency(s.value)}</p>
+                      <p className="text-xs text-yellow-500">+{s.points} pts</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-emerald-400 font-bold">{formatCurrency(s.value)}</p>
-                    <p className="text-xs text-yellow-500">+{s.points} pts</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {dept === "fei" && approvedFei.length > 0 && (
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-              {approvedFei.slice(0, 10).map((r: any) => (
-                <div key={r.id} className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white font-medium">{r.bankName}</p>
-                    <p className="text-xs text-gray-500">{r.returnType} • {formatDate(r.createdAt)}</p>
+            {dept === "consignacao" && approvedConsignment.length > 0 && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
+                {approvedConsignment.slice(0, 10).map((r: any) => (
+                  <div key={r.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white font-medium">{r.vehicleModel}</p>
+                      <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.entryDate)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-yellow-500">+{r.points} pts</p>
+                      {r.exitDate ? (
+                        <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}</p>
+                      ) : (
+                        <p className="text-xs text-cyan-400">No pátio</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-amber-400 font-bold">{formatCurrency(r.financedValue)}</p>
-                    <p className="text-xs text-yellow-500">+{r.points} pts</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {dept === "consignacao" && approvedConsignment.length > 0 && (
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-              {approvedConsignment.slice(0, 10).map((r: any) => (
-                <div key={r.id} className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white font-medium">{r.vehicleModel}</p>
-                    <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.entryDate)}</p>
+            {dept === "despachante" && approvedDispatch.length > 0 && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
+                {approvedDispatch.slice(0, 10).map((r: any) => (
+                  <div key={r.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white font-medium">{r.documentType}</p>
+                      <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.createdAt)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-yellow-500">+{r.points + (r.bonusPoints || 0)} pts</p>
+                      {r.customerPaid && <p className="text-xs text-emerald-400">Bônus!</p>}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-yellow-500">+{r.points} pts</p>
-                    {r.exitDate ? (
-                      <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}</p>
-                    ) : (
-                      <p className="text-xs text-cyan-400">No pátio</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {dept === "despachante" && approvedDispatch.length > 0 && (
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-              {approvedDispatch.slice(0, 10).map((r: any) => (
-                <div key={r.id} className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white font-medium">{r.documentType}</p>
-                    <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.createdAt)}</p>
+            {dept === "pre_vendas" && (appointments || []).length > 0 && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
+                {(appointments || []).slice(0, 10).map((a: any) => (
+                  <div key={a.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white font-medium">{a.customerName}</p>
+                      <p className="text-xs text-gray-500">{a.ticketNumber} • {formatDate(a.scheduledDate)}</p>
+                    </div>
+                    <div className="text-right">
+                      {a.attendanceStatus === 'approved' ? (
+                        <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Compareceu</span>
+                      ) : a.attendanceStatus === 'no_show' ? (
+                        <span className="text-xs text-red-400 flex items-center gap-1"><XCircle className="w-3 h-3" /> Não veio</span>
+                      ) : a.attendanceStatus === 'attended' ? (
+                        <span className="text-xs text-orange-400 flex items-center gap-1"><Clock className="w-3 h-3" /> Aguardando</span>
+                      ) : (
+                        <span className="text-xs text-gray-500">Agendado</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-yellow-500">+{r.points + (r.bonusPoints || 0)} pts</p>
-                    {r.customerPaid && <p className="text-xs text-emerald-400">Bônus!</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
 
-          {dept === "pre_vendas" && (appointments || []).length > 0 && (
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-              {(appointments || []).slice(0, 10).map((a: any) => (
-                <div key={a.id} className="p-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white font-medium">{a.customerName}</p>
-                    <p className="text-xs text-gray-500">{a.ticketNumber} • {formatDate(a.scheduledDate)}</p>
-                  </div>
-                  <div className="text-right">
-                    {a.attendanceStatus === 'approved' ? (
-                      <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Compareceu</span>
-                    ) : a.attendanceStatus === 'no_show' ? (
-                      <span className="text-xs text-red-400 flex items-center gap-1"><XCircle className="w-3 h-3" /> Não veio</span>
-                    ) : a.attendanceStatus === 'attended' ? (
-                      <span className="text-xs text-orange-400 flex items-center gap-1"><Clock className="w-3 h-3" /> Aguardando</span>
-                    ) : (
-                      <span className="text-xs text-gray-500">Agendado</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Mensagem quando não tem histórico */}
-          {((dept === "vendas" && approvedSales.length === 0) ||
-            (dept === "fei" && approvedFei.length === 0) ||
-            (dept === "consignacao" && approvedConsignment.length === 0) ||
-            (dept === "despachante" && approvedDispatch.length === 0) ||
-            (dept === "pre_vendas" && (appointments || []).length === 0)) && (
-            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-8 text-center">
-              <TrendingUp className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-              <p className="text-gray-500 text-sm">Nenhum registro ainda. Comece registrando!</p>
-            </div>
-          )}
-        </div>
+            {/* Mensagem quando não tem histórico */}
+            {((dept === "vendas" && approvedSales.length === 0) ||
+              (dept === "consignacao" && approvedConsignment.length === 0) ||
+              (dept === "despachante" && approvedDispatch.length === 0) ||
+              (dept === "pre_vendas" && (appointments || []).length === 0)) && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-8 text-center">
+                <TrendingUp className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">Nenhum registro ainda. Comece registrando!</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Back */}
         <button
