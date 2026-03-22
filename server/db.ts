@@ -680,7 +680,8 @@ export async function approveFeiRecord(id: number) {
   const record = result[0];
   if (!record || record.status !== 'pending') throw new Error("Registro F&I não encontrado ou já processado");
   await db.update(feiRecords).set({ status: 'approved' }).where(eq(feiRecords.id, id));
-  await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+  // F&I NÃO é venda de veículo - incrementSales=false para não contar no ranking de vendas
+  await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
   return record;
 }
 
@@ -697,14 +698,13 @@ export async function deleteFeiRecord(id: number) {
   const record = result[0];
   if (!record) throw new Error("Registro não encontrado");
   if (record.status === 'approved') {
+    // F&I NÃO decrementa totalSales (não é venda de veículo)
     await db.update(sellers).set({
-      totalSales: sql`GREATEST(totalSales - 1, 0)`,
       totalPoints: sql`GREATEST(totalPoints - ${record.points}, 0)`,
     }).where(eq(sellers.id, record.sellerId));
     if (record.competitionId) {
       await db.update(competitionParticipants).set({
         points: sql`GREATEST(points - ${record.points}, 0)`,
-        salesCount: sql`GREATEST(salesCount - 1, 0)`,
       }).where(and(
         eq(competitionParticipants.competitionId, record.competitionId),
         eq(competitionParticipants.sellerId, record.sellerId),
@@ -853,7 +853,8 @@ export async function approveConsignmentRecord(id: number) {
   const isValid = daysPassed >= record.validAfterDays;
   await db.update(consignmentRecords).set({ status: 'approved', isValid }).where(eq(consignmentRecords.id, id));
   if (isValid) {
-    await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+    // Consignação NÃO é venda de veículo - incrementSales=false
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
   }
   return { ...record, isValid };
 }
@@ -876,7 +877,7 @@ export async function updateConsignmentExitDate(id: number, exitDate: number) {
   await db.update(consignmentRecords).set({ exitDate, isValid }).where(eq(consignmentRecords.id, id));
   // Se ficou válido agora e já estava aprovado, atualizar pontos
   if (isValid && record.status === 'approved' && !record.isValid) {
-    await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
   }
   return { ...record, exitDate, isValid };
 }
@@ -893,7 +894,8 @@ export async function validateConsignmentDays() {
     const daysPassed = Math.floor((Date.now() - record.entryDate) / (1000 * 60 * 60 * 24));
     if (daysPassed >= record.validAfterDays) {
       await db.update(consignmentRecords).set({ isValid: true }).where(eq(consignmentRecords.id, record.id));
-      await updateSaleTotals(record.sellerId, record.competitionId, record.points);
+      // Consignação NÃO é venda de veículo - incrementSales=false
+      await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
     }
   }
 }
@@ -930,7 +932,8 @@ export async function approveDispatchRecord(id: number) {
   if (!record || record.status !== 'pending') throw new Error("Registro de despachante não encontrado ou já processado");
   await db.update(dispatchRecords).set({ status: 'approved' }).where(eq(dispatchRecords.id, id));
   const totalPoints = record.points + record.bonusPoints;
-  await updateSaleTotals(record.sellerId, record.competitionId, totalPoints);
+  // Despachante NÃO é venda de veículo - incrementSales=false
+  await updateSaleTotals(record.sellerId, record.competitionId, totalPoints, false);
   return record;
 }
 
@@ -948,14 +951,13 @@ export async function deleteDispatchRecord(id: number) {
   if (!record) throw new Error("Registro não encontrado");
   if (record.status === 'approved') {
     const totalPoints = record.points + record.bonusPoints;
+    // Despachante NÃO decrementa totalSales (não é venda de veículo)
     await db.update(sellers).set({
-      totalSales: sql`GREATEST(totalSales - 1, 0)`,
       totalPoints: sql`GREATEST(totalPoints - ${totalPoints}, 0)`,
     }).where(eq(sellers.id, record.sellerId));
     if (record.competitionId) {
       await db.update(competitionParticipants).set({
         points: sql`GREATEST(points - ${totalPoints}, 0)`,
-        salesCount: sql`GREATEST(salesCount - 1, 0)`,
       }).where(and(
         eq(competitionParticipants.competitionId, record.competitionId),
         eq(competitionParticipants.sellerId, record.sellerId),
@@ -1107,14 +1109,13 @@ export async function deleteSdrRecord(id: number) {
   const record = result[0];
   if (!record) throw new Error("Registro não encontrado");
   if (record.status === 'approved') {
+    // SDR/Agendamento NÃO decrementa totalSales (não é venda de veículo)
     await db.update(sellers).set({
-      totalSales: sql`GREATEST(totalSales - 1, 0)`,
       totalPoints: sql`GREATEST(totalPoints - ${record.points}, 0)`,
     }).where(eq(sellers.id, record.sellerId));
     if (record.competitionId) {
       await db.update(competitionParticipants).set({
         points: sql`GREATEST(points - ${record.points}, 0)`,
-        salesCount: sql`GREATEST(salesCount - 1, 0)`,
       }).where(and(
         eq(competitionParticipants.competitionId, record.competitionId),
         eq(competitionParticipants.sellerId, record.sellerId),

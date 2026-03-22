@@ -1,0 +1,44 @@
+{
+  "query": "SELECT COUNT(*) as total, status FROM sales GROUP BY status;\nSELECT COUNT(*) as total_approved FROM sales WHERE status = 'approved';\nSELECT id, sellerId, description, vehicleModel, value, leadSource, points, status, createdAt FROM sales WHERE status = 'approved' ORDER BY createdAt DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT COUNT(*) as total, status FROM sales GROUP BY status;\nSELECT COUNT(*) as total_approved FROM sales WHERE status = 'approved';\nSELECT id, sellerId, description, vehicleModel, value, leadSource, points, status, createdAt FROM sales WHERE status = 'approved' ORDER BY createdAt DESC LIMIT 20;",
+  "rows": [
+    {
+      "total": "28",
+      "status": "approved"
+    },
+    {
+      "total": "1",
+      "status": "rejected"
+    }
+  ],
+  "messages": [
+    "total_approved",
+    "28",
+    "id\tsellerId\tdescription\tvehicleModel\tvalue\tleadSource\tpoints\tstatus\tcreatedAt",
+    "300006\t1\tNULL\tKangoo\t55000\tlead_loja\t1\tapproved\t2026-03-21 23:48:53",
+    "300005\t6\tVENDIDA DIA 21/03\tOUTLANDER 2015\t78000\tlead_loja\t1\tapproved\t2026-03-21 22:54:54",
+    "300004\t2\tA vista!\tGol 2009\t14000\tlead_vendedor\t1\tapproved\t2026-03-21 22:05:25",
+    "300003\t1\tNULL\tEtios sedan\t46000\tlead_vendedor\t1\tapproved\t2026-03-21 22:04:45",
+    "300002\t2\tEntrou um gol 2009 na troca!\tOnix Plus 2022\t67990\tlead_loja\t1\tapproved\t2026-03-21 21:12:01",
+    "300001\t4\tSábado plantão \tOnix 2019 \t66990\tlead_vendedor\t1\tapproved\t2026-03-21 18:29:45",
+    "270001\t4\tCliente fechou no plantão de vendas",
+    "Lead da loja\tFord ka 2020\t68990\tlead_loja\t1\tapproved\t2026-03-21 14:36:02",
+    "240001\t4\tVendido ( Facebook ) ",
+    "\t206 \t9400\tlead_vendedor\t1\tapproved\t2026-03-20 20:12:23",
+    "150027\t1\tNULL\tTiida\t46000\tNULL\t1\tapproved\t2026-03-19 18:53:00",
+    "150026\t1\tNULL\tPeugeot 308\t42000\tNULL\t1\tapproved\t2026-03-19 18:52:21",
+    "150025\t1\tNULL\tGol 2011\t27500\tNULL\t1\tapproved\t2026-03-19 18:50:55",
+    "150024\t1\tNULL\tCronos\t0\tNULL\t1\tapproved\t2026-03-19 18:50:31",
+    "150022\t1\tNULL\tEtios Vermelho 2013\t0\tNULL\t1\tapproved\t2026-03-19 18:49:44",
+    "150021\t5\tNULL\tSandero 1.0 2012\t32000\tNULL\t1\tapproved\t2026-03-19 18:49:37",
+    "150020\t1\tNULL\tEtios branco 2015\t0\tNULL\t1\tapproved\t2026-03-19 18:48:06",
+    "150019\t5\tNULL\tNivus 1.0 2022\t122990\tNULL\t1\tapproved\t2026-03-19 18:47:44",
+    "150018\t3\tNULL\tRenault Sandero\t34900\tNULL\t1\tapproved\t2026-03-19 18:45:59",
+    "150017\t6\tVendido dia 04/03\tKicks 2020 \t83000\tNULL\t1\tapproved\t2026-03-19 18:44:28",
+    "150016\t7\tCivic 2011\tCivic \t54990\tNULL\t1\tapproved\t2026-03-19 18:44:00",
+    "150015\t3\tNULL\tHonda Civic 2014\t77900\tNULL\t1\tapproved\t2026-03-19 18:43:57"
+  ],
+  "stdout": "total\tstatus\n28\tapproved\n1\trejected\ntotal_approved\n28\nid\tsellerId\tdescription\tvehicleModel\tvalue\tleadSource\tpoints\tstatus\tcreatedAt\n300006\t1\tNULL\tKangoo\t55000\tlead_loja\t1\tapproved\t2026-03-21 23:48:53\n300005\t6\tVENDIDA DIA 21/03\tOUTLANDER 2015\t78000\tlead_loja\t1\tapproved\t2026-03-21 22:54:54\n300004\t2\tA vista!\tGol 2009\t14000\tlead_vendedor\t1\tapproved\t2026-03-21 22:05:25\n300003\t1\tNULL\tEtios sedan\t46000\tlead_vendedor\t1\tapproved\t2026-03-21 22:04:45\n300002\t2\tEntrou um gol 2009 na troca!\tOnix Plus 2022\t67990\tlead_loja\t1\tapproved\t2026-03-21 21:12:01\n300001\t4\tSábado plantão \tOnix 2019 \t66990\tlead_vendedor\t1\tapproved\t2026-03-21 18:29:45\n270001\t4\tCliente fechou no plantão de vendas\nLead da loja\tFord ka 2020\t68990\tlead_loja\t1\tapproved\t2026-03-21 14:36:02\n240001\t4\tVendido ( Facebook ) \n\t206 \t9400\tlead_vendedor\t1\tapproved\t2026-03-20 20:12:23\n150027\t1\tNULL\tTiida\t46000\tNULL\t1\tapproved\t2026-03-19 18:53:00\n150026\t1\tNULL\tPeugeot 308\t42000\tNULL\t1\tapproved\t2026-03-19 18:52:21\n150025\t1\tNULL\tGol 2011\t27500\tNULL\t1\tapproved\t2026-03-19 18:50:55\n150024\t1\tNULL\tCronos\t0\tNULL\t1\tapproved\t2026-03-19 18:50:31\n150022\t1\tNULL\tEtios Vermelho 2013\t0\tNULL\t1\tapproved\t2026-03-19 18:49:44\n150021\t5\tNULL\tSandero 1.0 2012\t32000\tNULL\t1\tapproved\t2026-03-19 18:49:37\n150020\t1\tNULL\tEtios branco 2015\t0\tNULL\t1\tapproved\t2026-03-19 18:48:06\n150019\t5\tNULL\tNivus 1.0 2022\t122990\tNULL\t1\tapproved\t2026-03-19 18:47:44\n150018\t3\tNULL\tRenault Sandero\t34900\tNULL\t1\tapproved\t2026-03-19 18:45:59\n150017\t6\tVendido dia 04/03\tKicks 2020 \t83000\tNULL\t1\tapproved\t2026-03-19 18:44:28\n150016\t7\tCivic 2011\tCivic \t54990\tNULL\t1\tapproved\t2026-03-19 18:44:00\n150015\t3\tNULL\tHonda Civic 2014\t77900\tNULL\t1\tapproved\t2026-03-19 18:43:57\n",
+  "stderr": "",
+  "execution_time_ms": 126
+}

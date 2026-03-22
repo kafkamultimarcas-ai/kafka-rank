@@ -1,0 +1,87 @@
+{
+  "query": "UPDATE sellers s SET totalSales = (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved'), totalPoints = (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved');\nSELECT id, name, department, totalSales, totalPoints FROM sellers WHERE active = true ORDER BY totalSales DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute UPDATE sellers s SET totalSales = (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved'), totalPoints = (SELECT COUNT(*) FROM sales WHERE sellerId = s.id AND status = 'approved');\nSELECT id, name, department, totalSales, totalPoints FROM sellers WHERE active = true ORDER BY totalSales DESC;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "department": "vendas",
+      "totalSales": "8",
+      "totalPoints": "8"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "department": "vendas",
+      "totalSales": "6",
+      "totalPoints": "6"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "department": "vendas",
+      "totalSales": "5",
+      "totalPoints": "5"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "department": "vendas",
+      "totalSales": "3",
+      "totalPoints": "3"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "department": "vendas",
+      "totalSales": "2",
+      "totalPoints": "2"
+    },
+    {
+      "id": "30001",
+      "name": "Letícia ",
+      "department": "pre_vendas",
+      "totalSales": "0",
+      "totalPoints": "0"
+    },
+    {
+      "id": "60001",
+      "name": "Andréia Vieegas",
+      "department": "fei",
+      "totalSales": "0",
+      "totalPoints": "0"
+    },
+    {
+      "id": "60002",
+      "name": "Jordana claudino",
+      "department": "consignacao",
+      "totalSales": "0",
+      "totalPoints": "0"
+    },
+    {
+      "id": "60003",
+      "name": "Rafaela Simões ",
+      "department": "despachante",
+      "totalSales": "0",
+      "totalPoints": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tdepartment\ttotalSales\ttotalPoints\n1\tLeonardo\tvendas\t8\t8\n4\tWesley\tvendas\t6\t6\n6\tLucas\tvendas\t5\t5\n2\tGabriel\tvendas\t3\t3\n3\tMatheus\tvendas\t2\t2\n5\tPetherson\tvendas\t2\t2\n7\tEmanuel\tvendas\t2\t2\n30001\tLetícia \tpre_vendas\t0\t0\n60001\tAndréia Vieegas\tfei\t0\t0\n60002\tJordana claudino\tconsignacao\t0\t0\n60003\tRafaela Simões \tdespachante\t0\t0\n",
+  "stderr": "",
+  "execution_time_ms": 75
+}

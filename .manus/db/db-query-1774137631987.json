@@ -1,0 +1,59 @@
+{
+  "query": "SELECT s.sellerId, se.name, se.department, COUNT(*) as vendas, SUM(s.value) as totalValue\nFROM sales s\nJOIN sellers se ON se.id = s.sellerId\nWHERE s.status = 'approved'\nAND CAST(s.createdAt AS CHAR) >= '2026-03-01 00:00:00'\nAND CAST(s.createdAt AS CHAR) < '2026-04-01 00:00:00'\nGROUP BY s.sellerId, se.name, se.department\nORDER BY vendas DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.sellerId, se.name, se.department, COUNT(*) as vendas, SUM(s.value) as totalValue\nFROM sales s\nJOIN sellers se ON se.id = s.sellerId\nWHERE s.status = 'approved'\nAND CAST(s.createdAt AS CHAR) >= '2026-03-01 00:00:00'\nAND CAST(s.createdAt AS CHAR) < '2026-04-01 00:00:00'\nGROUP BY s.sellerId, se.name, se.department\nORDER BY vendas DESC;",
+  "rows": [
+    {
+      "sellerId": "1",
+      "name": "Leonardo",
+      "department": "vendas",
+      "vendas": "8",
+      "totalValue": "216500"
+    },
+    {
+      "sellerId": "4",
+      "name": "Wesley",
+      "department": "vendas",
+      "vendas": "6",
+      "totalValue": "358370"
+    },
+    {
+      "sellerId": "6",
+      "name": "Lucas",
+      "department": "vendas",
+      "vendas": "5",
+      "totalValue": "342990"
+    },
+    {
+      "sellerId": "2",
+      "name": "Gabriel",
+      "department": "vendas",
+      "vendas": "3",
+      "totalValue": "156990"
+    },
+    {
+      "sellerId": "3",
+      "name": "Matheus",
+      "department": "vendas",
+      "vendas": "2",
+      "totalValue": "112800"
+    },
+    {
+      "sellerId": "5",
+      "name": "Petherson",
+      "department": "vendas",
+      "vendas": "2",
+      "totalValue": "154990"
+    },
+    {
+      "sellerId": "7",
+      "name": "Emanuel",
+      "department": "vendas",
+      "vendas": "2",
+      "totalValue": "66490"
+    }
+  ],
+  "messages": [],
+  "stdout": "sellerId\tname\tdepartment\tvendas\ttotalValue\n1\tLeonardo\tvendas\t8\t216500\n4\tWesley\tvendas\t6\t358370\n6\tLucas\tvendas\t5\t342990\n2\tGabriel\tvendas\t3\t156990\n3\tMatheus\tvendas\t2\t112800\n5\tPetherson\tvendas\t2\t154990\n7\tEmanuel\tvendas\t2\t66490\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

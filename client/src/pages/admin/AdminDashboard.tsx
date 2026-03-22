@@ -22,8 +22,10 @@ export default function AdminDashboard() {
   const activeSellers = sellers?.filter(s => s.active) || [];
   const activeComps = competitions?.filter(c => c.status === "active") || [];
   const finishedComps = competitions?.filter(c => c.status === "finished") || [];
-  const totalSales = sellers?.reduce((sum, s) => sum + s.totalSales, 0) || 0;
-  const totalPoints = sellers?.reduce((sum, s) => sum + s.totalPoints, 0) || 0;
+  // Contar apenas vendedores (department=vendas) para Total de Vendas
+  const vendedores = activeSellers.filter(s => !s.department || s.department === 'vendas');
+  const totalSales = vendedores.reduce((sum, s) => sum + s.totalSales, 0) || 0;
+  const totalPoints = vendedores.reduce((sum, s) => sum + s.totalPoints, 0) || 0;
 
   return (
     <DashboardLayout>
@@ -41,7 +43,7 @@ export default function AdminDashboard() {
                 <Users className="h-5 w-5 text-primary" />
               </div>
             </div>
-            <p className="font-heading font-bold text-2xl text-foreground">{activeSellers.length}</p>
+            <p className="font-heading font-bold text-2xl text-foreground">{vendedores.length}</p>
             <p className="text-xs text-muted-foreground">Vendedores Ativos</p>
           </div>
           <div className="racing-card p-4">
@@ -104,7 +106,7 @@ export default function AdminDashboard() {
           <h2 className="font-heading font-bold text-sm text-foreground mb-4">TOP VENDEDORES</h2>
           {activeSellers.length > 0 ? (
             <div className="space-y-3">
-              {activeSellers.slice(0, 5).map((seller, idx) => (
+              {[...vendedores].sort((a, b) => b.totalSales - a.totalSales).slice(0, 5).map((seller, idx) => (
                 <div key={seller.id} className="flex items-center gap-3">
                   <span className="font-heading font-bold text-sm text-primary w-6">{idx + 1}</span>
                   {seller.photoUrl ? (

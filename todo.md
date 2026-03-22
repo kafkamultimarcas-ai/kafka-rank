@@ -508,3 +508,9 @@
 
 ## Bug - Erro de Publicação
 - [x] Corrigir erro que impede publicação da versão recente (aplicado code-splitting para reduzir bundle)
+
+## Bugs Críticos - Ranking e Meta (21/03)
+- [x] Ranking mensal de vendas mostra "Nenhuma venda registrada" (corrigido: vendedores tinham department=NULL)
+- [x] Vendas não estão indo para a meta mensal corretamente (corrigido: meta recalculada para 28 vendas reais)
+- [x] Total de vendas no painel geral filtrado para apenas vendedores (department=vendas)
+- [x] Garantir que apenas vendas de veículos contem no ranking de vendas e na meta (F&I/SDR/Desp/Consig não incrementam totalSales)
