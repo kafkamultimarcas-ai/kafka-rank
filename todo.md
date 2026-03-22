@@ -522,3 +522,14 @@
 - [x] Recalcular currentValue da meta de vendas (28/50)
 - [x] Verificar perfil de cada vendedor - filtrar apenas aprovadas na lista de vendas recentes
 - [x] Garantir que ranking mensal, competição e meta estejam sincronizados
+
+## Editar Vendas no Admin (21/03)
+- [x] Rota backend para editar venda (modelo, valor, vendedor, status)
+- [x] Recalcular pontos automaticamente ao mudar status (aprovar/rejeitar)
+- [x] Botão de editar venda no admin (lápis) ao lado do excluir
+- [x] Modal de edição com campos: modelo, valor, vendedor, status, origem do lead
+- [x] Poder re-aprovar venda rejeitada ou rejeitar venda aprovada
+- [x] Vendas rejeitadas com destaque visual (borda vermelha + opacidade reduzida)
+- [x] Vendas pendentes com destaque visual (borda amarela)
+- [x] Alerta de impacto ao mudar status (aviso sobre pontos)
+- [x] 13 testes passando para edição de vendas

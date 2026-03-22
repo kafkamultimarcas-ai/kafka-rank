@@ -331,6 +331,32 @@ export const appRouter = router({
       await db.rejectSale(input.id);
       return { success: true };
     }),
+    // Editar venda (admin) - ajusta pontos automaticamente
+    edit: adminProcedure.input(z.object({
+      id: z.number(),
+      vehicleModel: z.string().optional(),
+      value: z.number().optional(),
+      sellerId: z.number().optional(),
+      status: z.enum(['pending', 'approved', 'rejected']).optional(),
+      leadSource: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      const oldSalesList = await db.listSales(undefined, undefined);
+      const oldSale = oldSalesList.find((s: any) => s.id === id);
+      const result = await db.editSale(id, data);
+      // Atualizar meta se status mudou
+      if (oldSale && data.status && data.status !== oldSale.status) {
+        const saleDate = new Date(oldSale.createdAt);
+        const comp = oldSale.competitionId ? await db.getCompetitionById(oldSale.competitionId) : null;
+        const saleCategory = comp?.category || 'vendas';
+        if (oldSale.status === 'approved' && data.status !== 'approved') {
+          await db.autoUpdateStoreGoal(saleCategory, saleDate.getMonth() + 1, saleDate.getFullYear(), -1);
+        } else if (oldSale.status !== 'approved' && data.status === 'approved') {
+          await db.autoUpdateStoreGoal(saleCategory, saleDate.getMonth() + 1, saleDate.getFullYear(), 1);
+        }
+      }
+      return { success: true, sale: result };
+    }),
     // Excluir venda (admin) - reverte pontos e meta se aprovada
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar venda antes de deletar para decrementar meta

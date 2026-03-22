@@ -295,6 +295,76 @@ export async function deleteSale(saleId: number) {
   return sale;
 }
 
+export async function editSale(saleId: number, data: { vehicleModel?: string; value?: number; sellerId?: number; status?: 'pending' | 'approved' | 'rejected'; leadSource?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const saleResult = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  const oldSale = saleResult[0];
+  if (!oldSale) throw new Error("Venda não encontrada");
+
+  const updates: any = {};
+  if (data.vehicleModel !== undefined) updates.vehicleModel = data.vehicleModel;
+  if (data.value !== undefined) updates.value = data.value;
+  if (data.leadSource !== undefined) updates.leadSource = data.leadSource;
+
+  // Se mudou o status, precisa ajustar pontos
+  const oldStatus = oldSale.status;
+  const newStatus = data.status ?? oldStatus;
+  const oldSellerId = oldSale.sellerId;
+  const newSellerId = data.sellerId ?? oldSellerId;
+
+  // Se mudou vendedor E estava aprovada, reverter pontos do antigo
+  if (newSellerId !== oldSellerId && oldStatus === 'approved') {
+    await db.update(sellers).set({
+      totalSales: sql`GREATEST(totalSales - 1, 0)`,
+      totalPoints: sql`GREATEST(totalPoints - ${oldSale.points}, 0)`,
+    }).where(eq(sellers.id, oldSellerId));
+    if (oldSale.competitionId) {
+      await db.update(competitionParticipants).set({
+        points: sql`GREATEST(points - ${oldSale.points}, 0)`,
+        salesCount: sql`GREATEST(salesCount - 1, 0)`,
+      }).where(and(
+        eq(competitionParticipants.competitionId, oldSale.competitionId),
+        eq(competitionParticipants.sellerId, oldSellerId),
+      ));
+    }
+    // Dar pontos pro novo vendedor
+    await updateSaleTotals(newSellerId, oldSale.competitionId, oldSale.points);
+    updates.sellerId = newSellerId;
+  } else if (newSellerId !== oldSellerId) {
+    updates.sellerId = newSellerId;
+  }
+
+  // Se status mudou
+  if (newStatus !== oldStatus) {
+    updates.status = newStatus;
+    if (oldStatus === 'approved' && newStatus !== 'approved') {
+      // Estava aprovada, agora não está mais → reverter pontos
+      await db.update(sellers).set({
+        totalSales: sql`GREATEST(totalSales - 1, 0)`,
+        totalPoints: sql`GREATEST(totalPoints - ${oldSale.points}, 0)`,
+      }).where(eq(sellers.id, newSellerId));
+      if (oldSale.competitionId) {
+        await db.update(competitionParticipants).set({
+          points: sql`GREATEST(points - ${oldSale.points}, 0)`,
+          salesCount: sql`GREATEST(salesCount - 1, 0)`,
+        }).where(and(
+          eq(competitionParticipants.competitionId, oldSale.competitionId),
+          eq(competitionParticipants.sellerId, newSellerId),
+        ));
+      }
+    } else if (oldStatus !== 'approved' && newStatus === 'approved') {
+      // Não estava aprovada, agora está → dar pontos
+      await updateSaleTotals(newSellerId, oldSale.competitionId, oldSale.points);
+    }
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await db.update(sales).set(updates).where(eq(sales.id, saleId));
+  }
+  return { ...oldSale, ...updates };
+}
+
 // ===== LIVE FEED =====
 export async function getRecentApprovedSales(sinceTimestamp: number) {
   const db = await getDb();

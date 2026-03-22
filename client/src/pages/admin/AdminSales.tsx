@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -17,8 +17,13 @@ export default function AdminSales() {
   const utils = trpc.useUtils();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<any>(null);
   const [form, setForm] = useState({
     sellerId: "", competitionId: "", description: "", vehicleModel: "", value: "", points: "1",
+  });
+  const [editForm, setEditForm] = useState({
+    vehicleModel: "", value: "", sellerId: "", status: "", leadSource: "",
   });
 
   const createSale = trpc.sales.create.useMutation({
@@ -32,6 +37,20 @@ export default function AdminSales() {
       toast.success("Venda registrada!");
     },
     onError: () => toast.error("Erro ao registrar venda."),
+  });
+
+  const editSale = trpc.sales.edit.useMutation({
+    onSuccess: () => {
+      utils.sales.list.invalidate();
+      utils.sellers.list.invalidate();
+      utils.participants.list.invalidate();
+      utils.competitions.ranking.invalidate();
+      utils.goals.monthlyRanking.invalidate();
+      setEditDialogOpen(false);
+      setEditingSale(null);
+      toast.success("Venda atualizada com sucesso!");
+    },
+    onError: (err) => toast.error(err.message || "Erro ao editar venda."),
   });
 
   const deleteSale = trpc.sales.delete.useMutation({
@@ -58,6 +77,31 @@ export default function AdminSales() {
     });
   }
 
+  function openEditDialog(sale: any) {
+    setEditingSale(sale);
+    setEditForm({
+      vehicleModel: sale.vehicleModel || "",
+      value: sale.value ? sale.value.toString() : "",
+      sellerId: sale.sellerId.toString(),
+      status: sale.status || "approved",
+      leadSource: sale.leadSource || "",
+    });
+    setEditDialogOpen(true);
+  }
+
+  function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingSale) return;
+    const data: any = { id: editingSale.id };
+    if (editForm.vehicleModel !== (editingSale.vehicleModel || "")) data.vehicleModel = editForm.vehicleModel;
+    if (editForm.value !== (editingSale.value ? editingSale.value.toString() : "")) data.value = editForm.value ? parseInt(editForm.value) : 0;
+    if (editForm.sellerId !== editingSale.sellerId.toString()) data.sellerId = parseInt(editForm.sellerId);
+    if (editForm.status !== (editingSale.status || "approved")) data.status = editForm.status;
+    if (editForm.leadSource !== (editingSale.leadSource || "")) data.leadSource = editForm.leadSource;
+    // Sempre enviar pelo menos o id
+    editSale.mutate(data);
+  }
+
   const statusIcon = (status: string) => {
     if (status === 'approved') return <CheckCircle2 className="h-4 w-4 text-green-400" />;
     if (status === 'pending') return <Clock className="h-4 w-4 text-yellow-400" />;
@@ -70,13 +114,19 @@ export default function AdminSales() {
     return "Rejeitada";
   };
 
+  const statusBg = (status: string) => {
+    if (status === 'approved') return "";
+    if (status === 'pending') return "border-l-4 border-l-yellow-500/50";
+    return "border-l-4 border-l-red-500/50 opacity-70";
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-heading font-bold text-xl text-foreground">Vendas</h1>
-            <p className="text-muted-foreground text-sm mt-1">Registre, acompanhe e exclua vendas</p>
+            <p className="text-muted-foreground text-sm mt-1">Registre, edite, acompanhe e exclua vendas</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -135,13 +185,83 @@ export default function AdminSales() {
           </Dialog>
         </div>
 
+        {/* Edit Sale Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-foreground">Editar Venda</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <Label className="text-foreground">Vendedor</Label>
+                <Select value={editForm.sellerId} onValueChange={v => setEditForm({ ...editForm, sellerId: v })}>
+                  <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione o vendedor" /></SelectTrigger>
+                  <SelectContent>
+                    {sellers?.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-foreground">Modelo do Veículo</Label>
+                <Input value={editForm.vehicleModel} onChange={e => setEditForm({ ...editForm, vehicleModel: e.target.value })} placeholder="Ex: Honda Civic 2024" className="bg-input border-border text-foreground" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-foreground">Valor (R$)</Label>
+                  <Input type="number" value={editForm.value} onChange={e => setEditForm({ ...editForm, value: e.target.value })} placeholder="0" className="bg-input border-border text-foreground" />
+                </div>
+                <div>
+                  <Label className="text-foreground">Status</Label>
+                  <Select value={editForm.status} onValueChange={v => setEditForm({ ...editForm, status: v })}>
+                    <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="approved">Aprovada</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="rejected">Rejeitada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-foreground">Origem do Lead</Label>
+                <Select value={editForm.leadSource || "none"} onValueChange={v => setEditForm({ ...editForm, leadSource: v === "none" ? "" : v })}>
+                  <SelectTrigger className="bg-input border-border text-foreground"><SelectValue placeholder="Selecione a origem" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem origem</SelectItem>
+                    <SelectItem value="lead_loja">Lead Loja</SelectItem>
+                    <SelectItem value="lead_vendedor">Lead Vendedor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {editingSale && editForm.status !== (editingSale.status || "approved") && (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <p className="text-xs text-yellow-400">
+                    {editForm.status === 'approved' && editingSale.status !== 'approved' && (
+                      <>Ao aprovar esta venda, os pontos serão adicionados ao vendedor e ao ranking.</>
+                    )}
+                    {editForm.status !== 'approved' && editingSale.status === 'approved' && (
+                      <>Ao mudar o status, os pontos serão revertidos do vendedor e do ranking.</>
+                    )}
+                    {editForm.status === 'rejected' && editingSale.status === 'pending' && (
+                      <>A venda será marcada como rejeitada.</>
+                    )}
+                  </p>
+                </div>
+              )}
+              <Button type="submit" className="w-full racing-gradient text-white" disabled={editSale.isPending}>
+                {editSale.isPending ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         {/* Sales List */}
         {salesList && salesList.length > 0 ? (
           <div className="space-y-2">
             {salesList.map(sale => {
               const seller = sellers?.find(s => s.id === sale.sellerId);
               return (
-                <div key={sale.id} className="racing-card p-4 flex items-center gap-4">
+                <div key={sale.id} className={`racing-card p-4 flex items-center gap-4 ${statusBg(sale.status || 'approved')}`}>
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <ShoppingCart className="h-5 w-5 text-primary" />
                   </div>
@@ -159,7 +279,7 @@ export default function AdminSales() {
                       {new Date(sale.createdAt).toLocaleDateString("pt-BR")}
                     </p>
                   </div>
-                  <div className="text-right shrink-0 flex items-center gap-3">
+                  <div className="text-right shrink-0 flex items-center gap-2">
                     <div>
                       {sale.value ? <p className="text-sm font-semibold text-foreground">R$ {sale.value.toLocaleString("pt-BR")}</p> : null}
                       <div className="flex items-center gap-1 justify-end">
@@ -167,6 +287,14 @@ export default function AdminSales() {
                         <span className="text-xs font-heading text-primary">+{sale.points} pts</span>
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 h-8 w-8"
+                      onClick={() => openEditDialog(sale)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8">
