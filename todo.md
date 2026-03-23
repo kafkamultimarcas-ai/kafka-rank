@@ -551,3 +551,49 @@
 - [x] Admin pode aprovar/rejeitar/re-aprovar direto da página F&I
 - [x] Filtro por colaborador na página admin F&I
 - [x] Mostrar detalhes de cada registro (placa, CPF, banco, valor, retorno, data, observações)
+
+## Módulo Pós-Venda (23/03)
+
+### Schema e Backend
+- [x] Tabela oficinas_parceiras (id, nome, telefone, endereco, observacoes, active)
+- [x] Tabela pos_venda_chamados (id, cliente_nome, cliente_telefone, carro_modelo, carro_placa, problema_relatado, observacoes, vendedor_id, responsavel_pv_id, oficina_id, status, data_entrada_agendada, data_entrada_real, prazo_entrega, data_entrega_real, created_at, updated_at)
+- [x] Tabela pos_venda_gastos (id, chamado_id, descricao, valor, foto_nota_url, status_aprovacao, autorizado_por, created_at)
+- [x] Tabela pos_venda_historico (id, chamado_id, acao, descricao, usuario, created_at)
+- [x] Funções db.ts para CRUD de chamados, oficinas e gastos
+- [x] Rotas tRPC para pós-venda (abrir chamado, listar, atualizar status, adicionar gasto, aprovar gasto)
+
+### Frontend - Vendedor
+- [x] Botão "Abrir Chamado" na página de Pós-Venda
+- [x] Formulário simples: nome cliente, telefone, carro, placa, problema, observações, vendedor
+- [x] Modal super simples com poucos campos essenciais
+
+### Frontend - Painel Pós-Venda
+- [x] Lista visual com cards coloridos por status (Cliente / Carro / Problema / Status / Data)
+- [x] Filtros por contadores: Todos | Abertos | Agendados | Em serviço | Finalizados | Entregues
+- [x] Detalhes do chamado ao clicar (modal com abas)
+- [x] Agendar data de entrada do veículo
+- [x] Selecionar/digitar oficina parceira
+- [x] Definir prazo de entrega ao cliente
+- [x] Adicionar observações e anotações (histórico)
+- [x] Anexar fotos de notas de serviço (upload S3)
+- [x] Registrar gastos com descrição e valor
+- [x] Busca por cliente, placa, modelo ou ticket
+- [x] Alertas visuais de prazo vencido/vencendo
+
+### Frontend - Admin/Financeiro
+- [x] Tela dedicada "Gastos PV" no sidebar com filtros (Pendente / Autorizado / Pago / Recusado)
+- [x] Gerente autoriza ou recusa gasto
+- [x] Financeiro marca como pago
+- [x] Resumo financeiro com totais por status
+- [x] Cada gasto vinculado ao chamado, cliente, carro e oficina
+- [x] Link para ver nota fiscal anexada
+
+### Alertas
+- [x] Alertas de prazo na página de Pós-Venda (vencidos em vermelho, vencendo em amarelo)
+- [x] Badge "ATRASADO" animado nos cards com prazo vencido
+- [x] Contadores visuais por status para visão rápida
+
+### Cadastro de Oficinas
+- [x] CRUD de oficinas parceiras via rotas tRPC
+- [x] Seleção de oficina no chamado (dropdown) ou digitar nome manualmente
+- [x] 16 testes passando para o módulo pós-venda

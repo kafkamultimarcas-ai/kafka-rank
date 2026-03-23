@@ -1418,3 +1418,283 @@ export async function getAppointmentRanking(month: number, year: number) {
     ...r,
   }));
 }
+
+
+// ===== MÓDULO PÓS-VENDA =====
+import { pvOficinas, pvChamados, pvGastos, pvHistorico, InsertPvOficina, InsertPvChamado, InsertPvGasto, InsertPvHistorico } from "../drizzle/schema";
+
+// --- Oficinas Parceiras ---
+export async function listOficinas() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pvOficinas).where(eq(pvOficinas.active, true)).orderBy(pvOficinas.name);
+}
+
+export async function createOficina(data: InsertPvOficina) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(pvOficinas).values(data);
+  return result[0].insertId;
+}
+
+export async function updateOficina(id: number, data: { name?: string; phone?: string; address?: string; notes?: string; active?: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(pvOficinas).set(data).where(eq(pvOficinas.id, id));
+}
+
+export async function deleteOficina(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(pvOficinas).set({ active: false }).where(eq(pvOficinas.id, id));
+}
+
+// --- Chamados Pós-Venda ---
+export async function getNextPvTicketNumber() {
+  const db = await getDb();
+  if (!db) return "#PV001";
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(pvChamados);
+  const num = Number(result?.count || 0) + 1;
+  return `#PV${String(num).padStart(3, '0')}`;
+}
+
+export async function createPvChamado(data: InsertPvChamado) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(pvChamados).values(data);
+  const chamadoId = result[0].insertId;
+  // Registrar no histórico
+  await db.insert(pvHistorico).values({
+    chamadoId,
+    acao: 'abertura',
+    descricao: `Chamado aberto: ${data.problemaRelatado}`,
+    usuario: 'Vendedor',
+  });
+  return chamadoId;
+}
+
+export async function listPvChamados(filters?: { status?: string; vendedorId?: number; responsavelPvId?: number }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (filters?.status && filters.status !== 'todos') {
+    conditions.push(eq(pvChamados.status, filters.status as any));
+  }
+  if (filters?.vendedorId) {
+    conditions.push(eq(pvChamados.vendedorId, filters.vendedorId));
+  }
+  if (filters?.responsavelPvId) {
+    conditions.push(eq(pvChamados.responsavelPvId, filters.responsavelPvId));
+  }
+  if (conditions.length > 0) {
+    return db.select().from(pvChamados).where(and(...conditions)).orderBy(desc(pvChamados.updatedAt));
+  }
+  return db.select().from(pvChamados).orderBy(desc(pvChamados.updatedAt));
+}
+
+export async function getPvChamadoById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(pvChamados).where(eq(pvChamados.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function updatePvChamado(id: number, data: {
+  status?: string;
+  responsavelPvId?: number;
+  oficinaId?: number;
+  oficinaNome?: string;
+  dataEntradaAgendada?: number;
+  dataEntradaReal?: number;
+  prazoEntrega?: number;
+  dataEntregaReal?: number;
+  observacoes?: string;
+  clienteNome?: string;
+  clienteTelefone?: string;
+  carroModelo?: string;
+  carroPlaca?: string;
+  problemaRelatado?: string;
+}, usuario: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const updateData: any = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) updateData[key] = value;
+  }
+  if (Object.keys(updateData).length > 0) {
+    await db.update(pvChamados).set(updateData).where(eq(pvChamados.id, id));
+  }
+  // Registrar ação no histórico
+  let acao = 'atualizacao';
+  let descricao = 'Chamado atualizado';
+  if (data.status === 'agendado') { acao = 'agendamento'; descricao = `Entrada agendada`; }
+  else if (data.status === 'em_servico') { acao = 'servico'; descricao = 'Veículo em serviço'; }
+  else if (data.status === 'finalizado') { acao = 'finalizacao'; descricao = 'Serviço finalizado'; }
+  else if (data.status === 'entregue') { acao = 'entrega'; descricao = 'Veículo entregue ao cliente'; }
+  else if (data.status === 'cancelado') { acao = 'cancelamento'; descricao = 'Chamado cancelado'; }
+  else if (data.oficinaId || data.oficinaNome) { acao = 'oficina'; descricao = `Oficina vinculada: ${data.oficinaNome || 'ID ' + data.oficinaId}`; }
+  else if (data.prazoEntrega) { acao = 'prazo'; descricao = `Prazo de entrega definido: ${new Date(data.prazoEntrega).toLocaleDateString('pt-BR')}`; }
+  await db.insert(pvHistorico).values({ chamadoId: id, acao, descricao, usuario });
+  return { success: true };
+}
+
+export async function deletePvChamado(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Deletar gastos e histórico associados
+  await db.delete(pvGastos).where(eq(pvGastos.chamadoId, id));
+  await db.delete(pvHistorico).where(eq(pvHistorico.chamadoId, id));
+  await db.delete(pvChamados).where(eq(pvChamados.id, id));
+}
+
+// --- Gastos Pós-Venda ---
+export async function listPvGastos(chamadoId?: number, statusAprovacao?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (chamadoId) conditions.push(eq(pvGastos.chamadoId, chamadoId));
+  if (statusAprovacao && statusAprovacao !== 'todos') conditions.push(eq(pvGastos.statusAprovacao, statusAprovacao as any));
+  if (conditions.length > 0) {
+    return db.select().from(pvGastos).where(and(...conditions)).orderBy(desc(pvGastos.createdAt));
+  }
+  return db.select().from(pvGastos).orderBy(desc(pvGastos.createdAt));
+}
+
+export async function createPvGasto(data: InsertPvGasto, usuario: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(pvGastos).values(data);
+  // Registrar no histórico do chamado
+  await db.insert(pvHistorico).values({
+    chamadoId: data.chamadoId,
+    acao: 'gasto',
+    descricao: `Gasto registrado: ${data.descricao} - R$ ${data.valor}`,
+    usuario,
+  });
+  return result[0].insertId;
+}
+
+export async function updatePvGastoStatus(id: number, statusAprovacao: string, autorizadoPor?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const updateData: any = { statusAprovacao };
+  if (statusAprovacao === 'autorizado' || statusAprovacao === 'recusado') {
+    updateData.autorizadoPor = autorizadoPor || 'Admin';
+    updateData.autorizadoEm = Date.now();
+  }
+  if (statusAprovacao === 'pago') {
+    updateData.pagoEm = Date.now();
+  }
+  await db.update(pvGastos).set(updateData).where(eq(pvGastos.id, id));
+  // Registrar no histórico
+  const gasto = await db.select().from(pvGastos).where(eq(pvGastos.id, id)).limit(1);
+  if (gasto[0]) {
+    const statusLabel = statusAprovacao === 'autorizado' ? 'Autorizado' : statusAprovacao === 'recusado' ? 'Recusado' : statusAprovacao === 'pago' ? 'Pago' : statusAprovacao;
+    await db.insert(pvHistorico).values({
+      chamadoId: gasto[0].chamadoId,
+      acao: 'gasto_status',
+      descricao: `Gasto "${gasto[0].descricao}" - Status: ${statusLabel} por ${autorizadoPor || 'Admin'}`,
+      usuario: autorizadoPor || 'Admin',
+    });
+  }
+}
+
+export async function deletePvGasto(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(pvGastos).where(eq(pvGastos.id, id));
+}
+
+// --- Histórico ---
+export async function listPvHistorico(chamadoId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pvHistorico).where(eq(pvHistorico.chamadoId, chamadoId)).orderBy(desc(pvHistorico.createdAt));
+}
+
+// --- Contadores e Alertas ---
+export async function getPvChamadosCounts() {
+  const db = await getDb();
+  if (!db) return { aberto: 0, agendado: 0, em_servico: 0, finalizado: 0, entregue: 0, total: 0 };
+  const all = await db.select({ status: pvChamados.status, count: sql<number>`count(*)` }).from(pvChamados).groupBy(pvChamados.status);
+  const counts: any = { aberto: 0, agendado: 0, em_servico: 0, finalizado: 0, entregue: 0, cancelado: 0, total: 0 };
+  for (const row of all) {
+    counts[row.status] = Number(row.count);
+    if (row.status !== 'cancelado') counts.total += Number(row.count);
+  }
+  return counts;
+}
+
+export async function getPvGastosPendentes() {
+  const db = await getDb();
+  if (!db) return { count: 0, total: 0 };
+  const result = await db.select({
+    count: sql<number>`count(*)`,
+    total: sql<string>`COALESCE(SUM(valor), 0)`,
+  }).from(pvGastos).where(eq(pvGastos.statusAprovacao, 'pendente'));
+  return { count: Number(result[0]?.count || 0), total: parseFloat(String(result[0]?.total || '0')) };
+}
+
+// Chamados com prazo vencendo (próximas 24h) ou vencidos
+export async function getPvChamadosAlerta() {
+  const db = await getDb();
+  if (!db) return { vencendo: [], vencidos: [] };
+  const now = Date.now();
+  const in24h = now + 24 * 60 * 60 * 1000;
+  
+  // Chamados com prazo vencido (não entregues/cancelados)
+  const vencidos = await db.select().from(pvChamados).where(and(
+    sql`${pvChamados.prazoEntrega} IS NOT NULL`,
+    sql`${pvChamados.prazoEntrega} < ${now}`,
+    sql`${pvChamados.status} NOT IN ('entregue', 'cancelado')`,
+  )).orderBy(pvChamados.prazoEntrega);
+  
+  // Chamados com prazo nas próximas 24h
+  const vencendo = await db.select().from(pvChamados).where(and(
+    sql`${pvChamados.prazoEntrega} IS NOT NULL`,
+    sql`${pvChamados.prazoEntrega} >= ${now}`,
+    sql`${pvChamados.prazoEntrega} <= ${in24h}`,
+    sql`${pvChamados.status} NOT IN ('entregue', 'cancelado')`,
+  )).orderBy(pvChamados.prazoEntrega);
+  
+  return { vencendo, vencidos };
+}
+
+// Resumo financeiro de gastos pós-venda
+export async function getPvGastosResumo() {
+  const db = await getDb();
+  if (!db) return { pendente: 0, autorizado: 0, recusado: 0, pago: 0 };
+  const all = await db.select({
+    status: pvGastos.statusAprovacao,
+    total: sql<string>`COALESCE(SUM(valor), 0)`,
+  }).from(pvGastos).groupBy(pvGastos.statusAprovacao);
+  const resumo: any = { pendente: 0, autorizado: 0, recusado: 0, pago: 0 };
+  for (const row of all) {
+    resumo[row.status] = parseFloat(String(row.total));
+  }
+  return resumo;
+}
+
+// Listar todos os gastos com info do chamado (para tela financeira)
+export async function listAllPvGastosWithChamado(statusAprovacao?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (statusAprovacao && statusAprovacao !== 'todos') {
+    conditions.push(eq(pvGastos.statusAprovacao, statusAprovacao as any));
+  }
+  const gastos = conditions.length > 0
+    ? await db.select().from(pvGastos).where(and(...conditions)).orderBy(desc(pvGastos.createdAt))
+    : await db.select().from(pvGastos).orderBy(desc(pvGastos.createdAt));
+  
+  // Buscar chamados associados
+  const chamadoIds = Array.from(new Set(gastos.map(g => g.chamadoId)));
+  if (chamadoIds.length === 0) return [];
+  const chamados = await db.select().from(pvChamados).where(inArray(pvChamados.id, chamadoIds));
+  const chamadoMap = new Map(chamados.map(c => [c.id, c]));
+  
+  return gastos.map(g => ({
+    ...g,
+    chamado: chamadoMap.get(g.chamadoId) || null,
+  }));
+}

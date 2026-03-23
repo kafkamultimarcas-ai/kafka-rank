@@ -11,6 +11,7 @@ import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
+import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter } from "./routers/pvRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1300,5 +1301,8 @@ export const appRouter = router({
   crmSellerStats: crmSellerStatsRouter,
   finCategories: finCategoriesRouter,
   finTransactions: finTransactionsRouter,
+  pvChamados: pvChamadosRouter,
+  pvGastos: pvGastosRouter,
+  pvOficinas: pvOficinasRouter,
 });
 export type AppRouter = typeof appRouter;

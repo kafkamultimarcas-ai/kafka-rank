@@ -528,3 +528,78 @@ export const finTransactions = mysqlTable("fin_transactions", {
 });
 export type FinTransaction = typeof finTransactions.$inferSelect;
 export type InsertFinTransaction = typeof finTransactions.$inferInsert;
+
+
+// ===== MÓDULO PÓS-VENDA =====
+
+// Oficinas parceiras
+export const pvOficinas = mysqlTable("pv_oficinas", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  address: varchar("address", { length: 500 }),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PvOficina = typeof pvOficinas.$inferSelect;
+export type InsertPvOficina = typeof pvOficinas.$inferInsert;
+
+// Chamados de pós-venda
+export const pvChamados = mysqlTable("pv_chamados", {
+  id: int("id").autoincrement().primaryKey(),
+  ticketNumber: varchar("ticketNumber", { length: 20 }).notNull(), // #PV001, #PV002...
+  // Dados do cliente
+  clienteNome: varchar("clienteNome", { length: 255 }).notNull(),
+  clienteTelefone: varchar("clienteTelefone", { length: 20 }),
+  // Dados do veículo
+  carroModelo: varchar("carroModelo", { length: 255 }).notNull(),
+  carroPlaca: varchar("carroPlaca", { length: 10 }),
+  // Problema
+  problemaRelatado: text("problemaRelatado").notNull(),
+  observacoes: text("observacoes"),
+  // Responsáveis
+  vendedorId: int("vendedorId").notNull(), // quem abriu o chamado
+  responsavelPvId: int("responsavelPvId"), // quem do pós-venda pegou
+  oficinaId: int("oficinaId"), // oficina parceira vinculada
+  oficinaNome: varchar("oficinaNome", { length: 255 }), // caso digite manualmente
+  // Status e datas
+  status: mysqlEnum("status", ["aberto", "agendado", "em_servico", "finalizado", "entregue", "cancelado"]).default("aberto").notNull(),
+  dataEntradaAgendada: bigint("dataEntradaAgendada", { mode: "number" }), // quando cliente vai trazer
+  dataEntradaReal: bigint("dataEntradaReal", { mode: "number" }), // quando carro chegou de fato
+  prazoEntrega: bigint("prazoEntrega", { mode: "number" }), // prazo combinado para devolver ao cliente
+  dataEntregaReal: bigint("dataEntregaReal", { mode: "number" }), // quando de fato entregou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PvChamado = typeof pvChamados.$inferSelect;
+export type InsertPvChamado = typeof pvChamados.$inferInsert;
+
+// Gastos de pós-venda (vinculados ao chamado)
+export const pvGastos = mysqlTable("pv_gastos", {
+  id: int("id").autoincrement().primaryKey(),
+  chamadoId: int("chamadoId").notNull(),
+  descricao: varchar("descricao", { length: 500 }).notNull(),
+  valor: decimal("valor", { precision: 12, scale: 2 }).notNull(), // valor em reais
+  fotoNotaUrl: text("fotoNotaUrl"), // foto da nota de serviço (S3)
+  fotoNotaKey: varchar("fotoNotaKey", { length: 500 }),
+  statusAprovacao: mysqlEnum("statusAprovacao", ["pendente", "autorizado", "recusado", "pago"]).default("pendente").notNull(),
+  autorizadoPor: varchar("autorizadoPor", { length: 255 }), // nome de quem autorizou
+  autorizadoEm: bigint("autorizadoEm", { mode: "number" }),
+  pagoEm: bigint("pagoEm", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PvGasto = typeof pvGastos.$inferSelect;
+export type InsertPvGasto = typeof pvGastos.$inferInsert;
+
+// Histórico de ações no chamado (timeline)
+export const pvHistorico = mysqlTable("pv_historico", {
+  id: int("id").autoincrement().primaryKey(),
+  chamadoId: int("chamadoId").notNull(),
+  acao: varchar("acao", { length: 100 }).notNull(), // abertura, agendamento, entrada, servico, gasto, finalizacao, entrega
+  descricao: text("descricao").notNull(),
+  usuario: varchar("usuario", { length: 255 }).notNull(), // quem fez a ação
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PvHistorico = typeof pvHistorico.$inferSelect;
+export type InsertPvHistorico = typeof pvHistorico.$inferInsert;
