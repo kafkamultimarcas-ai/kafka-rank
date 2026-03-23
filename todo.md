@@ -597,3 +597,10 @@
 - [x] CRUD de oficinas parceiras via rotas tRPC
 - [x] Seleção de oficina no chamado (dropdown) ou digitar nome manualmente
 - [x] 16 testes passando para o módulo pós-venda
+
+## Pós-Venda na Minha Área do Vendedor (23/03)
+- [x] Botão "Abrir Chamado Pós-Venda" nas Ações Rápidas da Minha Área
+- [x] Vendedor consegue abrir chamado direto da sua área com modal simples
+- [x] Vendedor vê lista dos chamados que ele abriu com status atualizado e filtros
+- [x] Formulário simples de abertura (nome cliente, telefone, carro, placa, problema, observações)
+- [x] Cards coloridos por status com alerta de prazo vencido

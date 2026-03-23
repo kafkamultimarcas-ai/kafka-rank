@@ -25,8 +25,8 @@ import {
   LayoutGrid,
   Filter,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Award, Target } from "lucide-react";
+import { useMemo, useState, useCallback } from "react";
+import { Award, Target, Wrench, ChevronRight, MapPin } from "lucide-react";
 
 const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gradient: string }> = {
   vendas: { label: "Vendas", color: "text-red-400", icon: Car, gradient: "from-red-600/20 to-red-500/10 border-red-500/30" },
@@ -85,6 +85,11 @@ export default function MinhaArea() {
   // Filter state for F&I records
   const [feiFilter, setFeiFilter] = useState<"todos" | "approved" | "pending" | "rejected">("todos");
 
+  // Pós-Venda state
+  const [showPvModal, setShowPvModal] = useState(false);
+  const [pvForm, setPvForm] = useState({ clienteNome: '', clienteTelefone: '', carroModelo: '', carroPlaca: '', problemaRelatado: '', observacoes: '' });
+  const [pvFilter, setPvFilter] = useState<string>('todos');
+
   // Buscar dados específicos do setor
   const { data: appointments } = trpc.sdr.myAppointments.useQuery(
     { sellerId },
@@ -106,6 +111,21 @@ export default function MinhaArea() {
     { sellerId },
     { enabled: sellerId > 0 && dept === "despachante" }
   );
+
+  // Pós-Venda - chamados do vendedor
+  const { data: myPvChamados, refetch: refetchPv } = trpc.pvChamados.list.useQuery(
+    { vendedorId: sellerId },
+    { enabled: sellerId > 0 }
+  );
+  const createPvMutation = trpc.pvChamados.create.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setShowPvModal(false);
+      setPvForm({ clienteNome: '', clienteTelefone: '', carroModelo: '', carroPlaca: '', problemaRelatado: '', observacoes: '' });
+      refetchPv();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   // Buscar metas individuais do vendedor logado
   const now = useMemo(() => new Date(), []);
@@ -175,6 +195,26 @@ export default function MinhaArea() {
 
   const approvedDispatch = (myDispatch || []).filter((r: any) => r.status === 'approved');
   const pendingDispatch = (myDispatch || []).filter((r: any) => r.status === 'pending');
+
+  // Pós-Venda computed
+  const allPv = myPvChamados || [];
+  const pvAbertos = allPv.filter((c: any) => c.status === 'aberto');
+  const pvAgendados = allPv.filter((c: any) => c.status === 'agendado');
+  const pvEmServico = allPv.filter((c: any) => c.status === 'em_servico');
+  const pvFinalizados = allPv.filter((c: any) => c.status === 'finalizado');
+  const pvEntregues = allPv.filter((c: any) => c.status === 'entregue');
+  const filteredPv = useMemo(() => {
+    if (pvFilter === 'todos') return allPv;
+    return allPv.filter((c: any) => c.status === pvFilter);
+  }, [allPv, pvFilter]);
+
+  const pvStatusConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    aberto: { label: 'Aberto', color: 'text-blue-400', bg: 'bg-blue-500/20', border: 'border-blue-500/30' },
+    agendado: { label: 'Agendado', color: 'text-yellow-400', bg: 'bg-yellow-500/20', border: 'border-yellow-500/30' },
+    em_servico: { label: 'Em Serviço', color: 'text-orange-400', bg: 'bg-orange-500/20', border: 'border-orange-500/30' },
+    finalizado: { label: 'Finalizado', color: 'text-emerald-400', bg: 'bg-emerald-500/20', border: 'border-emerald-500/30' },
+    entregue: { label: 'Entregue', color: 'text-gray-400', bg: 'bg-gray-500/20', border: 'border-gray-500/30' },
+  };
 
   const DeptIcon = deptInfo.icon;
 
@@ -574,6 +614,27 @@ export default function MinhaArea() {
             </div>
           </button>
 
+          {/* Pós-Venda - Abrir Chamado */}
+          <button
+            onClick={() => setShowPvModal(true)}
+            className="w-full bg-gradient-to-r from-orange-600/20 to-orange-500/10 border border-orange-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-orange-500/60 transition-all"
+          >
+            <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+              <Wrench className="w-6 h-6 text-orange-400" />
+            </div>
+            <div className="text-left flex-1">
+              <p className="text-white font-bold">Abrir Chamado Pós-Venda</p>
+              <p className="text-gray-400 text-sm">
+                {pvAbertos.length > 0 ? `${pvAbertos.length} aberto(s)` : 'Reportar problema de cliente'}
+              </p>
+            </div>
+            {allPv.length > 0 && (
+              <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                {allPv.length}
+              </span>
+            )}
+          </button>
+
           {/* CRM - Meus Clientes */}
           <button
             onClick={() => navigate("/crm")}
@@ -702,6 +763,88 @@ export default function MinhaArea() {
           </div>
         )}
 
+        {/* ===== MEUS CHAMADOS PÓS-VENDA ===== */}
+        {allPv.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <Wrench className="w-4 h-4" /> Meus Chamados Pós-Venda
+            </h2>
+
+            {/* Filtros */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { key: 'todos', label: 'Todos', count: allPv.length, color: 'bg-gray-600' },
+                { key: 'aberto', label: 'Abertos', count: pvAbertos.length, color: 'bg-blue-600' },
+                { key: 'agendado', label: 'Agendados', count: pvAgendados.length, color: 'bg-yellow-600' },
+                { key: 'em_servico', label: 'Em Serviço', count: pvEmServico.length, color: 'bg-orange-600' },
+                { key: 'finalizado', label: 'Finalizados', count: pvFinalizados.length, color: 'bg-emerald-600' },
+                { key: 'entregue', label: 'Entregues', count: pvEntregues.length, color: 'bg-gray-500' },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setPvFilter(tab.key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    pvFilter === tab.key
+                      ? `${tab.color} text-white shadow-lg`
+                      : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700/60'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    pvFilter === tab.key ? 'bg-white/20' : 'bg-gray-700'
+                  }`}>{tab.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Lista de chamados */}
+            {filteredPv.length > 0 ? (
+              <div className="space-y-2">
+                {filteredPv.map((c: any) => {
+                  const sc = pvStatusConfig[c.status] || pvStatusConfig.aberto;
+                  const prazo = c.prazoEntrega ? new Date(c.prazoEntrega) : null;
+                  const isOverdue = prazo && prazo.getTime() < Date.now() && c.status !== 'entregue' && c.status !== 'finalizado';
+                  return (
+                    <div key={c.id} className={`rounded-xl p-4 border transition-all ${sc.bg} ${sc.border}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-white font-bold text-sm">{c.clienteNome}</p>
+                            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${sc.bg} ${sc.color} font-semibold border ${sc.border}`}>
+                              {sc.label}
+                            </span>
+                            {isOverdue && (
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/30 text-red-400 font-bold animate-pulse">
+                                ATRASADO
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            #{c.ticketNumber} • {c.carroModelo} {c.carroPlaca ? `• ${c.carroPlaca}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mb-2">
+                        <span className="text-gray-600">Problema:</span> {c.problemaRelatado}
+                      </p>
+                      <div className="flex items-center gap-4 text-[10px] text-gray-500">
+                        <span>Aberto: {formatDate(c.createdAt)}</span>
+                        {prazo && <span>Prazo: {formatDate(c.prazoEntrega)}</span>}
+                        {c.oficinaNome && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{c.oficinaNome}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-8 text-center">
+                <Wrench className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">Nenhum chamado {pvFilter !== 'todos' ? 'neste status' : 'registrado'}.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Back */}
         <button
           onClick={() => navigate("/")}
@@ -710,6 +853,113 @@ export default function MinhaArea() {
           <ArrowLeft className="w-3 h-3" /> Voltar ao ranking
         </button>
       </div>
+
+      {/* ===== MODAL ABRIR CHAMADO PÓS-VENDA ===== */}
+      {showPvModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setShowPvModal(false)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-gray-800">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-orange-400" /> Abrir Chamado Pós-Venda
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">Informe o problema do cliente. O setor de pós-venda será notificado.</p>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 font-medium mb-1 block">Nome do Cliente *</label>
+                <input
+                  type="text"
+                  value={pvForm.clienteNome}
+                  onChange={e => setPvForm(f => ({ ...f, clienteNome: e.target.value }))}
+                  placeholder="Ex: João Silva"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 font-medium mb-1 block">Telefone</label>
+                <input
+                  type="tel"
+                  value={pvForm.clienteTelefone}
+                  onChange={e => setPvForm(f => ({ ...f, clienteTelefone: e.target.value }))}
+                  placeholder="(11) 99999-9999"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 font-medium mb-1 block">Carro *</label>
+                  <input
+                    type="text"
+                    value={pvForm.carroModelo}
+                    onChange={e => setPvForm(f => ({ ...f, carroModelo: e.target.value }))}
+                    placeholder="Onix 2022"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-medium mb-1 block">Placa</label>
+                  <input
+                    type="text"
+                    value={pvForm.carroPlaca}
+                    onChange={e => setPvForm(f => ({ ...f, carroPlaca: e.target.value.toUpperCase() }))}
+                    placeholder="ABC1D23"
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 font-medium mb-1 block">Problema Relatado *</label>
+                <textarea
+                  value={pvForm.problemaRelatado}
+                  onChange={e => setPvForm(f => ({ ...f, problemaRelatado: e.target.value }))}
+                  placeholder="Descreva o problema que o cliente relatou..."
+                  rows={3}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-orange-500 focus:outline-none resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 font-medium mb-1 block">Observações</label>
+                <input
+                  type="text"
+                  value={pvForm.observacoes}
+                  onChange={e => setPvForm(f => ({ ...f, observacoes: e.target.value }))}
+                  placeholder="Algo a mais que queira informar..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:border-orange-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-800 flex gap-3">
+              <button
+                onClick={() => setShowPvModal(false)}
+                className="flex-1 py-2.5 rounded-lg bg-gray-800 text-gray-400 text-sm font-medium hover:bg-gray-700 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!pvForm.clienteNome.trim() || !pvForm.carroModelo.trim() || !pvForm.problemaRelatado.trim()) {
+                    toast.error('Preencha nome do cliente, carro e problema!');
+                    return;
+                  }
+                  createPvMutation.mutate({
+                    clienteNome: pvForm.clienteNome.trim(),
+                    clienteTelefone: pvForm.clienteTelefone.trim() || undefined,
+                    carroModelo: pvForm.carroModelo.trim(),
+                    carroPlaca: pvForm.carroPlaca.trim() || undefined,
+                    problemaRelatado: pvForm.problemaRelatado.trim(),
+                    observacoes: pvForm.observacoes.trim() || undefined,
+                    vendedorId: sellerId,
+                  });
+                }}
+                disabled={createPvMutation.isPending}
+                className="flex-1 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold transition-all disabled:opacity-50"
+              >
+                {createPvMutation.isPending ? 'Enviando...' : 'Abrir Chamado'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
