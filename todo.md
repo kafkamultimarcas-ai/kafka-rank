@@ -604,3 +604,9 @@
 - [x] Vendedor vê lista dos chamados que ele abriu com status atualizado e filtros
 - [x] Formulário simples de abertura (nome cliente, telefone, carro, placa, problema, observações)
 - [x] Cards coloridos por status com alerta de prazo vencido
+
+## Pós-Venda na Tela Principal (23/03)
+- [x] Botão "Pós-Venda" nos Quick Links do header da Home
+- [x] Seção dedicada "PÓS-VENDA" na Home com botão de acesso
+- [x] Página pública /pos-venda com seleção de vendedor, abertura de chamado e acompanhamento
+- [x] Cards expansíveis com detalhes do chamado, filtros por status e contadores

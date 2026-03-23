@@ -39,6 +39,7 @@ const MeusAgendamentos = lazy(() => import("./pages/MeusAgendamentos"));
 const SellerLogin = lazy(() => import("./pages/SellerLogin"));
 const MinhaArea = lazy(() => import("./pages/MinhaArea"));
 const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
+const PosVenda = lazy(() => import("./pages/PosVenda"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -93,6 +94,7 @@ function Router() {
         <Route path="/crm/admin/login" component={CrmAdminLogin} />
         <Route path="/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
+        <Route path="/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

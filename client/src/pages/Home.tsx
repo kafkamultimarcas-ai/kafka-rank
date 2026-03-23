@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus } from "lucide-react";
+import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -156,6 +156,26 @@ export default function Home() {
               <Button variant="outline" size="sm" onClick={() => setLocation("/tv")} className="gap-2">
                 <Tv className="h-4 w-4" /> Modo TV
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setLocation("/pos-venda")} className="gap-2 border-orange-600 text-orange-400 hover:bg-orange-600/10">
+                <Wrench className="h-4 w-4" /> Pós-Venda
+              </Button>
+            </div>
+
+            {/* Pós-Venda - Acesso Rápido */}
+            <div className="mt-8 max-w-md mx-auto">
+              <div className="racing-card p-5 border-2 border-orange-500/40 bg-orange-500/5">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <Wrench className="h-6 w-6 text-orange-400" />
+                  <h3 className="font-heading font-bold text-lg text-foreground">PÓS-VENDA</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4 text-center">Abra chamados para o setor de pós-venda resolver problemas de clientes</p>
+                <Button
+                  onClick={() => setLocation("/pos-venda")}
+                  className="w-full gap-2 bg-orange-600 hover:bg-orange-500 text-white font-bold"
+                >
+                  <Wrench className="h-4 w-4" /> Acessar Pós-Venda
+                </Button>
+              </div>
             </div>
 
             {/* Agendamentos - Seção destacada */}
