@@ -663,3 +663,29 @@
 - [ ] Notificações visuais (sininho com contador no header)
 - [ ] Metas individuais por vendedor
 - [ ] Busca global no topo
+
+## Módulo Financeiro - Contas a Pagar (24/03)
+
+### Categorias Personalizáveis
+- [x] Tabelas de categorias e transações financeiras já existiam no banco
+- [x] CRUD de categorias (criar, editar, excluir) - com cores personalizáveis
+- [x] Exibir categorias como abas na tela financeira (16 categorias pré-cadastradas)
+
+### Contas a Pagar
+- [x] CRUD completo de contas (criar, editar, excluir, marcar como pago)
+- [x] Status: pendente, vencido, pago, cancelado
+- [x] Filtro por mês (navegador de mês), por categoria (abas), por status, por tipo
+- [x] Busca por texto (descrição, fornecedor)
+- [x] Resumo financeiro: cards A Pagar, Pago, A Receber, Vencidas
+- [x] Código de barras, fornecedor, recorrência, observações
+
+### Notificações de Vencimento
+- [x] Endpoint de contas vencidas (overdue) e próximas do vencimento (upcomingDue)
+- [x] Card de "Vencidas" no dashboard com contagem
+- [x] Badge visual de status em cada conta (Pendente, Vence em breve, Vencido, Pago)
+
+### Interface
+- [x] Página admin do financeiro com abas dinâmicas (AdminFinanceiro)
+- [x] Cards de resumo (A Pagar, Pago, A Receber, Vencidas)
+- [x] Sidebar com link para o financeiro
+- [x] 195 testes passando (12 novos testes do financeiro)

@@ -47,6 +47,7 @@ const menuItems = [
   { icon: Wrench, label: "Pós-Venda", path: "/admin/pos-venda" },
   { icon: DollarSign, label: "Gastos PV", path: "/admin/pv-financeiro" },
   { icon: Flag, label: "Marketing", path: "/admin/marketing" },
+  { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
 ];
 
 // Items only visible to owner (not managers)

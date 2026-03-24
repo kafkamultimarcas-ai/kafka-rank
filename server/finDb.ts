@@ -212,3 +212,35 @@ Retorne APENAS o JSON, sem texto adicional.`,
   
   return prompts[docType] || prompts.boleto;
 }
+
+// ===== OVERDUE & UPCOMING =====
+
+export async function getOverdueTransactions() {
+  const db = await getDb();
+  if (!db) return [];
+  const now = Date.now();
+  return db.select().from(finTransactions)
+    .where(and(eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)))
+    .orderBy(asc(finTransactions.dueDate));
+}
+
+export async function getUpcomingDueTransactions(days: number = 3) {
+  const db = await getDb();
+  if (!db) return [];
+  const now = Date.now();
+  const futureDate = now + days * 24 * 60 * 60 * 1000;
+  return db.select().from(finTransactions)
+    .where(and(eq(finTransactions.status, "pending"), gte(finTransactions.dueDate, now), lte(finTransactions.dueDate, futureDate)))
+    .orderBy(asc(finTransactions.dueDate));
+}
+
+// Auto-update overdue status
+export async function autoUpdateOverdueStatus() {
+  const db = await getDb();
+  if (!db) return 0;
+  const now = Date.now();
+  const result = await db.update(finTransactions)
+    .set({ status: "overdue" })
+    .where(and(eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)));
+  return result[0]?.affectedRows || 0;
+}
