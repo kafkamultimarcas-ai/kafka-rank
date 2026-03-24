@@ -304,6 +304,15 @@ export async function listIntegrations() {
   return db.select().from(crmIntegrations).orderBy(desc(crmIntegrations.createdAt));
 }
 
+export async function getIntegrationByType(type: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(crmIntegrations).where(
+    and(eq(crmIntegrations.type, type), eq(crmIntegrations.active, true))
+  ).limit(1);
+  return rows[0] || null;
+}
+
 export async function getIntegrationByToken(token: string) {
   const db = await getDb();
   if (!db) return null;

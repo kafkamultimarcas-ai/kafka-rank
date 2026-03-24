@@ -70,14 +70,41 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // ===== SELLERS =====
+// Safe columns (excludes passwordHash)
+const safeSellerColumns = {
+  id: sellers.id,
+  name: sellers.name,
+  nickname: sellers.nickname,
+  photoUrl: sellers.photoUrl,
+  photoKey: sellers.photoKey,
+  phone: sellers.phone,
+  email: sellers.email,
+  department: sellers.department,
+  active: sellers.active,
+  totalSales: sellers.totalSales,
+  totalPoints: sellers.totalPoints,
+  username: sellers.username,
+  lastAccess: sellers.lastAccess,
+  createdAt: sellers.createdAt,
+  updatedAt: sellers.updatedAt,
+};
+
 export async function listSellers(activeOnly = false) {
   const db = await getDb();
   if (!db) return [];
-  if (activeOnly) return db.select().from(sellers).where(eq(sellers.active, true)).orderBy(desc(sellers.totalPoints));
-  return db.select().from(sellers).orderBy(desc(sellers.totalPoints));
+  if (activeOnly) return db.select(safeSellerColumns).from(sellers).where(eq(sellers.active, true)).orderBy(desc(sellers.totalPoints));
+  return db.select(safeSellerColumns).from(sellers).orderBy(desc(sellers.totalPoints));
 }
 
 export async function getSellerById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select(safeSellerColumns).from(sellers).where(eq(sellers.id, id)).limit(1);
+  return result[0];
+}
+
+// Internal use only - includes passwordHash for auth
+export async function getSellerByIdInternal(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(sellers).where(eq(sellers.id, id)).limit(1);

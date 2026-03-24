@@ -30,6 +30,7 @@ const AdminPosVenda = lazy(() => import("./pages/admin/AdminPosVenda"));
 const AdminPvFinanceiro = lazy(() => import("./pages/admin/AdminPvFinanceiro"));
 const AdminMarketing = lazy(() => import("./pages/admin/AdminMarketing"));
 const AdminFinanceiro = lazy(() => import("./pages/admin/AdminFinanceiro"));
+const AdminMetaIntegration = lazy(() => import("./pages/admin/AdminMetaIntegration"));
 
 const CompetitionView = lazy(() => import("./pages/CompetitionView"));
 const SellerProfile = lazy(() => import("./pages/SellerProfile"));
@@ -91,6 +92,7 @@ function Router() {
         <Route path="/admin/pv-financeiro" component={AdminPvFinanceiro} />
         <Route path="/admin/marketing" component={AdminMarketing} />
         <Route path="/admin/financeiro" component={AdminFinanceiro} />
+        <Route path="/admin/meta-integration" component={AdminMetaIntegration} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />

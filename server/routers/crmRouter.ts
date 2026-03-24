@@ -343,6 +343,76 @@ export const crmIntegrationsRouter = router({
     await crmDb.updateIntegration(input.id, { apiToken: newToken });
     return { apiToken: newToken };
   }),
+
+  // Meta-specific config
+  getMetaConfig: adminProcedure.query(async () => {
+    const integration = await crmDb.getIntegrationByType("facebook");
+    if (!integration) return null;
+    let config: any = {};
+    try { config = JSON.parse(integration.config || "{}"); } catch {}
+    return {
+      id: integration.id,
+      active: integration.active,
+      name: integration.name,
+      appId: config.appId || "",
+      appSecret: config.appSecret ? "***configurado***" : "",
+      pageAccessToken: config.pageAccessToken ? "***configurado***" : "",
+      verifyToken: config.verifyToken || "",
+      pageId: config.pageId || "",
+      hasAppSecret: !!config.appSecret,
+      hasPageAccessToken: !!config.pageAccessToken,
+    };
+  }),
+
+  saveMetaConfig: adminProcedure.input(z.object({
+    appId: z.string().optional(),
+    appSecret: z.string().optional(),
+    pageAccessToken: z.string().optional(),
+    verifyToken: z.string().optional(),
+    pageId: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    let integration = await crmDb.getIntegrationByType("facebook");
+    let existingConfig: any = {};
+    if (integration?.config) {
+      try { existingConfig = JSON.parse(integration.config); } catch {}
+    }
+    // Merge: only update fields that are provided and not masked
+    const newConfig: any = { ...existingConfig };
+    if (input.appId !== undefined) newConfig.appId = input.appId;
+    if (input.appSecret && !input.appSecret.includes("***")) newConfig.appSecret = input.appSecret;
+    if (input.pageAccessToken && !input.pageAccessToken.includes("***")) newConfig.pageAccessToken = input.pageAccessToken;
+    if (input.verifyToken !== undefined) newConfig.verifyToken = input.verifyToken;
+    if (input.pageId !== undefined) newConfig.pageId = input.pageId;
+
+    if (integration) {
+      await crmDb.updateIntegration(integration.id, { config: JSON.stringify(newConfig) });
+    } else {
+      const apiToken = `kafka_${nanoid(32)}`;
+      await crmDb.createIntegration({
+        type: "facebook",
+        name: "Meta Lead Ads (Facebook/Instagram)",
+        config: JSON.stringify(newConfig),
+        apiToken,
+      });
+    }
+    return { success: true };
+  }),
+
+  testMetaConnection: adminProcedure.mutation(async () => {
+    const integration = await crmDb.getIntegrationByType("facebook");
+    if (!integration?.config) return { success: false, error: "Integração não configurada" };
+    try {
+      const config = JSON.parse(integration.config);
+      if (!config.pageAccessToken) return { success: false, error: "Page Access Token não configurado" };
+      // Test by calling /me endpoint
+      const resp = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${config.pageAccessToken}`);
+      const data = await resp.json() as any;
+      if (data.error) return { success: false, error: data.error.message };
+      return { success: true, pageName: data.name, pageId: data.id };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }),
 });
 
 // ===== CRM CAMPAIGNS =====

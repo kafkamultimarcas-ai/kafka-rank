@@ -689,3 +689,21 @@
 - [x] Cards de resumo (A Pagar, Pago, A Receber, Vencidas)
 - [x] Sidebar com link para o financeiro
 - [x] 195 testes passando (12 novos testes do financeiro)
+
+## Integração Meta Lead Ads (Facebook/Instagram)
+- [x] Melhorar webhook Meta para buscar dados completos do lead via Graph API
+- [x] Adicionar verificação de assinatura do webhook (X-Hub-Signature-256)
+- [x] Config armazenada no banco (crm_integrations) via página admin
+- [x] Criar página de configuração da integração Meta no admin
+- [x] Instruções passo a passo para o usuário configurar no Facebook Developers
+
+## Correção de Bugs e Atualização Geral
+- [x] SEGURANÇA: passwordHash excluído de listSellers e getSellerById (safeSellerColumns)
+- [x] DOM: button aninhado no AdminFinanceiro corrigido (trocado por span com role=button)
+- [x] Meta webhook: busca dados completos do lead via Graph API (nome, telefone, email)
+- [x] Meta webhook: verifica assinatura X-Hub-Signature-256 com crypto.timingSafeEqual
+- [x] Meta webhook: valida verify_token contra config da integração
+- [x] Página de configuração Meta no admin (AdminMetaIntegration) com passo a passo
+- [x] Rotas getMetaConfig, saveMetaConfig, testMetaConnection no crmRouter
+- [x] Sidebar com link Meta Ads
+- [x] 204 testes passando (9 novos testes de segurança e Meta)

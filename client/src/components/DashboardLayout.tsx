@@ -48,6 +48,7 @@ const menuItems = [
   { icon: DollarSign, label: "Gastos PV", path: "/admin/pv-financeiro" },
   { icon: Flag, label: "Marketing", path: "/admin/marketing" },
   { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
+  { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
 ];
 
 // Items only visible to owner (not managers)

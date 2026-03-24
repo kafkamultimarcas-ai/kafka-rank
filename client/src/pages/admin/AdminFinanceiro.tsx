@@ -331,12 +331,15 @@ export default function AdminFinanceiro() {
             >
               <span className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: cat.color || undefined }} />
               {cat.name}
-              <button
-                className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              <span
+                role="button"
+                tabIndex={0}
+                className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); openEditCategory(cat); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); openEditCategory(cat); } }}
               >
                 <Edit2 className="w-3 h-3" />
-              </button>
+              </span>
             </Button>
           ))}
         </div>

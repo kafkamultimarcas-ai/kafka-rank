@@ -1,8 +1,49 @@
 import type { Express, Request, Response } from "express";
+import crypto from "crypto";
 import * as crmDb from "./crmDb";
 import { getDb } from "./db";
 import { sellers, crmLeadDistribution } from "../drizzle/schema";
 import { eq, and, asc } from "drizzle-orm";
+
+// ===== META GRAPH API HELPER =====
+async function fetchMetaLeadData(leadgenId: string, pageAccessToken: string): Promise<{ name: string; phone: string | null; email: string | null; fields: Record<string, string> } | null> {
+  try {
+    const url = `https://graph.facebook.com/v21.0/${leadgenId}?access_token=${pageAccessToken}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`Meta Graph API error: ${resp.status} ${resp.statusText}`);
+      return null;
+    }
+    const data = await resp.json() as any;
+    const fields: Record<string, string> = {};
+    let name = "";
+    let phone: string | null = null;
+    let email: string | null = null;
+
+    if (data.field_data && Array.isArray(data.field_data)) {
+      for (const field of data.field_data) {
+        const key = (field.name || "").toLowerCase();
+        const val = Array.isArray(field.values) ? field.values[0] : field.values;
+        fields[key] = val || "";
+        if (key === "full_name" || key === "nome_completo" || key === "nome") name = val || "";
+        if (key === "email") email = val || null;
+        if (key === "phone_number" || key === "telefone" || key === "whatsapp") phone = val || null;
+      }
+    }
+    if (!name) name = fields["first_name"] ? `${fields["first_name"]} ${fields["last_name"] || ""}`.trim() : "";
+    return { name: name || `Meta Lead #${leadgenId}`, phone, email, fields };
+  } catch (err) {
+    console.error("Error fetching Meta lead data:", err);
+    return null;
+  }
+}
+
+// Verify Meta webhook signature
+function verifyMetaSignature(payload: string, signature: string, appSecret: string): boolean {
+  if (!signature || !appSecret) return false;
+  const expectedSig = "sha256=" + crypto.createHmac("sha256", appSecret).update(payload).digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
+}
 
 /**
  * Public webhook endpoints for external integrations.
@@ -249,15 +290,25 @@ export function registerWebhookRoutes(app: Express) {
 
   // ===== META LEAD ADS (Instagram/Facebook) =====
   // Verification endpoint for Meta webhook setup
-  app.get("/api/webhooks/meta/verify", (req: Request, res: Response) => {
+  app.get("/api/webhooks/meta/verify", async (req: Request, res: Response) => {
     const mode = req.query["hub.mode"];
-    const token = req.query["hub.verify_token"];
+    const token = req.query["hub.verify_token"] as string;
     const challenge = req.query["hub.challenge"];
 
-    // The verify token should match one stored in integration config
-    // For simplicity, accept any token during setup - admin should configure in Meta
     if (mode === "subscribe" && token) {
-      console.log("Meta webhook verified");
+      // Validate verify_token against stored config
+      const metaIntegration = await crmDb.getIntegrationByType("facebook");
+      if (metaIntegration?.config) {
+        try {
+          const config = JSON.parse(metaIntegration.config);
+          if (config.verifyToken && config.verifyToken !== token) {
+            console.error("Meta webhook verify_token mismatch");
+            res.status(403).json({ error: "Verification failed: token mismatch" });
+            return;
+          }
+        } catch { /* config parse error, allow */ }
+      }
+      console.log("Meta webhook verified successfully");
       res.status(200).send(challenge);
     } else {
       res.status(403).json({ error: "Verification failed" });
@@ -267,41 +318,82 @@ export function registerWebhookRoutes(app: Express) {
   // Receive leads from Meta Lead Ads
   app.post("/api/webhooks/meta/leadgen", async (req: Request, res: Response) => {
     try {
-      // Meta sends a specific structure for leadgen webhooks
       const body = req.body;
 
-      // Meta webhook format: { object: "page", entry: [{ id, time, changes: [{ field: "leadgen", value: { ... } }] }] }
+      // Get Meta integration config for signature verification and Graph API
+      const metaIntegration = await crmDb.getIntegrationByType("facebook");
+      let appSecret = "";
+      let pageAccessToken = "";
+      if (metaIntegration?.config) {
+        try {
+          const config = JSON.parse(metaIntegration.config);
+          appSecret = config.appSecret || "";
+          pageAccessToken = config.pageAccessToken || "";
+        } catch { /* ignore parse error */ }
+      }
+
+      // Verify X-Hub-Signature-256 if appSecret is configured
+      if (appSecret) {
+        const signature = req.headers["x-hub-signature-256"] as string;
+        const rawBody = JSON.stringify(body);
+        if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+          console.error("Meta webhook signature verification failed");
+          res.status(403).json({ error: "Invalid signature" });
+          return;
+        }
+      }
+
+      // Meta webhook format: { object: "page", entry: [{ changes: [{ field: "leadgen", value: {...} }] }] }
       if (body.object === "page" && body.entry) {
         for (const entry of body.entry) {
           if (entry.changes) {
             for (const change of entry.changes) {
               if (change.field === "leadgen") {
                 const leadData = change.value;
-                // Meta leadgen value: { form_id, leadgen_id, created_time, page_id, ad_id, ad_group_id, campaign_id }
-                // The actual lead data needs to be fetched from Meta API using leadgen_id
-                // For now, store the webhook event and let admin fetch details
+                const leadgenId = leadData.leadgen_id?.toString();
                 const dept = "vendas";
                 const defaultStage = await crmDb.getDefaultStage(dept);
 
+                // Try to fetch complete lead data from Meta Graph API
+                let leadName = `Meta Lead #${leadgenId || Date.now()}`;
+                let leadPhone: string | null = null;
+                let leadEmail: string | null = null;
+                let extraFields = "";
+
+                if (leadgenId && pageAccessToken) {
+                  const metaData = await fetchMetaLeadData(leadgenId, pageAccessToken);
+                  if (metaData) {
+                    leadName = metaData.name;
+                    leadPhone = metaData.phone;
+                    leadEmail = metaData.email;
+                    // Store all extra fields in notes
+                    const fieldEntries = Object.entries(metaData.fields).filter(([k]) => !['full_name','email','phone_number','nome_completo','nome','telefone','whatsapp','first_name','last_name'].includes(k));
+                    if (fieldEntries.length > 0) {
+                      extraFields = "\n" + fieldEntries.map(([k, v]) => `${k}: ${v}`).join("\n");
+                    }
+                  }
+                }
+
+                const source = leadData.ad_id ? "instagram_ads" : "facebook_ads";
                 const leadId = await crmDb.createLead({
-                  name: `Meta Lead #${leadData.leadgen_id || Date.now()}`,
-                  phone: null,
-                  email: null,
+                  name: leadName,
+                  phone: leadPhone,
+                  email: leadEmail,
                   vehicleInterest: null,
                   vehiclePlate: null,
-                  source: leadData.ad_id ? "instagram_ads" : "facebook_ads",
+                  source,
                   department: dept,
                   stage: defaultStage?.name || "Novo Lead",
                   score: "hot",
                   sellerId: 0,
-                  notes: `Meta Lead Ads\nForm ID: ${leadData.form_id || "N/A"}\nLead ID: ${leadData.leadgen_id || "N/A"}\nCampaign: ${leadData.campaign_id || "N/A"}\nAd: ${leadData.ad_id || "N/A"}\nAd Group: ${leadData.ad_group_id || "N/A"}`,
+                  notes: `Meta Lead Ads\nForm ID: ${leadData.form_id || "N/A"}\nLead ID: ${leadgenId || "N/A"}\nCampaign: ${leadData.campaign_id || "N/A"}\nAd: ${leadData.ad_id || "N/A"}${extraFields}`,
                 });
 
                 await crmDb.createActivity({
                   leadId,
                   sellerId: 0,
                   type: "criacao",
-                  description: "Lead recebido do Meta Lead Ads (Instagram/Facebook)",
+                  description: `Lead recebido do ${source === "instagram_ads" ? "Instagram" : "Facebook"} Ads${leadPhone ? " (com telefone)" : ""}`,
                 });
 
                 await autoAssignLead(leadId, dept);
@@ -311,7 +403,7 @@ export function registerWebhookRoutes(app: Express) {
         }
       }
 
-      // Meta also supports direct lead data format (from Zapier, Make, etc)
+      // Direct lead data format (from Zapier, Make, etc)
       if (body.name || body.full_name || body.first_name) {
         const name = body.name || body.full_name || `${body.first_name || ""} ${body.last_name || ""}`.trim();
         const phone = body.phone || body.phone_number || body.tel || null;
