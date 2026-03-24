@@ -422,7 +422,7 @@ export default function Home() {
           <div className="container">
             <div className="flex items-center gap-3 mb-8">
               <Users className="h-6 w-6 text-primary" />
-              <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">TOP VENDEDORES</h2>
+              <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">TOP EQUIPE</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {vendedores.map((seller, idx) => (

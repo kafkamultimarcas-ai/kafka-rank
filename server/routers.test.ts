@@ -64,6 +64,7 @@ vi.mock("./db", () => ({
   // Consignment
   listConsignmentRecords: vi.fn().mockResolvedValue([]),
   createConsignmentRecord: vi.fn().mockResolvedValue(1),
+  checkConsignmentPlate: vi.fn().mockResolvedValue({ blocked: false, message: '' }),
   listPendingConsignmentRecords: vi.fn().mockResolvedValue([]),
   approveConsignmentRecord: vi.fn().mockResolvedValue({ id: 1, sellerId: 1, vehicleModel: 'Corolla', isValid: true, points: 1, competitionId: null }),
   rejectConsignmentRecord: vi.fn().mockResolvedValue(undefined),
@@ -550,6 +551,7 @@ describe("Consignment router", () => {
     const result = await caller.consignment.register({
       sellerId: 1, vehicleModel: "Corolla 2023", ownerName: "Jo\u00e3o Silva",
       ownerPhone: "(11) 99999-9999",
+      vehiclePlate: "ABC1D23",
       entryDate: Date.now() - 8 * 24 * 60 * 60 * 1000,
     });
     expect(result.id).toBe(1);

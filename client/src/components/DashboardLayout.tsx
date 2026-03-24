@@ -32,7 +32,7 @@ import { toast } from "sonner";
 const menuItems = [
   { icon: LayoutDashboard, label: "Painel Geral", path: "/admin" },
   { icon: CheckCircle, label: "Aprovar Vendas", path: "/admin/aprovacoes" },
-  { icon: Users, label: "Vendedores", path: "/admin/vendedores" },
+  { icon: Users, label: "Equipe", path: "/admin/vendedores" },
   { icon: Trophy, label: "Competições", path: "/admin/competicoes" },
   { icon: ShoppingCart, label: "Vendas", path: "/admin/vendas" },
   { icon: Banknote, label: "F&I", path: "/admin/fei" },
@@ -43,9 +43,10 @@ const menuItems = [
   { icon: Gift, label: "Sorteio Feirão", path: "/admin/sorteio" },
   { icon: Settings, label: "Configurações", path: "/admin/configuracoes" },
   { icon: LayoutGrid, label: "CRM Admin", path: "/crm/admin" },
-  { icon: Warehouse, label: "Controle de Pátio", path: "/controle-patio" },
+  { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
   { icon: Wrench, label: "Pós-Venda", path: "/admin/pos-venda" },
   { icon: DollarSign, label: "Gastos PV", path: "/admin/pv-financeiro" },
+  { icon: Flag, label: "Marketing", path: "/admin/marketing" },
 ];
 
 // Items only visible to owner (not managers)

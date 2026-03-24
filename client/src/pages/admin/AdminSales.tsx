@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle, Pencil, Search } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
@@ -29,12 +29,31 @@ export default function AdminSales() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [showAll, setShowAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterSellerId, setFilterSellerId] = useState<string>("todos");
 
   const filteredSales = useMemo(() => {
     if (!salesList) return [];
-    if (showAll) return salesList;
-    return filterByMonth(salesList, filterMonth, filterYear, 'createdAt' as any);
-  }, [salesList, filterMonth, filterYear, showAll]);
+    let result = showAll ? salesList : filterByMonth(salesList, filterMonth, filterYear, 'createdAt' as any);
+    // Filtro por vendedor
+    if (filterSellerId !== "todos") {
+      result = result.filter((s: any) => String(s.sellerId) === filterSellerId);
+    }
+    // Busca por texto
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter((s: any) => {
+        const seller = sellers?.find((sel: any) => sel.id === s.sellerId);
+        return (
+          seller?.name?.toLowerCase().includes(q) ||
+          seller?.nickname?.toLowerCase().includes(q) ||
+          s.vehicleModel?.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q)
+        );
+      });
+    }
+    return result;
+  }, [salesList, filterMonth, filterYear, showAll, filterSellerId, searchTerm, sellers]);
 
   const createSale = trpc.sales.create.useMutation({
     onSuccess: () => {
@@ -274,6 +293,30 @@ export default function AdminSales() {
           isAll={showAll}
           onToggleAll={() => setShowAll(!showAll)}
         />
+
+        {/* Busca e Filtro por Vendedor */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por vendedor, modelo, descrição..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-input border-border text-foreground"
+            />
+          </div>
+          <Select value={filterSellerId} onValueChange={setFilterSellerId}>
+            <SelectTrigger className="w-full sm:w-[200px] bg-input border-border text-foreground">
+              <SelectValue placeholder="Filtrar vendedor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os vendedores</SelectItem>
+              {sellers?.filter((s: any) => s.department === 'vendas' || !s.department).map((s: any) => (
+                <SelectItem key={s.id} value={String(s.id)}>{s.nickname || s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Sales List */}
         {filteredSales.length > 0 ? (

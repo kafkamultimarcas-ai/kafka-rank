@@ -12,6 +12,7 @@ import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter,
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter } from "./routers/pvRouter";
+import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1336,5 +1337,7 @@ export const appRouter = router({
   pvChamados: pvChamadosRouter,
   pvGastos: pvGastosRouter,
   pvOficinas: pvOficinasRouter,
+  mktStrategies: mktStrategiesRouter,
+  mktTasks: mktTasksRouter,
 });
 export type AppRouter = typeof appRouter;

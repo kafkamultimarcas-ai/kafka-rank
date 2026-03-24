@@ -343,7 +343,7 @@ function NovoChamadoModal({ open, onClose, sellers, onSuccess }: any) {
             <Select value={vendedorId} onValueChange={setVendedorId}>
               <SelectTrigger><SelectValue placeholder="Selecionar vendedor" /></SelectTrigger>
               <SelectContent>
-                {(sellers || []).filter((s: any) => s.active).map((s: any) => (
+                {(sellers || []).filter((s: any) => s.active && (s.department === "vendas" || !s.department)).map((s: any) => (
                   <SelectItem key={s.id} value={String(s.id)}>{s.nickname || s.name}</SelectItem>
                 ))}
               </SelectContent>

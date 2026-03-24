@@ -17,6 +17,8 @@ const DEPARTMENTS = [
   { value: "fei", label: "F&I", color: "bg-amber-500/20 text-amber-400" },
   { value: "consignacao", label: "Consignação", color: "bg-cyan-500/20 text-cyan-400" },
   { value: "despachante", label: "Despachante", color: "bg-emerald-500/20 text-emerald-400" },
+  { value: "pos_venda", label: "Pós-Venda", color: "bg-orange-500/20 text-orange-400" },
+  { value: "marketing", label: "Marketing", color: "bg-pink-500/20 text-pink-400" },
 ];
 
 function getDeptInfo(dept: string | null | undefined) {

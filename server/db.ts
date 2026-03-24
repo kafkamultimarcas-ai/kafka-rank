@@ -18,6 +18,8 @@ import {
   sdrRecords, InsertSdrRecord,
   goals, InsertGoal,
   managers, InsertManager,
+  mktStrategies, InsertMktStrategy,
+  mktTasks, InsertMktTask,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1697,4 +1699,53 @@ export async function listAllPvGastosWithChamado(statusAprovacao?: string) {
     ...g,
     chamado: chamadoMap.get(g.chamadoId) || null,
   }));
+}
+
+// ============ MARKETING ============
+
+export async function listMktStrategies() {
+  const db = await getDb();
+  return db!.select().from(mktStrategies).orderBy(desc(mktStrategies.createdAt));
+}
+
+export async function createMktStrategy(data: InsertMktStrategy) {
+  const db = await getDb();
+  const result = await db!.insert(mktStrategies).values(data);
+  return { id: result[0].insertId };
+}
+
+export async function updateMktStrategy(id: number, data: Partial<InsertMktStrategy>) {
+  const db = await getDb();
+  await db!.update(mktStrategies).set(data).where(eq(mktStrategies.id, id));
+}
+
+export async function deleteMktStrategy(id: number) {
+  const db = await getDb();
+  // Delete associated tasks first
+  await db!.delete(mktTasks).where(eq(mktTasks.strategyId, id));
+  await db!.delete(mktStrategies).where(eq(mktStrategies.id, id));
+}
+
+export async function listMktTasks(strategyId?: number) {
+  const db = await getDb();
+  if (strategyId) {
+    return db!.select().from(mktTasks).where(eq(mktTasks.strategyId, strategyId)).orderBy(desc(mktTasks.createdAt));
+  }
+  return db!.select().from(mktTasks).orderBy(desc(mktTasks.createdAt));
+}
+
+export async function createMktTask(data: InsertMktTask) {
+  const db = await getDb();
+  const result = await db!.insert(mktTasks).values(data);
+  return { id: result[0].insertId };
+}
+
+export async function updateMktTask(id: number, data: Partial<InsertMktTask>) {
+  const db = await getDb();
+  await db!.update(mktTasks).set(data).where(eq(mktTasks.id, id));
+}
+
+export async function deleteMktTask(id: number) {
+  const db = await getDb();
+  await db!.delete(mktTasks).where(eq(mktTasks.id, id));
 }

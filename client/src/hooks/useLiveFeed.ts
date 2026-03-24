@@ -106,12 +106,14 @@ export function useLiveFeed() {
     }
   }, [recentSales]);
 
-  // Detect overtakes
+  // Detect overtakes - only for vendedores (department=vendas)
   useEffect(() => {
     if (!sellersList || sellersList.length === 0) return;
 
+    // Filtrar apenas vendedores para o ranking de ultrapassagem
+    const vendedores = sellersList.filter(s => (s.department || 'vendas') === 'vendas');
     const currentRanking = new Map<number, number>();
-    const sorted = [...sellersList].sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0));
+    const sorted = [...vendedores].sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0));
     sorted.forEach((seller, index) => {
       currentRanking.set(seller.id, index + 1);
     });

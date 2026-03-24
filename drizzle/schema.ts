@@ -603,3 +603,38 @@ export const pvHistorico = mysqlTable("pv_historico", {
 });
 export type PvHistorico = typeof pvHistorico.$inferSelect;
 export type InsertPvHistorico = typeof pvHistorico.$inferInsert;
+
+// ============ MARKETING ============
+
+// Estratégias de Marketing
+export const mktStrategies = mysqlTable("mkt_strategies", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).default("geral"), // geral, redes_sociais, trafego_pago, eventos, parcerias
+  status: mysqlEnum("status", ["planejada", "em_andamento", "concluida", "cancelada"]).default("planejada").notNull(),
+  startDate: bigint("startDate", { mode: "number" }),
+  endDate: bigint("endDate", { mode: "number" }),
+  budget: int("budget"), // orçamento em centavos
+  responsibleId: int("responsibleId"), // seller do setor marketing
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MktStrategy = typeof mktStrategies.$inferSelect;
+export type InsertMktStrategy = typeof mktStrategies.$inferInsert;
+
+// Tarefas de Marketing
+export const mktTasks = mysqlTable("mkt_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  strategyId: int("strategyId"), // pode ser null se tarefa avulsa
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["pendente", "em_andamento", "concluida", "cancelada"]).default("pendente").notNull(),
+  priority: mysqlEnum("priority", ["baixa", "media", "alta", "urgente"]).default("media").notNull(),
+  dueDate: bigint("dueDate", { mode: "number" }),
+  assignedToId: int("assignedToId"), // seller do setor marketing
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MktTask = typeof mktTasks.$inferSelect;
+export type InsertMktTask = typeof mktTasks.$inferInsert;

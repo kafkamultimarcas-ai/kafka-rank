@@ -97,8 +97,8 @@ export default function PosVenda() {
               className="w-full rounded-xl border-2 border-orange-500/30 bg-gray-900 px-4 py-3.5 text-sm text-white font-medium focus:border-orange-500 focus:outline-none"
             >
               <option value="" disabled>Selecione seu nome...</option>
-              {(sellers || []).map((s: any) => (
-                <option key={s.id} value={s.id}>{s.nickname || s.name} — {s.department === 'vendas' ? 'Vendas' : s.department === 'pre_vendas' ? 'Pré-Vendas' : s.department || 'Vendas'}</option>
+              {(sellers || []).filter((s: any) => s.department === 'vendas' || !s.department).map((s: any) => (
+                <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
               ))}
             </select>
           </div>

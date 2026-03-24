@@ -1,7 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar } from "lucide-react";
+import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus } from "lucide-react";
+import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -26,15 +27,31 @@ export default function ConsignmentControl() {
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [exitRecordId, setExitRecordId] = useState<number | null>(null);
   const [exitDate, setExitDate] = useState("");
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Dados
   const { data: yardVehicles, refetch: refetchYard } = trpc.consignment.yard.useQuery();
   const { data: completed7Days, refetch: refetchCompleted } = trpc.consignment.completed7Days.useQuery(
-    { month: now.getMonth() + 1, year: now.getFullYear() }
+    { month: filterMonth + 1, year: filterYear }
   );
   const { data: exitedVehicles, refetch: refetchExited } = trpc.consignment.exited.useQuery(
-    { month: now.getMonth() + 1, year: now.getFullYear() }
+    { month: filterMonth + 1, year: filterYear }
   );
+
+  // Filtro de busca
+  const filterVehicles = (list: any[] | undefined) => {
+    if (!list) return [];
+    if (!searchTerm.trim()) return list;
+    const q = searchTerm.toLowerCase();
+    return list.filter((v: any) =>
+      v.vehiclePlate?.toLowerCase().includes(q) ||
+      v.vehicleModel?.toLowerCase().includes(q) ||
+      v.ownerName?.toLowerCase().includes(q) ||
+      getSellerName(v.sellerId)?.toLowerCase().includes(q)
+    );
+  };
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: false });
 
   const updateExit = trpc.consignment.updateExit.useMutation({
@@ -86,8 +103,8 @@ export default function ConsignmentControl() {
             <button onClick={() => setLocation("/")} className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <Warehouse className="w-5 h-5 text-blue-400" />
-            <h1 className="font-heading font-bold text-lg text-foreground">CONTROLE DE PÁTIO</h1>
+            <Warehouse className="w-5 h-5 text-cyan-400" />
+            <h1 className="font-heading font-bold text-lg text-foreground">CONSIGNAÇÃO</h1>
           </div>
         </div>
       </div>
@@ -118,6 +135,24 @@ export default function ConsignmentControl() {
       </div>
 
       <div className="container py-4 space-y-3">
+        {/* Filtro por mês */}
+        <MonthFilter
+          month={filterMonth}
+          year={filterYear}
+          onChange={(m, y) => { setFilterMonth(m); setFilterYear(y); }}
+        />
+
+        {/* Busca */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por placa, modelo, proprietário..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
         {/* VEÍCULOS NO PÁTIO */}
         {activeTab === "patio" && (
           <>
@@ -127,14 +162,14 @@ export default function ConsignmentControl() {
                 VEÍCULOS NO PÁTIO — {yardVehicles?.length || 0} veículos
               </h2>
             </div>
-            {!yardVehicles || yardVehicles.length === 0 ? (
+            {filterVehicles(yardVehicles).length === 0 ? (
               <div className="racing-card p-8 text-center">
                 <Car className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground text-sm">Nenhum veículo no pátio no momento.</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {yardVehicles.map((v: any) => {
+                {filterVehicles(yardVehicles).map((v: any) => {
                   const days = getDaysInYard(v.entryDate);
                   const isNear7 = days >= 5 && days < 7;
                   const isOver7 = days >= 7;
@@ -218,13 +253,13 @@ export default function ConsignmentControl() {
                 </div>
               </div>
             </div>
-            {!completed7Days || completed7Days.length === 0 ? (
+            {filterVehicles(completed7Days).length === 0 ? (
               <div className="racing-card p-6 text-center">
                 <p className="text-muted-foreground text-sm">Nenhum veículo completou 7 dias este mês.</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {completed7Days.map((v: any) => {
+                {filterVehicles(completed7Days).map((v: any) => {
                   const days = getDaysInYard(v.entryDate, v.exitDate);
                   return (
                     <div key={v.id} className="racing-card p-3 border-emerald-500/20">
@@ -266,13 +301,13 @@ export default function ConsignmentControl() {
                 HISTÓRICO DE SAÍDAS — {now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
               </h2>
             </div>
-            {!exitedVehicles || exitedVehicles.length === 0 ? (
+            {filterVehicles(exitedVehicles).length === 0 ? (
               <div className="racing-card p-6 text-center">
                 <p className="text-muted-foreground text-sm">Nenhum veículo saiu do pátio este mês.</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {exitedVehicles.map((v: any) => {
+                {filterVehicles(exitedVehicles).map((v: any) => {
                   const days = getDaysInYard(v.entryDate, v.exitDate);
                   return (
                     <div key={v.id} className={`racing-card p-3 ${v.isValid ? 'border-emerald-500/20' : 'border-red-500/20'}`}>

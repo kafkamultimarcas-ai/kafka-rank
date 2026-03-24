@@ -116,7 +116,7 @@ export default function AdminDashboard() {
               <span className="text-xs text-muted-foreground font-medium">EQUIPE</span>
             </div>
             <p className="font-heading font-bold text-2xl text-foreground">{vendedores.length}</p>
-            <p className="text-xs text-muted-foreground">vendedores ativos</p>
+            <p className="text-xs text-muted-foreground">colaboradores ativos</p>
             <p className="text-xs text-emerald-400 mt-1">{activeSellers.length} total na equipe</p>
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
 
         {/* Top Sellers do Mês */}
         <div className="racing-card p-5">
-          <h2 className="font-heading font-bold text-sm text-foreground mb-4">TOP VENDEDORES — {MONTH_NAMES[filterMonth].toUpperCase()}</h2>
+          <h2 className="font-heading font-bold text-sm text-foreground mb-4">TOP EQUIPE — {MONTH_NAMES[filterMonth].toUpperCase()}</h2>
           {vendedores.length > 0 ? (
             <div className="space-y-3">
               {(() => {

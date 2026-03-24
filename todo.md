@@ -625,3 +625,41 @@
 - [x] Dashboard admin com seletor de mês e visão geral (vendas, F&I, pós-venda, equipe)
 - [x] Top vendedores do mês selecionado no dashboard
 - [x] Histórico mensal acessível navegando entre meses
+
+## Pacote de Melhorias (24/03)
+
+### Bugs e Correções
+- [x] Pós-venda: testado e funcionando (criar chamado + mudar status OK)
+- [x] Chamado pós-venda: lista de vendedores já filtra apenas department=vendas
+- [x] Motivação do rank: ultrapassagens agora filtram apenas vendedores (department=vendas)
+- [x] Labels corrigidos: TOP VENDEDORES → TOP EQUIPE (Home + Dashboard)
+
+### Novo Colaborador
+- [x] Setor "Pós-Venda" já existe na lista de setores (pos_venda)
+- [x] Setor "Marketing" já existe na lista de setores
+
+### Vendas
+- [x] Busca por texto (vendedor, modelo, descrição) na tela de vendas
+- [x] Filtro dropdown por vendedor individual na tela de vendas
+
+### Controle de Pátio → Consignação
+- [x] Renomear "Controle de Pátio" para "Consignação"
+- [x] Cadastro de veículos consignados já existia
+- [x] Filtro por mês na consignação adicionado
+- [x] Busca por placa/modelo/proprietário na consignação
+- [x] Controle de duplicidade por placa (60 dias) já existia
+- [x] Aba de veículos 7 dias (meta) já existia
+- [x] Registro de saída sem excluir histórico já existia
+
+### Painel de Marketing
+- [x] Criar página de Marketing no admin (com sidebar)
+- [x] Estratégias de marketing com CRUD completo (criar, editar, excluir)
+- [x] Tarefas de marketing com CRUD, prioridade, prazo, responsável
+- [x] Vincular tarefas a estratégias
+- [x] Filtro por status e busca por texto
+- [x] Cards de estatísticas (estratégias, tarefas, em andamento, concluídas)
+
+### Melhorias Extras
+- [ ] Notificações visuais (sininho com contador no header)
+- [ ] Metas individuais por vendedor
+- [ ] Busca global no topo
