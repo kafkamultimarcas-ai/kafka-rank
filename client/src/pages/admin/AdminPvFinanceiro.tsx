@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import {
   DollarSign, CheckCircle2, Clock, XCircle, CreditCard,
   Car, User, FileText, ExternalLink
@@ -24,6 +25,9 @@ const STATUS_GASTO: Record<string, { label: string; color: string; bg: string; i
 
 export default function AdminPvFinanceiro() {
   const [filter, setFilter] = useState("todos");
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [showAllMonths, setShowAllMonths] = useState(false);
   const resumoQuery = trpc.pvGastos.resumo.useQuery();
   const gastosQuery = trpc.pvGastos.listAll.useQuery({ statusAprovacao: filter !== "todos" ? filter : undefined });
   const statusMutation = trpc.pvGastos.updateStatus.useMutation({
@@ -32,7 +36,11 @@ export default function AdminPvFinanceiro() {
   });
 
   const resumo = resumoQuery.data || { pendente: 0, autorizado: 0, recusado: 0, pago: 0 };
-  const gastos = gastosQuery.data || [];
+  const allGastos = gastosQuery.data || [];
+  const gastos = useMemo(() => {
+    if (showAllMonths) return allGastos;
+    return filterByMonth(allGastos, filterMonth, filterYear, 'createdAt' as any);
+  }, [allGastos, filterMonth, filterYear, showAllMonths]);
   const totalGeral = resumo.pendente + resumo.autorizado + resumo.pago;
 
   return (
@@ -45,6 +53,16 @@ export default function AdminPvFinanceiro() {
           </h1>
           <p className="text-muted-foreground text-sm">Controle de gastos com aprovação</p>
         </div>
+
+        {/* Filtro por mês */}
+        <MonthFilter
+          month={filterMonth}
+          year={filterYear}
+          onChange={(m, y) => { setFilterMonth(m); setFilterYear(y); setShowAllMonths(false); }}
+          showAll
+          isAll={showAllMonths}
+          onToggleAll={() => setShowAllMonths(!showAllMonths)}
+        />
 
         {/* Resumo financeiro */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

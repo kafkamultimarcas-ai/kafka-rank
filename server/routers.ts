@@ -12,7 +12,7 @@ import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter,
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter } from "./routers/pvRouter";
-import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved } from "./pushService";
+import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
@@ -437,7 +437,24 @@ export const appRouter = router({
       dueDate: z.number().optional(),
     })).mutation(async ({ input }) => {
       const id = await db.createActionPlan(input);
-      return { id };
+      // Criar notificação para o vendedor
+      const seller = await db.getSellerById(input.sellerId);
+      await db.createNotification({
+        sellerId: input.sellerId,
+        type: 'action_plan',
+        title: 'Novo Plano de Ação!',
+        message: `Você recebeu um novo plano de ação: "${input.title}". Acesse sua área para conferir.`,
+        actionUrl: `/minha-area/${input.sellerId}`,
+      });
+      // Push notification para o vendedor
+      sendPushToSeller(input.sellerId, {
+        title: '📋 Novo Plano de Ação!',
+        body: `Você recebeu: "${input.title}". Confira na sua área!`,
+        tag: `action-plan-${input.sellerId}`,
+        data: { type: 'action_plan', url: `/minha-area/${input.sellerId}` },
+        requireInteraction: true,
+      }).catch(console.error);
+      return { id, message: `Plano enviado para ${seller?.nickname || seller?.name || 'vendedor'}!` };
     }),
     update: adminProcedure.input(z.object({
       id: z.number(),
@@ -483,6 +500,21 @@ export const appRouter = router({
       });
       const parsed = JSON.parse(response.choices[0].message.content as string);
       const id = await db.createActionPlan({ sellerId: input.sellerId, title: parsed.title, content: parsed.content });
+      // Notificar vendedor sobre plano gerado por IA
+      await db.createNotification({
+        sellerId: input.sellerId,
+        type: 'action_plan',
+        title: 'Novo Plano de Ação (IA)!',
+        message: `Você recebeu um plano de ação personalizado: "${parsed.title}". Acesse sua área para conferir.`,
+        actionUrl: `/minha-area/${input.sellerId}`,
+      });
+      sendPushToSeller(input.sellerId, {
+        title: '🤖 Plano de Ação Personalizado!',
+        body: `Novo plano gerado para você: "${parsed.title}". Confira!`,
+        tag: `action-plan-ai-${input.sellerId}`,
+        data: { type: 'action_plan', url: `/minha-area/${input.sellerId}` },
+        requireInteraction: true,
+      }).catch(console.error);
       return { id, title: parsed.title, content: parsed.content };
     }),
   }),

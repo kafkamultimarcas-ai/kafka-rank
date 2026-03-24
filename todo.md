@@ -610,3 +610,18 @@
 - [x] Seção dedicada "PÓS-VENDA" na Home com botão de acesso
 - [x] Página pública /pos-venda com seleção de vendedor, abertura de chamado e acompanhamento
 - [x] Cards expansíveis com detalhes do chamado, filtros por status e contadores
+
+## Bug: Plano de Ação não chega ao vendedor (23/03)
+- [x] Investigado: faltava criar notificação + push ao criar plano de ação
+- [x] Corrigido: agora ao criar plano, cria notificação no banco + envia push notification
+- [x] Vendedor recebe alerta "Novo Plano de Ação" com detalhes do plano
+
+## Filtros por Mês em Todas as Telas (23/03)
+- [x] Componente MonthFilter reutilizável criado (setas prev/next, botão "Ver Todos")
+- [x] Filtro por mês na tela de Vendas (admin)
+- [x] Filtro por mês na tela de Pós-Venda
+- [x] Filtro por mês na tela de F&I
+- [x] Filtro por mês na tela de Gastos PV (Financeiro)
+- [x] Dashboard admin com seletor de mês e visão geral (vendas, F&I, pós-venda, equipe)
+- [x] Top vendedores do mês selecionado no dashboard
+- [x] Histórico mensal acessível navegando entre meses

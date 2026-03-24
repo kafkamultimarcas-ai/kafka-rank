@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,9 @@ export default function AdminPosVenda() {
   const [showNewChamado, setShowNewChamado] = useState(false);
   const [selectedChamado, setSelectedChamado] = useState<any>(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [showAllMonths, setShowAllMonths] = useState(true); // Pós-venda mostra todos por padrão
 
   const chamadosQuery = trpc.pvChamados.list.useQuery({ status: statusFilter !== "todos" ? statusFilter : undefined });
   const countsQuery = trpc.pvChamados.counts.useQuery();
@@ -58,8 +62,13 @@ export default function AdminPosVenda() {
   const oficinasQuery = trpc.pvOficinas.list.useQuery();
   const alertasQuery = trpc.pvChamados.alertas.useQuery();
 
-  const chamados = chamadosQuery.data || [];
+  const allChamados = chamadosQuery.data || [];
   const counts = countsQuery.data || { aberto: 0, agendado: 0, em_servico: 0, finalizado: 0, entregue: 0, total: 0 };
+
+  const chamados = useMemo(() => {
+    if (showAllMonths) return allChamados;
+    return filterByMonth(allChamados, filterMonth, filterYear, 'createdAt' as any);
+  }, [allChamados, filterMonth, filterYear, showAllMonths]);
 
   const filtered = useMemo(() => {
     if (!searchTerm) return chamados;
@@ -142,6 +151,16 @@ export default function AdminPosVenda() {
             </button>
           ))}
         </div>
+
+        {/* Filtro por mês */}
+        <MonthFilter
+          month={filterMonth}
+          year={filterYear}
+          onChange={(m, y) => { setFilterMonth(m); setFilterYear(y); setShowAllMonths(false); }}
+          showAll
+          isAll={showAllMonths}
+          onToggleAll={() => setShowAllMonths(!showAllMonths)}
+        />
 
         {/* Busca */}
         <div className="relative">

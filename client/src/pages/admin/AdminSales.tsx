@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle, Pencil } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 
 export default function AdminSales() {
   const { data: salesList } = trpc.sales.list.useQuery({});
@@ -25,6 +26,15 @@ export default function AdminSales() {
   const [editForm, setEditForm] = useState({
     vehicleModel: "", value: "", sellerId: "", status: "", leadSource: "",
   });
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [showAll, setShowAll] = useState(false);
+
+  const filteredSales = useMemo(() => {
+    if (!salesList) return [];
+    if (showAll) return salesList;
+    return filterByMonth(salesList, filterMonth, filterYear, 'createdAt' as any);
+  }, [salesList, filterMonth, filterYear, showAll]);
 
   const createSale = trpc.sales.create.useMutation({
     onSuccess: () => {
@@ -255,10 +265,20 @@ export default function AdminSales() {
           </DialogContent>
         </Dialog>
 
+        {/* Month Filter */}
+        <MonthFilter
+          month={filterMonth}
+          year={filterYear}
+          onChange={(m, y) => { setFilterMonth(m); setFilterYear(y); setShowAll(false); }}
+          showAll
+          isAll={showAll}
+          onToggleAll={() => setShowAll(!showAll)}
+        />
+
         {/* Sales List */}
-        {salesList && salesList.length > 0 ? (
+        {filteredSales.length > 0 ? (
           <div className="space-y-2">
-            {salesList.map(sale => {
+            {filteredSales.map(sale => {
               const seller = sellers?.find(s => s.id === sale.sellerId);
               return (
                 <div key={sale.id} className={`racing-card p-4 flex items-center gap-4 ${statusBg(sale.status || 'approved')}`}>
@@ -329,7 +349,7 @@ export default function AdminSales() {
         ) : (
           <div className="racing-card p-12 text-center">
             <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Nenhuma venda registrada.</p>
+            <p className="text-muted-foreground">{showAll ? "Nenhuma venda registrada." : "Nenhuma venda neste mês."}</p>
           </div>
         )}
       </div>

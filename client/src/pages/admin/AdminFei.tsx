@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 
 function formatDate(ts: number | string | Date | null | undefined) {
   if (!ts) return "—";
@@ -58,6 +59,9 @@ export default function AdminFei() {
 
   const [statusFilter, setStatusFilter] = useState<"todos" | "approved" | "pending" | "rejected">("todos");
   const [sellerFilter, setSellerFilter] = useState<string>("todos");
+  const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+  const [showAllMonths, setShowAllMonths] = useState(false);
   const [editDialog, setEditDialog] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [editForm, setEditForm] = useState({
@@ -86,8 +90,12 @@ export default function AdminFei() {
 
   const getSeller = (id: number) => sellers?.find(s => s.id === id);
 
-  // Filtros
-  const records = allFei || [];
+  // Filtros por mês
+  const allRecords = allFei || [];
+  const records = useMemo(() => {
+    if (showAllMonths) return allRecords;
+    return filterByMonth(allRecords, filterMonth, filterYear, 'createdAt' as any);
+  }, [allRecords, filterMonth, filterYear, showAllMonths]);
   const approvedCount = records.filter((r: any) => r.status === "approved").length;
   const pendingCount = records.filter((r: any) => r.status === "pending").length;
   const rejectedCount = records.filter((r: any) => r.status === "rejected").length;
@@ -162,6 +170,16 @@ export default function AdminFei() {
             <p className="text-xs text-muted-foreground">Rejeitadas</p>
           </div>
         </div>
+
+        {/* Filtro por mês */}
+        <MonthFilter
+          month={filterMonth}
+          year={filterYear}
+          onChange={(m, y) => { setFilterMonth(m); setFilterYear(y); setShowAllMonths(false); }}
+          showAll
+          isAll={showAllMonths}
+          onToggleAll={() => setShowAllMonths(!showAllMonths)}
+        />
 
         {/* Filtros */}
         <div className="flex flex-wrap gap-3 items-center">
