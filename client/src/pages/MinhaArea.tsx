@@ -284,11 +284,13 @@ export default function MinhaArea() {
                "Agendamentos"}
             </p>
           </div>
-          <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3 text-center">
-            <Trophy className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
-            <p className="text-2xl font-black text-white">{seller?.totalPoints || 0}</p>
-            <p className="text-xs text-gray-500">Pontos</p>
-          </div>
+          {(dept === 'vendas' || dept === 'pre_vendas') && (
+            <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3 text-center">
+              <Trophy className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
+              <p className="text-2xl font-black text-white">{seller?.totalPoints || 0}</p>
+              <p className="text-xs text-gray-500">Pontos</p>
+            </div>
+          )}
           <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3 text-center">
             <Bell className="w-5 h-5 text-red-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-white">{unreadCount?.count || 0}</p>

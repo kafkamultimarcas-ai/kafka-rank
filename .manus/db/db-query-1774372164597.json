@@ -1,0 +1,40 @@
+{
+  "query": "SELECT department, COUNT(*) as count, SUM(totalPoints) as total_points, SUM(totalSales) as total_sales FROM sellers GROUP BY department ORDER BY count DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT department, COUNT(*) as count, SUM(totalPoints) as total_points, SUM(totalSales) as total_sales FROM sellers GROUP BY department ORDER BY count DESC;",
+  "rows": [
+    {
+      "department": "vendas",
+      "count": "9",
+      "total_points": "32",
+      "total_sales": "31"
+    },
+    {
+      "department": "consignacao",
+      "count": "1",
+      "total_points": "0",
+      "total_sales": "0"
+    },
+    {
+      "department": "despachante",
+      "count": "1",
+      "total_points": "2",
+      "total_sales": "0"
+    },
+    {
+      "department": "pre_vendas",
+      "count": "1",
+      "total_points": "2",
+      "total_sales": "0"
+    },
+    {
+      "department": "fei",
+      "count": "1",
+      "total_points": "4",
+      "total_sales": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "department\tcount\ttotal_points\ttotal_sales\nvendas\t9\t32\t31\nconsignacao\t1\t0\t0\ndespachante\t1\t2\t0\npre_vendas\t1\t2\t0\nfei\t1\t4\t0\n",
+  "stderr": "",
+  "execution_time_ms": 1130
+}

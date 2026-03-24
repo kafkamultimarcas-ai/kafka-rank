@@ -277,8 +277,14 @@ export default function AdminSellers() {
                         )}
                       </div>
                       <div className="flex items-center gap-4 mt-1">
-                        <span className="text-xs text-muted-foreground">{seller.totalSales} vendas</span>
-                        <span className="text-xs font-heading text-primary">{seller.totalPoints} pts</span>
+                        {(!seller.department || seller.department === 'vendas' || seller.department === 'pre_vendas') ? (
+                          <>
+                            <span className="text-xs text-muted-foreground">{seller.totalSales} vendas</span>
+                            <span className="text-xs font-heading text-primary">{seller.totalPoints} pts</span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Sem ranking</span>
+                        )}
                         {seller.phone && <span className="text-xs text-muted-foreground hidden sm:inline">{seller.phone}</span>}
                       </div>
                     </div>

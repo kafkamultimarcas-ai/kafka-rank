@@ -369,7 +369,15 @@ export default function RegisterSale() {
                   <SelectValue placeholder="Selecione seu nome" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
-                  {sellers?.map(seller => (
+                  {sellers?.filter(s => {
+                    const dept = s.department || 'vendas';
+                    if (category === 'vendas') return dept === 'vendas';
+                    if (category === 'fei') return dept === 'fei';
+                    if (category === 'consignacao') return dept === 'consignacao';
+                    if (category === 'despachante') return dept === 'despachante';
+                    if (category === 'pre_vendas') return dept === 'pre_vendas' || dept === 'vendas';
+                    return true;
+                  }).map(seller => (
                     <SelectItem key={seller.id} value={seller.id.toString()} className="text-white hover:bg-gray-700">
                       <div className="flex items-center gap-2">
                         {seller.photoUrl && (
@@ -395,7 +403,12 @@ export default function RegisterSale() {
                 )}
                 <div>
                   <p className="text-white font-semibold">{selectedSeller.name}</p>
-                  <p className="text-gray-400 text-xs">{selectedSeller.totalSales} registros | {selectedSeller.totalPoints} pts</p>
+                  <p className="text-gray-400 text-xs">
+                    {(!selectedSeller.department || selectedSeller.department === 'vendas' || selectedSeller.department === 'pre_vendas')
+                      ? `${selectedSeller.totalSales} registros | ${selectedSeller.totalPoints} pts`
+                      : selectedSeller.department === 'fei' ? 'F&I' : selectedSeller.department === 'consignacao' ? 'Consignação' : selectedSeller.department === 'despachante' ? 'Despachante' : selectedSeller.department
+                    }
+                  </p>
                 </div>
               </div>
             )}

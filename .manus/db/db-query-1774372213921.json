@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE sellers SET totalPoints = 0, totalSales = 0 WHERE department NOT IN ('vendas', 'pre_vendas');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute UPDATE sellers SET totalPoints = 0, totalSales = 0 WHERE department NOT IN ('vendas', 'pre_vendas');",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 65
+}

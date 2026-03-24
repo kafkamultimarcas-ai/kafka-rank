@@ -45,16 +45,18 @@ export default function SellerProfile() {
             <div className="text-center sm:text-left">
               <h2 className="font-heading font-bold text-2xl text-foreground">{seller.name}</h2>
               {seller.nickname && <p className="text-muted-foreground">"{seller.nickname}"</p>}
-              <div className="flex items-center gap-6 mt-4 justify-center sm:justify-start">
-                <div className="text-center">
-                  <p className="font-heading font-bold text-2xl text-primary">{seller.totalSales}</p>
-                  <p className="text-xs text-muted-foreground">Vendas</p>
+              {(!seller.department || seller.department === 'vendas' || seller.department === 'pre_vendas') && (
+                <div className="flex items-center gap-6 mt-4 justify-center sm:justify-start">
+                  <div className="text-center">
+                    <p className="font-heading font-bold text-2xl text-primary">{seller.totalSales}</p>
+                    <p className="text-xs text-muted-foreground">Vendas</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-heading font-bold text-2xl text-primary">{seller.totalPoints}</p>
+                    <p className="text-xs text-muted-foreground">Pontos</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="font-heading font-bold text-2xl text-primary">{seller.totalPoints}</p>
-                  <p className="text-xs text-muted-foreground">Pontos</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

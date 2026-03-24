@@ -707,3 +707,18 @@
 - [x] Rotas getMetaConfig, saveMetaConfig, testMetaConnection no crmRouter
 - [x] Sidebar com link Meta Ads
 - [x] 204 testes passando (9 novos testes de segurança e Meta)
+
+## Correção Ranking por Setor
+- [x] Ranking de vendas: APENAS vendedores (department=vendas) - backend getMonthlyRanking
+- [x] Ranking de agendamentos: vendedores + SDR (department=vendas ou pre_vendas) - backend getAppointmentRanking
+- [x] Outros setores (despachante, consignação, F&I, pós-venda, marketing) NÃO aparecem no ranking
+- [x] updateSaleTotals bloqueia pontos para setores fora do ranking
+- [x] Pontos zerados no banco para setores não-vendas (despachante, F&I, consignação)
+- [x] Home: TOP EQUIPE filtra apenas vendedores
+- [x] AdminDashboard: TOP EQUIPE filtra apenas vendedores
+- [x] AdminSellers: mostra "Sem ranking" para setores não-vendas
+- [x] SellerProfile: esconde pontos/vendas para setores não-vendas
+- [x] MinhaArea: esconde pontos para setores não-vendas
+- [x] RegisterSale: filtra vendedores por departamento conforme categoria
+- [x] useLiveFeed: ultrapassagens só entre vendedores (já corrigido anteriormente)
+- [x] 225 testes passando (21 novos testes de ranking)

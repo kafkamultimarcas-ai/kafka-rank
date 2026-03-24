@@ -249,17 +249,34 @@ export async function createSale(data: InsertSale) {
   return result[0].insertId;
 }
 
+// Departamentos que participam do ranking de vendas
+const SALES_RANKING_DEPARTMENTS = ['vendas'];
+// Departamentos que participam do ranking de agendamentos
+const APPOINTMENT_RANKING_DEPARTMENTS = ['vendas', 'pre_vendas'];
+
 // incrementSales = true para vendas reais, false para agendamentos/SDR que não devem contar como venda
 async function updateSaleTotals(sellerId: number, competitionId: number | null | undefined, points: number, incrementSales: boolean = true) {
   const db = await getDb();
   if (!db) return;
+  
+  // Verificar departamento do vendedor - só vendedores somam pontos de venda
+  const sellerResult = await db.select({ department: sellers.department }).from(sellers).where(eq(sellers.id, sellerId)).limit(1);
+  const sellerDept = sellerResult[0]?.department || 'vendas';
+  
   if (incrementSales) {
+    // Vendas: só departamento vendas soma pontos e vendas
+    if (!SALES_RANKING_DEPARTMENTS.includes(sellerDept)) {
+      return; // Outros setores não somam pontos de venda
+    }
     await db.update(sellers).set({
       totalSales: sql`totalSales + 1`,
       totalPoints: sql`totalPoints + ${points}`,
     }).where(eq(sellers.id, sellerId));
   } else {
-    // Apenas pontos, sem incrementar totalSales (para agendamentos)
+    // Agendamentos/SDR: só vendedores e SDR somam pontos
+    if (!APPOINTMENT_RANKING_DEPARTMENTS.includes(sellerDept)) {
+      return; // Outros setores não somam pontos de agendamento
+    }
     await db.update(sellers).set({
       totalPoints: sql`totalPoints + ${points}`,
     }).where(eq(sellers.id, sellerId));
@@ -1423,8 +1440,10 @@ export async function getAppointmentRanking(month: number, year: number) {
     sellerMap.set(appt.sellerId, existing);
   }
   
-  // Buscar vendedores ativos do departamento pré-vendas ou vendas
-  const allSellers = await db.select().from(sellers).where(eq(sellers.active, true));
+  // Buscar vendedores ativos dos departamentos vendas e pré-vendas (SDR)
+  const allSellers = await db.select().from(sellers).where(
+    and(eq(sellers.active, true), or(eq(sellers.department, 'vendas'), eq(sellers.department, 'pre_vendas')))
+  );
   
   // Montar ranking com todos que têm agendamentos
   const ranking = allSellers
