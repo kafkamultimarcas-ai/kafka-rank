@@ -42,6 +42,7 @@ export const appRouter = router({
       nickname: z.string().optional(),
       phone: z.string().optional(),
       email: z.string().optional(),
+      department: z.string().optional(),
     })).mutation(async ({ input }) => {
       const id = await db.createSeller(input);
       return { id };

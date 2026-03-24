@@ -771,3 +771,7 @@
 - [x] Bloquear/desbloquear acesso individual sem afetar outros (já existia no AdminSellers com toggle ativar/desativar)
 - [x] Mostrar último acesso no admin (tela de Equipe) - exibe tempo relativo (agora, Xmin, Xh, Xd)
 - [x] Indicador visual de quem tem login definido (badge azul com username) e quem não tem (badge amarelo "Sem login")
+
+## Bug - Cadastro de Colaborador
+- [x] Bug: não consegue cadastrar novo colaborador e definir função/setor (causa: campo department não estava no input do sellers.create)
+- [x] Investigar erro no formulário de criação e na mutation sellers.create
