@@ -159,35 +159,6 @@ export default function MinhaArea() {
     },
   });
 
-  // Verificar se o vendedor logado é o mesmo do URL
-  const isAuthorized = sellerSession && sellerSession.id === sellerId;
-
-  if (!sellerSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-gray-400 mb-4">Você precisa fazer login para acessar esta área.</p>
-          <Button onClick={() => navigate("/login-vendedor")} className="bg-red-600 hover:bg-red-500">
-            Fazer Login
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">Você não tem permissão para acessar os dados deste colaborador.</p>
-          <Button onClick={() => navigate(`/minha-area/${sellerSession.id}`)} className="bg-red-600 hover:bg-red-500">
-            Ir para minha área
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
   const pendingApproval = (appointments || []).filter((a: any) => a.attendanceStatus === 'attended');
@@ -234,6 +205,35 @@ export default function MinhaArea() {
   };
 
   const DeptIcon = deptInfo.icon;
+
+  // Verificar se o vendedor logado é o mesmo do URL
+  const isAuthorized = sellerSession && sellerSession.id === sellerId;
+
+  if (!sellerSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">Você precisa fazer login para acessar esta área.</p>
+          <Button onClick={() => navigate("/login-vendedor")} className="bg-red-600 hover:bg-red-500">
+            Fazer Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Você não tem permissão para acessar os dados deste colaborador.</p>
+          <Button onClick={() => navigate(`/minha-area/${sellerSession.id}`)} className="bg-red-600 hover:bg-red-500">
+            Ir para minha área
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950">

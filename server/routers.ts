@@ -110,13 +110,33 @@ export const appRouter = router({
 
     // Verificar se est\u00e1 logado como vendedor
     me: publicProcedure.query(async ({ ctx }) => {
-      if (!ctx.user || ctx.user.loginMethod !== 'seller_password') return null;
-      const sellerId = -(ctx.user.id + 1000000);
-      const seller = await db.getSellerById(sellerId);
-      if (!seller) return null;
-      // Atualizar lastAccess
-      await db.updateSellerLastAccess(sellerId);
-      return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department };
+      // Primeiro tentar via ctx.user (quando não há conflito com OAuth)
+      if (ctx.user && ctx.user.loginMethod === 'seller_password') {
+        const sellerId = -(ctx.user.id + 1000000);
+        const seller = await db.getSellerById(sellerId);
+        if (seller) {
+          await db.updateSellerLastAccess(sellerId);
+          return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department };
+        }
+      }
+      // Fallback: verificar cookie seller_session diretamente
+      // (necessário quando OAuth ou manager token também está presente)
+      try {
+        const { parse: parseCookie } = await import("cookie");
+        const cookies = parseCookie(ctx.req.headers.cookie || "");
+        const sellerToken = cookies.seller_session;
+        if (sellerToken) {
+          const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
+          const seller = await db.getSellerById(payload.sellerId);
+          if (seller && seller.active) {
+            await db.updateSellerLastAccess(seller.id);
+            return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department };
+          }
+        }
+      } catch (e) {
+        // Token inválido ou expirado
+      }
+      return null;
     }),
 
     // Admin define/reseta senha de vendedor

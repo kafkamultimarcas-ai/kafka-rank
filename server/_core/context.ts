@@ -4,6 +4,7 @@ import { sdk } from "./sdk";
 import jwt from "jsonwebtoken";
 import { ENV } from "./env";
 import { getManagerById, getSellerById } from "../db";
+import { parse as parseCookieHeader } from "cookie";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -26,7 +27,8 @@ export async function createContext(
   // 2) If no OAuth user, try manager JWT cookie
   if (!user) {
     try {
-      const managerToken = opts.req.cookies?.manager_session;
+      const cookies = parseCookieHeader(opts.req.headers.cookie || "");
+        const managerToken = cookies.manager_session;
       if (managerToken) {
         const payload = jwt.verify(managerToken, ENV.cookieSecret) as { managerId: number; username: string };
         const manager = await getManagerById(payload.managerId);
@@ -53,7 +55,8 @@ export async function createContext(
   // 3) If no OAuth user and no manager, try seller JWT cookie
   if (!user) {
     try {
-      const sellerToken = opts.req.cookies?.seller_session;
+      const cookies2 = parseCookieHeader(opts.req.headers.cookie || "");
+        const sellerToken = cookies2.seller_session;
       if (sellerToken) {
         const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
         const seller = await getSellerById(payload.sellerId);

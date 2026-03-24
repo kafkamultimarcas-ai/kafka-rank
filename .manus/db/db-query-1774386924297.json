@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, name, username, passwordHash IS NOT NULL as hasPassword, lastAccess FROM sellers WHERE name LIKE '%Leonardo%' OR name LIKE '%leo%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, username, passwordHash IS NOT NULL as hasPassword, lastAccess FROM sellers WHERE name LIKE '%Leonardo%' OR name LIKE '%leo%';",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "username": "leo",
+      "hasPassword": "1",
+      "lastAccess": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tusername\thasPassword\tlastAccess\n1\tLeonardo\tleo\t1\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}

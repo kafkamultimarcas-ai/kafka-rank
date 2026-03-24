@@ -276,7 +276,7 @@ export default function AdminSellers() {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-4 mt-1">
+                      <div className="flex items-center gap-4 mt-1 flex-wrap">
                         {(!seller.department || seller.department === 'vendas' || seller.department === 'pre_vendas') ? (
                           <>
                             <span className="text-xs text-muted-foreground">{seller.totalSales} vendas</span>
@@ -285,6 +285,27 @@ export default function AdminSellers() {
                         ) : (
                           <span className="text-xs text-muted-foreground italic">Sem ranking</span>
                         )}
+                        {(seller as any).username ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 flex items-center gap-1">
+                            <Key className="h-2.5 w-2.5" /> {(seller as any).username}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-500">Sem login</span>
+                        )}
+                        {seller.lastAccess ? (
+                          <span className="text-[10px] text-muted-foreground" title={new Date(seller.lastAccess).toLocaleString('pt-BR')}>
+                            Acesso: {(() => {
+                              const diff = Date.now() - seller.lastAccess;
+                              const mins = Math.floor(diff / 60000);
+                              if (mins < 1) return 'agora';
+                              if (mins < 60) return `${mins}min atrás`;
+                              const hrs = Math.floor(mins / 60);
+                              if (hrs < 24) return `${hrs}h atrás`;
+                              const days = Math.floor(hrs / 24);
+                              return `${days}d atrás`;
+                            })()}
+                          </span>
+                        ) : null}
                         {seller.phone && <span className="text-xs text-muted-foreground hidden sm:inline">{seller.phone}</span>}
                       </div>
                     </div>

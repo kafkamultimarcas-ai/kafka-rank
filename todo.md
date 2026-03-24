@@ -736,3 +736,38 @@
 - [x] Acesso via login do colaborador (department=pos_venda)
 - [x] Visual limpo e fácil de usar no celular
 - [x] 234 testes passando (9 novos testes do pós-venda)
+
+## Login Individual por Colaborador
+- [ ] Corrigir bug de criação de login/senha para colaboradores
+- [ ] Remover necessidade de código de acesso geral - cada um entra com seu login
+- [ ] Tela de login individual (nome de usuário + senha)
+- [ ] Cada colaborador acessa sua "Minha Área" com login próprio
+- [ ] Histórico de último acesso (data/hora) registrado no banco
+- [ ] Admin pode ver último acesso de cada colaborador
+- [ ] CRM e sistema acessíveis via login individual
+
+## Consignação Integrada com Vendas
+- [ ] Ao registrar venda, detectar pela placa se é veículo consignado
+- [ ] Se for consignado, marcar automaticamente como "Vendido" na consignação
+- [ ] Registrar dados de pagamento ao proprietário (conta, PIX, data pagamento)
+- [ ] Vincular venda ao registro de consignação
+- [ ] Controle de pagamento: status (pendente, pago), forma (conta/PIX), data programada
+
+## Consignação - Controle Financeiro Completo
+- [ ] Adicionar campo valor de custo (quanto o cliente deixou o carro)
+- [ ] Adicionar campo se é quitado ou tem quitação pendente + valor da quitação
+- [ ] Adicionar campo valor de venda da loja (preço de venda ao público)
+- [ ] Calcular % de lucro da loja automaticamente
+- [ ] Acesso restrito: valores visíveis apenas para consignação, admin e gerente
+- [ ] Vendedores NÃO veem valores de custo
+- [ ] Integração com vendas: detectar carro consignado pela placa ao registrar venda
+- [ ] Marcar automaticamente como vendido na consignação quando venda é registrada
+- [ ] Registrar dados de pagamento ao proprietário (conta bancária, PIX, data)
+- [ ] Programar data de pagamento ao cliente no sistema
+
+## Login Individual - Melhorias
+- [x] PRIORIDADE: Investigar e corrigir bug do login individual (causa: cookie-parser não instalado, req.cookies undefined)
+- [x] Testar fluxo completo: definir senha no admin → login em /login-vendedor (testado com leo/1234)
+- [x] Bloquear/desbloquear acesso individual sem afetar outros (já existia no AdminSellers com toggle ativar/desativar)
+- [x] Mostrar último acesso no admin (tela de Equipe) - exibe tempo relativo (agora, Xmin, Xh, Xd)
+- [x] Indicador visual de quem tem login definido (badge azul com username) e quem não tem (badge amarelo "Sem login")
