@@ -722,3 +722,17 @@
 - [x] RegisterSale: filtra vendedores por departamento conforme categoria
 - [x] useLiveFeed: ultrapassagens só entre vendedores (já corrigido anteriormente)
 - [x] 225 testes passando (21 novos testes de ranking)
+
+## Painel Dedicado Pós-Venda (CONCLUÍDO)
+- [x] Painel exclusivo na MinhaArea quando department=pos_venda
+- [x] Visão ampla: TODOS os chamados dos vendedores (não só os dele)
+- [x] Cards de estatísticas: abertos, agendados, em serviço, finalizados, entregues
+- [x] Filtro por status (tabs interativas)
+- [x] Busca por cliente/veículo/vendedor
+- [x] Modal de detalhes do chamado com info completa
+- [x] Atualizar status direto do painel (rota updateBySeller - só pos_venda)
+- [x] Notificação push quando vendedor abre novo chamado (sendPushNewPvChamado)
+- [x] Notifica admin/gerente também (sendPushToAll)
+- [x] Acesso via login do colaborador (department=pos_venda)
+- [x] Visual limpo e fácil de usar no celular
+- [x] 234 testes passando (9 novos testes do pós-venda)

@@ -191,3 +191,38 @@ export async function sendPushAttendanceApproved(sellerId: number, customerName:
     vibrate: [200, 100, 200],
   });
 }
+
+// ===== ENVIAR PARA SETOR PÓS-VENDA =====
+export async function sendPushToPosVenda(payload: PushPayload) {
+  // Buscar todos os sellers do setor pos_venda e enviar push para cada um
+  try {
+    const { listSellers } = await import("./db");
+    const allSellers = await listSellers(true);
+    const pvSellers = allSellers.filter((s: any) => s.department === 'pos_venda');
+    for (const seller of pvSellers) {
+      const subscriptions = await getPushSubscriptionsBySeller(seller.id);
+      await sendToSubscriptions(subscriptions, payload);
+    }
+  } catch (err) {
+    console.error("[Push] Error sending to pos_venda:", err);
+  }
+}
+
+// Notificação: novo chamado pós-venda aberto por vendedor
+export async function sendPushNewPvChamado(vendedorName: string, clienteNome: string, carroModelo: string, ticketNumber: string) {
+  await sendPushToPosVenda({
+    title: "🔧 Novo Chamado Pós-Venda!",
+    body: `${vendedorName} abriu chamado #${ticketNumber}: ${clienteNome} - ${carroModelo}`,
+    tag: `pv-chamado-${ticketNumber}`,
+    data: { type: "pv_chamado", url: "/minha-area" },
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 200],
+  });
+  // Também notifica admin/gerente
+  await sendPushToAll({
+    title: "🔧 Novo Chamado Pós-Venda!",
+    body: `${vendedorName} abriu chamado #${ticketNumber}: ${clienteNome} - ${carroModelo}`,
+    tag: `pv-chamado-admin-${ticketNumber}`,
+    data: { type: "pv_chamado", url: "/admin/pos-venda" },
+  });
+}

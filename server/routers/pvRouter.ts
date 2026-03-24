@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as db from "../db";
 import { storagePut } from "../storage";
 import { nanoid } from "nanoid";
+import { sendPushNewPvChamado } from "../pushService";
 
 // ===== PÓS-VENDA ROUTER =====
 
@@ -28,6 +29,11 @@ export const pvChamadosRouter = router({
       observacoes: input.observacoes ?? null,
       vendedorId: input.vendedorId,
     });
+    // Notificar setor pós-venda sobre novo chamado
+    const seller = await db.getSellerById(input.vendedorId);
+    const vendedorName = seller?.nickname || seller?.name || 'Vendedor';
+    sendPushNewPvChamado(vendedorName, input.clienteNome, input.carroModelo, ticketNumber).catch(console.error);
+
     return { id, ticketNumber, message: `Chamado ${ticketNumber} aberto com sucesso!` };
   }),
 
@@ -82,6 +88,30 @@ export const pvChamadosRouter = router({
   // Alertas de prazo
   alertas: adminProcedure.query(async () => {
     return db.getPvChamadosAlerta();
+  }),
+
+  // Atualizar chamado pelo colaborador de pós-venda (sem precisar ser admin)
+  updateBySeller: publicProcedure.input(z.object({
+    id: z.number(),
+    sellerId: z.number(), // ID do colaborador de pós-venda logado
+    status: z.string().optional(),
+    responsavelPvId: z.number().optional(),
+    oficinaId: z.number().optional(),
+    oficinaNome: z.string().optional(),
+    dataEntradaAgendada: z.number().optional(),
+    dataEntradaReal: z.number().optional(),
+    prazoEntrega: z.number().optional(),
+    dataEntregaReal: z.number().optional(),
+    observacoes: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    // Verificar se o seller é do setor pós-venda
+    const seller = await db.getSellerById(input.sellerId);
+    if (!seller || seller.department !== 'pos_venda') {
+      throw new Error('Apenas colaboradores do setor Pós-Venda podem atualizar chamados.');
+    }
+    const { id, sellerId, ...data } = input;
+    const usuario = seller.nickname || seller.name;
+    return db.updatePvChamado(id, data, usuario);
   }),
 
   // Histórico do chamado

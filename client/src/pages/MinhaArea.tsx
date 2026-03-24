@@ -26,7 +26,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2 } from "lucide-react";
 
 const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gradient: string }> = {
   vendas: { label: "Vendas", color: "text-red-400", icon: Car, gradient: "from-red-600/20 to-red-500/10 border-red-500/30" },
@@ -34,6 +34,8 @@ const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gra
   fei: { label: "F&I", color: "text-amber-400", icon: DollarSign, gradient: "from-amber-600/20 to-amber-500/10 border-amber-500/30" },
   consignacao: { label: "Consignação", color: "text-cyan-400", icon: FileText, gradient: "from-cyan-600/20 to-cyan-500/10 border-cyan-500/30" },
   despachante: { label: "Despachante", color: "text-emerald-400", icon: FileText, gradient: "from-emerald-600/20 to-emerald-500/10 border-emerald-500/30" },
+  pos_venda: { label: "Pós-Venda", color: "text-orange-400", icon: Wrench, gradient: "from-orange-600/20 to-orange-500/10 border-orange-500/30" },
+  marketing: { label: "Marketing", color: "text-pink-400", icon: Target, gradient: "from-pink-600/20 to-pink-500/10 border-pink-500/30" },
 };
 
 function formatDate(ts: number | string | Date | null | undefined) {
@@ -112,11 +114,26 @@ export default function MinhaArea() {
     { enabled: sellerId > 0 && dept === "despachante" }
   );
 
-  // Pós-Venda - chamados do vendedor
+  // Pós-Venda - chamados do vendedor (ou TODOS se for setor pos_venda)
   const { data: myPvChamados, refetch: refetchPv } = trpc.pvChamados.list.useQuery(
-    { vendedorId: sellerId },
+    dept === 'pos_venda' ? {} : { vendedorId: sellerId },
     { enabled: sellerId > 0 }
   );
+  // Dados extras para painel pós-venda
+  const { data: pvCounts } = trpc.pvChamados.counts.useQuery(undefined, { enabled: dept === 'pos_venda' });
+  const { data: pvOficinas } = trpc.pvOficinas.list.useQuery(undefined, { enabled: dept === 'pos_venda' });
+  const { data: allSellers } = trpc.sellers.list.useQuery(undefined, { enabled: dept === 'pos_venda' });
+  const [pvSearch, setPvSearch] = useState('');
+  const [pvSelectedChamado, setPvSelectedChamado] = useState<any>(null);
+  const [pvStatusUpdate, setPvStatusUpdate] = useState('');
+  const updatePvMutation = trpc.pvChamados.updateBySeller.useMutation({
+    onSuccess: () => {
+      toast.success('Chamado atualizado!');
+      refetchPv();
+      setPvSelectedChamado(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
   const createPvMutation = trpc.pvChamados.create.useMutation({
     onSuccess: (data) => {
       toast.success(data.message);
@@ -265,7 +282,31 @@ export default function MinhaArea() {
 
       {/* Content */}
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Stats Cards */}
+        {/* Stats Cards - Pós-Venda tem painel próprio */}
+        {dept === 'pos_venda' ? (
+          <div className="grid grid-cols-4 gap-2">
+            <div className="bg-blue-950/40 border border-blue-500/30 rounded-xl p-3 text-center">
+              <Clipboard className="w-4 h-4 text-blue-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-blue-400">{pvCounts?.aberto || 0}</p>
+              <p className="text-[10px] text-blue-400/70">Abertos</p>
+            </div>
+            <div className="bg-yellow-950/40 border border-yellow-500/30 rounded-xl p-3 text-center">
+              <Calendar className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-yellow-400">{pvCounts?.agendado || 0}</p>
+              <p className="text-[10px] text-yellow-400/70">Agendados</p>
+            </div>
+            <div className="bg-orange-950/40 border border-orange-500/30 rounded-xl p-3 text-center">
+              <Wrench className="w-4 h-4 text-orange-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-orange-400">{pvCounts?.em_servico || 0}</p>
+              <p className="text-[10px] text-orange-400/70">Em Serviço</p>
+            </div>
+            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 text-center">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+              <p className="text-xl font-black text-emerald-400">{(pvCounts?.finalizado || 0) + (pvCounts?.entregue || 0)}</p>
+              <p className="text-[10px] text-emerald-400/70">Concluídos</p>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3 text-center">
             <DeptIcon className={`w-5 h-5 ${deptInfo.color} mx-auto mb-1`} />
@@ -297,6 +338,7 @@ export default function MinhaArea() {
             <p className="text-xs text-gray-500">Notificações</p>
           </div>
         </div>
+        )}
 
         {/* F&I Extra Stats */}
         {dept === "fei" && (
@@ -563,6 +605,126 @@ export default function MinhaArea() {
                 {apt.customerName} - {apt.ticketNumber}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ===== PAINEL COMPLETO PÓS-VENDA ===== */}
+        {dept === 'pos_venda' && (
+          <div className="space-y-4">
+            <h2 className="text-sm font-bold text-orange-400 uppercase tracking-wider flex items-center gap-2">
+              <Wrench className="w-4 h-4" /> Painel Pós-Venda
+            </h2>
+
+            {/* Busca */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                value={pvSearch}
+                onChange={e => setPvSearch(e.target.value)}
+                placeholder="Buscar por cliente, placa, ticket..."
+                className="w-full bg-gray-900/60 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white text-sm focus:border-orange-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Filtros de status */}
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { key: 'todos', label: 'Todos', count: allPv.length, color: 'bg-gray-600' },
+                { key: 'aberto', label: 'Abertos', count: pvAbertos.length, color: 'bg-blue-600' },
+                { key: 'agendado', label: 'Agendados', count: pvAgendados.length, color: 'bg-yellow-600' },
+                { key: 'em_servico', label: 'Em Serviço', count: pvEmServico.length, color: 'bg-orange-600' },
+                { key: 'finalizado', label: 'Finalizados', count: pvFinalizados.length, color: 'bg-emerald-600' },
+                { key: 'entregue', label: 'Entregues', count: pvEntregues.length, color: 'bg-gray-500' },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setPvFilter(tab.key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    pvFilter === tab.key
+                      ? `${tab.color} text-white shadow-lg`
+                      : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700/60'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    pvFilter === tab.key ? 'bg-white/20' : 'bg-gray-700'
+                  }`}>{tab.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Lista de chamados com visão ampla */}
+            {(() => {
+              const searchLower = pvSearch.toLowerCase();
+              const filtered = filteredPv.filter((c: any) => {
+                if (!pvSearch) return true;
+                return (
+                  c.clienteNome?.toLowerCase().includes(searchLower) ||
+                  c.carroPlaca?.toLowerCase().includes(searchLower) ||
+                  c.carroModelo?.toLowerCase().includes(searchLower) ||
+                  c.ticketNumber?.toLowerCase().includes(searchLower) ||
+                  c.problemaRelatado?.toLowerCase().includes(searchLower)
+                );
+              });
+              const vendedorMap = (allSellers || []).reduce((acc: any, s: any) => { acc[s.id] = s; return acc; }, {});
+              return filtered.length > 0 ? (
+                <div className="space-y-3">
+                  {filtered.map((c: any) => {
+                    const sc = pvStatusConfig[c.status] || pvStatusConfig.aberto;
+                    const prazo = c.prazoEntrega ? new Date(c.prazoEntrega) : null;
+                    const isOverdue = prazo && prazo.getTime() < Date.now() && c.status !== 'entregue' && c.status !== 'finalizado' && c.status !== 'cancelado';
+                    const vendedor = vendedorMap[c.vendedorId];
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => { setPvSelectedChamado(c); setPvStatusUpdate(c.status); }}
+                        className={`rounded-xl p-4 border transition-all cursor-pointer hover:scale-[1.01] ${sc.bg} ${sc.border}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white font-bold text-sm">{c.clienteNome}</p>
+                              <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${sc.bg} ${sc.color} font-semibold border ${sc.border}`}>
+                                {sc.label}
+                              </span>
+                              {isOverdue && (
+                                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/30 text-red-400 font-bold animate-pulse">
+                                  ATRASADO
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              #{c.ticketNumber} • {c.carroModelo} {c.carroPlaca ? `• ${c.carroPlaca}` : ''}
+                            </p>
+                          </div>
+                          <Eye className="w-4 h-4 text-gray-500 shrink-0 mt-1" />
+                        </div>
+                        <p className="text-xs text-gray-400 mb-2 line-clamp-2">
+                          <span className="text-gray-600">Problema:</span> {c.problemaRelatado}
+                        </p>
+                        <div className="flex items-center gap-3 text-[10px] text-gray-500 flex-wrap">
+                          {vendedor && (
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {vendedor.nickname || vendedor.name}
+                            </span>
+                          )}
+                          <span>Aberto: {formatDate(c.createdAt)}</span>
+                          {prazo && <span>Prazo: {formatDate(c.prazoEntrega)}</span>}
+                          {c.oficinaNome && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{c.oficinaNome}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-8 text-center">
+                  <Wrench className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">{pvSearch ? 'Nenhum chamado encontrado.' : 'Nenhum chamado registrado.'}</p>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -958,6 +1120,120 @@ export default function MinhaArea() {
               >
                 {createPvMutation.isPending ? 'Enviando...' : 'Abrir Chamado'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL DETALHES CHAMADO (PÓS-VENDA) ===== */}
+      {pvSelectedChamado && dept === 'pos_venda' && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center" onClick={() => setPvSelectedChamado(null)}>
+          <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between z-10">
+              <div>
+                <h3 className="text-white font-bold text-lg">#{pvSelectedChamado.ticketNumber}</h3>
+                <p className="text-gray-400 text-xs">{pvSelectedChamado.clienteNome}</p>
+              </div>
+              <button onClick={() => setPvSelectedChamado(null)} className="text-gray-500 hover:text-white p-2">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Info do veículo */}
+              <div className="bg-gray-800/50 rounded-xl p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Veículo</span>
+                  <span className="text-white font-medium">{pvSelectedChamado.carroModelo}</span>
+                </div>
+                {pvSelectedChamado.carroPlaca && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Placa</span>
+                    <span className="text-white font-medium">{pvSelectedChamado.carroPlaca}</span>
+                  </div>
+                )}
+                {pvSelectedChamado.clienteTelefone && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Telefone</span>
+                    <a href={`tel:${pvSelectedChamado.clienteTelefone}`} className="text-blue-400 font-medium">{pvSelectedChamado.clienteTelefone}</a>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Vendedor</span>
+                  <span className="text-white font-medium">
+                    {(() => {
+                      const v = (allSellers || []).find((s: any) => s.id === pvSelectedChamado.vendedorId);
+                      return v ? (v.nickname || v.name) : `ID ${pvSelectedChamado.vendedorId}`;
+                    })()}
+                  </span>
+                </div>
+                {pvSelectedChamado.oficinaNome && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Oficina</span>
+                    <span className="text-white font-medium">{pvSelectedChamado.oficinaNome}</span>
+                  </div>
+                )}
+                {pvSelectedChamado.prazoEntrega && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Prazo</span>
+                    <span className={`font-medium ${new Date(pvSelectedChamado.prazoEntrega).getTime() < Date.now() ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {formatDate(pvSelectedChamado.prazoEntrega)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Problema */}
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-bold mb-1">Problema Relatado</p>
+                <p className="text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">{pvSelectedChamado.problemaRelatado}</p>
+              </div>
+
+              {pvSelectedChamado.observacoes && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold mb-1">Observações</p>
+                  <p className="text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">{pvSelectedChamado.observacoes}</p>
+                </div>
+              )}
+
+              {/* Atualizar Status */}
+              {pvSelectedChamado.status !== 'entregue' && pvSelectedChamado.status !== 'cancelado' && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold mb-2">Atualizar Status</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'aberto', label: 'Aberto', color: 'bg-blue-600 hover:bg-blue-500' },
+                      { value: 'agendado', label: 'Agendado', color: 'bg-yellow-600 hover:bg-yellow-500' },
+                      { value: 'em_servico', label: 'Em Serviço', color: 'bg-orange-600 hover:bg-orange-500' },
+                      { value: 'finalizado', label: 'Finalizado', color: 'bg-emerald-600 hover:bg-emerald-500' },
+                      { value: 'entregue', label: 'Entregue', color: 'bg-gray-600 hover:bg-gray-500' },
+                      { value: 'cancelado', label: 'Cancelar', color: 'bg-red-600 hover:bg-red-500' },
+                    ].filter(s => s.value !== pvSelectedChamado.status).map(s => (
+                      <button
+                        key={s.value}
+                        onClick={() => {
+                          updatePvMutation.mutate({
+                            id: pvSelectedChamado.id,
+                            sellerId: sellerId,
+                            status: s.value,
+                          });
+                        }}
+                        disabled={updatePvMutation.isPending}
+                        className={`${s.color} text-white text-xs font-bold py-2.5 rounded-lg transition-all disabled:opacity-50`}
+                      >
+                        {updatePvMutation.isPending ? '...' : s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Datas */}
+              <div className="text-[10px] text-gray-600 flex gap-3 flex-wrap">
+                <span>Criado: {formatDate(pvSelectedChamado.createdAt)}</span>
+                <span>Atualizado: {formatDate(pvSelectedChamado.updatedAt)}</span>
+              </div>
             </div>
           </div>
         </div>
