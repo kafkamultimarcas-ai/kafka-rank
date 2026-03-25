@@ -1795,3 +1795,25 @@ export async function deleteMktTask(id: number) {
   const db = await getDb();
   await db!.delete(mktTasks).where(eq(mktTasks.id, id));
 }
+
+
+// ===== IAM CONFIG =====
+import { iamConfig, InsertIamConfig } from "../drizzle/schema";
+
+export async function getIamConfig() {
+  const db = await getDb();
+  const rows = await db!.select().from(iamConfig).limit(1);
+  return rows[0] || null;
+}
+
+export async function updateIamConfig(data: Partial<InsertIamConfig>) {
+  const db = await getDb();
+  const existing = await getIamConfig();
+  if (existing) {
+    await db!.update(iamConfig).set(data).where(eq(iamConfig.id, existing.id));
+    return { ...existing, ...data };
+  } else {
+    const [result] = await db!.insert(iamConfig).values({ ...data } as InsertIamConfig);
+    return { id: result.insertId, ...data };
+  }
+}

@@ -638,3 +638,29 @@ export const mktTasks = mysqlTable("mkt_tasks", {
 });
 export type MktTask = typeof mktTasks.$inferSelect;
 export type InsertMktTask = typeof mktTasks.$inferInsert;
+
+// Configuração do IAM (Agente IA) pelo Admin
+export const iamConfig = mysqlTable("iam_config", {
+  id: int("id").autoincrement().primaryKey(),
+  // Contexto do dia
+  dayContext: mysqlEnum("dayContext", [
+    "normal", "feirao", "movimento_fraco", "meta_apertada", "fim_de_mes", 
+    "inicio_de_mes", "promocao", "lancamento", "treinamento"
+  ]).default("normal").notNull(),
+  dayContextCustom: text("dayContextCustom"), // texto livre para contexto personalizado
+  // Mensagem motivacional personalizada (substitui a aleatória)
+  customGreeting: text("customGreeting"),
+  // Instruções extras para o IAM
+  extraInstructions: text("extraInstructions"), // ex: "Foque em vender SUVs esta semana", "Cobrar anúncios no Facebook"
+  // Alertas/avisos para vendedores
+  alertMessage: text("alertMessage"), // ex: "Feirão neste sábado! Todos confirmem presença"
+  alertActive: boolean("alertActive").default(false).notNull(),
+  // Foco da semana
+  weeklyFocus: text("weeklyFocus"), // ex: "Captar 10 carros consignados", "Bater meta de agendamentos"
+  // Ativo
+  active: boolean("active").default(true).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedBy: varchar("updatedBy", { length: 255 }),
+});
+export type IamConfig = typeof iamConfig.$inferSelect;
+export type InsertIamConfig = typeof iamConfig.$inferInsert;

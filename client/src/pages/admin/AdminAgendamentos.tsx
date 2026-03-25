@@ -2,13 +2,14 @@ import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useMemo } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
   CalendarClock, Search, Trash2, Edit2, Phone, Mail, Car, Clock,
-  CheckCircle2, XCircle, AlertCircle, UserCheck, User, Hash,
-  AlertTriangle, PhoneCall, RotateCcw, Save, X, Filter,
+  CheckCircle2, XCircle, AlertCircle, UserCheck, User,
+  AlertTriangle, PhoneCall, Save, X, Bell, CalendarPlus,
+  Timer, Siren,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
@@ -19,7 +20,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }>
 
 const ATTENDANCE_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Aguardando", color: "text-gray-400 bg-gray-500/20", icon: Clock },
-  attended: { label: "Compareceu (aguardando)", color: "text-blue-400 bg-blue-500/20", icon: UserCheck },
+  attended: { label: "Cliente Aguardando", color: "text-cyan-400 bg-cyan-500/20 animate-pulse", icon: UserCheck },
   approved: { label: "Confirmado", color: "text-emerald-400 bg-emerald-500/20", icon: CheckCircle2 },
   rejected: { label: "Rejeitado", color: "text-red-400 bg-red-500/20", icon: XCircle },
   no_show: { label: "Não compareceu", color: "text-orange-400 bg-orange-500/20", icon: AlertCircle },
@@ -33,6 +34,13 @@ export default function AdminAgendamentos() {
   const [sellerFilter, setSellerFilter] = useState<number | "all">("all");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<any>({});
+  const [now, setNow] = useState(Date.now());
+
+  // Live clock for countdown
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: allRecords, refetch } = trpc.sdr.list.useQuery({});
   const { data: sellersList } = trpc.sellers.list.useQuery({ activeOnly: false });
@@ -42,8 +50,8 @@ export default function AdminAgendamentos() {
   const rejectAttMut = trpc.sdr.rejectAttendance.useMutation({ onSuccess: () => { refetch(); toast.success("Comparecimento rejeitado"); } });
   const markNoShowMut = trpc.sdr.markNoShow.useMutation({ onSuccess: () => { refetch(); toast.success("Marcado como não compareceu"); } });
 
-  const now = Date.now();
   const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+  const ONE_HOUR = 60 * 60 * 1000;
 
   const sellerMap = useMemo(() => {
     const map = new Map<number, string>();
@@ -54,8 +62,6 @@ export default function AdminAgendamentos() {
   const records = useMemo(() => {
     if (!allRecords) return [];
     let filtered = [...allRecords];
-
-    // Search filter
     if (search) {
       const s = search.toLowerCase();
       filtered = filtered.filter(r => {
@@ -66,16 +72,12 @@ export default function AdminAgendamentos() {
           sellerName.toLowerCase().includes(s);
       });
     }
-
-    // Seller filter
     if (sellerFilter !== "all") {
       filtered = filtered.filter(r => r.sellerId === sellerFilter);
     }
-
     return filtered;
   }, [allRecords, search, sellerFilter, sellerMap]);
 
-  // Categorize records
   const rescueRecords = useMemo(() => {
     return records.filter(r => {
       if (r.attendanceStatus === 'no_show') return true;
@@ -96,6 +98,17 @@ export default function AdminAgendamentos() {
     if (tab === "pendentes") return pendingAttendance;
     return records;
   }, [tab, records, rescueRecords, pendingAttendance]);
+
+  // Play alert sound when there are rescue leads
+  useEffect(() => {
+    if (rescueRecords.length > 0 && tab === "resgate") {
+      // Visual notification via toast
+      toast.warning(`${rescueRecords.length} lead(s) para resgate urgente!`, {
+        duration: 5000,
+        icon: <Siren className="h-5 w-5 text-orange-400" />,
+      });
+    }
+  }, [tab]);
 
   function startEdit(record: any) {
     setEditingId(record.id);
@@ -127,12 +140,45 @@ export default function AdminAgendamentos() {
     return new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
+function formatDateShort(ts: number | string | Date | null) {
+    if (!ts) return "\u2014";
+    const d = ts instanceof Date ? ts : new Date(ts);
+    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
   function getTimeSince(ts: number) {
     const diff = now - ts;
+    const minutes = Math.floor(diff / (1000 * 60));
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
     if (days > 0) return `${days}d ${hours % 24}h atrás`;
-    return `${hours}h atrás`;
+    if (hours > 0) return `${hours}h ${minutes % 60}min atrás`;
+    return `${minutes}min atrás`;
+  }
+
+  function getTimeUntil(ts: number) {
+    const diff = ts - now;
+    if (diff <= 0) return null;
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `em ${days}d ${hours % 24}h`;
+    if (hours > 0) return `em ${hours}h ${minutes % 60}min`;
+    return `em ${minutes}min`;
+  }
+
+  function getRecordVisualStatus(record: any) {
+    if (record.attendanceStatus === 'attended') return 'client_waiting';
+    if (record.attendanceStatus === 'approved') return 'confirmed';
+    if (record.attendanceStatus === 'no_show') return 'rescue';
+    if (record.scheduledDate) {
+      const diff = now - record.scheduledDate;
+      if (diff > FORTY_EIGHT_HOURS) return 'rescue';
+      if (diff > ONE_HOUR) return 'overdue';
+      if (diff > 0) return 'expected_now';
+      if (diff > -30 * 60 * 1000) return 'arriving_soon';
+    }
+    return 'normal';
   }
 
   return (
@@ -144,13 +190,19 @@ export default function AdminAgendamentos() {
             <CalendarClock className="h-7 w-7 text-primary" />
             <h1 className="text-2xl font-bold font-heading">Agendamentos</h1>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 font-medium">
-              {rescueRecords.length} para resgate
-            </span>
-            <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 font-medium">
-              {pendingAttendance.length} comparecimentos pendentes
-            </span>
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            {rescueRecords.length > 0 && (
+              <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 font-bold animate-pulse flex items-center gap-1.5">
+                <Siren className="h-4 w-4" />
+                {rescueRecords.length} RESGATE URGENTE
+              </span>
+            )}
+            {pendingAttendance.length > 0 && (
+              <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-400 font-bold animate-pulse flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4" />
+                {pendingAttendance.length} CLIENTE AGUARDANDO
+              </span>
+            )}
           </div>
         </div>
 
@@ -164,13 +216,19 @@ export default function AdminAgendamentos() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors relative ${
                 tab === t.key
-                  ? t.key === "resgate" ? "bg-orange-600 text-white" : "bg-primary text-primary-foreground"
+                  ? t.key === "resgate" ? "bg-red-600 text-white" : t.key === "pendentes" ? "bg-cyan-600 text-white" : "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
               {t.label} ({t.count})
+              {t.key === "resgate" && t.count > 0 && tab !== t.key && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-ping" />
+              )}
+              {t.key === "pendentes" && t.count > 0 && tab !== t.key && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 bg-cyan-500 rounded-full animate-ping" />
+              )}
             </button>
           ))}
         </div>
@@ -200,16 +258,33 @@ export default function AdminAgendamentos() {
 
         {/* Rescue banner */}
         {tab === "resgate" && rescueRecords.length > 0 && (
-          <Card className="border-orange-500/30 bg-orange-950/20">
+          <Card className="border-red-500/50 bg-red-950/30 shadow-lg shadow-red-500/10">
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0" />
+                <div className="relative">
+                  <Siren className="h-8 w-8 text-red-400" />
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-ping" />
+                </div>
                 <div>
-                  <p className="font-semibold text-orange-300">Leads para Resgate</p>
-                  <p className="text-sm text-orange-400/80">
-                    Estes clientes agendaram mas não compareceram há mais de 48h. Oriente os vendedores a tentarem um resgate!
+                  <p className="font-bold text-red-300 text-lg">ALERTA DE RESGATE</p>
+                  <p className="text-sm text-red-400/80">
+                    {rescueRecords.length} lead(s) agendaram mas não compareceram há mais de 48h. Oriente os vendedores a tentarem um resgate urgente!
                   </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Client waiting banner */}
+        {pendingAttendance.length > 0 && tab !== "pendentes" && (
+          <Card className="border-cyan-500/50 bg-cyan-950/30 cursor-pointer hover:bg-cyan-950/40 transition-colors" onClick={() => setTab("pendentes")}>
+            <CardContent className="py-3">
+              <div className="flex items-center gap-3">
+                <UserCheck className="h-6 w-6 text-cyan-400 animate-pulse" />
+                <p className="text-sm text-cyan-300 font-medium">
+                  {pendingAttendance.length} cliente(s) aguardando confirmação de comparecimento — clique para ver
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -231,14 +306,21 @@ export default function AdminAgendamentos() {
               const attCfg = ATTENDANCE_LABELS[record.attendanceStatus || "pending"] || ATTENDANCE_LABELS.pending;
               const StatusIcon = statusCfg.icon;
               const AttIcon = attCfg.icon;
-              const isRescue = tab === "resgate" || (record.attendanceStatus === 'no_show') ||
-                (record.attendanceStatus === 'pending' && record.scheduledDate && (now - record.scheduledDate) > FORTY_EIGHT_HOURS);
+              const vs = getRecordVisualStatus(record);
+              const isRescue = vs === 'rescue';
+              const isClientWaiting = vs === 'client_waiting';
+              const isArrivingSoon = vs === 'arriving_soon';
+              const isExpectedNow = vs === 'expected_now';
+
+              const borderClass = isRescue ? "border-red-500/50 bg-red-950/15" :
+                isClientWaiting ? "border-cyan-500/50 bg-cyan-950/15 shadow-lg shadow-cyan-500/5" :
+                isExpectedNow ? "border-amber-500/50 bg-amber-950/15" :
+                isArrivingSoon ? "border-yellow-500/30 bg-yellow-950/10" : "";
 
               return (
-                <Card key={record.id} className={`${isRescue ? "border-orange-500/40 bg-orange-950/10" : ""} ${record.attendanceStatus === 'attended' ? "border-blue-500/40 bg-blue-950/10" : ""}`}>
+                <Card key={record.id} className={borderClass}>
                   <CardContent className="py-4">
                     {isEditing ? (
-                      /* Edit mode */
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-primary">{record.ticketNumber || `#${record.id}`}</span>
@@ -279,8 +361,8 @@ export default function AdminAgendamentos() {
                         </div>
                       </div>
                     ) : (
-                      /* View mode */
                       <div className="space-y-3">
+                        {/* Top row: ticket, status badges, actions */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -292,11 +374,27 @@ export default function AdminAgendamentos() {
                                 <AttIcon className="h-3 w-3" /> {attCfg.label}
                               </span>
                               {isRescue && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/30 text-orange-300">
-                                  <AlertTriangle className="h-3 w-3" /> RESGATE
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-500/30 text-red-300 animate-pulse">
+                                  <Siren className="h-3 w-3" /> RESGATE
+                                </span>
+                              )}
+                              {isClientWaiting && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-cyan-500/30 text-cyan-300 animate-pulse">
+                                  <Bell className="h-3 w-3" /> CLIENTE AGUARDANDO
+                                </span>
+                              )}
+                              {isArrivingSoon && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-yellow-500/30 text-yellow-300">
+                                  <Timer className="h-3 w-3" /> CHEGANDO EM BREVE
+                                </span>
+                              )}
+                              {isExpectedNow && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/30 text-amber-300 animate-pulse">
+                                  <AlertTriangle className="h-3 w-3" /> ESPERADO AGORA
                                 </span>
                               )}
                             </div>
+                            {/* Customer name and seller */}
                             <div className="flex items-center gap-2 text-sm">
                               <User className="h-3.5 w-3.5 text-muted-foreground" />
                               <span className="font-semibold">{record.customerName || "Sem nome"}</span>
@@ -320,24 +418,48 @@ export default function AdminAgendamentos() {
                           </div>
                         </div>
 
-                        {/* Details row */}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {/* Details row with dates prominently shown */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                           {record.customerPhone && (
                             <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {record.customerPhone}</span>
-                          )}
-                          {record.customerEmail && (
-                            <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {record.customerEmail}</span>
                           )}
                           {record.vehicleInterest && (
                             <span className="flex items-center gap-1"><Car className="h-3 w-3" /> {record.vehicleInterest}</span>
                           )}
+                        </div>
+
+                        {/* Date section - prominent */}
+                        <div className="flex flex-wrap gap-3 text-xs">
+                          {/* Created date */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/40 border border-border/50">
+                            <CalendarPlus className="h-3.5 w-3.5 text-blue-400" />
+                            <span className="text-muted-foreground">Criado:</span>
+                            <span className="font-medium text-foreground">{formatDateShort(record.createdAt)}</span>
+                          </div>
+                          {/* Scheduled date */}
                           {record.scheduledDate && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> {formatDate(record.scheduledDate)}
-                              {isRescue && record.scheduledDate && (
-                                <span className="text-orange-400 font-medium ml-1">({getTimeSince(record.scheduledDate)})</span>
+                            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border ${
+                              isRescue ? "bg-red-500/10 border-red-500/30" :
+                              isExpectedNow ? "bg-amber-500/10 border-amber-500/30" :
+                              isArrivingSoon ? "bg-yellow-500/10 border-yellow-500/30" :
+                              "bg-muted/40 border-border/50"
+                            }`}>
+                              <Clock className={`h-3.5 w-3.5 ${isRescue ? "text-red-400" : isExpectedNow ? "text-amber-400" : isArrivingSoon ? "text-yellow-400" : "text-emerald-400"}`} />
+                              <span className="text-muted-foreground">Agendado:</span>
+                              <span className={`font-bold ${isRescue ? "text-red-300" : isExpectedNow ? "text-amber-300" : isArrivingSoon ? "text-yellow-300" : "text-foreground"}`}>
+                                {formatDate(record.scheduledDate)}
+                              </span>
+                              {/* Time context */}
+                              {record.scheduledDate < now ? (
+                                <span className={`font-medium ml-1 ${isRescue ? "text-red-400" : "text-orange-400"}`}>
+                                  ({getTimeSince(record.scheduledDate)})
+                                </span>
+                              ) : (
+                                <span className="text-emerald-400 font-medium ml-1">
+                                  ({getTimeUntil(record.scheduledDate)})
+                                </span>
                               )}
-                            </span>
+                            </div>
                           )}
                         </div>
 

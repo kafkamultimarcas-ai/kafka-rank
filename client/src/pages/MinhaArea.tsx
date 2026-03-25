@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useCallback } from "react";
 import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2 } from "lucide-react";
+import IAMFloatingButton from "@/components/IAMFloatingButton";
+import IAMGreeting from "@/components/IAMGreeting";
 
 const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gradient: string }> = {
   vendas: { label: "Vendas", color: "text-red-400", icon: Car, gradient: "from-red-600/20 to-red-500/10 border-red-500/30" },
@@ -1238,6 +1240,9 @@ export default function MinhaArea() {
           </div>
         </div>
       )}
+      {/* IAM - Super Agente IA */}
+      {seller && <IAMFloatingButton sellerId={sellerId} />}
+      {seller && <IAMGreeting sellerName={seller.nickname || seller.name} sellerId={sellerId} />}
     </div>
   );
 }

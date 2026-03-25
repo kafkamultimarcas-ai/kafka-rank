@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import IAMFloatingButton from "@/components/IAMFloatingButton";
 import {
   CalendarPlus,
   ArrowLeft,
@@ -708,6 +709,7 @@ export default function MeusAgendamentos() {
           animation: pulse-subtle 2s ease-in-out infinite;
         }
       `}</style>
+      <IAMFloatingButton sellerId={sellerId} />
     </div>
   );
 }

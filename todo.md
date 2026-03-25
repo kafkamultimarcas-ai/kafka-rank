@@ -775,3 +775,57 @@
 ## Bug - Cadastro de Colaborador
 - [x] Bug: não consegue cadastrar novo colaborador e definir função/setor (causa: campo department não estava no input do sellers.create)
 - [x] Investigar erro no formulário de criação e na mutation sellers.create
+
+## Bug - Agendamentos
+- [x] Bug: página de agendamentos dá "An unexpected error occurred" - era o bug de hooks do MinhaArea.tsx já corrigido, versão publicada atualizada
+
+## Melhorias Agendamentos
+- [x] Mostrar data de criação do agendamento (quando o vendedor criou)
+- [x] Mostrar data/hora agendada de forma visível nos cards
+- [x] Resgate automático após 48h sem comparecimento com alerta visual pulsante
+- [x] Status "Cliente Aguardando" visível na tela
+- [x] Alerta sonoro/visual de resgate do lead
+
+## IA Vendedor de Carros
+- [ ] Criar área "IA Vendedor" na Minha Área do vendedor
+- [ ] Upload de print de conversa (imagem) para análise da IA
+- [ ] IA especialista em vendas de carros: estratégia, quebra de objeção, perfil comportamental
+- [ ] Sugestões de resposta baseadas no contexto da conversa
+- [ ] Usar LLM integrado do sistema (sem custo adicional)
+
+## IA Super Agente - Requisitos Expandidos
+- [ ] Especialista em vendas de carros (quebra objeção, fechamento, perfil comportamental)
+- [ ] Estrategista de marketing (conteúdo viral, ideias de vídeos, construção de conteúdo)
+- [ ] Especialista em consignação de carros (objeções, contratos, negociação com proprietário)
+- [ ] Especialista em financiamento de carros (simulação, argumentos, bancos)
+- [ ] Especialista em despachante (documentação, transferência, emplacamento)
+- [ ] Especialista em gestão de equipe (motivação, metas, liderança)
+- [ ] Especialista em agendamento e resgate de leads (scripts, gatilhos mentais)
+- [ ] Especialista em pós-venda (fidelização, indicação, satisfação)
+- [ ] Gatilhos mentais avançados (urgência, escassez, prova social, autoridade)
+- [ ] Humanizado e acessível (linguagem clara, exemplos práticos)
+- [ ] Interface com categorias de consulta rápida
+- [ ] Upload de print de conversa para análise
+
+## IAM - Acesso Global e Mensagem Motivacional
+- [ ] Botão flutuante do IAM visível em todas as páginas do vendedor
+- [ ] Mensagem motivacional personalizada ao abrir o app (como um gestor de alta performance)
+- [ ] Categorias de consulta rápida intuitivas
+- [ ] Interface de chat intuitiva para qualquer dúvida
+
+## IAM - Funcionalidades Extras
+- [ ] Modo "Me ajuda a responder AGORA" (print → resposta pronta em 1 toque)
+- [ ] Simulador de financiamento integrado (valor, entrada, prazo → argumento de venda)
+- [ ] Gerador de script de ligação personalizado
+- [ ] Criador de mensagem de follow-up (reengajamento de lead frio)
+- [ ] Ideias de conteúdo do dia (posts/vídeos para redes sociais)
+- [ ] Modo Objeção Rápida (botões prontos: "Tá caro", "Vou pensar", etc)
+- [ ] Consultor de documentação/despachante
+- [ ] Dica de pós-venda (lembrete de follow-up)
+
+## IAM - Configuração pelo Admin
+- [x] Tabela iam_config no banco para armazenar configurações do admin
+- [x] Tela admin para configurar: contexto do dia (feirão, movimento fraco, meta apertada), mensagem personalizada, instruções extras
+- [x] IAM usa contexto admin nas respostas (adapta tom, urgência, foco)
+- [x] Mensagem motivacional do dia configurável pelo admin
+- [x] Alertas de ação para engajar vendedores na plataforma

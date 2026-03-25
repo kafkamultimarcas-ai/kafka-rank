@@ -1,0 +1,80 @@
+{
+  "query": "SELECT id, name, nickname FROM sellers ORDER BY id LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, nickname FROM sellers ORDER BY id LIMIT 20;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "nickname": "Leo"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "nickname": "Gabriel"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "nickname": "Matheus"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "nickname": "Wesley"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "nickname": "Petherson"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "nickname": "Lucas"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "nickname": "Emanuel"
+    },
+    {
+      "id": "30001",
+      "name": "Letícia ",
+      "nickname": "Le"
+    },
+    {
+      "id": "60001",
+      "name": "Andréia Vieegas",
+      "nickname": "Deia"
+    },
+    {
+      "id": "60002",
+      "name": "Jordana claudino",
+      "nickname": "Jordana "
+    },
+    {
+      "id": "60003",
+      "name": "Rafaela Simões ",
+      "nickname": "Rafa"
+    },
+    {
+      "id": "90001",
+      "name": "LOJA ",
+      "nickname": "LOJA "
+    },
+    {
+      "id": "120001",
+      "name": "Vinicius albuini",
+      "nickname": "Jadião"
+    },
+    {
+      "id": "180001",
+      "name": "Tissiane dos santos ",
+      "nickname": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tnickname\n1\tLeonardo\tLeo\n2\tGabriel\tGabriel\n3\tMatheus\tMatheus\n4\tWesley\tWesley\n5\tPetherson\tPetherson\n6\tLucas\tLucas\n7\tEmanuel\tEmanuel\n30001\tLetícia \tLe\n60001\tAndréia Vieegas\tDeia\n60002\tJordana claudino\tJordana \n60003\tRafaela Simões \tRafa\n90001\tLOJA \tLOJA \n120001\tVinicius albuini\tJadião\n180001\tTissiane dos santos \t\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}

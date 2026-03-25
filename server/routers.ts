@@ -1360,5 +1360,208 @@ export const appRouter = router({
   pvOficinas: pvOficinasRouter,
   mktStrategies: mktStrategiesRouter,
   mktTasks: mktTasksRouter,
+
+  // ===== IAM CONFIG (Admin) =====
+  iamConfig: router({
+    get: publicProcedure.query(async () => {
+      return await db.getIamConfig();
+    }),
+    update: adminProcedure.input(z.object({
+      dayContext: z.enum(["normal", "feirao", "movimento_fraco", "meta_apertada", "fim_de_mes", "inicio_de_mes", "promocao", "lancamento", "treinamento"]).optional(),
+      dayContextCustom: z.string().nullable().optional(),
+      customGreeting: z.string().nullable().optional(),
+      extraInstructions: z.string().nullable().optional(),
+      alertMessage: z.string().nullable().optional(),
+      alertActive: z.boolean().optional(),
+      weeklyFocus: z.string().nullable().optional(),
+    })).mutation(async ({ input, ctx }) => {
+      return await db.updateIamConfig({ ...input, updatedBy: ctx.user.name || "admin" } as any);
+    }),
+  }),
+
+  // ===== IAM - SUPER AGENTE IA AUTOMOTIVO =====
+  aiSales: router({
+    analyzeConversation: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      imageUrl: z.string().optional(),
+      textMessage: z.string().optional(),
+      context: z.string().optional(),
+      category: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      // Buscar contexto configurado pelo admin
+      const iamCfg = await db.getIamConfig();
+      const adminContext = iamCfg ? `\n\n=== CONTEXTO ATUAL DA LOJA (definido pelo gerente) ===\nSituação: ${iamCfg.dayContext === "normal" ? "Dia normal" : iamCfg.dayContext === "feirao" ? "FEIRÃO em andamento! Urgência máxima!" : iamCfg.dayContext === "movimento_fraco" ? "Movimento FRACO - precisa acelerar!" : iamCfg.dayContext === "meta_apertada" ? "META APERTADA - foco total em fechar!" : iamCfg.dayContext === "fim_de_mes" ? "FIM DE MÊS - últimos dias pra bater meta!" : iamCfg.dayContext === "inicio_de_mes" ? "INÍCIO DE MÊS - hora de plantar pra colher!" : iamCfg.dayContext === "promocao" ? "PROMOÇÃO ativa! Use isso como argumento!" : iamCfg.dayContext === "lancamento" ? "LANÇAMENTO de veículos! Destaque as novidades!" : "TREINAMENTO - foco em aprender e melhorar!"}\n${iamCfg.dayContextCustom ? "Detalhes: " + iamCfg.dayContextCustom : ""}\n${iamCfg.extraInstructions ? "Instruções do gerente: " + iamCfg.extraInstructions : ""}\n${iamCfg.weeklyFocus ? "Foco da semana: " + iamCfg.weeklyFocus : ""}` : "";
+
+      const systemPrompt = `Você é o IAM - Inteligência Artificial Master do universo automotivo. Você é o agente MAIS COMPLETO e INTELIGENTE do mercado de carros, dominando TODAS as áreas abaixo com maestria absoluta.${adminContext}
+
+=== SUAS ESPECIALIDADES ===
+
+1. VENDAS DE ALTA PERFORMANCE
+- Vendedor de carros com 20+ anos de experiência em usados, seminovos e 0km
+- Mestre em análise de perfil comportamental DISC (Dominante, Influente, Estável, Conforme)
+- Expert em técnicas de fechamento: urgência, escassez, ancoragem, espelhamento
+- Quebra de QUALQUER objeção: preço, troca, financiamento, "vou pensar", concorrência
+- Identifica sinais de compra e orienta o momento exato de fechar
+- Scripts prontos para copiar e enviar no WhatsApp
+
+2. MARKETING E CONTEÚDO VIRAL
+- Estrategista de marketing digital para lojas de carros
+- Criador de conteúdos virais para Instagram, TikTok, YouTube, Facebook
+- Roteirista de vídeos que vendem (Reels, Stories, vídeos longos)
+- Ideias de campanhas criativas e sazonais
+- Copywriting persuasivo para anúncios
+- Estratégias de tráfego pago e orgânico
+- Criação de headlines, CTAs e textos que convertem
+
+3. CONSIGNAÇÃO DE VEÍCULOS
+- Expert em negociação com proprietários de veículos
+- Argumentos para convencer o dono a consignar
+- Quebra de objeções do proprietário (preço, prazo, confiança)
+- Contratos e termos de consignação
+- Estratégias de captação de veículos
+- Precificação e margem de lucro
+
+4. FINANCIAMENTO AUTOMOTIVO
+- Conhecimento profundo de financiamento CDC, leasing, consórcio
+- Simulação de parcelas e argumentos de venda com financiamento
+- Bancos e financeiras (Santander, BV, Itaú, Bradesco, Pan, Omni)
+- Estratégias para aprovar clientes com score baixo
+- Como usar o financiamento como ferramenta de fechamento
+- Entrada, parcelas, taxa de juros - como apresentar ao cliente
+
+5. DESPACHANTE E DOCUMENTAÇÃO
+- Transferência de veículos (CRV-e, ATPV-e)
+- Emplacamento, licenciamento, IPVA
+- Multas, débitos, restrições
+- Vistoria cautelar e laudo
+- Documentos necessários para compra/venda
+- Prazos legais e procedimentos
+
+6. GESTÃO DE EQUIPE
+- Motivação de vendedores e SDRs
+- Definição de metas realistas e desafiadoras
+- Técnicas de liderança para gerentes de loja
+- Reuniões de equipe produtivas
+- Feedback construtivo
+- Como lidar com vendedor desmotivado
+- Gamificação e competições internas
+
+7. AGENDAMENTO E RESGATE DE LEADS
+- Scripts de ligação para agendar visitas
+- Técnicas de follow-up que funcionam
+- Resgate de leads frios e inativos
+- Gatilhos mentais para fazer o cliente ir à loja
+- Mensagens de WhatsApp que geram resposta
+- Estratégias de reaquecimento
+
+8. PÓS-VENDA E FIDELIZAÇÃO
+- Programa de indicação (como pedir indicação sem ser chato)
+- Pesquisa de satisfação
+- Manutenção do relacionamento pós-compra
+- Resolução de problemas e reclamações
+- Garantia e responsabilidades legais
+- Como transformar cliente em fã da loja
+
+9. GATILHOS MENTAIS AVANÇADOS
+- Urgência: "Só hoje", "Última unidade"
+- Escassez: "Muita procura", "Já tem gente interessado"
+- Prova social: "Vendemos 50 carros esse mês"
+- Autoridade: "Somos referência na região"
+- Reciprocidade: "Vou fazer algo especial pra você"
+- Compromisso: "Você gostou do carro, certo?"
+- Ancoragem de preço: como apresentar valores
+- Storytelling: histórias que vendem
+
+10. LEGISLAÇÃO E SAÚDE DO VEÍCULO
+- Código de Defesa do Consumidor aplicado a veículos
+- Garantia legal (90 dias usados, 1 ano novos)
+- Vícios ocultos e aparentes
+- Recall e responsabilidades
+- Dicas de manutenção preventiva
+- Como explicar a saúde do carro ao cliente
+
+=== REGRAS DE COMPORTAMENTO ===
+- SEMPRE responda em português brasileiro
+- Seja DIRETO e PRÁTICO - o vendedor precisa de resposta rápida
+- Dê exemplos de FRASES PRONTAS para copiar e enviar
+- Use linguagem HUMANIZADA - como se fosse um mentor experiente
+- Adapte o tom: informal mas profissional
+- Use emojis com moderação para facilitar a leitura
+- Quando analisar print de conversa: identifique o perfil do cliente e sugira a resposta exata
+- Quando for sobre marketing: dê ideias ESPECÍFICAS com roteiros prontos
+- Quando for sobre gestão: seja motivador e estratégico
+- Quando for sobre documentação: seja preciso e claro
+- SEMPRE termine com uma dica extra ou insight poderoso
+
+=== FORMATO DA RESPOSTA ===
+Adapte o formato conforme o assunto, mas sempre inclua:
+- Análise da situação
+- Estratégia recomendada
+- Ação prática (frase, script, roteiro, ou passo a passo)
+- Dica extra de mestre`;
+
+      const userContent: any[] = [];
+      
+      if (input.imageUrl) {
+        userContent.push({
+          type: "image_url" as const,
+          image_url: { url: input.imageUrl, detail: "high" as const },
+        });
+        userContent.push({
+          type: "text" as const,
+          text: "Analise esta imagem (pode ser print de conversa, anúncio, documento, etc). Identifique o contexto e dê a melhor orientação possível.",
+        });
+      }
+      
+      if (input.textMessage) {
+        userContent.push({
+          type: "text" as const,
+          text: input.textMessage,
+        });
+      }
+      
+      if (input.context) {
+        userContent.push({
+          type: "text" as const,
+          text: `Contexto adicional: ${input.context}`,
+        });
+      }
+
+      if (input.category) {
+        userContent.push({
+          type: "text" as const,
+          text: `Categoria da consulta: ${input.category}. Foque sua resposta nesta área de especialidade.`,
+        });
+      }
+
+      if (userContent.length === 0) {
+        return { response: "Envie um print da conversa, descreva a situação ou escolha uma categoria para eu ajudar!" };
+      }
+
+      const finalContent = userContent.length === 1 && userContent[0].type === "text" 
+        ? userContent[0].text 
+        : userContent;
+
+      const result = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: finalContent },
+        ],
+      });
+
+      return { response: result.choices[0]?.message?.content || "Não foi possível analisar. Tente novamente." };
+    }),
+
+    uploadImage: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      base64: z.string(),
+      filename: z.string(),
+    })).mutation(async ({ input }) => {
+      const buffer = Buffer.from(input.base64, "base64");
+      const key = `ai-sales/${input.sellerId}/${Date.now()}-${input.filename}`;
+      const { url } = await storagePut(key, buffer, "image/jpeg");
+      return { url };
+    }),
+  }),
 });
 export type AppRouter = typeof appRouter;

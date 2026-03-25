@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `iam_config` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`dayContext` enum('normal','feirao','movimento_fraco','meta_apertada','fim_de_mes','inicio_de_mes','promocao','lancamento','treinamento') NOT NULL DEFAULT 'normal',\n\t`dayContextCustom` text,\n\t`customGreeting` text,\n\t`extraInstructions` text,\n\t`alertMessage` text,\n\t`alertActive` boolean NOT NULL DEFAULT false,\n\t`weeklyFocus` text,\n\t`active` boolean NOT NULL DEFAULT true,\n\t`updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\t`updatedBy` varchar(255),\n\tCONSTRAINT `iam_config_id` PRIMARY KEY(`id`)\n);\nINSERT INTO iam_config (dayContext, active) VALUES ('normal', true);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute CREATE TABLE IF NOT EXISTS `iam_config` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`dayContext` enum('normal','feirao','movimento_fraco','meta_apertada','fim_de_mes','inicio_de_mes','promocao','lancamento','treinamento') NOT NULL DEFAULT 'normal',\n\t`dayContextCustom` text,\n\t`customGreeting` text,\n\t`extraInstructions` text,\n\t`alertMessage` text,\n\t`alertActive` boolean NOT NULL DEFAULT false,\n\t`weeklyFocus` text,\n\t`active` boolean NOT NULL DEFAULT true,\n\t`updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\t`updatedBy` varchar(255),\n\tCONSTRAINT `iam_config_id` PRIMARY KEY(`id`)\n);\nINSERT INTO iam_config (dayContext, active) VALUES ('normal', true);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 920
+}

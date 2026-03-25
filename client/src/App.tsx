@@ -31,6 +31,7 @@ const AdminPvFinanceiro = lazy(() => import("./pages/admin/AdminPvFinanceiro"));
 const AdminMarketing = lazy(() => import("./pages/admin/AdminMarketing"));
 const AdminFinanceiro = lazy(() => import("./pages/admin/AdminFinanceiro"));
 const AdminMetaIntegration = lazy(() => import("./pages/admin/AdminMetaIntegration"));
+const AdminIAM = lazy(() => import("./pages/admin/AdminIAM"));
 
 const CompetitionView = lazy(() => import("./pages/CompetitionView"));
 const SellerProfile = lazy(() => import("./pages/SellerProfile"));
@@ -43,6 +44,7 @@ const SellerLogin = lazy(() => import("./pages/SellerLogin"));
 const MinhaArea = lazy(() => import("./pages/MinhaArea"));
 const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
+const IAVendedor = lazy(() => import("./pages/IAVendedor"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -93,6 +95,7 @@ function Router() {
         <Route path="/admin/marketing" component={AdminMarketing} />
         <Route path="/admin/financeiro" component={AdminFinanceiro} />
         <Route path="/admin/meta-integration" component={AdminMetaIntegration} />
+        <Route path="/admin/iam" component={AdminIAM} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />
@@ -102,6 +105,7 @@ function Router() {
         <Route path="/crm/integracoes" component={IntegrationDocs} />
         <Route path="/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
+        <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
