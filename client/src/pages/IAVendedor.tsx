@@ -9,7 +9,7 @@ import {
   Sparkles, Brain, Target, Zap, Copy, Check,
   Phone, MessageSquare, TrendingUp, FileText, Heart,
   Shield, DollarSign, Video, Users, CalendarCheck,
-  Lightbulb, AlertTriangle, Car, HandshakeIcon, Trophy,
+  Lightbulb, AlertTriangle, Car, HandshakeIcon, Trophy, Mic, MicOff,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 
@@ -79,6 +79,8 @@ export default function IAVendedor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   const uploadMut = trpc.aiSales.uploadImage.useMutation();
   const analyzeMut = trpc.aiSales.analyzeConversation.useMutation();
@@ -89,6 +91,45 @@ export default function IAVendedor() {
   useEffect(() => {
     if (messages.length > 0) setShowCategories(false);
   }, [messages.length]);
+
+  // Voice recognition
+  function toggleVoice() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Seu navegador não suporta reconhecimento de voz. Use o Chrome.");
+      return;
+    }
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-BR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setTextInput(prev => prev ? prev + " " + transcript : transcript);
+      setIsRecording(false);
+      toast.success("Voz capturada!");
+    };
+    recognition.onerror = (event: any) => {
+      console.error("Speech error:", event.error);
+      if (event.error === "not-allowed") {
+        toast.error("Permita o acesso ao microfone nas configurações do navegador.");
+      } else {
+        toast.error("Erro no reconhecimento de voz. Tente novamente.");
+      }
+      setIsRecording(false);
+    };
+    recognition.onend = () => setIsRecording(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    toast.info("🎤 Fale agora...");
+  }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -210,7 +251,7 @@ export default function IAVendedor() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-gradient-to-r from-violet-950 via-purple-950 to-indigo-950 border-b border-purple-500/20 px-4 py-3 shadow-lg shadow-purple-500/5">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/minha-area/${sid}`)} className="text-purple-300 hover:text-white transition-colors">
+          <button onClick={() => { if (window.history.length > 1) { window.history.back(); } else { navigate(sid ? `/minha-area/${sid}` : '/'); } }} className="text-purple-300 hover:text-white transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2.5">
@@ -424,6 +465,21 @@ export default function IAVendedor() {
             title="Enviar print da galeria ou tirar foto"
           >
             <Camera className="h-5 w-5 text-violet-400" />
+          </button>
+          <button
+            onClick={toggleVoice}
+            className={`flex-shrink-0 h-10 w-10 rounded-full border flex items-center justify-center transition-all ${
+              isRecording
+                ? "bg-red-500/20 border-red-500/50 animate-pulse"
+                : "bg-muted/50 border-border/50 hover:bg-emerald-500/10 hover:border-emerald-500/30"
+            }`}
+            title={isRecording ? "Parar gravação" : "Falar por voz"}
+          >
+            {isRecording ? (
+              <MicOff className="h-5 w-5 text-red-400" />
+            ) : (
+              <Mic className="h-5 w-5 text-emerald-400" />
+            )}
           </button>
           <div className="flex-1 relative">
             <textarea

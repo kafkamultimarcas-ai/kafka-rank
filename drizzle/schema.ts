@@ -657,6 +657,8 @@ export const iamConfig = mysqlTable("iam_config", {
   alertActive: boolean("alertActive").default(false).notNull(),
   // Foco da semana
   weeklyFocus: text("weeklyFocus"), // ex: "Captar 10 carros consignados", "Bater meta de agendamentos"
+  // Taxa de financiamento (% ao mês) - configurável pelo admin
+  financingRate: decimal("financingRate", { precision: 5, scale: 2 }).default("2.20").notNull(),
   // Ativo
   active: boolean("active").default(true).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

@@ -162,6 +162,13 @@
       "when": 1774410830551,
       "tag": "0022_military_lucky_pierre",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1774413012924,
+      "tag": "0023_demonic_santa_claus",
+      "breakpoints": true
     }
   ]
 }

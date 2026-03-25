@@ -1374,6 +1374,7 @@ export const appRouter = router({
       alertMessage: z.string().nullable().optional(),
       alertActive: z.boolean().optional(),
       weeklyFocus: z.string().nullable().optional(),
+      financingRate: z.string().optional(),
     })).mutation(async ({ input, ctx }) => {
       return await db.updateIamConfig({ ...input, updatedBy: ctx.user.name || "admin" } as any);
     }),

@@ -45,6 +45,7 @@ const MinhaArea = lazy(() => import("./pages/MinhaArea"));
 const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
 const IAVendedor = lazy(() => import("./pages/IAVendedor"));
+const SimuladorFinanciamento = lazy(() => import("./pages/SimuladorFinanciamento"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -106,6 +107,8 @@ function Router() {
         <Route path="/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
+        <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
+        <Route path="/simulador-financiamento" component={SimuladorFinanciamento} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

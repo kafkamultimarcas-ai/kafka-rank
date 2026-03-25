@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   Bot, Save, Sparkles, Megaphone, Target, Brain,
   AlertTriangle, Zap, Calendar, TrendingDown, TrendingUp,
-  Gift, Rocket, GraduationCap, Settings2,
+  Gift, Rocket, GraduationCap, Settings2, DollarSign, Percent,
 } from "lucide-react";
 
 const DAY_CONTEXTS = [
@@ -34,6 +34,7 @@ export default function AdminIAM() {
   const [alertMessage, setAlertMessage] = useState("");
   const [alertActive, setAlertActive] = useState(false);
   const [weeklyFocus, setWeeklyFocus] = useState("");
+  const [financingRate, setFinancingRate] = useState("2.20");
 
   useEffect(() => {
     if (config) {
@@ -44,6 +45,7 @@ export default function AdminIAM() {
       setAlertMessage(config.alertMessage || "");
       setAlertActive(config.alertActive || false);
       setWeeklyFocus(config.weeklyFocus || "");
+      setFinancingRate(config.financingRate || "2.20");
     }
   }, [config]);
 
@@ -57,6 +59,7 @@ export default function AdminIAM() {
         alertMessage: alertMessage || null,
         alertActive,
         weeklyFocus: weeklyFocus || null,
+        financingRate: financingRate || "2.20",
       });
       utils.iamConfig.get.invalidate();
       toast.success("Configuração do IAM salva com sucesso!");
@@ -228,6 +231,41 @@ export default function AdminIAM() {
             placeholder="Ex: ATENÇÃO: Feirão neste sábado das 8h às 18h. Todos devem estar presentes. Confirmar presença com o gerente."
             className="w-full rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-sm resize-none h-20 placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-orange-500/30"
           />
+        </CardContent>
+      </Card>
+
+      {/* Taxa de Financiamento */}
+      <Card className="border-emerald-500/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4 text-emerald-400" />
+            Taxa de Financiamento
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Taxa mensal usada no simulador de financiamento dos vendedores. Altere conforme a taxa vigente.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="10"
+                value={financingRate}
+                onChange={e => setFinancingRate(e.target.value)}
+                className="bg-muted/20 border-border/50 pr-10 text-lg font-bold"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Percent className="h-4 w-4 text-emerald-400" />
+              </div>
+            </div>
+            <span className="text-sm text-muted-foreground">ao mês</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2">
+            Padrão: 2.20% • Esta taxa é usada no simulador ilustrativo que os vendedores acessam
+          </p>
         </CardContent>
       </Card>
 

@@ -1,0 +1,1 @@
+ALTER TABLE `iam_config` ADD `financingRate` decimal(5,2) DEFAULT '2.20' NOT NULL;

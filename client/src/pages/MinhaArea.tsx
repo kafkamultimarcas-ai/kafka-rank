@@ -815,6 +815,22 @@ export default function MinhaArea() {
             </div>
           </button>
 
+          {/* Simulador de Financiamento */}
+          {(dept === "vendas" || dept === "fei") && (
+            <button
+              onClick={() => navigate(`/simulador-financiamento/${sellerId}`)}
+              className="w-full bg-gradient-to-r from-teal-600/20 to-emerald-500/10 border border-teal-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-teal-500/60 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-teal-400" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-bold">Simulador de Financiamento</p>
+                <p className="text-gray-400 text-sm">Calcule parcelas e argumente com o cliente</p>
+              </div>
+            </button>
+          )}
+
           {/* Ver Ranking */}
           <button
             onClick={() => navigate("/")}

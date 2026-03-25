@@ -839,3 +839,19 @@
 
 ## IAM - Fechamento de Vendas
 - [x] Adicionar categoria "Fechamento de Vendas" nas especialidades do IAM (com ícone Trophy dourado)
+
+## Simulador de Financiamento
+- [x] Criar simulador de financiamento ilustrativo com taxa configurável pelo admin (padrão 2.2%)
+- [x] Campos: valor do veículo, entrada, prazo (12-60 meses)
+- [x] Mostrar: parcela mensal, valor total, juros totais, argumento de venda
+- [x] Acessível na Minha Área (vendas/F&I) e rota /simulador-financiamento
+- [x] Aviso de "simulação ilustrativa"
+- [x] Taxa configurável pelo admin em Admin > Configurar IAM
+
+## Reconhecimento de Voz no IAM
+- [x] Botão de microfone no IAM para gravar voz (verde, ao lado da câmera)
+- [x] Converter áudio em texto usando Web Speech API do navegador (pt-BR)
+- [x] Funcionar no celular (Android e iOS via Chrome)
+
+## Área de Consulta de Cliente
+- [ ] Campo para registrar score e situação do cliente manualmente
