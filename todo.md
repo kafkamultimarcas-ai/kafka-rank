@@ -833,3 +833,6 @@
 ## IAM - Acesso na Tela Principal
 - [x] Adicionar card destacado do IAM na Home com dropdown de vendedores para acesso direto
 - [x] Card com features rápidas: Quebrar objeções, Analisar conversa, Ideias de conteúdo, Scripts de venda
+
+## Bug - IAM Enviar Print
+- [x] Bug: botão de enviar print não abre galeria/câmera do celular (removido capture=environment que forçava só câmera)

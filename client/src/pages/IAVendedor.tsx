@@ -407,11 +407,11 @@ export default function IAVendedor() {
 
       {/* Input area */}
       <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border/50 p-3">
+        {/* Input para galeria - sem capture para abrir seletor de arquivo/galeria */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleImageSelect}
           className="hidden"
         />
@@ -419,6 +419,7 @@ export default function IAVendedor() {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex-shrink-0 h-10 w-10 rounded-full bg-muted/50 border border-border/50 flex items-center justify-center hover:bg-violet-500/10 hover:border-violet-500/30 transition-colors"
+            title="Enviar print da galeria ou tirar foto"
           >
             <Camera className="h-5 w-5 text-violet-400" />
           </button>
