@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle } from "lucide-react";
+import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -200,6 +200,74 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* IAM - Assistente de Vendas IA */}
+            <div className="mt-8 max-w-md mx-auto">
+              <div className="relative overflow-hidden racing-card p-5 border-2 border-violet-500/40 bg-gradient-to-br from-violet-950/50 to-purple-950/50">
+                {/* Glow effect */}
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-violet-500/10 rounded-full blur-2xl" />
+                <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl" />
+                
+                <div className="relative">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 animate-pulse">
+                      <Bot className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-heading font-bold text-lg text-foreground flex items-center gap-1.5">
+                        IAM <Sparkles className="h-4 w-4 text-yellow-400" />
+                      </h3>
+                      <p className="text-[10px] text-violet-400 -mt-0.5">Inteligência Artificial de Mercado</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground mb-4 text-center">
+                    Seu assistente pessoal de vendas! Tire dúvidas, peça scripts, quebre objeções, crie conteúdo e muito mais.
+                  </p>
+
+                  {/* Quick features */}
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div className="flex items-center gap-2 bg-violet-900/20 rounded-lg px-3 py-2 border border-violet-500/10">
+                      <MessageCircle className="h-3.5 w-3.5 text-violet-400 flex-shrink-0" />
+                      <span className="text-[11px] text-violet-300">Quebrar objeções</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-violet-900/20 rounded-lg px-3 py-2 border border-violet-500/10">
+                      <Camera className="h-3.5 w-3.5 text-violet-400 flex-shrink-0" />
+                      <span className="text-[11px] text-violet-300">Analisar conversa</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-violet-900/20 rounded-lg px-3 py-2 border border-violet-500/10">
+                      <Lightbulb className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0" />
+                      <span className="text-[11px] text-violet-300">Ideias de conteúdo</span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-violet-900/20 rounded-lg px-3 py-2 border border-violet-500/10">
+                      <Target className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
+                      <span className="text-[11px] text-violet-300">Scripts de venda</span>
+                    </div>
+                  </div>
+
+                  {sellers && sellers.length > 0 ? (
+                    <select
+                      onChange={e => { if (e.target.value) setLocation(`/ia-vendedor/${e.target.value}`); }}
+                      defaultValue=""
+                      className="w-full rounded-lg border-2 border-violet-500/30 bg-background px-4 py-3 text-sm text-foreground font-medium mb-2 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                    >
+                      <option value="" disabled>Selecione seu nome para acessar o IAM...</option>
+                      {sellers.map(s => (
+                        <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Button
+                      onClick={() => setLocation("/login-vendedor")}
+                      className="w-full gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold shadow-lg shadow-violet-500/20"
+                    >
+                      <Bot className="h-4 w-4" /> Acessar IAM
+                    </Button>
+                  )}
+                  <p className="text-[10px] text-violet-400/60 text-center mt-1">Disponível 24h para ajudar você a vender mais</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

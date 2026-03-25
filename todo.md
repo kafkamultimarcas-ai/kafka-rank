@@ -829,3 +829,7 @@
 - [x] IAM usa contexto admin nas respostas (adapta tom, urgência, foco)
 - [x] Mensagem motivacional do dia configurável pelo admin
 - [x] Alertas de ação para engajar vendedores na plataforma
+
+## IAM - Acesso na Tela Principal
+- [x] Adicionar card destacado do IAM na Home com dropdown de vendedores para acesso direto
+- [x] Card com features rápidas: Quebrar objeções, Analisar conversa, Ideias de conteúdo, Scripts de venda
