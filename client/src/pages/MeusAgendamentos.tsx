@@ -26,6 +26,8 @@ import {
   Timer,
   AlertTriangle,
   PhoneCall,
+  Flame,
+  Filter,
 } from "lucide-react";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
@@ -116,6 +118,8 @@ export default function MeusAgendamentos() {
   const [vehicleInterest, setVehicleInterest] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [isFeiraoForm, setIsFeiraoForm] = useState(false);
+  const [filterFeirao, setFilterFeirao] = useState<"todos" | "feirao" | "normal">("todos");
 
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: appointments, isLoading } = trpc.sdr.myAppointments.useQuery({ sellerId }, { enabled: sellerId > 0, refetchInterval: 10000 });
@@ -162,6 +166,7 @@ export default function MeusAgendamentos() {
     setVehicleInterest("");
     setScheduledDate("");
     setNotes("");
+    setIsFeiraoForm(false);
   };
 
   const handleCreate = () => {
@@ -178,6 +183,7 @@ export default function MeusAgendamentos() {
       vehicleInterest: vehicleInterest.trim() || undefined,
       scheduledDate: scheduledDate ? new Date(scheduledDate).getTime() : undefined,
       notes: notes.trim() || undefined,
+      isFeirão: isFeiraoForm,
     });
   };
 
@@ -196,8 +202,13 @@ export default function MeusAgendamentos() {
 
   // Separate and sort appointments
   const agendamentos = useMemo(() => {
-    return (appointments || []).filter((a: any) => a.type === "agendamento");
-  }, [appointments]);
+    let list = (appointments || []).filter((a: any) => a.type === "agendamento");
+    if (filterFeirao === "feirao") list = list.filter((a: any) => a.isFeirão);
+    if (filterFeirao === "normal") list = list.filter((a: any) => !a.isFeirão);
+    return list;
+  }, [appointments, filterFeirao]);
+
+  const feiraoCount = useMemo(() => (appointments || []).filter((a: any) => a.type === "agendamento" && a.isFeirão).length, [appointments]);
 
   // Categorize appointments
   const categorized = useMemo(() => {
@@ -290,6 +301,12 @@ export default function MeusAgendamentos() {
               <StatusIcon className="h-3 w-3" />
               {statusCfg.label}
             </span>
+            {apt.isFeirão && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                <Flame className="h-3 w-3" />
+                Feirão
+              </span>
+            )}
           </div>
           {/* Countdown Timer */}
           {scheduled && !isOverdue && vs !== "no_show" && vs !== "confirmed" && vs !== "attended" && (
@@ -586,6 +603,33 @@ export default function MeusAgendamentos() {
           </div>
         </div>
 
+        {/* Filtro Feirão */}
+        {feiraoCount > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {[
+              { key: "todos" as const, label: "Todos", count: (appointments || []).filter((a: any) => a.type === "agendamento").length },
+              { key: "feirao" as const, label: "Feirão Kafka", count: feiraoCount, icon: Flame },
+              { key: "normal" as const, label: "Normal", count: (appointments || []).filter((a: any) => a.type === "agendamento" && !a.isFeirão).length },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setFilterFeirao(tab.key)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  filterFeirao === tab.key
+                    ? tab.key === "feirao" ? "bg-orange-600 text-white shadow-lg" : "bg-primary text-white shadow-lg"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {tab.icon && <tab.icon className="h-3 w-3" />}
+                {tab.label}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  filterFeirao === tab.key ? "bg-white/20" : "bg-background"
+                }`}>{tab.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Create Form */}
         {showForm && (
           <div className="racing-card p-5 space-y-4">
@@ -634,6 +678,35 @@ export default function MeusAgendamentos() {
                 </label>
                 <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Observações sobre o cliente..." />
               </div>
+              {/* Toggle Feirão */}
+              <button
+                type="button"
+                onClick={() => setIsFeiraoForm(!isFeiraoForm)}
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all w-full ${
+                  isFeiraoForm
+                    ? 'border-orange-500 bg-gradient-to-r from-orange-600/20 to-red-600/20'
+                    : 'border-border bg-background hover:border-orange-500/50'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  isFeiraoForm ? 'bg-orange-500 text-white' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <Flame className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className={`font-bold text-sm ${isFeiraoForm ? 'text-orange-400' : 'text-foreground'}`}>
+                    Agendamento de Feirão
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isFeiraoForm ? 'Este agendamento é para o Feirão Kafka' : 'Marque se este agendamento é para um feirão'}
+                  </p>
+                </div>
+                <div className={`ml-auto w-12 h-7 rounded-full transition-all flex items-center px-1 ${
+                  isFeiraoForm ? 'bg-orange-500 justify-end' : 'bg-muted justify-start'
+                }`}>
+                  <div className="w-5 h-5 rounded-full bg-white shadow-md transition-all" />
+                </div>
+              </button>
             </div>
             <div className="flex gap-2">
               <Button onClick={handleCreate} disabled={createAppointment.isPending} className="flex-1">

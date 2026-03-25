@@ -345,8 +345,22 @@ export const appRouter = router({
       }
       // Push notification de venda aprovada
       if (seller) {
-        sendPushSaleApproved(seller.name, sale.vehicleModel || 'veículo').catch(console.error);
+        sendPushSaleApproved(seller.name, sale.vehicleModel || 've\u00edculo').catch(console.error);
       }
+      // Criar registro de documentos pendentes para esta venda
+      try {
+        const existingDoc = await db.getSaleDocumentBySaleId(input.id);
+        if (!existingDoc) {
+          await db.createSaleDocument({
+            saleId: input.id,
+            sellerId: sale.sellerId,
+            clienteNome: sale.description || null,
+            vehicleModel: sale.vehicleModel || null,
+            docStatus: 'pendente',
+            dispatchStatus: 'aguardando_docs',
+          });
+        }
+      } catch (e) { console.error('Erro ao criar sale_document:', e); }
       return { success: true };
     }),
     // Rejeitar venda (admin)
@@ -922,6 +936,7 @@ export const appRouter = router({
       vehicleInterest: z.string().optional(),
       scheduledDate: z.number().optional(),
       notes: z.string().optional(),
+      isFeirão: z.boolean().optional(),
     })).mutation(async ({ input }) => {
       const result = await db.createSdrRecord({
         sellerId: input.sellerId,
@@ -934,6 +949,7 @@ export const appRouter = router({
         source: null,
         scheduledDate: input.scheduledDate ?? null,
         converted: false,
+        isFeirão: input.isFeirão ?? false,
         notes: input.notes ?? null,
         points: 1,
       });
@@ -1562,6 +1578,84 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       const key = `ai-sales/${input.sellerId}/${Date.now()}-${input.filename}`;
       const { url } = await storagePut(key, buffer, "image/jpeg");
       return { url };
+    }),
+  }),
+
+  // ===== DOCUMENTOS DE VENDA (Vendedor ↔ Despachante) =====
+  saleDocuments: router({
+    // Vendedor: listar seus documentos de venda
+    myDocs: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
+      return db.listSaleDocumentsBySeller(input.sellerId);
+    }),
+    // Vendedor: contar documentos pendentes
+    pendingCount: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
+      return db.countPendingDocsBySeller(input.sellerId);
+    }),
+    // Vendedor: upload de CNH
+    uploadCnh: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+      base64: z.string(),
+      filename: z.string(),
+    })).mutation(async ({ input }) => {
+      const buffer = Buffer.from(input.base64, 'base64');
+      const key = `sale-docs/${input.sellerId}/cnh-${Date.now()}-${input.filename}`;
+      const { url } = await storagePut(key, buffer, 'image/jpeg');
+      const result = await db.uploadSaleDocCnh(input.id, url, key);
+      // Se ficou completo, notificar despachante
+      if (result.docStatus === 'completo') {
+        await db.createNotification({
+          targetType: 'admin',
+          type: 'docs_complete',
+          title: 'Documentos completos para transfer\u00eancia!',
+          message: `Vendedor enviou CNH e Comprovante para ${result.vehicleModel || 've\u00edculo'} - Pronto para despachante!`,
+          actionUrl: '/admin/documentos',
+        });
+      }
+      return { success: true, docStatus: result.docStatus };
+    }),
+    // Vendedor: upload de Comprovante de Resid\u00eancia
+    uploadComprovante: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+      base64: z.string(),
+      filename: z.string(),
+    })).mutation(async ({ input }) => {
+      const buffer = Buffer.from(input.base64, 'base64');
+      const key = `sale-docs/${input.sellerId}/comprovante-${Date.now()}-${input.filename}`;
+      const { url } = await storagePut(key, buffer, 'image/jpeg');
+      const result = await db.uploadSaleDocComprovante(input.id, url, key);
+      if (result.docStatus === 'completo') {
+        await db.createNotification({
+          targetType: 'admin',
+          type: 'docs_complete',
+          title: 'Documentos completos para transfer\u00eancia!',
+          message: `Vendedor enviou CNH e Comprovante para ${result.vehicleModel || 've\u00edculo'} - Pronto para despachante!`,
+          actionUrl: '/admin/documentos',
+        });
+      }
+      return { success: true, docStatus: result.docStatus };
+    }),
+    // Admin/Despachante: listar todos os documentos
+    listAll: adminProcedure.input(z.object({ filterStatus: z.string().optional() }).optional()).query(async ({ input }) => {
+      return db.listAllSaleDocuments(input?.filterStatus);
+    }),
+    // Despachante: marcar como em transfer\u00eancia
+    markInTransfer: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.markSaleDocInTransfer(input.id);
+      return { success: true };
+    }),
+    // Despachante: marcar como transferido com documento emitido
+    markTransferred: adminProcedure.input(z.object({
+      id: z.number(),
+      base64: z.string(),
+      filename: z.string(),
+    })).mutation(async ({ input }) => {
+      const buffer = Buffer.from(input.base64, 'base64');
+      const key = `sale-docs/emitidos/${Date.now()}-${input.filename}`;
+      const { url } = await storagePut(key, buffer, 'application/pdf');
+      await db.markSaleDocTransferred(input.id, url, key);
+      return { success: true };
     }),
   }),
 });

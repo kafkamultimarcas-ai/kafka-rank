@@ -9,7 +9,7 @@ import {
   CalendarClock, Search, Trash2, Edit2, Phone, Mail, Car, Clock,
   CheckCircle2, XCircle, AlertCircle, UserCheck, User,
   AlertTriangle, PhoneCall, Save, X, Bell, CalendarPlus,
-  Timer, Siren,
+  Timer, Siren, Flame,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
@@ -376,6 +376,11 @@ function formatDateShort(ts: number | string | Date | null) {
                               {isRescue && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-500/30 text-red-300 animate-pulse">
                                   <Siren className="h-3 w-3" /> RESGATE
+                                </span>
+                              )}
+                              {record.isFeirão && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                  <Flame className="h-3 w-3" /> Feirão
                                 </span>
                               )}
                               {isClientWaiting && (

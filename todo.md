@@ -873,3 +873,25 @@
 - [x] Todas as rotas HTTP respondendo 200
 - [x] APIs tRPC funcionando
 - [x] Warning DialogContent "Missing Description" corrigido (aria-describedby)
+
+## Bug Fix - Crash ao clicar em Vendas (Metas da Loja)
+- [x] Corrigir crash "An unexpected error occurred" ao clicar em Vendas (não reproduzível no dev - versão antiga publicada)
+- [x] Varredura completa de bugs no sistema
+
+## Melhoria: Fluxo Completo de Documentos (Vendedor ↔ Despachante)
+- [x] Adicionar campos de documento emitido na tabela dispatch_records (documentUrl, documentKey, transferredAt, originalSellerId)
+- [x] Criar tabela sale_documents para vendedor enviar CNH + Comprovante de Residência por venda
+- [x] Vendedor faz upload de CNH e Comprovante de Residência para cada venda
+- [x] Documentos visíveis na Home quando vendedor lança venda (fácil e visual)
+- [x] Documentos visíveis na MinhaArea com alerta grande e botões visuais
+- [x] Alerta "Documentos Pendentes" na tela do vendedor se não enviou docs
+- [x] Venda só fica 100% concluída quando docs são enviados
+- [x] Despachante acessa automaticamente os documentos enviados pelo vendedor
+- [x] Despachante marca transferência e inclui documento emitido
+- [x] Vendedor vê status da transferência e acessa documento emitido
+
+## Melhoria: Flag de Feirão nos Agendamentos
+- [x] Adicionar campo booleano 'isFeirão' na tabela de agendamentos
+- [x] Ícone selecionável ao criar agendamento para marcar como Feirão
+- [x] Filtro para visualizar apenas agendamentos de Feirão
+- [x] Visual diferenciado para agendamentos de Feirão (ícone, badge)

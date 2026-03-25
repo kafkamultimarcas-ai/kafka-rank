@@ -151,6 +151,12 @@ export const dispatchRecords = mysqlTable("dispatch_records", {
   transferValue: int("transferValue").default(0), // valor da transferência em centavos
   points: int("points").default(1).notNull(),
   bonusPoints: int("bonusPoints").default(0).notNull(), // pontos bônus se cliente pagou
+  // Documento emitido (preenchido quando despachante marca como transferido)
+  documentUrl: text("documentUrl"), // URL do documento emitido (S3)
+  documentKey: varchar("documentKey", { length: 500 }), // chave S3 do documento
+  transferredAt: bigint("transferredAt", { mode: "number" }), // quando foi transferido
+  // Placa do veículo vendido e vendedor original (para vincular ao vendedor)
+  originalSellerId: int("originalSellerId"), // vendedor que vendeu o carro (para notificar)
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -243,6 +249,7 @@ export const sdrRecords = mysqlTable("sdr_records", {
   source: varchar("source", { length: 100 }),
   scheduledDate: bigint("scheduledDate", { mode: "number" }),
   converted: boolean("converted").default(false).notNull(),
+  isFeirão: boolean("isFeirão").default(false).notNull(), // flag para agendamentos de feirão
   notes: text("notes"),
   // Fluxo de comparecimento
   attendanceStatus: mysqlEnum("attendanceStatus", ["pending", "attended", "no_show", "approved", "rejected"]).default("pending"), // pending=aguardando, attended=vendedor marcou que veio, no_show=não compareceu, approved=gerente aprovou, rejected=gerente reprovou
@@ -666,3 +673,34 @@ export const iamConfig = mysqlTable("iam_config", {
 });
 export type IamConfig = typeof iamConfig.$inferSelect;
 export type InsertIamConfig = typeof iamConfig.$inferInsert;
+
+// ===== DOCUMENTOS DE VENDA (Vendedor → Despachante) =====
+// Cada venda aprovada precisa de CNH e Comprovante de Residência do cliente
+export const saleDocuments = mysqlTable("sale_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  saleId: int("saleId").notNull(), // venda vinculada
+  sellerId: int("sellerId").notNull(), // vendedor que enviou
+  // Dados do cliente
+  clienteNome: varchar("clienteNome", { length: 255 }),
+  vehiclePlate: varchar("vehiclePlate", { length: 10 }),
+  vehicleModel: varchar("vehicleModel", { length: 255 }),
+  // CNH do cliente
+  cnhUrl: text("cnhUrl"), // URL no S3
+  cnhKey: varchar("cnhKey", { length: 500 }),
+  // Comprovante de Residência
+  comprovanteUrl: text("comprovanteUrl"), // URL no S3
+  comprovanteKey: varchar("comprovanteKey", { length: 500 }),
+  // Status do fluxo
+  docStatus: mysqlEnum("docStatus", ["pendente", "parcial", "completo"]).default("pendente").notNull(),
+  // Transferência pelo despachante
+  dispatchStatus: mysqlEnum("dispatchStatus", ["aguardando_docs", "docs_enviados", "em_transferencia", "transferido"]).default("aguardando_docs").notNull(),
+  dispatchRecordId: int("dispatchRecordId"), // vincula ao registro de despachante quando criado
+  documentoEmitidoUrl: text("documentoEmitidoUrl"), // documento emitido pelo despachante (S3)
+  documentoEmitidoKey: varchar("documentoEmitidoKey", { length: 500 }),
+  transferredAt: bigint("transferredAt", { mode: "number" }), // quando despachante concluiu transferência
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SaleDocument = typeof saleDocuments.$inferSelect;
+export type InsertSaleDocument = typeof saleDocuments.$inferInsert;

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles } from "lucide-react";
+import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload } from "lucide-react";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -308,11 +308,40 @@ export default function RegisterSale() {
                 </p>
               )}
             </div>
+
+            {/* Aviso de Documentos - só para vendas */}
+            {category === "vendas" && (
+              <div className="bg-gradient-to-r from-orange-600/20 to-red-600/20 border border-orange-500/40 rounded-xl p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                    <FileWarning className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-orange-400 font-bold text-sm">Documentos Necessários!</p>
+                    <p className="text-gray-400 text-xs mt-1">Após a aprovação, envie a <strong className="text-white">CNH</strong> e o <strong className="text-white">Comprovante de Residência</strong> do cliente na sua <strong className="text-white">Minha Área</strong> para o despachante iniciar a transferência.</p>
+                    <Link href={sellerId ? `/minha-area/${sellerId}` : '/login-vendedor'}>
+                      <button className="mt-3 flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors">
+                        <Upload className="w-3.5 h-3.5" /> Ir para Minha Área e enviar docs
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
               <Button onClick={resetForm} className="bg-red-600 hover:bg-red-700 text-white font-bold">
                 <catInfo.icon className="w-4 h-4 mr-2" />
                 REGISTRAR OUTRO
               </Button>
+              {sellerId && category === "vendas" && (
+                <Link href={`/minha-area/${sellerId}`}>
+                  <Button variant="outline" className="w-full border-orange-600 text-orange-400 hover:bg-orange-600/10 font-bold">
+                    <FileText className="w-4 h-4 mr-2" />
+                    ENVIAR DOCUMENTOS
+                  </Button>
+                </Link>
+              )}
               <Link href="/">
                 <Button variant="outline" className="w-full border-gray-700 text-gray-300 hover:bg-gray-800">
                   <ArrowLeft className="w-4 h-4 mr-2" />

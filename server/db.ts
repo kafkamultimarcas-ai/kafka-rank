@@ -20,6 +20,7 @@ import {
   managers, InsertManager,
   mktStrategies, InsertMktStrategy,
   mktTasks, InsertMktTask,
+  saleDocuments, InsertSaleDocument,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1083,6 +1084,42 @@ export async function deleteDispatchRecord(id: number) {
   await db.delete(dispatchRecords).where(eq(dispatchRecords.id, id));
 }
 
+// Despachante: marcar como transferido com documento emitido
+export async function markDispatchTransferred(id: number, documentUrl: string, documentKey: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(dispatchRecords).where(eq(dispatchRecords.id, id)).limit(1);
+  const record = result[0];
+  if (!record) throw new Error("Registro de despachante n\u00e3o encontrado");
+  await db.update(dispatchRecords).set({
+    documentUrl,
+    documentKey,
+    transferredAt: Date.now(),
+  }).where(eq(dispatchRecords.id, id));
+  return { ...record, documentUrl, documentKey, transferredAt: Date.now() };
+}
+
+// Listar documentos transferidos para um vendedor (pelo originalSellerId)
+export async function listTransferredDocumentsForSeller(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(dispatchRecords)
+    .where(and(
+      eq(dispatchRecords.originalSellerId, sellerId),
+      sql`${dispatchRecords.transferredAt} IS NOT NULL`
+    ))
+    .orderBy(desc(dispatchRecords.transferredAt));
+}
+
+// Listar todos os documentos transferidos (para admin/despachante)
+export async function listAllTransferredDocuments() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(dispatchRecords)
+    .where(sql`${dispatchRecords.transferredAt} IS NOT NULL`)
+    .orderBy(desc(dispatchRecords.transferredAt));
+}
+
 // ===== SDR / PRÉ-VENDAS / AGENDAMENTOS =====
 export async function getNextTicketNumber() {
   const db = await getDb();
@@ -1816,4 +1853,105 @@ export async function updateIamConfig(data: Partial<InsertIamConfig>) {
     const [result] = await db!.insert(iamConfig).values({ ...data } as InsertIamConfig);
     return { id: result.insertId, ...data };
   }
+}
+
+
+// ===== DOCUMENTOS DE VENDA (Vendedor → Despachante) =====
+
+// Criar registro de documentos para uma venda (chamado automaticamente quando venda é aprovada)
+export async function createSaleDocument(data: Partial<InsertSaleDocument> & { saleId: number; sellerId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(saleDocuments).values(data as InsertSaleDocument);
+  return result[0].insertId;
+}
+
+// Buscar documento de venda pelo saleId
+export async function getSaleDocumentBySaleId(saleId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(saleDocuments).where(eq(saleDocuments.saleId, saleId)).limit(1);
+  return result[0] || null;
+}
+
+// Listar documentos de venda por vendedor
+export async function listSaleDocumentsBySeller(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(saleDocuments).where(eq(saleDocuments.sellerId, sellerId)).orderBy(desc(saleDocuments.createdAt));
+}
+
+// Listar todos os documentos de venda (para despachante/admin)
+export async function listAllSaleDocuments(filterStatus?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filterStatus) conditions.push(eq(saleDocuments.docStatus, filterStatus as any));
+  if (conditions.length > 0) return db.select().from(saleDocuments).where(and(...conditions)).orderBy(desc(saleDocuments.createdAt));
+  return db.select().from(saleDocuments).orderBy(desc(saleDocuments.createdAt));
+}
+
+// Vendedor faz upload de CNH
+export async function uploadSaleDocCnh(id: number, cnhUrl: string, cnhKey: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const doc = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  if (!doc[0]) throw new Error("Documento de venda não encontrado");
+  const hasComprovante = !!doc[0].comprovanteUrl;
+  const newStatus = hasComprovante ? 'completo' : 'parcial';
+  const newDispatchStatus = hasComprovante ? 'docs_enviados' : doc[0].dispatchStatus;
+  await db.update(saleDocuments).set({
+    cnhUrl, cnhKey,
+    docStatus: newStatus,
+    dispatchStatus: newDispatchStatus === 'aguardando_docs' ? (newStatus === 'completo' ? 'docs_enviados' : 'aguardando_docs') : newDispatchStatus,
+  }).where(eq(saleDocuments.id, id));
+  return { ...doc[0], cnhUrl, cnhKey, docStatus: newStatus };
+}
+
+// Vendedor faz upload de Comprovante de Residência
+export async function uploadSaleDocComprovante(id: number, comprovanteUrl: string, comprovanteKey: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const doc = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  if (!doc[0]) throw new Error("Documento de venda não encontrado");
+  const hasCnh = !!doc[0].cnhUrl;
+  const newStatus = hasCnh ? 'completo' : 'parcial';
+  const newDispatchStatus = hasCnh ? 'docs_enviados' : doc[0].dispatchStatus;
+  await db.update(saleDocuments).set({
+    comprovanteUrl, comprovanteKey,
+    docStatus: newStatus,
+    dispatchStatus: newDispatchStatus === 'aguardando_docs' ? (newStatus === 'completo' ? 'docs_enviados' : 'aguardando_docs') : newDispatchStatus,
+  }).where(eq(saleDocuments.id, id));
+  return { ...doc[0], comprovanteUrl, comprovanteKey, docStatus: newStatus };
+}
+
+// Despachante marca como em transferência
+export async function markSaleDocInTransfer(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(saleDocuments).set({ dispatchStatus: 'em_transferencia' }).where(eq(saleDocuments.id, id));
+}
+
+// Despachante marca como transferido e inclui documento emitido
+export async function markSaleDocTransferred(id: number, documentoEmitidoUrl: string, documentoEmitidoKey: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(saleDocuments).set({
+    dispatchStatus: 'transferido',
+    documentoEmitidoUrl,
+    documentoEmitidoKey,
+    transferredAt: Date.now(),
+  }).where(eq(saleDocuments.id, id));
+}
+
+// Contar documentos pendentes por vendedor
+export async function countPendingDocsBySeller(sellerId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(saleDocuments)
+    .where(and(
+      eq(saleDocuments.sellerId, sellerId),
+      sql`${saleDocuments.docStatus} != 'completo'`
+    ));
+  return Number(result?.count || 0);
 }

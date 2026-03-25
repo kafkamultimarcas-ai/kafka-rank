@@ -25,8 +25,8 @@ import {
   LayoutGrid,
   Filter,
 } from "lucide-react";
-import { useMemo, useState, useCallback } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2 } from "lucide-react";
+import { useMemo, useState, useCallback, useRef } from "react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 
@@ -89,6 +89,13 @@ export default function MinhaArea() {
   // Filter state for F&I records
   const [feiFilter, setFeiFilter] = useState<"todos" | "approved" | "pending" | "rejected">("todos");
 
+  // Documentos de Venda state
+  const [showDocTab, setShowDocTab] = useState(false);
+  const cnhInputRef = useRef<HTMLInputElement>(null);
+  const comprovanteInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingDocId, setUploadingDocId] = useState<number | null>(null);
+  const [uploadingType, setUploadingType] = useState<'cnh' | 'comprovante' | null>(null);
+
   // Pós-Venda state
   const [showPvModal, setShowPvModal] = useState(false);
   const [pvForm, setPvForm] = useState({ clienteNome: '', clienteTelefone: '', carroModelo: '', carroPlaca: '', problemaRelatado: '', observacoes: '' });
@@ -115,6 +122,24 @@ export default function MinhaArea() {
     { sellerId },
     { enabled: sellerId > 0 && dept === "despachante" }
   );
+
+  // Documentos de venda (para vendedores)
+  const { data: myDocs, refetch: refetchDocs } = trpc.saleDocuments.myDocs.useQuery(
+    { sellerId },
+    { enabled: sellerId > 0 && dept === "vendas" }
+  );
+  const { data: pendingDocsCount } = trpc.saleDocuments.pendingCount.useQuery(
+    { sellerId },
+    { enabled: sellerId > 0 && dept === "vendas" }
+  );
+  const uploadCnhMutation = trpc.saleDocuments.uploadCnh.useMutation({
+    onSuccess: () => { toast.success('CNH enviada com sucesso!'); refetchDocs(); setUploadingDocId(null); setUploadingType(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const uploadComprovanteMutation = trpc.saleDocuments.uploadComprovante.useMutation({
+    onSuccess: () => { toast.success('Comprovante enviado com sucesso!'); refetchDocs(); setUploadingDocId(null); setUploadingType(null); },
+    onError: (e) => toast.error(e.message),
+  });
 
   // Pós-Venda - chamados do vendedor (ou TODOS se for setor pos_venda)
   const { data: myPvChamados, refetch: refetchPv } = trpc.pvChamados.list.useQuery(
@@ -207,6 +232,34 @@ export default function MinhaArea() {
   };
 
   const DeptIcon = deptInfo.icon;
+
+  // Função de upload de arquivo (converte para base64)
+  const handleFileUpload = useCallback((docId: number, type: 'cnh' | 'comprovante') => {
+    setUploadingDocId(docId);
+    setUploadingType(type);
+    if (type === 'cnh') cnhInputRef.current?.click();
+    else comprovanteInputRef.current?.click();
+  }, []);
+
+  const processFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadingDocId || !uploadingType) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande (máx 10MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      if (uploadingType === 'cnh') {
+        uploadCnhMutation.mutate({ id: uploadingDocId, sellerId, base64, filename: file.name });
+      } else {
+        uploadComprovanteMutation.mutate({ id: uploadingDocId, sellerId, base64, filename: file.name });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [uploadingDocId, uploadingType, sellerId, uploadCnhMutation, uploadComprovanteMutation]);
+
+  const pendingDocsList = useMemo(() => (myDocs || []).filter((d: any) => d.docStatus !== 'completo'), [myDocs]);
+  const completeDocs = useMemo(() => (myDocs || []).filter((d: any) => d.docStatus === 'completo'), [myDocs]);
 
   // Verificar se o vendedor logado é o mesmo do URL
   const isAuthorized = sellerSession && sellerSession.id === sellerId;
@@ -404,6 +457,152 @@ export default function MinhaArea() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ALERTA: Documentos Pendentes */}
+        {dept === "vendas" && pendingDocsCount && pendingDocsCount > 0 && (
+          <button
+            onClick={() => setShowDocTab(!showDocTab)}
+            className="w-full bg-gradient-to-r from-red-600/30 to-orange-600/20 border border-red-500/50 rounded-xl p-4 flex items-center gap-3 hover:border-red-400/70 transition-all animate-pulse"
+          >
+            <div className="w-10 h-10 rounded-full bg-red-500/30 flex items-center justify-center shrink-0">
+              <FileWarning className="w-5 h-5 text-red-400" />
+            </div>
+            <div className="text-left flex-1">
+              <p className="text-red-400 font-bold text-sm">{pendingDocsCount} Documento{pendingDocsCount > 1 ? 's' : ''} Pendente{pendingDocsCount > 1 ? 's' : ''}</p>
+              <p className="text-gray-400 text-xs">Envie CNH e Comprovante para concluir suas vendas</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-red-400" />
+          </button>
+        )}
+
+        {/* Aba de Documentos de Venda */}
+        {dept === "vendas" && showDocTab && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <FileText className="w-4 h-4" /> Documentos das Vendas
+            </h2>
+
+            {/* Hidden file inputs */}
+            <input ref={cnhInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={processFileUpload} />
+            <input ref={comprovanteInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={processFileUpload} />
+
+            {/* Docs pendentes */}
+            {pendingDocsList.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-red-400 font-semibold">Pendentes - Envie para concluir a venda</p>
+                {pendingDocsList.map((doc: any) => (
+                  <div key={doc.id} className="bg-red-950/20 border border-red-500/30 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-white font-bold text-sm">{doc.vehicleModel || 'Ve\u00edculo'}</p>
+                        <p className="text-xs text-gray-500">{doc.clienteNome || 'Cliente'} {doc.vehiclePlate ? `\u2022 ${doc.vehiclePlate}` : ''}</p>
+                      </div>
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/20 text-red-400 font-semibold">
+                        {doc.docStatus === 'pendente' ? 'Faltam 2 docs' : 'Falta 1 doc'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* CNH */}
+                      <button
+                        onClick={() => !doc.cnhUrl && handleFileUpload(doc.id, 'cnh')}
+                        disabled={!!doc.cnhUrl || uploadCnhMutation.isPending}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all ${
+                          doc.cnhUrl
+                            ? 'bg-emerald-950/30 border-emerald-500/40 cursor-default'
+                            : 'bg-gray-900/60 border-gray-700 hover:border-red-500/50 cursor-pointer'
+                        }`}
+                      >
+                        {doc.cnhUrl ? (
+                          <FileCheck className="w-5 h-5 text-emerald-400" />
+                        ) : uploadCnhMutation.isPending && uploadingDocId === doc.id ? (
+                          <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Upload className="w-5 h-5 text-gray-400" />
+                        )}
+                        <span className={`text-[10px] font-semibold ${doc.cnhUrl ? 'text-emerald-400' : 'text-gray-400'}`}>
+                          {doc.cnhUrl ? 'CNH Enviada' : 'Enviar CNH'}
+                        </span>
+                      </button>
+                      {/* Comprovante */}
+                      <button
+                        onClick={() => !doc.comprovanteUrl && handleFileUpload(doc.id, 'comprovante')}
+                        disabled={!!doc.comprovanteUrl || uploadComprovanteMutation.isPending}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all ${
+                          doc.comprovanteUrl
+                            ? 'bg-emerald-950/30 border-emerald-500/40 cursor-default'
+                            : 'bg-gray-900/60 border-gray-700 hover:border-red-500/50 cursor-pointer'
+                        }`}
+                      >
+                        {doc.comprovanteUrl ? (
+                          <FileCheck className="w-5 h-5 text-emerald-400" />
+                        ) : uploadComprovanteMutation.isPending && uploadingDocId === doc.id ? (
+                          <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Upload className="w-5 h-5 text-gray-400" />
+                        )}
+                        <span className={`text-[10px] font-semibold ${doc.comprovanteUrl ? 'text-emerald-400' : 'text-gray-400'}`}>
+                          {doc.comprovanteUrl ? 'Comprovante Enviado' : 'Enviar Comprovante'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Docs completos - com status da transfer\u00eancia */}
+            {completeDocs.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-emerald-400 font-semibold">Documentos Completos</p>
+                {completeDocs.map((doc: any) => (
+                  <div key={doc.id} className="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-white font-bold text-sm">{doc.vehicleModel || 'Ve\u00edculo'}</p>
+                        <p className="text-xs text-gray-500">{doc.clienteNome || 'Cliente'}</p>
+                      </div>
+                      <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${
+                        doc.dispatchStatus === 'transferido'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : doc.dispatchStatus === 'em_transferencia'
+                          ? 'bg-yellow-500/20 text-yellow-400'
+                          : 'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {doc.dispatchStatus === 'transferido' ? 'Transferido' :
+                         doc.dispatchStatus === 'em_transferencia' ? 'Em Transfer\u00eancia' :
+                         'Aguardando Despachante'}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-[10px] text-emerald-400 flex items-center gap-1"><FileCheck className="w-3 h-3" /> CNH</span>
+                      <span className="text-[10px] text-emerald-400 flex items-center gap-1"><FileCheck className="w-3 h-3" /> Comprovante</span>
+                    </div>
+                    {doc.dispatchStatus === 'transferido' && doc.documentoEmitidoUrl && (
+                      <a
+                        href={doc.documentoEmitidoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        <Eye className="w-3 h-3" /> Ver documento emitido
+                      </a>
+                    )}
+                    {doc.transferredAt && (
+                      <p className="text-[10px] text-gray-600 mt-1">Transferido em {formatDate(doc.transferredAt)}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(myDocs || []).length === 0 && (
+              <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-6 text-center">
+                <FileCheck className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">Nenhuma venda aprovada ainda. Documentos aparecer\u00e3o aqui quando suas vendas forem aprovadas.</p>
+              </div>
+            )}
           </div>
         )}
 

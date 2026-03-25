@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `dispatch_records` ADD `documentUrl` text;\nALTER TABLE `dispatch_records` ADD `documentKey` varchar(500);\nALTER TABLE `dispatch_records` ADD `transferredAt` bigint;\nALTER TABLE `dispatch_records` ADD `originalSellerId` int;\nALTER TABLE `sdr_records` ADD `isFeirão` boolean DEFAULT false NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute ALTER TABLE `dispatch_records` ADD `documentUrl` text;\nALTER TABLE `dispatch_records` ADD `documentKey` varchar(500);\nALTER TABLE `dispatch_records` ADD `transferredAt` bigint;\nALTER TABLE `dispatch_records` ADD `originalSellerId` int;\nALTER TABLE `sdr_records` ADD `isFeirão` boolean DEFAULT false NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1722
+}

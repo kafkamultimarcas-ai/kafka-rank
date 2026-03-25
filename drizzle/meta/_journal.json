@@ -169,6 +169,20 @@
       "when": 1774413012924,
       "tag": "0023_demonic_santa_claus",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1774439643051,
+      "tag": "0024_hard_hellcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1774439783064,
+      "tag": "0025_rich_stature",
+      "breakpoints": true
     }
   ]
 }

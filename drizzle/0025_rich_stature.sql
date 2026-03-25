@@ -1,0 +1,22 @@
+CREATE TABLE `sale_documents` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`saleId` int NOT NULL,
+	`sellerId` int NOT NULL,
+	`clienteNome` varchar(255),
+	`vehiclePlate` varchar(10),
+	`vehicleModel` varchar(255),
+	`cnhUrl` text,
+	`cnhKey` varchar(500),
+	`comprovanteUrl` text,
+	`comprovanteKey` varchar(500),
+	`docStatus` enum('pendente','parcial','completo') NOT NULL DEFAULT 'pendente',
+	`dispatchStatus` enum('aguardando_docs','docs_enviados','em_transferencia','transferido') NOT NULL DEFAULT 'aguardando_docs',
+	`dispatchRecordId` int,
+	`documentoEmitidoUrl` text,
+	`documentoEmitidoKey` varchar(500),
+	`transferredAt` bigint,
+	`notes` text,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `sale_documents_id` PRIMARY KEY(`id`)
+);
