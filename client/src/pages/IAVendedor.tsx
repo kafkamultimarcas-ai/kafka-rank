@@ -9,7 +9,7 @@ import {
   Sparkles, Brain, Target, Zap, Copy, Check,
   Phone, MessageSquare, TrendingUp, FileText, Heart,
   Shield, DollarSign, Video, Users, CalendarCheck,
-  Lightbulb, AlertTriangle, Car, HandshakeIcon,
+  Lightbulb, AlertTriangle, Car, HandshakeIcon, Trophy,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 
@@ -43,6 +43,7 @@ const CATEGORIES = [
   { id: "gestao", icon: Users, label: "Gestão de Equipe", color: "from-violet-500 to-purple-500", desc: "Motivar e liderar" },
   { id: "posvenda", icon: Heart, label: "Pós-Venda", color: "from-rose-500 to-pink-500", desc: "Fidelizar e indicação" },
   { id: "marketing", icon: TrendingUp, label: "Marketing Digital", color: "from-cyan-500 to-blue-500", desc: "Tráfego e campanhas" },
+  { id: "fechamento", icon: Trophy, label: "Fechamento de Vendas", color: "from-yellow-500 to-amber-500", desc: "Fechar negócio agora" },
   { id: "gatilhos", icon: Brain, label: "Gatilhos Mentais", color: "from-purple-500 to-violet-500", desc: "Técnicas avançadas" },
 ];
 
@@ -58,6 +59,7 @@ const CATEGORY_PROMPTS: Record<string, string> = {
   gestao: "Preciso de ajuda com gestão da equipe de vendas. Situação:",
   posvenda: "Preciso de ajuda com pós-venda. Situação:",
   marketing: "Preciso de estratégia de marketing digital para a loja. Objetivo:",
+  fechamento: "Preciso de técnicas de fechamento de vendas para fechar o negócio agora. O cliente está interessado mas preciso dar o empurrão final. Situação:",
   gatilhos: "Me ensine gatilhos mentais avançados para usar na venda de carros. Situação:",
 };
 

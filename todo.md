@@ -836,3 +836,6 @@
 
 ## Bug - IAM Enviar Print
 - [x] Bug: botão de enviar print não abre galeria/câmera do celular (removido capture=environment que forçava só câmera)
+
+## IAM - Fechamento de Vendas
+- [x] Adicionar categoria "Fechamento de Vendas" nas especialidades do IAM (com ícone Trophy dourado)
