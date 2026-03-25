@@ -52,7 +52,11 @@ vi.mock("./db", () => ({
   createQuote: vi.fn().mockResolvedValue(1),
   listNotifications: vi.fn().mockResolvedValue([]),
   markNotificationRead: vi.fn().mockResolvedValue(undefined),
-  getAppSetting: vi.fn().mockResolvedValue("kafka2024"),
+  getAppSetting: vi.fn().mockImplementation(async (key: string) => {
+    if (key === "access_code_hash") return null; // No hash yet, triggers legacy fallback
+    if (key === "access_code") return "kafka2024";
+    return null;
+  }),
   setAppSetting: vi.fn().mockResolvedValue(undefined),
   // F&I
   listFeiRecords: vi.fn().mockResolvedValue([]),

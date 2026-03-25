@@ -4,6 +4,13 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { nanoid } from "nanoid";
+
+// ===== SECURITY: Constantes de validação =====
+const MAX_BASE64_SIZE = 10 * 1024 * 1024; // 10MB em base64 (~7.5MB arquivo real)
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const base64Schema = z.string().max(MAX_BASE64_SIZE, 'Arquivo muito grande. Máximo 7.5MB.');
+const filenameSchema = z.string().max(255).regex(/^[a-zA-Z0-9._\-\s\u00C0-\u024F]+$/, 'Nome de arquivo inválido');
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
@@ -66,7 +73,7 @@ export const appRouter = router({
     }),
     uploadPhoto: adminProcedure.input(z.object({
       id: z.number(),
-      base64: z.string(),
+      base64: base64Schema,
       mimeType: z.string(),
     })).mutation(async ({ input }) => {
       const ext = input.mimeType.split("/")[1] || "jpg";
@@ -440,7 +447,7 @@ export const appRouter = router({
     uploadVideo: adminProcedure.input(z.object({
       id: z.number(),
       fileName: z.string(),
-      fileBase64: z.string(),
+      fileBase64: base64Schema,
       mimeType: z.string(),
     })).mutation(async ({ input }) => {
       const buffer = Buffer.from(input.fileBase64, 'base64');
@@ -1221,16 +1228,31 @@ export const appRouter = router({
   // ===== ACCESS CONTROL =====
   access: router({
     verify: publicProcedure.input(z.object({ code: z.string() })).mutation(async ({ input }) => {
-      const storedCode = await db.getAppSetting("access_code");
-      if (!storedCode) return { valid: true };
-      return { valid: input.code === storedCode };
+      const storedHash = await db.getAppSetting("access_code_hash");
+      // Fallback: se não tem hash, tenta código legado em texto plano
+      if (!storedHash) {
+        const legacyCode = await db.getAppSetting("access_code");
+        if (!legacyCode) return { valid: true };
+        const valid = input.code === legacyCode;
+        // Migrar para hash se validou
+        if (valid) {
+          const hash = await bcrypt.hash(legacyCode, 10);
+          await db.setAppSetting("access_code_hash", hash);
+        }
+        return { valid };
+      }
+      const valid = await bcrypt.compare(input.code, storedHash);
+      return { valid };
     }),
     getCode: adminProcedure.query(async () => {
       const code = await db.getAppSetting("access_code");
       return { code: code || "" };
     }),
     setCode: adminProcedure.input(z.object({ code: z.string().min(1) })).mutation(async ({ input }) => {
+      // Salvar código em texto (para admin ver) E hash (para verificação segura)
       await db.setAppSetting("access_code", input.code);
+      const hash = await bcrypt.hash(input.code, 10);
+      await db.setAppSetting("access_code_hash", hash);
       return { success: true };
     }),
   }),
@@ -1571,7 +1593,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
 
     uploadImage: publicProcedure.input(z.object({
       sellerId: z.number(),
-      base64: z.string(),
+      base64: base64Schema,
       filename: z.string(),
     })).mutation(async ({ input }) => {
       const buffer = Buffer.from(input.base64, "base64");
@@ -1595,7 +1617,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     uploadCnh: publicProcedure.input(z.object({
       id: z.number(),
       sellerId: z.number(),
-      base64: z.string(),
+      base64: base64Schema,
       filename: z.string(),
     })).mutation(async ({ input }) => {
       const buffer = Buffer.from(input.base64, 'base64');
@@ -1618,7 +1640,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     uploadComprovante: publicProcedure.input(z.object({
       id: z.number(),
       sellerId: z.number(),
-      base64: z.string(),
+      base64: base64Schema,
       filename: z.string(),
     })).mutation(async ({ input }) => {
       const buffer = Buffer.from(input.base64, 'base64');
@@ -1648,7 +1670,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     // Despachante: marcar como transferido com documento emitido
     markTransferred: adminProcedure.input(z.object({
       id: z.number(),
-      base64: z.string(),
+      base64: base64Schema,
       filename: z.string(),
     })).mutation(async ({ input }) => {
       const buffer = Buffer.from(input.base64, 'base64');

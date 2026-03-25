@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerWebhookRoutes } from "../webhooks";
@@ -31,9 +33,65 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // ===== SECURITY HEADERS (Helmet) =====
+  app.use(helmet({
+    contentSecurityPolicy: false, // Desabilitado para não quebrar Vite/React em dev
+    crossOriginEmbedderPolicy: false, // Necessário para embeds de vídeo/imagem
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Permite carregar recursos CDN
+  }));
+
+  // ===== RATE LIMITING =====
+  // Rate limit global: 200 requests por minuto por IP
+  const globalLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitas requisições. Tente novamente em 1 minuto." },
+  });
+  app.use(globalLimiter);
+
+  // Rate limit para login: 10 tentativas por 15 minutos por IP (anti brute force)
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
+    // Usa o keyGenerator padrão (req.ip) que já lida com IPv6
+  });
+  // Aplicar rate limit de login nas rotas de autenticação
+  app.use("/api/trpc/sellerSession.login", loginLimiter);
+  app.use("/api/trpc/managers.login", loginLimiter);
+  app.use("/api/trpc/access.verify", loginLimiter);
+
+  // Rate limit para webhooks públicos: 30 por minuto por IP (anti spam)
+  const webhookLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Rate limit excedido para webhooks." },
+  });
+  app.use("/api/webhooks/widget", webhookLimiter);
+
+  // Rate limit para uploads: 20 por minuto por IP
+  const uploadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitos uploads. Tente novamente em 1 minuto." },
+  });
+  app.use("/api/trpc/saleDocuments.uploadCnh", uploadLimiter);
+  app.use("/api/trpc/saleDocuments.uploadComprovante", uploadLimiter);
+  app.use("/api/trpc/sellers.uploadPhoto", uploadLimiter);
+
+  // Configure body parser with size limit for file uploads (reduzido de 50mb para 16mb)
+  app.use(express.json({ limit: "16mb" }));
+  app.use(express.urlencoded({ limit: "16mb", extended: true }));
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // CRM webhook endpoints for external integrations

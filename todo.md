@@ -895,3 +895,16 @@
 - [x] Ícone selecionável ao criar agendamento para marcar como Feirão
 - [x] Filtro para visualizar apenas agendamentos de Feirão
 - [x] Visual diferenciado para agendamentos de Feirão (ícone, badge)
+
+## Varredura de Bugs e Auditoria de Segurança
+- [x] Varredura completa de bugs (logs, TypeScript, testes, console) - 0 erros
+- [x] Auditoria de segurança: SQL Injection - PROTEGIDO (Drizzle ORM parametrizado)
+- [x] Auditoria de segurança: XSS - PROTEGIDO (React auto-escaping)
+- [x] Auditoria de segurança: Exposição de dados sensíveis - PROTEGIDO (safeSellerColumns)
+- [x] Auditoria de segurança: Autenticação e autorização - PROTEGIDO (bcrypt, JWT, adminProcedure)
+- [x] Auditoria de segurança: CSRF e cookies - PROTEGIDO (httpOnly, secure, sameSite)
+- [x] Auditoria de segurança: Rate limiting e brute force - IMPLEMENTADO (express-rate-limit)
+- [x] Auditoria de segurança: Upload de arquivos - IMPLEMENTADO (10MB max, validação)
+- [x] Auditoria de segurança: Headers de segurança - IMPLEMENTADO (helmet: HSTS, X-Frame, etc)
+- [x] Corrigir vulnerabilidades: rate limiting, helmet, upload limits, hash código acesso
+- [x] Testes de segurança automatizados (10 testes específicos de segurança)
