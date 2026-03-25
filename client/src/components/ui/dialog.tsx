@@ -128,6 +128,7 @@ function DialogContent({
           className
         )}
         onEscapeKeyDown={handleEscapeKeyDown}
+        aria-describedby={props['aria-describedby'] ?? undefined}
         {...props}
       >
         {children}

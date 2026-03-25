@@ -855,3 +855,21 @@
 
 ## Área de Consulta de Cliente
 - [ ] Campo para registrar score e situação do cliente manualmente
+
+## Simulador Visível na Tela Principal
+- [x] Adicionar simulador de financiamento embutido na Home (não só link, mas o simulador real)
+- [x] Fácil acesso para qualquer vendedor usar direto
+
+## Bug Fix - MinhaArea Hooks
+- [x] Corrigir bug "Rendered more hooks than during the previous render" em MinhaArea.tsx:220 (já corrigido - hooks movidos antes dos early returns)
+
+## Varredura Completa de Bugs - 25/03/2026
+- [x] TypeScript: 0 erros (npx tsc --noEmit limpo)
+- [x] Build: OK em 28.45s (apenas warnings de chunk size esperados)
+- [x] 245 testes passando (17 arquivos)
+- [x] Console browser: 0 erros recentes
+- [x] Network requests: 100% status 200
+- [x] DevServer: 0 erros recentes
+- [x] Todas as rotas HTTP respondendo 200
+- [x] APIs tRPC funcionando
+- [x] Warning DialogContent "Missing Description" corrigido (aria-describedby)

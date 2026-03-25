@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb } from "lucide-react";
+import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -43,6 +43,25 @@ export default function Home() {
   const activeComps = competitions || [];
   const finishedComps = useMemo(() => (allCompetitions || []).filter(c => c.status === "finished"), [allCompetitions]);
   const storeGoals = useMemo(() => (goals || []).filter(g => g.type === "store"), [goals]);
+
+  // Simulador de Financiamento
+  const { data: iamConfig } = trpc.iamConfig.get.useQuery();
+  const [simValor, setSimValor] = useState("");
+  const [simEntrada, setSimEntrada] = useState("");
+  const [simPrazo, setSimPrazo] = useState(48);
+  const simTaxa = iamConfig?.financingRate ? parseFloat(iamConfig.financingRate) : 2.2;
+  const simFinanciado = Math.max(0, (parseFloat(simValor.replace(/\D/g, "")) || 0) - (parseFloat(simEntrada.replace(/\D/g, "")) || 0));
+  const simParcela = simFinanciado > 0 && simTaxa > 0 ? simFinanciado * (simTaxa / 100) / (1 - Math.pow(1 + simTaxa / 100, -simPrazo)) : 0;
+  const simTotal = simParcela * simPrazo;
+  const simJuros = simTotal - simFinanciado;
+
+  const formatCurrency = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const handleMoneyInput = (value: string, setter: (v: string) => void) => {
+    const nums = value.replace(/\D/g, "");
+    if (!nums) { setter(""); return; }
+    const n = parseInt(nums);
+    setter(n.toLocaleString("pt-BR"));
+  };
 
   // Ranking mensal de vendas
   const [showMonthlyRanking, setShowMonthlyRanking] = useState<string | null>(null);
@@ -159,6 +178,88 @@ export default function Home() {
               <Button variant="outline" size="sm" onClick={() => setLocation("/pos-venda")} className="gap-2 border-orange-600 text-orange-400 hover:bg-orange-600/10">
                 <Wrench className="h-4 w-4" /> Pós-Venda
               </Button>
+            </div>
+
+            {/* SIMULADOR DE FINANCIAMENTO */}
+            <div className="mt-8 max-w-md mx-auto">
+              <div className="racing-card p-5 border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 to-green-950/40">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Calculator className="h-6 w-6 text-emerald-400" />
+                  <h3 className="font-heading font-bold text-lg text-foreground">SIMULADOR DE FINANCIAMENTO</h3>
+                </div>
+                <p className="text-[10px] text-emerald-400/70 text-center mb-4">Simulação ilustrativa • Taxa: {simTaxa}% a.m.</p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Valor do Veículo (R$)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Ex: 45.000"
+                      value={simValor}
+                      onChange={e => handleMoneyInput(e.target.value, setSimValor)}
+                      className="w-full rounded-lg border-2 border-emerald-500/30 bg-background px-4 py-3 text-sm text-foreground font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Entrada (R$)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Ex: 10.000"
+                      value={simEntrada}
+                      onChange={e => handleMoneyInput(e.target.value, setSimEntrada)}
+                      className="w-full rounded-lg border-2 border-emerald-500/30 bg-background px-4 py-3 text-sm text-foreground font-bold focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Prazo: {simPrazo}x</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {[12, 24, 36, 48, 60].map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setSimPrazo(p)}
+                          className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                            simPrazo === p
+                              ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                              : "bg-muted text-muted-foreground hover:bg-emerald-500/20"
+                          }`}
+                        >
+                          {p}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {simParcela > 0 && (
+                  <div className="mt-4 pt-4 border-t border-emerald-500/20">
+                    <div className="text-center mb-3">
+                      <p className="text-xs text-muted-foreground">Parcela estimada</p>
+                      <p className="font-heading font-bold text-3xl text-emerald-400">{formatCurrency(simParcela)}</p>
+                      <p className="text-xs text-muted-foreground">{simPrazo}x de {formatCurrency(simParcela)}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-muted/50 rounded-lg p-2">
+                        <p className="text-[10px] text-muted-foreground">Financiado</p>
+                        <p className="text-xs font-bold text-foreground">{formatCurrency(simFinanciado)}</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-lg p-2">
+                        <p className="text-[10px] text-muted-foreground">Total</p>
+                        <p className="text-xs font-bold text-foreground">{formatCurrency(simTotal)}</p>
+                      </div>
+                      <div className="bg-muted/50 rounded-lg p-2">
+                        <p className="text-[10px] text-muted-foreground">Juros</p>
+                        <p className="text-xs font-bold text-yellow-400">{formatCurrency(simJuros)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <p className="text-[10px] text-emerald-300 text-center">💡 Argumento: "Por apenas <strong>{formatCurrency(simParcela)}/mês</strong>, você sai de carro hoje!"</p>
+                    </div>
+                  </div>
+                )}
+                <p className="text-[8px] text-muted-foreground/50 text-center mt-3">⚠️ Valores meramente ilustrativos. Consulte condições reais com financeira.</p>
+              </div>
             </div>
 
             {/* Pós-Venda - Acesso Rápido */}
