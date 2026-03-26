@@ -945,3 +945,13 @@
 - [x] Botão "Editar/Reagendar" para vendedor alterar data, horário, nome, telefone, carro
 - [x] Rota backend para marcar agendamento como feirão (toggle)
 - [x] Rota backend para vendedor editar/reagendar agendamento
+
+## Ranking Feirão e Vínculo Telefone Agendamento↔Venda
+- [x] Ranking visual do Feirão: tela pública mostrando quem mais agendou pro feirão com contagem
+- [x] Conferência de comparecimento do feirão: painel para verificar se cliente veio
+- [x] Vínculo por telefone: ao registrar venda, cruzar telefone com agendamentos e identificar origem
+- [x] Alerta para SDR: quando vendedor lançar venda de cliente que estava no agendamento da SDR
+- [x] Controle de comissão SDR: pré-vendas vê quais clientes dela foram convertidos em venda
+- [x] Rota backend: ranking feirão (quem mais agendou pro feirão)
+- [x] Rota backend: buscar agendamento por telefone (cruzamento)
+- [x] Rota backend: vincular venda ao agendamento de origem

@@ -26,7 +26,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 
@@ -959,6 +959,27 @@ export default function MinhaArea() {
                 </span>
               )}
             </button>
+          )}
+
+          {/* Feirão - para Vendas e Pré-Vendas */}
+          {(dept === "vendas" || dept === "pre_vendas") && (
+            <button
+              onClick={() => navigate("/feirao")}
+              className="w-full bg-gradient-to-r from-red-600/20 to-orange-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-red-500/60 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Flame className="w-6 h-6 text-red-400" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-bold">Ranking Feirão</p>
+                <p className="text-gray-400 text-sm">Ver ranking e conferência de comparecimento</p>
+              </div>
+            </button>
+          )}
+
+          {/* Conversões SDR - para Pré-Vendas */}
+          {dept === "pre_vendas" && (
+            <SdrConversionsCard sellerId={Number(sellerId)} />
           )}
 
           {/* Registrar - botão específico por setor */}
@@ -1936,6 +1957,82 @@ function OrcamentoDetail({ orcamentoId, orc }: { orcamentoId: number; orc: any }
       )}
 
       <p className="text-[10px] text-gray-600">Lançado por {orc.criadoPor} em {new Date(orc.createdAt).toLocaleDateString('pt-BR')}</p>
+    </div>
+  );
+}
+
+
+// Componente de Conversões SDR - mostra agendamentos que viraram venda
+function SdrConversionsCard({ sellerId }: { sellerId: number }) {
+  const { data: conversions, isLoading } = trpc.sdr.myConversions.useQuery({ sellerId });
+  const [expanded, setExpanded] = useState(false);
+
+  if (isLoading) return null;
+  if (!conversions || conversions.length === 0) {
+    return (
+      <div className="bg-gradient-to-r from-emerald-600/10 to-green-500/5 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <Handshake className="w-6 h-6 text-emerald-400" />
+        </div>
+        <div className="text-left flex-1">
+          <p className="text-white font-bold">Minhas Conversões</p>
+          <p className="text-gray-400 text-sm">Nenhum agendamento convertido em venda ainda</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full bg-gradient-to-r from-emerald-600/20 to-green-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
+      >
+        <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <Handshake className="w-6 h-6 text-emerald-400" />
+        </div>
+        <div className="text-left flex-1">
+          <p className="text-white font-bold">Minhas Conversões</p>
+          <p className="text-gray-400 text-sm">{conversions.length} agendamento(s) convertido(s) em venda</p>
+        </div>
+        <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+          {conversions.length}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-2 pl-2">
+          {conversions.map((c: any, i: number) => (
+            <div key={i} className="racing-card p-3 border border-emerald-500/20 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400">
+                  {c.agendamento.customerName || "Cliente"}
+                </span>
+                {c.agendamento.ticketNumber && (
+                  <span className="text-[10px] font-mono text-muted-foreground">#{c.agendamento.ticketNumber}</span>
+                )}
+              </div>
+              {c.agendamento.customerPhone && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Phone className="h-3 w-3" /> {c.agendamento.customerPhone}
+                </p>
+              )}
+              {c.venda && (
+                <div className="bg-emerald-500/10 rounded-lg p-2 mt-1">
+                  <p className="text-[11px] text-emerald-400 font-bold">Venda fechada!</p>
+                  <p className="text-[10px] text-gray-400">
+                    Vendedor: {c.vendedorNome} | {c.venda.vehicleModel || "Veículo"}
+                    {c.venda.value ? ` | R$ ${(c.venda.value / 100).toLocaleString("pt-BR")}` : ""}
+                  </p>
+                  <p className="text-[10px] text-gray-500">
+                    {new Date(c.venda.createdAt).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

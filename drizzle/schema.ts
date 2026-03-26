@@ -91,6 +91,8 @@ export const sales = mysqlTable("sales", {
   vehicleModel: varchar("vehicleModel", { length: 255 }),
   value: int("value").default(0),
   leadSource: varchar("leadSource", { length: 50 }), // 'lead_loja' ou 'lead_vendedor'
+  customerPhone: varchar("customerPhone", { length: 20 }), // telefone do comprador para cruzar com agendamento
+  sdrRecordId: int("sdrRecordId"), // vínculo com agendamento de origem (preenchido automaticamente pelo cruzamento de telefone)
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

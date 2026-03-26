@@ -47,6 +47,7 @@ const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
 const IAVendedor = lazy(() => import("./pages/IAVendedor"));
 const SimuladorFinanciamento = lazy(() => import("./pages/SimuladorFinanciamento"));
+const RankingFeirao = lazy(() => import("./pages/RankingFeirao"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -107,6 +108,7 @@ function Router() {
         <Route path="/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
         <Route path="/pos-venda" component={PosVenda} />
+        <Route path="/feirao" component={RankingFeirao} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />

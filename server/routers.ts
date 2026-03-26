@@ -304,16 +304,50 @@ export const appRouter = router({
       value: z.number().optional(),
       description: z.string().optional(),
       leadSource: z.enum(['lead_loja', 'lead_vendedor']),
+      customerPhone: z.string().optional(),
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
-      const id = await db.createSale({ ...input, points, status: 'pending' });
+      
+      // Cruzamento automático: buscar agendamento pelo telefone
+      let sdrRecordId: number | undefined = undefined;
+      let sdrSellerName: string | undefined = undefined;
+      if (input.customerPhone) {
+        const matchedRecords = await db.findSdrRecordByPhone(input.customerPhone);
+        if (matchedRecords.length > 0) {
+          sdrRecordId = matchedRecords[0].id;
+          const sdrSeller = await db.getSellerById(matchedRecords[0].sellerId);
+          sdrSellerName = sdrSeller?.name;
+        }
+      }
+      
+      const id = await db.createSale({ ...input, points, status: 'pending', sdrRecordId });
+      
+      // Se encontrou agendamento vinculado, marcar como convertido e notificar SDR
+      if (sdrRecordId && sdrSellerName) {
+        await db.linkSaleToSdrRecord(id, sdrRecordId);
+        // Notificar o SDR que seu agendamento virou venda
+        const matchedRecords = await db.findSdrRecordByPhone(input.customerPhone!);
+        if (matchedRecords.length > 0) {
+          const sdrRecord = matchedRecords[0];
+          await db.createNotification({
+            targetType: 'seller',
+            sellerId: sdrRecord.sellerId,
+            type: 'sale_from_appointment',
+            title: 'Seu agendamento virou venda!',
+            message: `O cliente ${sdrRecord.customerName || input.customerPhone} que você agendou foi atendido por ${seller.name} e fechou a compra de ${input.vehicleModel}!`,
+            actionUrl: '/minha-area',
+          });
+        }
+      }
+      
       // Notifica o dono
+      const sdrInfo = sdrSellerName ? ` | Agendamento de: ${sdrSellerName}` : '';
       await notifyOwner({
         title: `Nova venda para aprovar!`,
-        content: `${seller.name} registrou uma venda: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''}. Acesse o painel para aprovar.`,
+        content: `${seller.name} registrou uma venda: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''}${sdrInfo}. Acesse o painel para aprovar.`,
       });
       const leadLabel = input.leadSource === 'lead_loja' ? 'Lead Loja' : 'Lead Vendedor';
       // Notificação persistente para admin/gerente
@@ -321,12 +355,16 @@ export const appRouter = router({
         targetType: 'admin',
         type: 'pending_sale',
         title: 'Nova venda para aprovar!',
-        message: `${seller.name} registrou: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''} | ${leadLabel}`,
+        message: `${seller.name} registrou: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''} | ${leadLabel}${sdrInfo}`,
         actionUrl: '/admin/aprovacoes',
       });
       // Push notification para admin/gerente
       sendPushPendingSale(seller.name, input.vehicleModel, 'Venda').catch(console.error);
-      return { id, message: "Venda registrada! Aguardando aprovação do gerente." };
+      return { 
+        id, 
+        message: "Venda registrada! Aguardando aprovação do gerente.",
+        linkedSdr: sdrRecordId ? { sdrRecordId, sdrSellerName } : null,
+      };
     }),
     // Listar vendas pendentes (admin)
     listPending: adminProcedure.query(async () => {
@@ -1126,6 +1164,66 @@ export const appRouter = router({
       competitionId: z.number().optional(),
     }).optional()).query(async ({ input }) => {
       return db.listApprovedAppointments(input?.competitionId);
+    }),
+    // ===== FEIRÃO =====
+    // Ranking do feirão: quem mais agendou
+    rankingFeirao: publicProcedure.input(z.object({
+      competitionId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      const ranking = await db.getRankingFeirao(input?.competitionId);
+      // Enriquecer com nomes dos vendedores/SDRs
+      const sellersList = await db.listSellers();
+      return ranking.map((r: any) => {
+        const seller = sellersList.find((s: any) => s.id === r.sellerId);
+        return {
+          ...r,
+          sellerName: seller?.name || 'Desconhecido',
+          department: seller?.department || 'vendas',
+          avatarUrl: seller?.photoUrl || null,
+        };
+      });
+    }),
+    // Listar todos agendamentos de feirão (para conferência)
+    listFeirao: publicProcedure.input(z.object({
+      competitionId: z.number().optional(),
+    }).optional()).query(async ({ input }) => {
+      const agendamentos = await db.listFeiraoAgendamentos(input?.competitionId);
+      const sellersList = await db.listSellers();
+      return agendamentos.map((a: any) => ({
+        ...a,
+        sellerName: sellersList.find((s: any) => s.id === a.sellerId)?.name || 'Desconhecido',
+      }));
+    }),
+    // Buscar agendamento por telefone (para cruzamento com venda)
+    findByPhone: publicProcedure.input(z.object({
+      phone: z.string().min(8),
+    })).query(async ({ input }) => {
+      const records = await db.findSdrRecordByPhone(input.phone);
+      const sellersList = await db.listSellers();
+      return records.map((r: any) => ({
+        ...r,
+        sellerName: sellersList.find((s: any) => s.id === r.sellerId)?.name || 'Desconhecido',
+      }));
+    }),
+    // Vincular venda a agendamento
+    linkToSale: adminProcedure.input(z.object({
+      saleId: z.number(),
+      sdrRecordId: z.number(),
+    })).mutation(async ({ input }) => {
+      await db.linkSaleToSdrRecord(input.saleId, input.sdrRecordId);
+      return { success: true, message: 'Venda vinculada ao agendamento!' };
+    }),
+    // Conversões do SDR (para controle de comissão)
+    myConversions: publicProcedure.input(z.object({
+      sellerId: z.number(),
+    })).query(async ({ input }) => {
+      return db.getSdrConversions(input.sellerId);
+    }),
+    // Vendas vinculadas a agendamentos de um SDR
+    salesLinkedToSdr: publicProcedure.input(z.object({
+      sellerId: z.number(),
+    })).query(async ({ input }) => {
+      return db.listSalesLinkedToSdr(input.sellerId);
     }),
   }),
 

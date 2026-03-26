@@ -2138,3 +2138,107 @@ export async function getPvOrcamentoById(id: number) {
   const result = await db.select().from(pvOrcamentos).where(eq(pvOrcamentos.id, id)).limit(1);
   return result[0] || null;
 }
+
+
+// ===== RANKING FEIRÃO =====
+
+// Listar todos agendamentos de feirão (para ranking e conferência)
+export async function listFeiraoAgendamentos(competitionId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(sdrRecords.isFeirão, true), eq(sdrRecords.type, 'agendamento')];
+  if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
+  return db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.scheduledDate));
+}
+
+// Ranking de feirão: quem mais agendou pro feirão
+export async function getRankingFeirao(competitionId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(sdrRecords.isFeirão, true), eq(sdrRecords.type, 'agendamento')];
+  if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
+  const result = await db.select({
+    sellerId: sdrRecords.sellerId,
+    total: sql<number>`count(*)`,
+    compareceram: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} IN ('attended', 'approved') THEN 1 ELSE 0 END)`,
+    naoVieram: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} = 'no_show' THEN 1 ELSE 0 END)`,
+    pendentes: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} = 'pending' THEN 1 ELSE 0 END)`,
+  }).from(sdrRecords).where(and(...conditions)).groupBy(sdrRecords.sellerId).orderBy(desc(sql`count(*)`));
+  return result;
+}
+
+// ===== VÍNCULO TELEFONE: AGENDAMENTO ↔ VENDA =====
+
+// Normalizar telefone para busca (remove tudo que não é dígito, pega últimos 8-9 dígitos)
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  // Pega os últimos 9 dígitos (ou 8 se o telefone for fixo)
+  return digits.length >= 9 ? digits.slice(-9) : digits;
+}
+
+// Buscar agendamentos por telefone do cliente (para cruzamento com venda)
+export async function findSdrRecordByPhone(phone: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const normalized = normalizePhone(phone);
+  if (normalized.length < 8) return [];
+  // Busca com LIKE nos últimos dígitos
+  const result = await db.select().from(sdrRecords)
+    .where(and(
+      sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${sdrRecords.customerPhone}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', '') LIKE ${'%' + normalized}`,
+      eq(sdrRecords.type, 'agendamento'),
+    ))
+    .orderBy(desc(sdrRecords.createdAt));
+  return result;
+}
+
+// Vincular venda a um agendamento SDR
+export async function linkSaleToSdrRecord(saleId: number, sdrRecordId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(sales).set({ sdrRecordId }).where(eq(sales.id, saleId));
+  // Marcar o agendamento como convertido
+  await db.update(sdrRecords).set({ converted: true }).where(eq(sdrRecords.id, sdrRecordId));
+}
+
+// Listar vendas vinculadas a agendamentos de um SDR (para controle de comissão)
+export async function listSalesLinkedToSdr(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  // Busca todas as vendas que têm sdrRecordId vinculado a agendamentos deste SDR
+  const sdrIds = await db.select({ id: sdrRecords.id }).from(sdrRecords)
+    .where(and(eq(sdrRecords.sellerId, sellerId), eq(sdrRecords.type, 'agendamento')));
+  if (sdrIds.length === 0) return [];
+  const ids = sdrIds.map(r => r.id);
+  return db.select().from(sales).where(and(
+    inArray(sales.sdrRecordId, ids),
+    eq(sales.status, 'approved'),
+  )).orderBy(desc(sales.createdAt));
+}
+
+// Buscar agendamentos convertidos de um SDR com detalhes da venda
+export async function getSdrConversions(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const records = await db.select().from(sdrRecords)
+    .where(and(
+      eq(sdrRecords.sellerId, sellerId),
+      eq(sdrRecords.type, 'agendamento'),
+      eq(sdrRecords.converted, true),
+    ))
+    .orderBy(desc(sdrRecords.createdAt));
+  // Para cada agendamento convertido, buscar a venda vinculada
+  const result = [];
+  for (const record of records) {
+    const saleResult = await db.select().from(sales)
+      .where(eq(sales.sdrRecordId, record.id)).limit(1);
+    const sale = saleResult[0] || null;
+    const sellerResult = sale ? await db.select().from(sellers).where(eq(sellers.id, sale.sellerId)).limit(1) : [];
+    result.push({
+      agendamento: record,
+      venda: sale,
+      vendedorNome: sellerResult[0]?.name || 'Desconhecido',
+    });
+  }
+  return result;
+}

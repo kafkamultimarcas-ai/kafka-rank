@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload } from "lucide-react";
+import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone } from "lucide-react";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -225,7 +225,12 @@ export default function RegisterSale() {
             value: value ? parseInt(value.replace(/\D/g, "")) : undefined,
             description: description || undefined,
             leadSource: saleLeadSource as 'lead_loja' | 'lead_vendedor',
+            customerPhone: customerPhone || undefined,
           });
+          // Mostrar alerta se venda foi vinculada a agendamento SDR
+          if ((result as any).linkedSdr) {
+            toast.success(`Agendamento encontrado! SDR: ${(result as any).linkedSdr.sdrSellerName}`, { duration: 5000 });
+          }
           break;
         case "fei":
           if (!bankName || !returnType) { toast.error("Informe o banco e o tipo de retorno!"); return; }
@@ -550,6 +555,15 @@ export default function RegisterSale() {
                   </Label>
                   <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
                     placeholder="Ex: Honda Civic 2024" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-green-400" />
+                    Telefone do comprador
+                  </Label>
+                  <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                    placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  <p className="text-[10px] text-gray-500">Se preencher, o sistema cruza automaticamente com agendamentos (SDR ganha comissão)</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Valor (R$)</Label>
