@@ -18,7 +18,7 @@ import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
-import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter } from "./routers/pvRouter";
+import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
@@ -1397,6 +1397,7 @@ export const appRouter = router({
   finTransactions: finTransactionsRouter,
   pvChamados: pvChamadosRouter,
   pvGastos: pvGastosRouter,
+  pvOrcamentos: pvOrcamentosRouter,
   pvOficinas: pvOficinasRouter,
   mktStrategies: mktStrategiesRouter,
   mktTasks: mktTasksRouter,

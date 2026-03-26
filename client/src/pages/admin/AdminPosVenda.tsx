@@ -368,7 +368,9 @@ function NovoChamadoModal({ open, onClose, sellers, onSuccess }: any) {
 
 // ===== MODAL: DETALHE DO CHAMADO =====
 function DetalheChamadoModal({ open, onClose, chamado, sellers, oficinas, onUpdate }: any) {
-  const [tab, setTab] = useState<"info" | "gastos" | "historico">("info");
+  const [tab, setTab] = useState<"info" | "gastos" | "orcamentos" | "historico">("info");
+  const orcamentosQuery = trpc.pvOrcamentos.list.useQuery({ chamadoId: chamado.id });
+  const orcamentos = orcamentosQuery.data || [];
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<any>({});
 
@@ -415,6 +417,7 @@ function DetalheChamadoModal({ open, onClose, chamado, sellers, oficinas, onUpda
         <div className="flex gap-1 border-b border-border pb-1">
           {[
             { key: "info", label: "Detalhes", icon: FileText },
+            { key: "orcamentos", label: `Orçamentos (${orcamentos.length})`, icon: FileText },
             { key: "gastos", label: `Gastos (${gastos.length})`, icon: DollarSign },
             { key: "historico", label: "Histórico", icon: History },
           ].map((t) => (
@@ -548,6 +551,11 @@ function DetalheChamadoModal({ open, onClose, chamado, sellers, oficinas, onUpda
               />
             )}
           </div>
+        )}
+
+        {/* Tab: Orçamentos */}
+        {tab === "orcamentos" && (
+          <AdminOrcamentosTab chamadoId={chamado.id} orcamentos={orcamentos} onRefresh={() => orcamentosQuery.refetch()} />
         )}
 
         {/* Tab: Gastos */}
@@ -767,6 +775,197 @@ function GastosTab({ chamadoId, gastos, onRefresh }: { chamadoId: number; gastos
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+
+// ===== TAB: ORÇAMENTOS (dentro do detalhe do chamado) =====
+function AdminOrcamentosTab({ chamadoId, orcamentos, onRefresh }: { chamadoId: number; orcamentos: any[]; onRefresh: () => void }) {
+  const [expandedOrc, setExpandedOrc] = useState<number | null>(null);
+  const updateStatusMutation = trpc.pvOrcamentos.updateStatus.useMutation({
+    onSuccess: () => { toast.success("Status atualizado!"); onRefresh(); },
+    onError: (err: any) => toast.error(err.message),
+  });
+  const deleteMutation = trpc.pvOrcamentos.delete.useMutation({
+    onSuccess: () => { toast.success("Orçamento excluído!"); onRefresh(); },
+    onError: (err: any) => toast.error(err.message),
+  });
+  const [motivoReprovacao, setMotivoReprovacao] = useState("");
+  const [showMotivoFor, setShowMotivoFor] = useState<number | null>(null);
+
+  const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+    pendente: { bg: "bg-yellow-500/10", text: "text-yellow-400", label: "Pendente" },
+    aprovado: { bg: "bg-green-500/10", text: "text-green-400", label: "Aprovado" },
+    reprovado: { bg: "bg-red-500/10", text: "text-red-400", label: "Reprovado" },
+    pago: { bg: "bg-emerald-500/10", text: "text-emerald-400", label: "Pago" },
+  };
+
+  const totalGeral = orcamentos.reduce((s: number, o: any) => s + parseFloat(o.valorTotal || "0"), 0);
+  const totalAprovado = orcamentos.filter((o: any) => o.statusAprovacao === "aprovado" || o.statusAprovacao === "pago").reduce((s: number, o: any) => s + parseFloat(o.valorTotal || "0"), 0);
+
+  if (orcamentos.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">Nenhum orçamento lançado</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Resumo */}
+      <div className="grid grid-cols-2 gap-2">
+        <Card className="border-purple-500/30 bg-purple-500/5">
+          <CardContent className="p-2 text-center">
+            <p className="text-[10px] text-muted-foreground">Total Orçado</p>
+            <p className="text-sm font-bold text-purple-400">{formatCurrency(totalGeral)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-green-500/30 bg-green-500/5">
+          <CardContent className="p-2 text-center">
+            <p className="text-[10px] text-muted-foreground">Total Aprovado</p>
+            <p className="text-sm font-bold text-green-400">{formatCurrency(totalAprovado)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lista de orçamentos */}
+      {orcamentos.map((orc: any) => {
+        const st = STATUS_COLORS[orc.statusAprovacao] || STATUS_COLORS.pendente;
+        const isExpanded = expandedOrc === orc.id;
+        return (
+          <Card key={orc.id} className={`border-${orc.statusAprovacao === 'pendente' ? 'yellow' : orc.statusAprovacao === 'aprovado' ? 'green' : orc.statusAprovacao === 'reprovado' ? 'red' : 'emerald'}-500/30`}>
+            <CardContent className="p-3">
+              <button onClick={() => setExpandedOrc(isExpanded ? null : orc.id)} className="w-full text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{orc.titulo}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(orc.valorTotal)} · {orc.criadoPor} · {formatDate(orc.createdAt)}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${st.bg} ${st.text} ml-2`}>
+                    {st.label}
+                  </span>
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="mt-3 space-y-2 border-t border-border pt-3">
+                  {orc.descricao && <p className="text-xs text-muted-foreground">{orc.descricao}</p>}
+
+                  {/* Foto do orçamento */}
+                  {orc.fotoUrl && (
+                    <a href={orc.fotoUrl} target="_blank" rel="noopener noreferrer">
+                      <img src={orc.fotoUrl} alt="Orçamento" className="rounded-lg max-h-48 object-contain border border-border hover:border-purple-500 transition-all" />
+                      <p className="text-[10px] text-purple-400 mt-1">Clique para ampliar</p>
+                    </a>
+                  )}
+
+                  {/* Itens do orçamento */}
+                  <OrcamentoItensView orcamentoId={orc.id} />
+
+                  {/* Ações de aprovação */}
+                  {orc.statusAprovacao === "pendente" && (
+                    <div className="flex gap-2 pt-2">
+                      <Button size="sm" className="bg-green-600 hover:bg-green-500 flex-1" onClick={() => {
+                        updateStatusMutation.mutate({ id: orc.id, statusAprovacao: "aprovado" });
+                      }}>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Aprovar
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-red-500/50 text-red-400 flex-1" onClick={() => {
+                        setShowMotivoFor(orc.id);
+                      }}>
+                        <X className="h-3.5 w-3.5 mr-1" /> Reprovar
+                      </Button>
+                    </div>
+                  )}
+
+                  {orc.statusAprovacao === "aprovado" && (
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500 w-full" onClick={() => {
+                      updateStatusMutation.mutate({ id: orc.id, statusAprovacao: "pago" });
+                    }}>
+                      <DollarSign className="h-3.5 w-3.5 mr-1" /> Marcar como Pago
+                    </Button>
+                  )}
+
+                  {/* Modal de motivo de reprovação */}
+                  {showMotivoFor === orc.id && (
+                    <div className="space-y-2 bg-red-500/5 border border-red-500/30 rounded-lg p-3">
+                      <p className="text-xs text-red-400 font-bold">Motivo da Reprovação</p>
+                      <Textarea
+                        value={motivoReprovacao}
+                        onChange={(e) => setMotivoReprovacao(e.target.value)}
+                        placeholder="Descreva o motivo..."
+                        rows={2}
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-red-600 hover:bg-red-500 flex-1" onClick={() => {
+                          updateStatusMutation.mutate({
+                            id: orc.id,
+                            statusAprovacao: "reprovado",
+                            motivoReprovacao: motivoReprovacao || undefined,
+                          });
+                          setShowMotivoFor(null);
+                          setMotivoReprovacao("");
+                        }}>
+                          Confirmar Reprovação
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => { setShowMotivoFor(null); setMotivoReprovacao(""); }}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Info de aprovação */}
+                  {orc.aprovadoPor && (
+                    <p className="text-[10px] text-muted-foreground">
+                      {orc.statusAprovacao === 'aprovado' ? 'Aprovado' : orc.statusAprovacao === 'reprovado' ? 'Reprovado' : 'Pago'} por {orc.aprovadoPor}
+                      {orc.aprovadoEm && ` em ${new Date(orc.aprovadoEm).toLocaleDateString('pt-BR')}`}
+                    </p>
+                  )}
+                  {orc.motivoReprovacao && (
+                    <p className="text-[10px] text-red-400 italic">Motivo: {orc.motivoReprovacao}</p>
+                  )}
+
+                  {/* Excluir */}
+                  <Button size="sm" variant="outline" className="border-red-500/50 text-red-400 w-full" onClick={() => {
+                    if (confirm("Excluir este orçamento e todos os itens?")) deleteMutation.mutate({ id: orc.id });
+                  }}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir Orçamento
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===== COMPONENTE: Itens do orçamento (view) =====
+function OrcamentoItensView({ orcamentoId }: { orcamentoId: number }) {
+  const itensQuery = trpc.pvOrcamentos.itens.useQuery({ orcamentoId });
+  const itens = itensQuery.data || [];
+
+  if (itens.length === 0) return null;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] text-muted-foreground uppercase font-bold">Itens</p>
+      {itens.map((item: any) => (
+        <div key={item.id} className="flex items-center gap-2 text-xs bg-muted/30 rounded px-2 py-1.5">
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+            item.tipo === 'peca' ? 'bg-blue-500/20 text-blue-400' :
+            item.tipo === 'servico' ? 'bg-orange-500/20 text-orange-400' :
+            'bg-muted text-muted-foreground'
+          }`}>
+            {item.tipo === 'peca' ? 'PEÇA' : item.tipo === 'servico' ? 'SERVIÇO' : 'OUTRO'}
+          </span>
+          <span className="flex-1 truncate">{item.descricao}</span>
+          <span className="text-muted-foreground">{item.quantidade}x</span>
+          <span className="text-green-400 font-mono">{formatCurrency(item.valorTotal)}</span>
+        </div>
+      ))}
     </div>
   );
 }

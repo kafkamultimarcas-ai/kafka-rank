@@ -26,7 +26,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3 } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 
@@ -1489,6 +1489,9 @@ export default function MinhaArea() {
                 </div>
               </div>
 
+              {/* ORÇAMENTOS / PEÇAS / SERVIÇOS */}
+              <PvOrcamentosSection chamadoId={pvSelectedChamado.id} sellerId={sellerId} sellerName={seller?.nickname || seller?.name || 'PV'} />
+
               {/* Atualizar Status */}
               {pvSelectedChamado.status !== 'entregue' && pvSelectedChamado.status !== 'cancelado' && (
                 <div>
@@ -1533,6 +1536,406 @@ export default function MinhaArea() {
       {/* IAM - Super Agente IA */}
       {seller && <IAMFloatingButton sellerId={sellerId} />}
       {seller && <IAMGreeting sellerName={seller.nickname || seller.name} sellerId={sellerId} />}
+    </div>
+  );
+}
+
+
+// ===== COMPONENTE: Orçamentos / Peças / Serviços dentro do chamado =====
+function PvOrcamentosSection({ chamadoId, sellerId, sellerName }: { chamadoId: number; sellerId: number; sellerName: string }) {
+  const [showForm, setShowForm] = useState(false);
+  const [titulo, setTitulo] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [itens, setItens] = useState<{ tipo: 'peca' | 'servico' | 'outro'; descricao: string; quantidade: number; valorUnitario: string }[]>([]);
+  const [novoItemTipo, setNovoItemTipo] = useState<'peca' | 'servico' | 'outro'>('peca');
+  const [novoItemDesc, setNovoItemDesc] = useState('');
+  const [novoItemQtd, setNovoItemQtd] = useState(1);
+  const [novoItemValor, setNovoItemValor] = useState('');
+  const [expandedOrc, setExpandedOrc] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const orcamentosQuery = trpc.pvOrcamentos.list.useQuery({ chamadoId });
+  const orcamentos = orcamentosQuery.data || [];
+
+  const uploadMutation = trpc.pvOrcamentos.uploadFoto.useMutation();
+  const createMutation = trpc.pvOrcamentos.create.useMutation({
+    onSuccess: () => {
+      toast.success('Orçamento lançado!');
+      orcamentosQuery.refetch();
+      resetForm();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const addItemMutation = trpc.pvOrcamentos.addItem.useMutation({
+    onSuccess: () => { orcamentosQuery.refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+
+  function resetForm() {
+    setShowForm(false);
+    setTitulo('');
+    setDescricao('');
+    setFotoFile(null);
+    setFotoPreview(null);
+    setItens([]);
+    setNovoItemDesc('');
+    setNovoItemQtd(1);
+    setNovoItemValor('');
+  }
+
+  function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFotoFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setFotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function addItem() {
+    if (!novoItemDesc.trim() || !novoItemValor.trim()) {
+      toast.error('Preencha descrição e valor do item');
+      return;
+    }
+    setItens(prev => [...prev, {
+      tipo: novoItemTipo,
+      descricao: novoItemDesc.trim(),
+      quantidade: novoItemQtd,
+      valorUnitario: novoItemValor.replace(',', '.'),
+    }]);
+    setNovoItemDesc('');
+    setNovoItemQtd(1);
+    setNovoItemValor('');
+  }
+
+  function removeItem(idx: number) {
+    setItens(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  const totalItens = itens.reduce((sum, item) => sum + (item.quantidade * parseFloat(item.valorUnitario || '0')), 0);
+
+  async function handleSubmit() {
+    if (!titulo.trim()) { toast.error('Digite o título do orçamento'); return; }
+
+    let fotoUrl: string | undefined;
+    let fotoKey: string | undefined;
+
+    // Upload foto se houver
+    if (fotoFile) {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.readAsDataURL(fotoFile);
+      });
+      try {
+        const result = await uploadMutation.mutateAsync({
+          fileName: fotoFile.name,
+          fileBase64: base64,
+          contentType: fotoFile.type,
+        });
+        fotoUrl = result.url;
+        fotoKey = result.key;
+      } catch {
+        toast.error('Erro ao enviar foto');
+        return;
+      }
+    }
+
+    // Criar orçamento
+    const orcResult = await createMutation.mutateAsync({
+      chamadoId,
+      titulo: titulo.trim(),
+      descricao: descricao.trim() || undefined,
+      fotoUrl,
+      fotoKey,
+      valorTotal: String(totalItens.toFixed(2)),
+      criadoPor: sellerName,
+      criadoPorId: sellerId,
+    });
+
+    // Adicionar itens
+    for (const item of itens) {
+      const vt = (item.quantidade * parseFloat(item.valorUnitario || '0')).toFixed(2);
+      await addItemMutation.mutateAsync({
+        orcamentoId: orcResult.id,
+        tipo: item.tipo,
+        descricao: item.descricao,
+        quantidade: item.quantidade,
+        valorUnitario: item.valorUnitario,
+        valorTotal: vt,
+      });
+    }
+  }
+
+  const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+    pendente: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'Pendente' },
+    aprovado: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'Aprovado' },
+    reprovado: { bg: 'bg-red-500/20', text: 'text-red-400', label: 'Reprovado' },
+    pago: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Pago' },
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-purple-400 uppercase font-bold flex items-center gap-1">
+          <Receipt className="w-3 h-3" /> Orçamentos / Peças
+        </p>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 transition-all"
+        >
+          <Plus className="w-3 h-3" /> Lançar
+        </button>
+      </div>
+
+      {/* Lista de orçamentos existentes */}
+      {orcamentos.length > 0 && (
+        <div className="space-y-2 mb-3">
+          {orcamentos.map((orc: any) => {
+            const st = STATUS_COLORS[orc.statusAprovacao] || STATUS_COLORS.pendente;
+            const isExpanded = expandedOrc === orc.id;
+            return (
+              <div key={orc.id} className="bg-gray-800/60 border border-gray-700/50 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setExpandedOrc(isExpanded ? null : orc.id)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">{orc.titulo}</p>
+                    <p className="text-xs text-gray-400">
+                      {Number(orc.valorTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {' · '}{new Date(orc.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${st.bg} ${st.text}`}>
+                    {st.label}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <OrcamentoDetail orcamentoId={orc.id} orc={orc} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {orcamentos.length === 0 && !showForm && (
+        <p className="text-xs text-gray-600 italic mb-3">Nenhum orçamento lançado ainda.</p>
+      )}
+
+      {/* Formulário para lançar orçamento */}
+      {showForm && (
+        <div className="bg-gray-800/80 border border-purple-500/30 rounded-xl p-4 space-y-3 mb-3">
+          <p className="text-sm text-purple-400 font-bold">Novo Orçamento</p>
+
+          <input
+            value={titulo}
+            onChange={e => setTitulo(e.target.value)}
+            placeholder="Título (ex: Orçamento Oficina X - Ar condicionado)"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none"
+          />
+
+          <textarea
+            value={descricao}
+            onChange={e => setDescricao(e.target.value)}
+            placeholder="Descrição / observações (opcional)"
+            rows={2}
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none resize-none"
+          />
+
+          {/* Upload foto/scanner */}
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Foto / Scanner do Orçamento</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              capture="environment"
+              onChange={handleFotoChange}
+              className="hidden"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-2 rounded-lg transition-all"
+              >
+                <Camera className="w-4 h-4" />
+                {fotoFile ? 'Trocar Foto' : 'Tirar Foto / Escanear'}
+              </button>
+              {fotoFile && (
+                <span className="text-xs text-green-400 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> {fotoFile.name}
+                </span>
+              )}
+            </div>
+            {fotoPreview && (
+              <img src={fotoPreview} alt="Preview" className="mt-2 rounded-lg max-h-40 object-contain border border-gray-700" />
+            )}
+          </div>
+
+          {/* Itens (peças e serviços) */}
+          <div>
+            <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+              <Package className="w-3 h-3" /> Itens (Peças e Serviços)
+            </p>
+
+            {/* Lista de itens adicionados */}
+            {itens.length > 0 && (
+              <div className="space-y-1 mb-2">
+                {itens.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-gray-900/50 rounded-lg px-2 py-1.5 text-xs">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      item.tipo === 'peca' ? 'bg-blue-500/20 text-blue-400' :
+                      item.tipo === 'servico' ? 'bg-orange-500/20 text-orange-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {item.tipo === 'peca' ? 'PEÇA' : item.tipo === 'servico' ? 'SERVIÇO' : 'OUTRO'}
+                    </span>
+                    <span className="text-white flex-1 truncate">{item.descricao}</span>
+                    <span className="text-gray-400">{item.quantidade}x</span>
+                    <span className="text-green-400 font-mono">
+                      R$ {(item.quantidade * parseFloat(item.valorUnitario || '0')).toFixed(2)}
+                    </span>
+                    <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-300">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <div className="text-right text-xs font-bold text-green-400 pr-2">
+                  Total: R$ {totalItens.toFixed(2)}
+                </div>
+              </div>
+            )}
+
+            {/* Adicionar novo item */}
+            <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-2 space-y-2">
+              <div className="flex gap-2">
+                <select
+                  value={novoItemTipo}
+                  onChange={e => setNovoItemTipo(e.target.value as any)}
+                  className="bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none"
+                >
+                  <option value="peca">Peça</option>
+                  <option value="servico">Serviço</option>
+                  <option value="outro">Outro</option>
+                </select>
+                <input
+                  value={novoItemDesc}
+                  onChange={e => setNovoItemDesc(e.target.value)}
+                  placeholder="Descrição do item"
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-500">Qtd:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={novoItemQtd}
+                    onChange={e => setNovoItemQtd(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-14 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white text-center focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-1 flex-1">
+                  <span className="text-[10px] text-gray-500">R$:</span>
+                  <input
+                    value={novoItemValor}
+                    onChange={e => setNovoItemValor(e.target.value)}
+                    placeholder="0,00"
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <button
+                  onClick={addItem}
+                  className="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded font-bold transition-all"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Botões */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSubmit}
+              disabled={createMutation.isPending || uploadMutation.isPending}
+              className="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold py-2.5 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              <Receipt className="w-4 h-4" />
+              {createMutation.isPending || uploadMutation.isPending ? 'Enviando...' : 'Lançar Orçamento'}
+            </button>
+            <button
+              onClick={resetForm}
+              className="bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2.5 rounded-lg transition-all"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== COMPONENTE: Detalhe de um orçamento expandido =====
+function OrcamentoDetail({ orcamentoId, orc }: { orcamentoId: number; orc: any }) {
+  const itensQuery = trpc.pvOrcamentos.itens.useQuery({ orcamentoId });
+  const itens = itensQuery.data || [];
+
+  return (
+    <div className="px-3 pb-3 border-t border-gray-700/50 space-y-2">
+      {orc.descricao && (
+        <p className="text-xs text-gray-400 mt-2">{orc.descricao}</p>
+      )}
+
+      {/* Foto do orçamento */}
+      {orc.fotoUrl && (
+        <a href={orc.fotoUrl} target="_blank" rel="noopener noreferrer" className="block mt-2">
+          <img src={orc.fotoUrl} alt="Orçamento" className="rounded-lg max-h-48 object-contain border border-gray-700 hover:border-purple-500 transition-all" />
+          <p className="text-[10px] text-purple-400 mt-1">Clique para ampliar</p>
+        </a>
+      )}
+
+      {/* Itens */}
+      {itens.length > 0 && (
+        <div className="space-y-1 mt-2">
+          <p className="text-[10px] text-gray-500 uppercase font-bold">Itens</p>
+          {itens.map((item: any) => (
+            <div key={item.id} className="flex items-center gap-2 text-xs bg-gray-900/30 rounded px-2 py-1.5">
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                item.tipo === 'peca' ? 'bg-blue-500/20 text-blue-400' :
+                item.tipo === 'servico' ? 'bg-orange-500/20 text-orange-400' :
+                'bg-gray-500/20 text-gray-400'
+              }`}>
+                {item.tipo === 'peca' ? 'PEÇA' : item.tipo === 'servico' ? 'SERVIÇO' : 'OUTRO'}
+              </span>
+              <span className="text-white flex-1 truncate">{item.descricao}</span>
+              <span className="text-gray-400">{item.quantidade}x</span>
+              <span className="text-green-400 font-mono">
+                R$ {Number(item.valorTotal || 0).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Info de aprovação */}
+      {orc.statusAprovacao === 'aprovado' && orc.aprovadoPor && (
+        <p className="text-[10px] text-green-400">Aprovado por {orc.aprovadoPor} em {orc.aprovadoEm ? new Date(orc.aprovadoEm).toLocaleDateString('pt-BR') : '—'}</p>
+      )}
+      {orc.statusAprovacao === 'reprovado' && (
+        <div>
+          <p className="text-[10px] text-red-400">Reprovado por {orc.aprovadoPor || '—'}</p>
+          {orc.motivoReprovacao && <p className="text-[10px] text-red-300 italic">{orc.motivoReprovacao}</p>}
+        </div>
+      )}
+
+      <p className="text-[10px] text-gray-600">Lançado por {orc.criadoPor} em {new Date(orc.createdAt).toLocaleDateString('pt-BR')}</p>
     </div>
   );
 }

@@ -1506,7 +1506,7 @@ export async function getAppointmentRanking(month: number, year: number) {
 
 
 // ===== MÓDULO PÓS-VENDA =====
-import { pvOficinas, pvChamados, pvGastos, pvHistorico, InsertPvOficina, InsertPvChamado, InsertPvGasto, InsertPvHistorico } from "../drizzle/schema";
+import { pvOficinas, pvChamados, pvGastos, pvHistorico, pvOrcamentos, pvOrcamentoItens, InsertPvOficina, InsertPvChamado, InsertPvGasto, InsertPvHistorico, InsertPvOrcamento, InsertPvOrcamentoItem } from "../drizzle/schema";
 
 // --- Oficinas Parceiras ---
 export async function listOficinas() {
@@ -1963,5 +1963,176 @@ export async function getSaleDocumentById(id: number) {
   const db = await getDb();
   if (!db) return null;
   const result = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  return result[0] || null;
+}
+
+
+// ===== MÓDULO ORÇAMENTOS PÓS-VENDA =====
+
+// Listar orçamentos de um chamado
+export async function listPvOrcamentos(chamadoId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pvOrcamentos).where(eq(pvOrcamentos.chamadoId, chamadoId)).orderBy(desc(pvOrcamentos.createdAt));
+}
+
+// Listar todos os orçamentos (para financeiro)
+export async function listAllPvOrcamentos(statusAprovacao?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  if (statusAprovacao && statusAprovacao !== 'todos') {
+    return db.select().from(pvOrcamentos).where(eq(pvOrcamentos.statusAprovacao, statusAprovacao as any)).orderBy(desc(pvOrcamentos.createdAt));
+  }
+  return db.select().from(pvOrcamentos).orderBy(desc(pvOrcamentos.createdAt));
+}
+
+// Listar todos os orçamentos com info do chamado (para financeiro)
+export async function listAllPvOrcamentosWithChamado(statusAprovacao?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (statusAprovacao && statusAprovacao !== 'todos') {
+    conditions.push(eq(pvOrcamentos.statusAprovacao, statusAprovacao as any));
+  }
+  const query = db.select({
+    orcamento: pvOrcamentos,
+    chamado: {
+      id: pvChamados.id,
+      ticketNumber: pvChamados.ticketNumber,
+      clienteNome: pvChamados.clienteNome,
+      clienteTelefone: pvChamados.clienteTelefone,
+      carroModelo: pvChamados.carroModelo,
+      carroPlaca: pvChamados.carroPlaca,
+      status: pvChamados.status,
+    },
+  }).from(pvOrcamentos)
+    .leftJoin(pvChamados, eq(pvOrcamentos.chamadoId, pvChamados.id));
+  
+  if (conditions.length > 0) {
+    return query.where(and(...conditions)).orderBy(desc(pvOrcamentos.createdAt));
+  }
+  return query.orderBy(desc(pvOrcamentos.createdAt));
+}
+
+// Criar orçamento
+export async function createPvOrcamento(data: Omit<InsertPvOrcamento, 'id' | 'createdAt' | 'updatedAt'>, usuario: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(pvOrcamentos).values(data as any);
+  const orcamentoId = result[0].insertId;
+  
+  // Registrar no histórico do chamado
+  await db.insert(pvHistorico).values({
+    chamadoId: data.chamadoId,
+    acao: 'orcamento',
+    descricao: `Orçamento "${data.titulo}" lançado - ${Number(data.valorTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+    usuario,
+  });
+  
+  return orcamentoId;
+}
+
+// Adicionar item ao orçamento
+export async function addPvOrcamentoItem(data: Omit<InsertPvOrcamentoItem, 'id' | 'createdAt'>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(pvOrcamentoItens).values(data as any);
+  
+  // Recalcular total do orçamento
+  await recalcPvOrcamentoTotal(data.orcamentoId);
+  
+  return result[0].insertId;
+}
+
+// Listar itens de um orçamento
+export async function listPvOrcamentoItens(orcamentoId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pvOrcamentoItens).where(eq(pvOrcamentoItens.orcamentoId, orcamentoId)).orderBy(pvOrcamentoItens.createdAt);
+}
+
+// Remover item do orçamento
+export async function deletePvOrcamentoItem(id: number, orcamentoId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(pvOrcamentoItens).where(eq(pvOrcamentoItens.id, id));
+  await recalcPvOrcamentoTotal(orcamentoId);
+}
+
+// Recalcular total do orçamento
+async function recalcPvOrcamentoTotal(orcamentoId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const [result] = await db.select({
+    total: sql<string>`COALESCE(SUM(${pvOrcamentoItens.valorTotal}), 0)`,
+  }).from(pvOrcamentoItens).where(eq(pvOrcamentoItens.orcamentoId, orcamentoId));
+  
+  await db.update(pvOrcamentos).set({ valorTotal: String(result?.total || '0') }).where(eq(pvOrcamentos.id, orcamentoId));
+}
+
+// Aprovar/Reprovar orçamento (financeiro)
+export async function updatePvOrcamentoStatus(id: number, statusAprovacao: string, aprovadoPor: string, motivoReprovacao?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  
+  const updateData: any = { statusAprovacao, aprovadoPor };
+  if (statusAprovacao === 'aprovado' || statusAprovacao === 'pago') {
+    updateData.aprovadoEm = Date.now();
+  }
+  if (motivoReprovacao) {
+    updateData.motivoReprovacao = motivoReprovacao;
+  }
+  
+  await db.update(pvOrcamentos).set(updateData).where(eq(pvOrcamentos.id, id));
+  
+  // Registrar no histórico do chamado
+  const orc = await db.select().from(pvOrcamentos).where(eq(pvOrcamentos.id, id)).limit(1);
+  if (orc[0]) {
+    const statusLabel = statusAprovacao === 'aprovado' ? 'APROVADO' : statusAprovacao === 'reprovado' ? 'REPROVADO' : statusAprovacao === 'pago' ? 'PAGO' : statusAprovacao;
+    await db.insert(pvHistorico).values({
+      chamadoId: orc[0].chamadoId,
+      acao: 'orcamento_status',
+      descricao: `Orçamento "${orc[0].titulo}" ${statusLabel} por ${aprovadoPor}${motivoReprovacao ? ` - Motivo: ${motivoReprovacao}` : ''}`,
+      usuario: aprovadoPor,
+    });
+  }
+}
+
+// Deletar orçamento inteiro
+export async function deletePvOrcamento(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Deletar itens primeiro
+  await db.delete(pvOrcamentoItens).where(eq(pvOrcamentoItens.orcamentoId, id));
+  await db.delete(pvOrcamentos).where(eq(pvOrcamentos.id, id));
+}
+
+// Contagem de orçamentos pendentes
+export async function getPvOrcamentosPendentes() {
+  const db = await getDb();
+  if (!db) return { count: 0, total: '0' };
+  const [result] = await db.select({
+    count: sql<number>`count(*)`,
+    total: sql<string>`COALESCE(SUM(${pvOrcamentos.valorTotal}), 0)`,
+  }).from(pvOrcamentos).where(eq(pvOrcamentos.statusAprovacao, 'pendente'));
+  return { count: Number(result?.count || 0), total: String(result?.total || '0') };
+}
+
+// Resumo de orçamentos por status
+export async function getPvOrcamentosResumo() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    status: pvOrcamentos.statusAprovacao,
+    count: sql<number>`count(*)`,
+    total: sql<string>`COALESCE(SUM(${pvOrcamentos.valorTotal}), 0)`,
+  }).from(pvOrcamentos).groupBy(pvOrcamentos.statusAprovacao);
+}
+
+// Buscar orçamento por ID
+export async function getPvOrcamentoById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(pvOrcamentos).where(eq(pvOrcamentos.id, id)).limit(1);
   return result[0] || null;
 }

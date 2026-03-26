@@ -612,6 +612,41 @@ export const pvHistorico = mysqlTable("pv_historico", {
 export type PvHistorico = typeof pvHistorico.$inferSelect;
 export type InsertPvHistorico = typeof pvHistorico.$inferInsert;
 
+// Orçamentos de pós-venda (vinculados ao chamado)
+export const pvOrcamentos = mysqlTable("pv_orcamentos", {
+  id: int("id").autoincrement().primaryKey(),
+  chamadoId: int("chamadoId").notNull(),
+  titulo: varchar("titulo", { length: 500 }).notNull(), // ex: "Orçamento Oficina X - Ar condicionado"
+  descricao: text("descricao"), // detalhes gerais
+  fotoUrl: text("fotoUrl"), // foto/scanner do orçamento (S3)
+  fotoKey: varchar("fotoKey", { length: 500 }),
+  valorTotal: decimal("valorTotal", { precision: 12, scale: 2 }).default("0"), // soma dos itens
+  statusAprovacao: mysqlEnum("statusAprovacao", ["pendente", "aprovado", "reprovado", "pago"]).default("pendente").notNull(),
+  aprovadoPor: varchar("aprovadoPor", { length: 255 }), // quem aprovou (financeiro)
+  aprovadoEm: bigint("aprovadoEm", { mode: "number" }),
+  motivoReprovacao: text("motivoReprovacao"), // motivo se reprovado
+  criadoPor: varchar("criadoPor", { length: 255 }).notNull(), // quem lançou (pós-venda)
+  criadoPorId: int("criadoPorId"), // sellerId de quem lançou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PvOrcamento = typeof pvOrcamentos.$inferSelect;
+export type InsertPvOrcamento = typeof pvOrcamentos.$inferInsert;
+
+// Itens do orçamento (peças e serviços)
+export const pvOrcamentoItens = mysqlTable("pv_orcamento_itens", {
+  id: int("id").autoincrement().primaryKey(),
+  orcamentoId: int("orcamentoId").notNull(),
+  tipo: mysqlEnum("tipo", ["peca", "servico", "outro"]).default("peca").notNull(),
+  descricao: varchar("descricao", { length: 500 }).notNull(), // nome da peça ou serviço
+  quantidade: int("quantidade").default(1).notNull(),
+  valorUnitario: decimal("valorUnitario", { precision: 12, scale: 2 }).notNull(),
+  valorTotal: decimal("valorTotal", { precision: 12, scale: 2 }).notNull(), // qtd * valorUnitario
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PvOrcamentoItem = typeof pvOrcamentoItens.$inferSelect;
+export type InsertPvOrcamentoItem = typeof pvOrcamentoItens.$inferInsert;
+
 // ============ MARKETING ============
 
 // Estratégias de Marketing

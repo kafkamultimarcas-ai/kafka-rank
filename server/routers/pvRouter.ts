@@ -235,3 +235,117 @@ export const pvOficinasRouter = router({
     return { success: true };
   }),
 });
+
+// ===== ORÇAMENTOS PÓS-VENDA ROUTER =====
+export const pvOrcamentosRouter = router({
+  // Listar orçamentos de um chamado
+  list: publicProcedure.input(z.object({ chamadoId: z.number() })).query(async ({ input }) => {
+    return db.listPvOrcamentos(input.chamadoId);
+  }),
+
+  // Listar todos os orçamentos com info do chamado (financeiro)
+  listAll: publicProcedure.input(z.object({
+    statusAprovacao: z.string().optional(),
+  }).optional()).query(async ({ input }) => {
+    return db.listAllPvOrcamentosWithChamado(input?.statusAprovacao);
+  }),
+
+  // Listar itens de um orçamento
+  itens: publicProcedure.input(z.object({ orcamentoId: z.number() })).query(async ({ input }) => {
+    return db.listPvOrcamentoItens(input.orcamentoId);
+  }),
+
+  // Criar orçamento (pós-venda pode criar)
+  create: publicProcedure.input(z.object({
+    chamadoId: z.number(),
+    titulo: z.string().min(1),
+    descricao: z.string().optional(),
+    fotoUrl: z.string().optional(),
+    fotoKey: z.string().optional(),
+    valorTotal: z.string().optional(),
+    criadoPor: z.string().min(1),
+    criadoPorId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const id = await db.createPvOrcamento({
+      chamadoId: input.chamadoId,
+      titulo: input.titulo,
+      descricao: input.descricao ?? null,
+      fotoUrl: input.fotoUrl ?? null,
+      fotoKey: input.fotoKey ?? null,
+      valorTotal: input.valorTotal || '0',
+      criadoPor: input.criadoPor,
+      criadoPorId: input.criadoPorId ?? null,
+      statusAprovacao: 'pendente',
+    }, input.criadoPor);
+    return { id, message: 'Orçamento lançado com sucesso!' };
+  }),
+
+  // Adicionar item ao orçamento
+  addItem: publicProcedure.input(z.object({
+    orcamentoId: z.number(),
+    tipo: z.enum(['peca', 'servico', 'outro']),
+    descricao: z.string().min(1),
+    quantidade: z.number().min(1),
+    valorUnitario: z.string(),
+    valorTotal: z.string(),
+  })).mutation(async ({ input }) => {
+    const id = await db.addPvOrcamentoItem({
+      orcamentoId: input.orcamentoId,
+      tipo: input.tipo,
+      descricao: input.descricao,
+      quantidade: input.quantidade,
+      valorUnitario: input.valorUnitario,
+      valorTotal: input.valorTotal,
+    });
+    return { id, message: 'Item adicionado!' };
+  }),
+
+  // Remover item do orçamento
+  removeItem: publicProcedure.input(z.object({
+    id: z.number(),
+    orcamentoId: z.number(),
+  })).mutation(async ({ input }) => {
+    await db.deletePvOrcamentoItem(input.id, input.orcamentoId);
+    return { success: true };
+  }),
+
+  // Upload foto/scanner do orçamento
+  uploadFoto: publicProcedure.input(z.object({
+    fileName: z.string(),
+    fileBase64: z.string(),
+    contentType: z.string(),
+  })).mutation(async ({ input }) => {
+    const suffix = nanoid(8);
+    const key = `pv-orcamentos/${suffix}-${input.fileName}`;
+    const buffer = Buffer.from(input.fileBase64, 'base64');
+    const { url } = await storagePut(key, buffer, input.contentType);
+    return { url, key };
+  }),
+
+  // Aprovar/Reprovar orçamento (admin/financeiro)
+  updateStatus: adminProcedure.input(z.object({
+    id: z.number(),
+    statusAprovacao: z.enum(['pendente', 'aprovado', 'reprovado', 'pago']),
+    motivoReprovacao: z.string().optional(),
+  })).mutation(async ({ input, ctx }) => {
+    const aprovadoPor = ctx.user?.name || 'Admin';
+    await db.updatePvOrcamentoStatus(input.id, input.statusAprovacao, aprovadoPor, input.motivoReprovacao);
+    return { success: true };
+  }),
+
+  // Deletar orçamento
+  delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    await db.deletePvOrcamento(input.id);
+    return { success: true };
+  }),
+
+  // Pendentes (contagem + total)
+  pendentes: publicProcedure.query(async () => {
+    return db.getPvOrcamentosPendentes();
+  }),
+
+  // Resumo
+  resumo: publicProcedure.query(async () => {
+    return db.getPvOrcamentosResumo();
+  }),
+});

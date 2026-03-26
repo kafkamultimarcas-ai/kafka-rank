@@ -931,3 +931,11 @@
 - [x] Botões de WhatsApp e Ligação direta no card do chamado do Pós-Venda
 - [x] Campo de observação no card do chamado para pós-venda anotar o que está sendo feito
 - [x] Responsável do pós-venda visível no card do chamado
+
+## Sistema de Orçamentos e Peças no Pós-Venda
+- [x] Tabela pv_orcamentos: itens (peça/serviço), valor, quantidade, foto/scanner do orçamento, status aprovação
+- [x] Pós-Venda pode lançar peças e serviços dentro do chamado do veículo
+- [x] Pós-Venda pode escanear/fotografar orçamento da mecânica e anexar ao chamado
+- [x] Financeiro vê todos os orçamentos pendentes e aprova/reprova cada item
+- [x] Controle de valores: total do orçamento, total aprovado, total reprovado
+- [x] Histórico de aprovações/reprovações no chamado
