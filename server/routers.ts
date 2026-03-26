@@ -149,6 +149,33 @@ export const appRouter = router({
       return null;
     }),
 
+    // Primeiro acesso: vendedor cria seu próprio login
+    firstAccess: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      accessCode: z.string().min(1), // código de acesso fornecido pelo admin
+      username: z.string().min(3),
+      password: z.string().min(4),
+    })).mutation(async ({ input, ctx }) => {
+      const seller = await db.getSellerByIdInternal(input.sellerId);
+      if (!seller || !seller.active) throw new Error('Vendedor não encontrado ou inativo');
+      if (seller.username && seller.passwordHash) throw new Error('Este vendedor já possui login. Use a tela de login.');
+      // Verificar username único
+      const existing = await db.getSellerByUsername(input.username);
+      if (existing) throw new Error('Este nome de usuário já está em uso');
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      await db.updateSeller(input.sellerId, { username: input.username, passwordHash });
+      await db.updateSellerLastAccess(input.sellerId);
+      // Auto-login
+      const token = jwt.sign(
+        { sellerId: seller.id, username: input.username },
+        ENV.cookieSecret,
+        { expiresIn: '30d' }
+      );
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie('seller_session', token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname };
+    }),
+
     // Admin define/reseta senha de vendedor
     setPassword: adminProcedure.input(z.object({
       id: z.number(),
@@ -1104,6 +1131,20 @@ export const appRouter = router({
     markNoShow: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.markNoShow(input.id);
       return { success: true };
+    }),
+    // Alternar comparecimento: permite corrigir status errado (veio <-> não veio)
+    toggleAttendance: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+      newStatus: z.enum(['attended', 'no_show', 'pending']),
+    })).mutation(async ({ input }) => {
+      // Verificar que o agendamento pertence ao vendedor
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento n\u00e3o encontrado ou n\u00e3o pertence a este vendedor');
+      await db.updateSdrRecord(input.id, { attendanceStatus: input.newStatus, attendanceMarkedAt: input.newStatus === 'attended' ? Date.now() : null });
+      const statusLabel = input.newStatus === 'attended' ? 'Compareceu' : input.newStatus === 'no_show' ? 'N\u00e3o compareceu' : 'Pendente';
+      return { success: true, message: `Status alterado para: ${statusLabel}` };
     }),
     // Rota pública: vendedor reagenda cliente que não veio
     reschedule: publicProcedure.input(z.object({

@@ -979,3 +979,18 @@
 - [x] Campo valor de custo (valor que o consignado deixou)
 - [x] Campo observações na consignação
 - [ ] Verificar outros bugs gerais no sistema
+
+## Controle de Acesso por Setor
+- [ ] Primeiro acesso: vendedor cria login/senha no primeiro acesso
+- [ ] Agendamentos privados: cada vendedor vê APENAS os seus agendamentos
+- [ ] Fichas de financiamento privadas: vendedor vê apenas as suas fichas
+- [ ] CRM privado: cada vendedor vê apenas seus dados
+- [ ] Estoque consignação visível para todos (veículos disponíveis)
+- [ ] Ranking e meta visíveis para todos
+- [ ] Admin controla: bloquear/desbloquear vendedor, alterar senha, excluir
+- [ ] Admin define permissões por módulo para cada vendedor/setor
+- [ ] Setores isolados: Pós-Venda não vê Financeiro, Consignação não vê Vendas, etc.
+
+## Bug: Não consegue alterar comparecimento do agendamento
+- [x] Botão para alternar comparecimento (veio/não veio) no card do agendamento
+- [x] Permitir corrigir status de comparecimento errado diretamente no card

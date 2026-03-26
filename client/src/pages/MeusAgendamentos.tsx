@@ -178,6 +178,14 @@ export default function MeusAgendamentos() {
     onError: (e) => toast.error(e.message),
   });
 
+  const toggleAttendance = trpc.sdr.toggleAttendance.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      utils.sdr.myAppointments.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const startEditing = (apt: any) => {
     setEditingId(apt.id);
     setEditData({
@@ -551,9 +559,25 @@ export default function MeusAgendamentos() {
           {/* Overdue / No Show: show rescue options */}
           {isOverdue && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-red-400 font-semibold">
-                <AlertTriangle className="h-4 w-4" />
-                Cliente não compareceu! Tente um resgate:
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-red-400 font-semibold">
+                  <AlertTriangle className="h-4 w-4" />
+                  Cliente n\u00e3o compareceu! Tente um resgate:
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm('Corrigir status: marcar que o cliente COMPARECEU?')) {
+                      toggleAttendance.mutate({ id: apt.id, sellerId, newStatus: 'attended' });
+                    }
+                  }}
+                  disabled={toggleAttendance.isPending}
+                  className="gap-1 text-[10px] h-7 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  <UserCheck className="h-3 w-3" />
+                  Corrigir: Veio
+                </Button>
               </div>
               <div className="flex gap-2">
                 {apt.customerPhone && (
@@ -596,9 +620,25 @@ export default function MeusAgendamentos() {
           {/* No Show (already marked): show rescue options */}
           {vs === "no_show" && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-orange-400 font-semibold">
-                <AlertCircle className="h-4 w-4" />
-                Cliente não veio. Tente resgatar este cliente!
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-orange-400 font-semibold">
+                  <AlertCircle className="h-4 w-4" />
+                  Cliente n\u00e3o veio. Tente resgatar este cliente!
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm('Corrigir status: marcar que o cliente COMPARECEU?')) {
+                      toggleAttendance.mutate({ id: apt.id, sellerId, newStatus: 'attended' });
+                    }
+                  }}
+                  disabled={toggleAttendance.isPending}
+                  className="gap-1 text-[10px] h-7 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+                >
+                  <UserCheck className="h-3 w-3" />
+                  Corrigir: Veio
+                </Button>
               </div>
               <div className="flex gap-2">
                 {apt.customerPhone && (
@@ -675,13 +715,27 @@ export default function MeusAgendamentos() {
             </div>
           )}
 
-          {/* Attended: show waiting status */}
+          {/* Attended: show waiting status + botão para corrigir se errado */}
           {vs === "attended" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${attendCfg.color}`}>
                 <AttendIcon className="h-3 w-3" />
                 {attendCfg.label}
               </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  if (confirm('Desfazer comparecimento? O status voltará para pendente.')) {
+                    toggleAttendance.mutate({ id: apt.id, sellerId, newStatus: 'pending' });
+                  }
+                }}
+                disabled={toggleAttendance.isPending}
+                className="gap-1 text-[10px] h-6 text-muted-foreground hover:text-red-400"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Desfazer
+              </Button>
             </div>
           )}
 
