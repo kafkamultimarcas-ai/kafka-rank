@@ -23,7 +23,8 @@ import {
 import {
   Plus, Search, Wrench, Clock, Truck, CheckCircle2, AlertTriangle,
   Car, Phone, User, FileText, Calendar, Building2, DollarSign,
-  ChevronRight, Trash2, Edit, Eye, X, ImagePlus, History
+  ChevronRight, Trash2, Edit, Eye, X, ImagePlus, History,
+  MessageCircle, PhoneCall, Edit3
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
@@ -448,11 +449,50 @@ function DetalheChamadoModal({ open, onClose, chamado, sellers, oficinas, onUpda
                     </div>
                   )}
                   <InfoRow icon={User} label="Vendedor" value={vendedor?.nickname || vendedor?.name || "—"} />
+                  <InfoRow icon={User} label="Responsável PV" value={(() => {
+                    if (!chamado.responsavelPvId) return "—";
+                    const r = sellers.find((s: any) => s.id === chamado.responsavelPvId);
+                    return r ? (r.nickname || r.name) : `ID ${chamado.responsavelPvId}`;
+                  })()} />
                   <InfoRow icon={Building2} label="Oficina" value={chamado.oficinaNome || "—"} />
                   <InfoRow icon={Calendar} label="Entrada Agendada" value={formatDate(chamado.dataEntradaAgendada)} />
                   <InfoRow icon={Calendar} label="Entrada Real" value={formatDate(chamado.dataEntradaReal)} />
                   <InfoRow icon={Calendar} label="Prazo Entrega" value={formatDate(chamado.prazoEntrega)} />
                   <InfoRow icon={Calendar} label="Entrega Real" value={formatDate(chamado.dataEntregaReal)} />
+                </div>
+
+                {/* Botões WhatsApp e Ligação */}
+                {chamado.clienteTelefone && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href={`https://wa.me/55${chamado.clienteTelefone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-bold transition-all"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      WhatsApp
+                    </a>
+                    <a
+                      href={`tel:${chamado.clienteTelefone}`}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all"
+                    >
+                      <PhoneCall className="w-4 h-4" />
+                      Ligar
+                    </a>
+                  </div>
+                )}
+
+                {/* Serviço Realizado / O que está sendo feito */}
+                <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 p-3">
+                  <p className="text-xs text-orange-400 uppercase font-bold mb-1 flex items-center gap-1">
+                    <Wrench className="w-3 h-3" /> O que está sendo feito
+                  </p>
+                  {chamado.servicoRealizado ? (
+                    <p className="text-sm">{chamado.servicoRealizado}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Nenhuma anotação ainda.</p>
+                  )}
                 </div>
 
                 {/* Gasto total do carro */}
@@ -572,6 +612,10 @@ function EditChamadoForm({ chamado, oficinas, sellers, editData, setEditData, on
       <div>
         <label className="text-xs text-muted-foreground">Observações</label>
         <Textarea defaultValue={chamado.observacoes} onChange={(e) => setEditData((d: any) => ({ ...d, observacoes: e.target.value }))} rows={2} />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground flex items-center gap-1"><Wrench className="h-3 w-3 text-orange-400" /> O que está sendo feito (Serviço)</label>
+        <Textarea defaultValue={chamado.servicoRealizado} onChange={(e) => setEditData((d: any) => ({ ...d, servicoRealizado: e.target.value }))} rows={2} placeholder="Descreva o que está sendo feito no veículo..." />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

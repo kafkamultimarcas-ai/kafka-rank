@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { Wrench, ArrowLeft, Plus, Phone, Car, User, AlertTriangle, MapPin, Clock, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { Wrench, ArrowLeft, Plus, Phone, Car, User, AlertTriangle, MapPin, Clock, ChevronDown, ChevronUp, FileText, MessageCircle, PhoneCall } from "lucide-react";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
@@ -322,16 +322,47 @@ export default function PosVenda() {
 
                       {/* Detalhes expandidos */}
                       {isExpanded && (
-                        <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-2">
+                        <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-3">
                           <div className="text-xs space-y-1.5">
                             <p className="text-gray-400"><span className="text-gray-600">Problema:</span> {c.problemaRelatado}</p>
                             {c.observacoes && <p className="text-gray-400"><span className="text-gray-600">Obs:</span> {c.observacoes}</p>}
+                            {c.servicoRealizado && (
+                              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 mt-1">
+                                <p className="text-[10px] text-orange-400 uppercase font-bold mb-0.5 flex items-center gap-1">
+                                  <Wrench className="h-3 w-3" /> O que está sendo feito
+                                </p>
+                                <p className="text-gray-300 text-xs">{c.servicoRealizado}</p>
+                              </div>
+                            )}
                             {c.clienteTelefone && (
                               <p className="text-gray-400 flex items-center gap-1">
                                 <Phone className="h-3 w-3" /> {c.clienteTelefone}
                               </p>
                             )}
                           </div>
+
+                          {/* Botões WhatsApp e Ligação */}
+                          {c.clienteTelefone && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <a
+                                href={`https://wa.me/55${c.clienteTelefone.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-bold transition-all"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                WhatsApp
+                              </a>
+                              <a
+                                href={`tel:${c.clienteTelefone}`}
+                                className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all"
+                              >
+                                <PhoneCall className="w-4 h-4" />
+                                Ligar
+                              </a>
+                            </div>
+                          )}
+
                           <div className="flex flex-wrap gap-3 text-[10px] text-gray-500 pt-1">
                             <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Aberto: {formatDate(c.createdAt)}</span>
                             {c.dataEntradaAgendada && <span>Entrada: {formatDate(c.dataEntradaAgendada)}</span>}

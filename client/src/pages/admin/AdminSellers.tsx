@@ -18,6 +18,7 @@ const DEPARTMENTS = [
   { value: "consignacao", label: "Consignação", color: "bg-cyan-500/20 text-cyan-400" },
   { value: "despachante", label: "Despachante", color: "bg-emerald-500/20 text-emerald-400" },
   { value: "pos_venda", label: "Pós-Venda", color: "bg-orange-500/20 text-orange-400" },
+  { value: "financeiro", label: "Financeiro", color: "bg-green-500/20 text-green-400" },
   { value: "marketing", label: "Marketing", color: "bg-pink-500/20 text-pink-400" },
 ];
 

@@ -1594,6 +1594,7 @@ export async function updatePvChamado(id: number, data: {
   prazoEntrega?: number;
   dataEntregaReal?: number;
   observacoes?: string;
+  servicoRealizado?: string;
   clienteNome?: string;
   clienteTelefone?: string;
   carroModelo?: string;
@@ -1617,6 +1618,7 @@ export async function updatePvChamado(id: number, data: {
   else if (data.status === 'finalizado') { acao = 'finalizacao'; descricao = 'Serviço finalizado'; }
   else if (data.status === 'entregue') { acao = 'entrega'; descricao = 'Veículo entregue ao cliente'; }
   else if (data.status === 'cancelado') { acao = 'cancelamento'; descricao = 'Chamado cancelado'; }
+  else if (data.servicoRealizado) { acao = 'servico_obs'; descricao = `Observação do serviço: ${data.servicoRealizado.substring(0, 100)}`; }
   else if (data.oficinaId || data.oficinaNome) { acao = 'oficina'; descricao = `Oficina vinculada: ${data.oficinaNome || 'ID ' + data.oficinaId}`; }
   else if (data.prazoEntrega) { acao = 'prazo'; descricao = `Prazo de entrega definido: ${new Date(data.prazoEntrega).toLocaleDateString('pt-BR')}`; }
   await db.insert(pvHistorico).values({ chamadoId: id, acao, descricao, usuario });

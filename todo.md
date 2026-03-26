@@ -919,3 +919,15 @@
 ## Próximos Passos
 - [x] Notificação push para documentos pendentes (enviada quando venda é aprovada)
 - [x] Notificação push para documento transferido (enviada quando despachante marca transferência)
+
+## Melhoria: Setor Financeiro + Pós-Venda Visual + Login Setorial
+- [ ] Adicionar setor "Financeiro" na lista de setores (schema + frontend)
+- [ ] Financeiro tem acesso a toda tela do Pós-Venda
+- [ ] Aba exclusiva de Contas só para Financeiro (Pós-Venda NÃO acessa)
+- [ ] Login de Financeiro e Pós-Venda pela tela principal com senha
+- [ ] Redesign visual do Pós-Venda - painel organizado com cards por status
+- [ ] Filtro de abas no Pós-Venda (Todos, Abertos, Em Andamento, Resolvidos)
+- [ ] Pós-Venda não precisa selecionar nome - já mostra tudo ao entrar
+- [x] Botões de WhatsApp e Ligação direta no card do chamado do Pós-Venda
+- [x] Campo de observação no card do chamado para pós-venda anotar o que está sendo feito
+- [x] Responsável do pós-venda visível no card do chamado

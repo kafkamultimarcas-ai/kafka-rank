@@ -565,6 +565,7 @@ export const pvChamados = mysqlTable("pv_chamados", {
   // Problema
   problemaRelatado: text("problemaRelatado").notNull(),
   observacoes: text("observacoes"),
+  servicoRealizado: text("servicoRealizado"), // anotação do pós-venda sobre o que está sendo feito
   // Responsáveis
   vendedorId: int("vendedorId").notNull(), // quem abriu o chamado
   responsavelPvId: int("responsavelPvId"), // quem do pós-venda pegou

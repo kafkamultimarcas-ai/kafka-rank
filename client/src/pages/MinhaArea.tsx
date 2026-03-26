@@ -26,7 +26,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3 } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 
@@ -37,6 +37,7 @@ const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gra
   consignacao: { label: "Consignação", color: "text-cyan-400", icon: FileText, gradient: "from-cyan-600/20 to-cyan-500/10 border-cyan-500/30" },
   despachante: { label: "Despachante", color: "text-emerald-400", icon: FileText, gradient: "from-emerald-600/20 to-emerald-500/10 border-emerald-500/30" },
   pos_venda: { label: "Pós-Venda", color: "text-orange-400", icon: Wrench, gradient: "from-orange-600/20 to-orange-500/10 border-orange-500/30" },
+  financeiro: { label: "Financeiro", color: "text-green-400", icon: DollarSign, gradient: "from-green-600/20 to-green-500/10 border-green-500/30" },
   marketing: { label: "Marketing", color: "text-pink-400", icon: Target, gradient: "from-pink-600/20 to-pink-500/10 border-pink-500/30" },
 };
 
@@ -100,6 +101,7 @@ export default function MinhaArea() {
   const [showPvModal, setShowPvModal] = useState(false);
   const [pvForm, setPvForm] = useState({ clienteNome: '', clienteTelefone: '', carroModelo: '', carroPlaca: '', problemaRelatado: '', observacoes: '' });
   const [pvFilter, setPvFilter] = useState<string>('todos');
+  const [pvServicoEdit, setPvServicoEdit] = useState('');
 
   // Buscar dados específicos do setor
   const { data: appointments } = trpc.sdr.myAppointments.useQuery(
@@ -1367,13 +1369,13 @@ export default function MinhaArea() {
                 {pvSelectedChamado.carroPlaca && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Placa</span>
-                    <span className="text-white font-medium">{pvSelectedChamado.carroPlaca}</span>
+                    <span className="text-white font-mono font-medium">{pvSelectedChamado.carroPlaca}</span>
                   </div>
                 )}
                 {pvSelectedChamado.clienteTelefone && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Telefone</span>
-                    <a href={`tel:${pvSelectedChamado.clienteTelefone}`} className="text-blue-400 font-medium">{pvSelectedChamado.clienteTelefone}</a>
+                    <span className="text-blue-400 font-medium">{pvSelectedChamado.clienteTelefone}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
@@ -1385,6 +1387,18 @@ export default function MinhaArea() {
                     })()}
                   </span>
                 </div>
+                {/* Responsável Pós-Venda */}
+                {pvSelectedChamado.responsavelPvId && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Responsável PV</span>
+                    <span className="text-orange-400 font-medium">
+                      {(() => {
+                        const r = (allSellers || []).find((s: any) => s.id === pvSelectedChamado.responsavelPvId);
+                        return r ? (r.nickname || r.name) : `ID ${pvSelectedChamado.responsavelPvId}`;
+                      })()}
+                    </span>
+                  </div>
+                )}
                 {pvSelectedChamado.oficinaNome && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Oficina</span>
@@ -1401,6 +1415,28 @@ export default function MinhaArea() {
                 )}
               </div>
 
+              {/* Botões WhatsApp e Ligação */}
+              {pvSelectedChamado.clienteTelefone && (
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={`https://wa.me/55${pvSelectedChamado.clienteTelefone.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white text-sm font-bold transition-all"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    WhatsApp
+                  </a>
+                  <a
+                    href={`tel:${pvSelectedChamado.clienteTelefone}`}
+                    className="flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all"
+                  >
+                    <PhoneCall className="w-5 h-5" />
+                    Ligar
+                  </a>
+                </div>
+              )}
+
               {/* Problema */}
               <div>
                 <p className="text-xs text-gray-500 uppercase font-bold mb-1">Problema Relatado</p>
@@ -1413,6 +1449,45 @@ export default function MinhaArea() {
                   <p className="text-sm text-gray-300 bg-gray-800/50 rounded-lg p-3">{pvSelectedChamado.observacoes}</p>
                 </div>
               )}
+
+              {/* Serviço Realizado / O que está sendo feito */}
+              <div>
+                <p className="text-xs text-orange-400 uppercase font-bold mb-1 flex items-center gap-1">
+                  <Wrench className="w-3 h-3" /> O que está sendo feito
+                </p>
+                {pvSelectedChamado.servicoRealizado ? (
+                  <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                    <p className="text-sm text-gray-200">{pvSelectedChamado.servicoRealizado}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-600 italic">Nenhuma anotação ainda.</p>
+                )}
+                <div className="mt-2">
+                  <textarea
+                    value={pvServicoEdit}
+                    onChange={e => setPvServicoEdit(e.target.value)}
+                    placeholder="Descreva o que está sendo feito no veículo..."
+                    rows={2}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:border-orange-500 focus:outline-none resize-none"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!pvServicoEdit.trim()) { toast.error('Digite a observação do serviço'); return; }
+                      updatePvMutation.mutate({
+                        id: pvSelectedChamado.id,
+                        sellerId: sellerId,
+                        servicoRealizado: pvServicoEdit.trim(),
+                      });
+                      setPvServicoEdit('');
+                    }}
+                    disabled={updatePvMutation.isPending || !pvServicoEdit.trim()}
+                    className="mt-1.5 w-full py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    {updatePvMutation.isPending ? 'Salvando...' : 'Salvar Observação do Serviço'}
+                  </button>
+                </div>
+              </div>
 
               {/* Atualizar Status */}
               {pvSelectedChamado.status !== 'entregue' && pvSelectedChamado.status !== 'cancelado' && (

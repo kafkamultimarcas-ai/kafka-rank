@@ -1,0 +1,1 @@
+ALTER TABLE `pv_chamados` ADD `servicoRealizado` text;

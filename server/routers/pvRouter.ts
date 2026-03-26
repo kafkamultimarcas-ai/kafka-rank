@@ -63,6 +63,7 @@ export const pvChamadosRouter = router({
     prazoEntrega: z.number().optional(),
     dataEntregaReal: z.number().optional(),
     observacoes: z.string().optional(),
+    servicoRealizado: z.string().optional(),
     clienteNome: z.string().optional(),
     clienteTelefone: z.string().optional(),
     carroModelo: z.string().optional(),
@@ -103,6 +104,7 @@ export const pvChamadosRouter = router({
     prazoEntrega: z.number().optional(),
     dataEntregaReal: z.number().optional(),
     observacoes: z.string().optional(),
+    servicoRealizado: z.string().optional(),
   })).mutation(async ({ input }) => {
     // Verificar se o seller é do setor pós-venda
     const seller = await db.getSellerById(input.sellerId);
