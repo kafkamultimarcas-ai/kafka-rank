@@ -20,6 +20,7 @@ import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAl
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
+import { fichaRouter } from "./routers/fichaRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -27,6 +28,7 @@ import { ENV } from "./_core/env";
 
 export const appRouter = router({
   system: systemRouter,
+  fichas: fichaRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

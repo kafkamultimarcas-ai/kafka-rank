@@ -21,6 +21,7 @@ import {
   mktStrategies, InsertMktStrategy,
   mktTasks, InsertMktTask,
   saleDocuments, InsertSaleDocument,
+  fichasFinanciamento, InsertFichaFinanciamento, fichaBancos, InsertFichaBanco, BANCOS_FINANCIAMENTO,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -2241,4 +2242,85 @@ export async function getSdrConversions(sellerId: number) {
     });
   }
   return result;
+}
+
+
+// ===== MESA DE CRÉDITO / FICHAS DE FINANCIAMENTO =====
+
+export async function createFichaFinanciamento(data: InsertFichaFinanciamento) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(fichasFinanciamento).values(data);
+  const fichaId = result[0].insertId;
+  // Criar registros para todos os bancos
+  const bancosData: InsertFichaBanco[] = BANCOS_FINANCIAMENTO.map(banco => ({
+    fichaId,
+    banco,
+    status: "pendente" as const,
+  }));
+  await db.insert(fichaBancos).values(bancosData);
+  return fichaId;
+}
+
+export async function listFichasFinanciamento(opts?: { sellerId?: number; status?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (opts?.sellerId) conditions.push(eq(fichasFinanciamento.sellerId, opts.sellerId));
+  if (opts?.status) conditions.push(eq(fichasFinanciamento.status, opts.status as any));
+  if (conditions.length > 0) {
+    return db.select().from(fichasFinanciamento).where(and(...conditions)).orderBy(desc(fichasFinanciamento.createdAt));
+  }
+  return db.select().from(fichasFinanciamento).orderBy(desc(fichasFinanciamento.createdAt));
+}
+
+export async function getFichaById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(fichasFinanciamento).where(eq(fichasFinanciamento.id, id)).limit(1);
+  return result[0];
+}
+
+export async function updateFichaFinanciamento(id: number, data: Partial<InsertFichaFinanciamento>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(fichasFinanciamento).set(data).where(eq(fichasFinanciamento.id, id));
+}
+
+export async function listFichaBancos(fichaId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(fichaBancos).where(eq(fichaBancos.fichaId, fichaId)).orderBy(fichaBancos.banco);
+}
+
+export async function updateFichaBanco(id: number, data: Partial<InsertFichaBanco>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(fichaBancos).set(data).where(eq(fichaBancos.id, id));
+}
+
+export async function getFichaFilaCount() {
+  const db = await getDb();
+  if (!db) return { naFila: 0, emAnalise: 0, total: 0 };
+  const result = await db.select({
+    status: fichasFinanciamento.status,
+    count: sql<number>`count(*)`,
+  }).from(fichasFinanciamento).groupBy(fichasFinanciamento.status);
+  const counts: Record<string, number> = {};
+  result.forEach(r => { counts[r.status] = Number(r.count); });
+  return {
+    naFila: counts["na_fila"] || 0,
+    emAnalise: counts["em_analise"] || 0,
+    aprovado: counts["aprovado"] || 0,
+    recusado: counts["recusado"] || 0,
+    parcial: counts["parcial"] || 0,
+    total: Object.values(counts).reduce((a, b) => a + b, 0),
+  };
+}
+
+export async function deleteFichaFinanciamento(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(fichaBancos).where(eq(fichaBancos.fichaId, id));
+  await db.delete(fichasFinanciamento).where(eq(fichasFinanciamento.id, id));
 }

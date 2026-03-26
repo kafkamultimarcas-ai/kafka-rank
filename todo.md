@@ -955,3 +955,17 @@
 - [x] Rota backend: ranking feirão (quem mais agendou pro feirão)
 - [x] Rota backend: buscar agendamento por telefone (cruzamento)
 - [x] Rota backend: vincular venda ao agendamento de origem
+
+## Mesa de Crédito / Ficha de Financiamento
+- [x] Tabela fichas_financiamento: dados completos do cliente (nome, CPF, RG, nascimento, estado civil, mãe, pai, cidade nasceu, email, telefone, CEP, endereço, profissão, renda, local trabalho, referência pessoal)
+- [x] Tabela ficha_bancos: status por banco (aprovado, recusado, análise), observação, valor parcela
+- [x] Dados do veículo: modelo, placa, ano, valor financiado
+- [x] Upload foto CNH/RG do cliente (S3) com visualização clicável
+- [x] 16 bancos cadastrados: Santander, Bradesco, Itaú, Pan, C6, Safra, BBC, Omni, Daycoval, BV, Ailos, Sicoob, Listo, Carbank, Porto Seguro
+- [x] Formulário completo na tela principal para vendedor preencher ficha
+- [x] Fila de aprovação para F&I por ordem de chegada
+- [x] Cronômetro visível mostrando tempo de espera de cada ficha
+- [x] F&I atualiza status por banco: aprovado/recusado/análise + observação + valor parcela
+- [x] Vendedor vê status da sua ficha e retorno dos bancos
+- [x] Observações do vendedor sobre bancos já tentados
+- [x] Consulta FIPE por placa (placeholder - API não disponível)

@@ -742,3 +742,78 @@ export const saleDocuments = mysqlTable("sale_documents", {
 });
 export type SaleDocument = typeof saleDocuments.$inferSelect;
 export type InsertSaleDocument = typeof saleDocuments.$inferInsert;
+
+
+// ==================== MESA DE CRÉDITO / FINANCIAMENTO ====================
+
+export const BANCOS_FINANCIAMENTO = [
+  "Santander", "Bradesco", "Itaú", "Pan", "C6", "Safra", "BBC", "Omni",
+  "Daycoval", "BV", "Ailos", "Sicoob", "Listo", "Carbank", "Porto Seguro"
+] as const;
+
+export const fichasFinanciamento = mysqlTable("fichas_financiamento", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(), // vendedor que enviou
+  competitionId: int("competitionId"),
+  // Status da ficha na fila
+  status: mysqlEnum("status", ["na_fila", "em_analise", "aprovado", "recusado", "parcial"]).default("na_fila").notNull(),
+  // Dados do veículo
+  veiculo: varchar("veiculo", { length: 255 }),
+  placa: varchar("placa", { length: 10 }),
+  anoModelo: varchar("anoModelo", { length: 20 }),
+  valorFipe: int("valorFipe"), // centavos
+  valorFinanciado: int("valorFinanciado"), // centavos
+  // Dados pessoais do cliente
+  nomeCompleto: varchar("nomeCompleto", { length: 255 }).notNull(),
+  cpf: varchar("cpf", { length: 20 }).notNull(),
+  rg: varchar("rg", { length: 30 }),
+  dataNascimento: varchar("dataNascimento", { length: 20 }),
+  estadoCivil: varchar("estadoCivil", { length: 50 }),
+  nomeMae: varchar("nomeMae", { length: 255 }),
+  nomePai: varchar("nomePai", { length: 255 }),
+  cidadeNasceu: varchar("cidadeNasceu", { length: 255 }),
+  email: varchar("email_ficha", { length: 320 }),
+  telefone: varchar("telefone", { length: 30 }),
+  cep: varchar("cep", { length: 15 }),
+  endereco: text("endereco"),
+  profissao: varchar("profissao", { length: 255 }),
+  renda: varchar("renda", { length: 100 }),
+  localTrabalho: varchar("localTrabalho", { length: 255 }),
+  referenciaNome: varchar("referenciaNome", { length: 255 }),
+  referenciaTelefone: varchar("referenciaTelefone", { length: 30 }),
+  // Foto CNH/RG
+  cnhFotoUrl: text("cnhFotoUrl"),
+  cnhFotoKey: varchar("cnhFotoKey", { length: 500 }),
+  // Observações do vendedor (bancos já tentados, etc)
+  observacoesVendedor: text("observacoesVendedor"),
+  // Observações do F&I
+  observacoesFei: text("observacoesFei"),
+  // Quem do F&I está analisando
+  feiResponsavelId: int("feiResponsavelId"),
+  feiResponsavelNome: varchar("feiResponsavelNome", { length: 255 }),
+  // Timestamps de controle
+  inicioAnalise: bigint("inicioAnalise", { mode: "number" }), // quando F&I pegou a ficha
+  fimAnalise: bigint("fimAnalise", { mode: "number" }), // quando F&I finalizou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type FichaFinanciamento = typeof fichasFinanciamento.$inferSelect;
+export type InsertFichaFinanciamento = typeof fichasFinanciamento.$inferInsert;
+
+export const fichaBancos = mysqlTable("ficha_bancos", {
+  id: int("id").autoincrement().primaryKey(),
+  fichaId: int("fichaId").notNull(),
+  banco: varchar("banco", { length: 100 }).notNull(),
+  status: mysqlEnum("status_banco", ["pendente", "em_analise", "aprovado", "recusado"]).default("pendente").notNull(),
+  observacao: text("observacao"),
+  valorParcela: int("valorParcela"), // centavos
+  qtdParcelas: int("qtdParcelas"),
+  taxaJuros: varchar("taxaJuros", { length: 20 }),
+  tentadoPorVendedor: boolean("tentadoPorVendedor").default(false), // vendedor já tentou nesse banco
+  atualizadoPor: varchar("atualizadoPor", { length: 255 }),
+  atualizadoEm: bigint("atualizadoEm", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type FichaBanco = typeof fichaBancos.$inferSelect;
+export type InsertFichaBanco = typeof fichaBancos.$inferInsert;

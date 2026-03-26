@@ -26,7 +26,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 
@@ -737,6 +737,11 @@ export default function MinhaArea() {
           </div>
         )}
 
+        {/* ===== MINHAS FICHAS DE FINANCIAMENTO (Vendedor) ===== */}
+        {dept === "vendas" && (
+          <MinhasFichasFinanciamento sellerId={Number(sellerId)} />
+        )}
+
         {/* Pendentes - Consignação */}
         {dept === "consignacao" && pendingConsignment.length > 0 && (
           <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4">
@@ -1049,6 +1054,36 @@ export default function MinhaArea() {
               <div className="text-left flex-1">
                 <p className="text-white font-bold">Simulador de Financiamento</p>
                 <p className="text-gray-400 text-sm">Calcule parcelas e argumente com o cliente</p>
+              </div>
+            </button>
+          )}
+
+          {/* Ficha de Financiamento / Mesa de Crédito */}
+          {(dept === "vendas") && (
+            <button
+              onClick={() => navigate("/ficha-financiamento")}
+              className="w-full bg-gradient-to-r from-blue-600/20 to-indigo-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-blue-400" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-bold">Enviar Ficha p/ Mesa de Crédito</p>
+                <p className="text-gray-400 text-sm">Preencha a ficha cadastral para financiamento</p>
+              </div>
+            </button>
+          )}
+          {(dept === "fei") && (
+            <button
+              onClick={() => navigate("/mesa-credito")}
+              className="w-full bg-gradient-to-r from-blue-600/20 to-indigo-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <CreditCard className="w-6 h-6 text-blue-400" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-bold">Mesa de Crédito</p>
+                <p className="text-gray-400 text-sm">Analisar fichas de financiamento</p>
               </div>
             </button>
           )}
@@ -2033,6 +2068,156 @@ function SdrConversionsCard({ sellerId }: { sellerId: number }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+
+function MinhasFichasFinanciamento({ sellerId }: { sellerId: number }) {
+  const { data: fichas } = trpc.fichas.list.useQuery({ sellerId }, { refetchInterval: 10000 });
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [showCnh, setShowCnh] = useState(false);
+
+  if (!fichas || fichas.length === 0) return null;
+
+  const STATUS_COLORS: Record<string, string> = {
+    na_fila: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40",
+    em_analise: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+    aprovado: "bg-green-500/20 text-green-400 border-green-500/40",
+    recusado: "bg-red-500/20 text-red-400 border-red-500/40",
+    parcial: "bg-orange-500/20 text-orange-400 border-orange-500/40",
+  };
+  const STATUS_LABELS: Record<string, string> = {
+    na_fila: "Na Fila",
+    em_analise: "Em Análise",
+    aprovado: "Aprovado",
+    recusado: "Recusado",
+    parcial: "Parcial",
+  };
+
+  const formatCurrencyLocal = (cents: number | null | undefined) => {
+    if (!cents) return "—";
+    return `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+        <CreditCard className="w-4 h-4" /> Minhas Fichas de Financiamento ({fichas.length})
+      </h2>
+      <div className="space-y-2">
+        {fichas.map((f: any) => (
+          <div key={f.id} className={`border rounded-xl overflow-hidden transition-all ${
+            f.status === "aprovado" ? "border-green-500/30 bg-green-950/10" :
+            f.status === "recusado" ? "border-red-500/30 bg-red-950/10" :
+            f.status === "em_analise" ? "border-blue-500/30 bg-blue-950/10" :
+            f.status === "parcial" ? "border-orange-500/30 bg-orange-950/10" :
+            "border-yellow-500/30 bg-yellow-950/10"
+          }`}>
+            <button
+              onClick={() => setExpanded(expanded === f.id ? null : f.id)}
+              className="w-full p-3 text-left"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono text-gray-500">#{f.id}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_COLORS[f.status]}`}>
+                      {STATUS_LABELS[f.status]}
+                    </span>
+                    {f.status === "na_fila" && (
+                      <span className="text-[10px] text-yellow-400 animate-pulse">Aguardando F&I...</span>
+                    )}
+                    {f.status === "em_analise" && (
+                      <span className="text-[10px] text-blue-400 animate-pulse">Analisando...</span>
+                    )}
+                  </div>
+                  <p className="text-white font-bold text-sm mt-1">{f.nomeCompleto}</p>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 mt-0.5">
+                    {f.veiculo && <span>{f.veiculo}</span>}
+                    {f.placa && <span className="text-yellow-400 font-mono">{f.placa}</span>}
+                  </div>
+                </div>
+                <div className="text-right">
+                  {f.valorFinanciado && <p className="text-sm text-green-400 font-bold">{formatCurrencyLocal(f.valorFinanciado)}</p>}
+                  <p className="text-[10px] text-gray-600">{new Date(f.createdAt).toLocaleDateString("pt-BR")}</p>
+                </div>
+              </div>
+            </button>
+
+            {expanded === f.id && (
+              <div className="px-3 pb-3 space-y-3 border-t border-gray-800/50 pt-3">
+                {/* Responsável F&I */}
+                {f.feiResponsavelNome && (
+                  <div className="text-xs text-gray-400">
+                    F&I Responsável: <span className="text-blue-400 font-bold">{f.feiResponsavelNome}</span>
+                  </div>
+                )}
+
+                {/* Observações do F&I */}
+                {f.observacoesFei && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-purple-400 mb-0.5">RETORNO DO F&I:</p>
+                    <p className="text-xs text-purple-200">{f.observacoesFei}</p>
+                  </div>
+                )}
+
+                {/* Bancos */}
+                {f.bancos && f.bancos.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">Status por Banco:</p>
+                    {f.bancos.map((b: any) => (
+                      <div key={b.id} className="flex items-center justify-between bg-gray-800/30 rounded-lg px-2 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-3 h-3 text-gray-500" />
+                          <span className="text-xs text-white font-medium">{b.banco}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {b.valorParcela && (
+                            <span className="text-[10px] text-green-400">
+                              {formatCurrencyLocal(b.valorParcela)}
+                              {b.qtdParcelas && <span className="text-gray-500"> x{b.qtdParcelas}</span>}
+                            </span>
+                          )}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                            b.status === "aprovado" ? "bg-green-600 text-white" :
+                            b.status === "recusado" ? "bg-red-600 text-white" :
+                            b.status === "em_analise" ? "bg-blue-600 text-white" :
+                            "bg-gray-700 text-gray-300"
+                          }`}>
+                            {b.status === "pendente" ? "Pendente" : b.status === "em_analise" ? "Analisando" : b.status === "aprovado" ? "APROVADO" : "RECUSADO"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* CNH */}
+                {f.cnhFotoUrl && (
+                  <button onClick={() => setShowCnh(true)} className="flex items-center gap-2 text-xs text-green-400 hover:text-green-300">
+                    <Image className="w-3 h-3" /> Ver CNH/RG
+                  </button>
+                )}
+
+                {/* Tempo de análise */}
+                {f.fimAnalise && f.inicioAnalise && (
+                  <p className="text-[10px] text-gray-600 text-center">
+                    Tempo de análise: {Math.round((f.fimAnalise - f.inicioAnalise) / 60000)} minutos
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Modal CNH */}
+            {showCnh && expanded === f.id && f.cnhFotoUrl && (
+              <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4" onClick={() => setShowCnh(false)}>
+                <img src={f.cnhFotoUrl} alt="CNH" className="max-w-full max-h-full object-contain rounded-lg" />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

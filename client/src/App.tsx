@@ -48,6 +48,8 @@ const PosVenda = lazy(() => import("./pages/PosVenda"));
 const IAVendedor = lazy(() => import("./pages/IAVendedor"));
 const SimuladorFinanciamento = lazy(() => import("./pages/SimuladorFinanciamento"));
 const RankingFeirao = lazy(() => import("./pages/RankingFeirao"));
+const FichaFinanciamento = lazy(() => import("./pages/FichaFinanciamento"));
+const MesaCredito = lazy(() => import("./pages/MesaCredito"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -113,6 +115,8 @@ function Router() {
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
         <Route path="/simulador-financiamento" component={SimuladorFinanciamento} />
+        <Route path="/ficha-financiamento" component={FichaFinanciamento} />
+        <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
