@@ -1022,3 +1022,9 @@
 - [x] Admin controla: quais módulos o gerente pode ver/editar (17 módulos disponíveis)
 - [x] Botão "Gerente" aparece no header quando logado como gerente
 - [x] 350 testes passando
+
+## Edição de Registros F&I
+- [x] Backend: rota para editar registro F&I (valor, placa, CPF, banco, retorno, observações, data pgto)
+- [x] Frontend: botão de editar (lápis azul) no card F&I com dialog de edição completo
+- [x] Admin pode editar registros aprovados, pendentes ou rejeitados
+- [x] 357 testes passando

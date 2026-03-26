@@ -818,6 +818,20 @@ export const appRouter = router({
       await db.deleteFeiRecord(input.id);
       return { success: true };
     }),
+    update: adminProcedure.input(z.object({
+      id: z.number(),
+      customerCpf: z.string().optional(),
+      vehiclePlate: z.string().optional(),
+      bankName: z.string().optional(),
+      financedValue: z.number().optional(),
+      returnType: z.string().optional(),
+      paymentDate: z.number().nullable().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      const updated = await db.updateFeiRecord(id, data);
+      return updated;
+    }),
   }),
 
   // ===== CONSIGNA\u00c7\u00c3O =====

@@ -71,6 +71,8 @@ export default function AdminFei() {
     vehiclePlate: "",
     customerCpf: "",
     status: "",
+    notes: "",
+    paymentDate: "",
   });
 
   const approveFei = trpc.fei.approve.useMutation({
@@ -87,6 +89,26 @@ export default function AdminFei() {
     onSuccess: () => { utils.fei.list.invalidate(); utils.sellers.list.invalidate(); toast.success("Registro removido!"); },
     onError: () => toast.error("Erro ao remover."),
   });
+
+  const updateFei = trpc.fei.update.useMutation({
+    onSuccess: () => { utils.fei.list.invalidate(); toast.success("Registro atualizado!"); setEditDialog(false); },
+    onError: (err) => toast.error(err.message || "Erro ao atualizar."),
+  });
+
+  function handleSaveEdit() {
+    if (!editingRecord) return;
+    const financedValueCents = editForm.financedValue ? Math.round(parseFloat(editForm.financedValue.replace(',', '.')) * 100) : undefined;
+    updateFei.mutate({
+      id: editingRecord.id,
+      bankName: editForm.bankName || undefined,
+      returnType: editForm.returnType || undefined,
+      financedValue: financedValueCents,
+      vehiclePlate: editForm.vehiclePlate || undefined,
+      customerCpf: editForm.customerCpf || undefined,
+      notes: editForm.notes || undefined,
+      paymentDate: editForm.paymentDate ? Number(editForm.paymentDate) : undefined,
+    });
+  }
 
   const getSeller = (id: number) => sellers?.find(s => s.id === id);
 
@@ -122,6 +144,8 @@ export default function AdminFei() {
       vehiclePlate: record.vehiclePlate || "",
       customerCpf: record.customerCpf || "",
       status: record.status || "pending",
+      notes: record.notes || "",
+      paymentDate: record.paymentDate ? String(record.paymentDate) : "",
     });
     setEditDialog(true);
   }
@@ -338,6 +362,15 @@ export default function AdminFei() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                        onClick={() => openEdit(record)}
+                        title="Editar registro"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-7 w-7"
                         onClick={() => { if (confirm("Excluir este registro F&I?")) deleteFei.mutate({ id: record.id }); }}
                       >
@@ -360,6 +393,106 @@ export default function AdminFei() {
           </div>
         )}
       </div>
+      {/* Dialog de Edição */}
+      <Dialog open={editDialog} onOpenChange={setEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-blue-400" />
+              Editar Registro F&I
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Banco</Label>
+                <Input
+                  value={editForm.bankName}
+                  onChange={(e) => setEditForm(f => ({ ...f, bankName: e.target.value }))}
+                  placeholder="Nome do banco"
+                  className="h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Retorno</Label>
+                <Select value={editForm.returnType} onValueChange={(v) => setEditForm(f => ({ ...f, returnType: v }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["R0", "R1", "R2", "R3", "R4", "R5"].map(r => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Valor (R$)</Label>
+              <Input
+                value={editForm.financedValue}
+                onChange={(e) => setEditForm(f => ({ ...f, financedValue: e.target.value }))}
+                placeholder="0,00"
+                className="h-9"
+                type="text"
+                inputMode="decimal"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Placa</Label>
+                <Input
+                  value={editForm.vehiclePlate}
+                  onChange={(e) => setEditForm(f => ({ ...f, vehiclePlate: e.target.value.toUpperCase() }))}
+                  placeholder="ABC1D23"
+                  className="h-9"
+                  maxLength={7}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">CPF</Label>
+                <Input
+                  value={editForm.customerCpf}
+                  onChange={(e) => setEditForm(f => ({ ...f, customerCpf: e.target.value }))}
+                  placeholder="000.000.000-00"
+                  className="h-9"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Data Pagamento</Label>
+              <Input
+                type="date"
+                value={(editForm as any).paymentDate ? new Date(Number((editForm as any).paymentDate)).toISOString().split('T')[0] : ''}
+                onChange={(e) => {
+                  const val = e.target.value ? new Date(e.target.value).getTime() : '';
+                  setEditForm(f => ({ ...f, paymentDate: String(val) } as any));
+                }}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Observações</Label>
+              <textarea
+                value={(editForm as any).notes || ''}
+                onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value } as any))}
+                placeholder="Observações..."
+                className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm min-h-[60px] resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditDialog(false)}>Cancelar</Button>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={updateFei.isPending}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {updateFei.isPending ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

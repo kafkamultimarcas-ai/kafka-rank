@@ -834,6 +834,34 @@ export async function deleteFeiRecord(id: number) {
   await db.delete(feiRecords).where(eq(feiRecords.id, id));
 }
 
+export async function updateFeiRecord(id: number, data: {
+  customerCpf?: string;
+  vehiclePlate?: string;
+  bankName?: string;
+  financedValue?: number;
+  returnType?: string;
+  paymentDate?: number | null;
+  notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  if (!result[0]) throw new Error("Registro F&I não encontrado");
+  const updateData: any = {};
+  if (data.customerCpf !== undefined) updateData.customerCpf = data.customerCpf;
+  if (data.vehiclePlate !== undefined) updateData.vehiclePlate = data.vehiclePlate;
+  if (data.bankName !== undefined) updateData.bankName = data.bankName;
+  if (data.financedValue !== undefined) updateData.financedValue = data.financedValue;
+  if (data.returnType !== undefined) updateData.returnType = data.returnType;
+  if (data.paymentDate !== undefined) updateData.paymentDate = data.paymentDate;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+  if (Object.keys(updateData).length > 0) {
+    await db.update(feiRecords).set(updateData).where(eq(feiRecords.id, id));
+  }
+  const updated = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  return updated[0];
+}
+
 // ===== CONSIGNMENT RECORDS =====
 export async function listConsignmentRecords(competitionId?: number, sellerId?: number) {
   const db = await getDb();
