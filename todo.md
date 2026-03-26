@@ -969,3 +969,13 @@
 - [x] Vendedor vê status da sua ficha e retorno dos bancos
 - [x] Observações do vendedor sobre bancos já tentados
 - [x] Consulta FIPE por placa (placeholder - API não disponível)
+
+## Bugs
+- [x] Bug: não consegue criar login para setor Consignação (verificado: login já está criado no banco)
+- [x] Bug: data da consignação deve ser fixa (data do lançamento) e não editável pela consignação (contagem dos 7 dias depende dela)
+- [x] Campo leilão (sim/não) no formulário de consignação
+- [x] Campo quitação (quitado/financiado) no formulário de consignação
+- [x] Campo valor de quitação quando financiado
+- [x] Campo valor de custo (valor que o consignado deixou)
+- [x] Campo observações na consignação
+- [ ] Verificar outros bugs gerais no sistema

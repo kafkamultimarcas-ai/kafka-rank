@@ -282,6 +282,23 @@ export default function AdminApprovals() {
                   <span className="text-green-400 text-xs ml-2">(7+ dias - válido!)</span>
                 )}
               </div>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {record.hasAuction ? (
+                  <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded font-bold">Com Leilão</span>
+                ) : (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">Sem Leilão</span>
+                )}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${record.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                  {record.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
+                </span>
+                {record.vehicleStatus === 'financiado' && record.payoffValue && (
+                  <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Quit: R$ {(Number(record.payoffValue) / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                )}
+                {record.costValue && (
+                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(Number(record.costValue) / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                )}
+              </div>
+              {record.notes && <p className="text-xs text-muted-foreground italic mt-1">📝 {record.notes}</p>}
               <p className="text-muted-foreground/60 text-xs mt-1">{new Date(record.createdAt).toLocaleString("pt-BR")}</p>
             </div>
             <div className="flex flex-col gap-2 flex-shrink-0">

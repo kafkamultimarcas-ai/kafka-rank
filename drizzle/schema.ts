@@ -134,6 +134,11 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   exitDate: bigint("exitDate", { mode: "number" }), // data de saída do pátio (preenchido quando sai)
   validAfterDays: int("validAfterDays").default(7).notNull(), // dias mínimos no pátio
   isValid: boolean("isValid").default(false).notNull(), // se já completou os 7 dias
+  hasAuction: boolean("hasAuction").default(false), // se o carro tem leilão
+  vehicleStatus: varchar("vehicleStatus", { length: 20 }).default("quitado"), // quitado ou financiado
+  payoffValue: int("payoffValue"), // valor de quitação em centavos (quando financiado)
+  costValue: int("costValue"), // valor de custo que o consignado deixou (centavos)
+  notes: text("notes"), // observações adicionais
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

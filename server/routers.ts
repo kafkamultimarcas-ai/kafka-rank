@@ -834,6 +834,11 @@ export const appRouter = router({
       ownerName: z.string().min(1),
       ownerPhone: z.string().optional(),
       entryDate: z.number(),
+      hasAuction: z.boolean().optional(),
+      vehicleStatus: z.string().optional(),
+      payoffValue: z.number().optional(),
+      costValue: z.number().optional(),
+      notes: z.string().optional(),
     })).mutation(async ({ input }) => {
       // Verificar duplicidade de placa
       const plateCheck = await db.checkConsignmentPlate(input.vehiclePlate);

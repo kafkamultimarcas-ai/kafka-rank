@@ -749,9 +749,18 @@ export default function MinhaArea() {
               <Clock className="w-4 h-4" /> Consignações aguardando aprovação ({pendingConsignment.length})
             </h3>
             {pendingConsignment.slice(0, 5).map((r: any) => (
-              <div key={r.id} className="text-sm text-gray-300 py-1 flex justify-between">
-                <span>{r.vehicleModel} - {r.vehiclePlate}</span>
-                <span className="text-gray-500">{formatDate(r.entryDate)}</span>
+              <div key={r.id} className="text-sm text-gray-300 py-2 border-b border-orange-500/10 last:border-0">
+                <div className="flex justify-between">
+                  <span>{r.vehicleModel} - {r.vehiclePlate}</span>
+                  <span className="text-gray-500 text-xs">{formatDate(r.entryDate)}</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {r.hasAuction && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">Leilão</span>}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                    {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
+                  </span>
+                  {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(r.costValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
+                </div>
               </div>
             ))}
           </div>
@@ -777,6 +786,13 @@ export default function MinhaArea() {
                   <div className="flex justify-between text-xs text-gray-500 mt-0.5">
                     <span>Placa: {r.vehiclePlate || 'N/I'}</span>
                     <span>Entrada: {formatDate(r.entryDate)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {r.hasAuction && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">Leilão</span>}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                      {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
+                    </span>
+                    {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(r.costValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
                   </div>
                   {isOverdue && (
                     <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
@@ -1130,19 +1146,35 @@ export default function MinhaArea() {
             {dept === "consignacao" && approvedConsignment.length > 0 && (
               <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
                 {approvedConsignment.slice(0, 10).map((r: any) => (
-                  <div key={r.id} className="p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-white font-medium">{r.vehicleModel}</p>
-                      <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.entryDate)}</p>
+                  <div key={r.id} className="p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-white font-medium">{r.vehicleModel}</p>
+                        <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.entryDate)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-yellow-500">+{r.points} pts</p>
+                        {r.exitDate ? (
+                          <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}</p>
+                        ) : (
+                          <p className="text-xs text-cyan-400">No pátio</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-yellow-500">+{r.points} pts</p>
-                      {r.exitDate ? (
-                        <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}</p>
-                      ) : (
-                        <p className="text-xs text-cyan-400">No pátio</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {r.hasAuction && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">Leilão</span>}
+                      {!r.hasAuction && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">Sem Leilão</span>}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                        {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
+                      </span>
+                      {r.vehicleStatus === 'financiado' && r.payoffValue && (
+                        <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Quit: R$ {(r.payoffValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                      )}
+                      {r.costValue && (
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(r.costValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       )}
                     </div>
+                    {r.notes && <p className="text-[10px] text-gray-500 italic mt-0.5">{r.notes}</p>}
                   </div>
                 ))}
               </div>

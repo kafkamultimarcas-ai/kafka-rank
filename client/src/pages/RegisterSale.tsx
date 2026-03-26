@@ -48,6 +48,11 @@ export default function RegisterSale() {
   const [ownerName, setOwnerName] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [entryDate, setEntryDate] = useState("");
+  const [hasAuction, setHasAuction] = useState(false);
+  const [vehicleStatus, setVehicleStatus] = useState("quitado");
+  const [payoffValue, setPayoffValue] = useState("");
+  const [costValue, setCostValue] = useState("");
+  const [consignNotes, setConsignNotes] = useState("");
   const [plateCheckResult, setPlateCheckResult] = useState<{ blocked: boolean; warning: boolean; message: string } | null>(null);
   const [isCheckingPlate, setIsCheckingPlate] = useState(false);
 
@@ -246,14 +251,19 @@ export default function RegisterSale() {
           break;
         case "consignacao":
           if (!consignPlate || consignPlate.length < 6) { toast.error("Informe a placa do veículo!"); return; }
-          if (!consignModel || !ownerName || !entryDate) { toast.error("Informe o modelo, dono e data de entrada!"); return; }
+          if (!consignModel || !ownerName) { toast.error("Informe o modelo e o nome do dono!"); return; }
           if (checkPlateMutation.data?.blocked) { toast.error(checkPlateMutation.data.message); return; }
           result = await registerConsignment.mutateAsync({
             sellerId: sid, competitionId: cid,
             vehiclePlate: consignPlate,
             vehicleModel: consignModel, ownerName,
             ownerPhone: ownerPhone || undefined,
-            entryDate: new Date(entryDate).getTime(),
+            entryDate: Date.now(),
+            hasAuction,
+            vehicleStatus,
+            payoffValue: payoffValue ? Math.round(parseFloat(payoffValue) * 100) : undefined,
+            costValue: costValue ? Math.round(parseFloat(costValue) * 100) : undefined,
+            notes: consignNotes || undefined,
           });
           break;
         case "despachante":
@@ -650,9 +660,12 @@ export default function RegisterSale() {
                       }`} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Data entrada *</Label>
-                    <Input value={entryDate} onChange={e => setEntryDate(e.target.value)}
-                      type="date" className="bg-gray-800 border-gray-700 text-white" />
+                    <Label className="text-gray-300 font-semibold text-sm">Data entrada</Label>
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-md px-3 py-2 text-white text-sm flex items-center gap-2">
+                      <span className="text-emerald-400">Automática:</span>
+                      <span>{new Date().toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">A data de entrada é registrada automaticamente no momento do lançamento e não pode ser alterada (contagem dos 7 dias).</p>
                   </div>
                 </div>
                 {/* Alerta de placa duplicada */}
@@ -688,6 +701,64 @@ export default function RegisterSale() {
                   <Input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)}
                     placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                 </div>
+
+                {/* Leilão */}
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold text-sm">Leilão</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setHasAuction(false)}
+                      className={`py-2.5 rounded-lg text-sm font-bold border transition-all ${
+                        !hasAuction ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'
+                      }`}>Sem Leilão</button>
+                    <button type="button" onClick={() => setHasAuction(true)}
+                      className={`py-2.5 rounded-lg text-sm font-bold border transition-all ${
+                        hasAuction ? 'bg-red-600 border-red-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'
+                      }`}>Com Leilão</button>
+                  </div>
+                </div>
+
+                {/* Quitação */}
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold text-sm">Situação do veículo</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setVehicleStatus('quitado')}
+                      className={`py-2.5 rounded-lg text-sm font-bold border transition-all ${
+                        vehicleStatus === 'quitado' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'
+                      }`}>Quitado</button>
+                    <button type="button" onClick={() => setVehicleStatus('financiado')}
+                      className={`py-2.5 rounded-lg text-sm font-bold border transition-all ${
+                        vehicleStatus === 'financiado' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400'
+                      }`}>Financiado</button>
+                  </div>
+                </div>
+
+                {/* Valor de quitação (só aparece quando financiado) */}
+                {vehicleStatus === 'financiado' && (
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Valor de quitação (R$)</Label>
+                    <Input value={payoffValue} onChange={e => setPayoffValue(e.target.value)}
+                      type="number" step="0.01" placeholder="Ex: 25000.00"
+                      className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                )}
+
+                {/* Valor de custo */}
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold text-sm">Valor de custo (R$)</Label>
+                  <Input value={costValue} onChange={e => setCostValue(e.target.value)}
+                    type="number" step="0.01" placeholder="Valor que o consignado deixou"
+                    className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
+
+                {/* Observações */}
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold text-sm">Observações</Label>
+                  <textarea value={consignNotes} onChange={e => setConsignNotes(e.target.value)}
+                    placeholder="Informações adicionais sobre o veículo..."
+                    rows={3}
+                    className="w-full bg-gray-800 border border-gray-700 text-white placeholder:text-gray-500 rounded-md px-3 py-2 text-sm" />
+                </div>
+
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
                   <p className="text-blue-400 text-xs">
                     <strong>Regra:</strong> O veículo precisa ficar no mínimo 7 dias no pátio para contar pontos. Placa é obrigatória e não pode duplicar em 60 dias.
