@@ -994,3 +994,13 @@
 ## Bug: Não consegue alterar comparecimento do agendamento
 - [x] Botão para alternar comparecimento (veio/não veio) no card do agendamento
 - [x] Permitir corrigir status de comparecimento errado diretamente no card
+
+## Login Individual e Controle de Acesso (PRIORIDADE)
+- [x] Remover tela de código de acesso geral (ENTRAR NA COMPETIÇÃO)
+- [x] Tela principal: login individual com usuário e senha
+- [x] Primeiro acesso: vendedor escolhe seu nome na lista e cria usuário/senha (com seleção de setor)
+- [x] Após login, redirecionar direto para MinhaArea do vendedor logado
+- [x] Cada vendedor vê APENAS seus dados (agendamentos, fichas, CRM)
+- [x] Admin controla: editar setor, resetar senha, bloquear/desbloquear vendedor
+- [x] Consignação e ranking visíveis para todos (dados compartilhados)
+- [x] Botão de corrigir comparecimento no card do agendamento

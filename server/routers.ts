@@ -152,9 +152,10 @@ export const appRouter = router({
     // Primeiro acesso: vendedor cria seu próprio login
     firstAccess: publicProcedure.input(z.object({
       sellerId: z.number(),
-      accessCode: z.string().min(1), // código de acesso fornecido pelo admin
+      accessCode: z.string().optional(), // mantido para compatibilidade, não usado
       username: z.string().min(3),
       password: z.string().min(4),
+      department: z.string().optional(),
     })).mutation(async ({ input, ctx }) => {
       const seller = await db.getSellerByIdInternal(input.sellerId);
       if (!seller || !seller.active) throw new Error('Vendedor não encontrado ou inativo');
@@ -163,7 +164,9 @@ export const appRouter = router({
       const existing = await db.getSellerByUsername(input.username);
       if (existing) throw new Error('Este nome de usuário já está em uso');
       const passwordHash = await bcrypt.hash(input.password, 10);
-      await db.updateSeller(input.sellerId, { username: input.username, passwordHash });
+      const updateData: any = { username: input.username, passwordHash };
+      if (input.department) updateData.department = input.department;
+      await db.updateSeller(input.sellerId, updateData);
       await db.updateSellerLastAccess(input.sellerId);
       // Auto-login
       const token = jwt.sign(

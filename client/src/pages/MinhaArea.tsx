@@ -184,7 +184,7 @@ export default function MinhaArea() {
   const logoutMutation = trpc.sellers.logout.useMutation({
     onSuccess: () => {
       toast.success("Logout realizado!");
-      navigate("/login-vendedor");
+      window.location.href = "/";
     },
   });
 
@@ -271,7 +271,7 @@ export default function MinhaArea() {
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-gray-400 mb-4">Você precisa fazer login para acessar esta área.</p>
-          <Button onClick={() => navigate("/login-vendedor")} className="bg-red-600 hover:bg-red-500">
+          <Button onClick={() => window.location.href = "/"} className="bg-red-600 hover:bg-red-500">
             Fazer Login
           </Button>
         </div>

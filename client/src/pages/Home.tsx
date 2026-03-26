@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame } from "lucide-react";
+import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -33,6 +33,7 @@ export default function Home() {
   const { user, loading: authLoading } = useAuth();
   const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications();
   const [, setLocation] = useLocation();
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
   const { data: allCompetitions } = trpc.competitions.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
@@ -123,10 +124,17 @@ export default function Home() {
               <span className="hidden sm:inline">Registrar</span>
               <span className="sm:hidden">+</span>
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setLocation("/login-vendedor")} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
-              <LogIn className="h-4 w-4" />
-              <span className="hidden sm:inline">Minha Área</span>
-            </Button>
+            {sellerSession ? (
+              <Button size="sm" variant="outline" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">{sellerSession.nickname || sellerSession.name}</span>
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setLocation("/login-vendedor")} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Minha Área</span>
+              </Button>
+            )}
             {user?.role === "admin" ? (
               <Button size="sm" onClick={() => setLocation("/admin")} className="gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
                 <Shield className="h-4 w-4" />
@@ -184,9 +192,15 @@ export default function Home() {
               <Button variant="outline" size="sm" onClick={() => setLocation("/ficha-financiamento")} className="gap-2 border-blue-600 text-blue-400 hover:bg-blue-600/10">
                 <DollarSign className="h-4 w-4" /> Ficha Financiamento
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
-                <FileText className="h-4 w-4" /> Meus Documentos
-              </Button>
+              {sellerSession ? (
+                <Button variant="outline" size="sm" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
+                  <FileText className="h-4 w-4" /> Meus Documentos
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
+                  <FileText className="h-4 w-4" /> Meus Documentos
+                </Button>
+              )}
             </div>
 
             {/* SIMULADOR DE FINANCIAMENTO */}
@@ -289,27 +303,25 @@ export default function Home() {
             </div>
 
             {/* Agendamentos - Seção destacada */}
-            {sellers && sellers.length > 0 && (
-              <div className="mt-8 max-w-md mx-auto">
-                <div className="racing-card p-5 border-2 border-primary/40 bg-primary/5">
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    <CalendarPlus className="h-6 w-6 text-primary" />
-                    <h3 className="font-heading font-bold text-lg text-foreground">MEUS AGENDAMENTOS</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-4 text-center">Gerencie seus agendamentos, acompanhe clientes e confirme comparecimentos</p>
-                  <select
-                    onChange={e => { if (e.target.value) setLocation(`/agendamentos/${e.target.value}`); }}
-                    defaultValue=""
-                    className="w-full rounded-lg border-2 border-primary/30 bg-background px-4 py-3 text-sm text-foreground font-medium mb-3 focus:border-primary focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="" disabled>Selecione seu nome para acessar...</option>
-                    {sellers.map(s => (
-                      <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
-                    ))}
-                  </select>
+            <div className="mt-8 max-w-md mx-auto">
+              <div className="racing-card p-5 border-2 border-primary/40 bg-primary/5">
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <CalendarPlus className="h-6 w-6 text-primary" />
+                  <h3 className="font-heading font-bold text-lg text-foreground">MEUS AGENDAMENTOS</h3>
                 </div>
+                <p className="text-sm text-muted-foreground mb-4 text-center">Gerencie seus agendamentos, acompanhe clientes e confirme comparecimentos</p>
+                {sellerSession ? (
+                  <Button
+                    onClick={() => setLocation(`/agendamentos/${sellerSession.id}`)}
+                    className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
+                  >
+                    <CalendarPlus className="h-4 w-4" /> Meus Agendamentos
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center">Faça login para acessar seus agendamentos</p>
+                )}
               </div>
-            )}
+            </div>
 
             {/* IAM - Assistente de Vendas IA */}
             <div className="mt-8 max-w-md mx-auto">
@@ -355,24 +367,15 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {sellers && sellers.length > 0 ? (
-                    <select
-                      onChange={e => { if (e.target.value) setLocation(`/ia-vendedor/${e.target.value}`); }}
-                      defaultValue=""
-                      className="w-full rounded-lg border-2 border-violet-500/30 bg-background px-4 py-3 text-sm text-foreground font-medium mb-2 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-                    >
-                      <option value="" disabled>Selecione seu nome para acessar o IAM...</option>
-                      {sellers.map(s => (
-                        <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
-                      ))}
-                    </select>
-                  ) : (
+                  {sellerSession ? (
                     <Button
-                      onClick={() => setLocation("/login-vendedor")}
+                      onClick={() => setLocation(`/ia-vendedor/${sellerSession.id}`)}
                       className="w-full gap-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-bold shadow-lg shadow-violet-500/20"
                     >
                       <Bot className="h-4 w-4" /> Acessar IAM
                     </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center">Faça login para acessar o IAM</p>
                   )}
                   <p className="text-[10px] text-violet-400/60 text-center mt-1">Disponível 24h para ajudar você a vender mais</p>
                 </div>
