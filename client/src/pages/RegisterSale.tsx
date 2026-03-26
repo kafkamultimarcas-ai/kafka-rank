@@ -524,7 +524,7 @@ export default function RegisterSale() {
                           : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
                       }`}
                     >
-                      <span className="text-lg">\uD83C\uDFEA</span>
+                      <span className="text-lg">🏪</span>
                       <span>Lead Loja</span>
                       <span className="text-[10px] text-gray-500 font-normal">Plataformas da loja</span>
                     </button>
@@ -537,7 +537,7 @@ export default function RegisterSale() {
                           : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
                       }`}
                     >
-                      <span className="text-lg">\uD83D\uDC64</span>
+                      <span className="text-lg">👤</span>
                       <span>Lead Vendedor</span>
                       <span className="text-[10px] text-gray-500 font-normal">Facebook, anúncio próprio</span>
                     </button>

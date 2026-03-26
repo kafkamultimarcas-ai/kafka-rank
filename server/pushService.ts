@@ -208,6 +208,29 @@ export async function sendPushToPosVenda(payload: PushPayload) {
   }
 }
 
+// Vendedor específico: documentos pendentes (CNH + Comprovante)
+export async function sendPushDocsPendentes(sellerId: number, sellerName: string, vehicleModel: string) {
+  await sendPushToSeller(sellerId, {
+    title: "📄 Documentos Pendentes!",
+    body: `${sellerName}, envie a CNH e Comprovante de Residência da venda do ${vehicleModel}. Sua venda só fica 100% concluída com os documentos!`,
+    tag: `docs-pendentes-${sellerId}`,
+    data: { type: "docs_pendentes", url: "/login-vendedor" },
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 200],
+  });
+}
+
+// Vendedor específico: documento transferido pelo despachante
+export async function sendPushDocTransferido(sellerId: number, vehicleModel: string) {
+  await sendPushToSeller(sellerId, {
+    title: "✅ Documento Transferido!",
+    body: `O documento do ${vehicleModel} foi transferido pelo despachante! Acesse sua área para ver.`,
+    tag: `doc-transferido-${sellerId}`,
+    data: { type: "doc_transferido", url: "/login-vendedor" },
+    vibrate: [200, 100, 200],
+  });
+}
+
 // Notificação: novo chamado pós-venda aberto por vendedor
 export async function sendPushNewPvChamado(vendedorName: string, clienteNome: string, carroModelo: string, ticketNumber: string) {
   await sendPushToPosVenda({

@@ -1,0 +1,16 @@
+{
+  "query": "SELECT * FROM app_settings WHERE settingKey LIKE '%access%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT * FROM app_settings WHERE settingKey LIKE '%access%';",
+  "rows": [
+    {
+      "id": "1",
+      "settingKey": "access_code",
+      "settingValue": "kafka2024",
+      "updatedAt": "2026-03-18 01:39:52"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsettingKey\tsettingValue\tupdatedAt\n1\taccess_code\tkafka2024\t2026-03-18 01:39:52\n",
+  "stderr": "",
+  "execution_time_ms": 69
+}

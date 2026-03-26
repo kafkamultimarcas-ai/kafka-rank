@@ -908,3 +908,14 @@
 - [x] Auditoria de segurança: Headers de segurança - IMPLEMENTADO (helmet: HSTS, X-Frame, etc)
 - [x] Corrigir vulnerabilidades: rate limiting, helmet, upload limits, hash código acesso
 - [x] Testes de segurança automatizados (10 testes específicos de segurança)
+
+## Bug Fix - Erros reportados pelo usuário (26/03)
+- [x] Diagnosticar e corrigir todos os bugs atuais (rate limiter muito baixo causava 429)
+- [x] Varredura completa de logs e console (0 erros em todas as páginas)
+- [x] Corrigir emojis escapados no RegisterSale.tsx
+- [x] Corrigir warning de trust proxy no rate limiter
+- [x] Aumentar rate limit de 200 para 500 req/min nas rotas /api/
+
+## Próximos Passos
+- [x] Notificação push para documentos pendentes (enviada quando venda é aprovada)
+- [x] Notificação push para documento transferido (enviada quando despachante marca transferência)

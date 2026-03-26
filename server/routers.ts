@@ -20,7 +20,7 @@ import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAl
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
-import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller } from "./pushService";
+import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
@@ -353,6 +353,8 @@ export const appRouter = router({
       // Push notification de venda aprovada
       if (seller) {
         sendPushSaleApproved(seller.name, sale.vehicleModel || 've\u00edculo').catch(console.error);
+        // Push de documentos pendentes para o vendedor (lembrar de enviar CNH + Comprovante)
+        sendPushDocsPendentes(seller.id, seller.name, sale.vehicleModel || 'veículo').catch(console.error);
       }
       // Criar registro de documentos pendentes para esta venda
       try {
@@ -1677,6 +1679,17 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       const key = `sale-docs/emitidos/${Date.now()}-${input.filename}`;
       const { url } = await storagePut(key, buffer, 'application/pdf');
       await db.markSaleDocTransferred(input.id, url, key);
+      // Enviar push para o vendedor informando que o documento foi transferido
+      try {
+        // Buscar o documento pelo id do sale_document
+        const doc = await db.getSaleDocumentById(input.id);
+        if (doc && doc.sellerId) {
+          const seller = await db.getSellerById(doc.sellerId);
+          if (seller) {
+            sendPushDocTransferido(seller.id, doc.vehicleModel || 'veículo').catch(console.error);
+          }
+        }
+      } catch (e) { console.error('Erro ao enviar push doc transferido:', e); }
       return { success: true };
     }),
   }),

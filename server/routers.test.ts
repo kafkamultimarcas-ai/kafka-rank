@@ -122,6 +122,8 @@ vi.mock("./pushService", () => ({
   sendPushAttendanceApproved: vi.fn().mockResolvedValue(undefined),
   sendPushToAll: vi.fn().mockResolvedValue(undefined),
   sendPushToSeller: vi.fn().mockResolvedValue(undefined),
+  sendPushDocsPendentes: vi.fn().mockResolvedValue(undefined),
+  sendPushDocTransferido: vi.fn().mockResolvedValue(undefined),
 }));
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;

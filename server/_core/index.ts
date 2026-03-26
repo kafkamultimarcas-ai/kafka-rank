@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { ipKeyGenerator } from "express-rate-limit";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerWebhookRoutes } from "../webhooks";
@@ -34,6 +35,9 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Trust proxy (necessário para rate limiting correto atrás de proxy/load balancer)
+  app.set('trust proxy', 1);
+
   // ===== SECURITY HEADERS (Helmet) =====
   app.use(helmet({
     contentSecurityPolicy: false, // Desabilitado para não quebrar Vite/React em dev
@@ -42,15 +46,15 @@ async function startServer() {
   }));
 
   // ===== RATE LIMITING =====
-  // Rate limit global: 200 requests por minuto por IP
-  const globalLimiter = rateLimit({
+  // Rate limit para API: 500 requests por minuto por IP (não aplicar em assets estáticos)
+  const apiLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minuto
-    max: 200,
+    max: 500,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Muitas requisições. Tente novamente em 1 minuto." },
   });
-  app.use(globalLimiter);
+  app.use("/api/", apiLimiter);
 
   // Rate limit para login: 10 tentativas por 15 minutos por IP (anti brute force)
   const loginLimiter = rateLimit({
@@ -59,7 +63,7 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
-    // Usa o keyGenerator padrão (req.ip) que já lida com IPv6
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
   });
   // Aplicar rate limit de login nas rotas de autenticação
   app.use("/api/trpc/sellerSession.login", loginLimiter);

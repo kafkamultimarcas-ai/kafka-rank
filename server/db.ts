@@ -1955,3 +1955,11 @@ export async function countPendingDocsBySeller(sellerId: number) {
     ));
   return Number(result?.count || 0);
 }
+
+// Buscar documento de venda pelo id do documento
+export async function getSaleDocumentById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  return result[0] || null;
+}
