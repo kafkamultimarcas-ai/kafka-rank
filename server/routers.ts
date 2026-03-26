@@ -1075,6 +1075,37 @@ export const appRouter = router({
       await db.rescheduleSdrRecord(input.id, input.newDate, input.notes);
       return { success: true, message: 'Cliente reagendado com sucesso!' };
     }),
+    // Vendedor marca/desmarca como feirão
+    toggleFeirao: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+      isFeirão: z.boolean(),
+    })).mutation(async ({ input }) => {
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento não encontrado ou não pertence a este vendedor');
+      await db.updateSdrRecord(input.id, { isFeirão: input.isFeirão } as any);
+      return { success: true, message: input.isFeirão ? 'Marcado como Feirão!' : 'Removido do Feirão!' };
+    }),
+    // Vendedor edita/reagenda agendamento (nome, telefone, carro, data, notas)
+    editByVendedor: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+      customerName: z.string().optional(),
+      customerPhone: z.string().optional(),
+      customerEmail: z.string().optional(),
+      vehicleInterest: z.string().optional(),
+      scheduledDate: z.number().optional(),
+      notes: z.string().optional(),
+      isFeirão: z.boolean().optional(),
+    })).mutation(async ({ input }) => {
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento não encontrado ou não pertence a este vendedor');
+      const { id, sellerId, ...data } = input;
+      await db.updateSdrRecord(id, data as any);
+      return { success: true, message: 'Agendamento atualizado com sucesso!' };
+    }),
     // Admin edita agendamento
     update: adminProcedure.input(z.object({
       id: z.number(),

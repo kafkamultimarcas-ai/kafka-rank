@@ -28,6 +28,9 @@ import {
   PhoneCall,
   Flame,
   Filter,
+  Edit2,
+  Save,
+  X,
 } from "lucide-react";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
@@ -120,6 +123,8 @@ export default function MeusAgendamentos() {
   const [notes, setNotes] = useState("");
   const [isFeiraoForm, setIsFeiraoForm] = useState(false);
   const [filterFeirao, setFilterFeirao] = useState<"todos" | "feirao" | "normal">("todos");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editData, setEditData] = useState<any>({});
 
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: appointments, isLoading } = trpc.sdr.myAppointments.useQuery({ sellerId }, { enabled: sellerId > 0, refetchInterval: 10000 });
@@ -154,6 +159,51 @@ export default function MeusAgendamentos() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const toggleFeirao = trpc.sdr.toggleFeirao.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      utils.sdr.myAppointments.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const editByVendedor = trpc.sdr.editByVendedor.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      utils.sdr.myAppointments.invalidate();
+      setEditingId(null);
+      setEditData({});
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const startEditing = (apt: any) => {
+    setEditingId(apt.id);
+    setEditData({
+      customerName: apt.customerName || "",
+      customerPhone: apt.customerPhone || "",
+      customerEmail: apt.customerEmail || "",
+      vehicleInterest: apt.vehicleInterest || "",
+      scheduledDate: apt.scheduledDate ? new Date(Number(apt.scheduledDate)).toISOString().slice(0, 16) : "",
+      notes: apt.notes || "",
+      isFeirão: apt.isFeirão || false,
+    });
+  };
+
+  const handleSaveEdit = (aptId: number) => {
+    editByVendedor.mutate({
+      id: aptId,
+      sellerId,
+      customerName: editData.customerName || undefined,
+      customerPhone: editData.customerPhone || undefined,
+      customerEmail: editData.customerEmail || undefined,
+      vehicleInterest: editData.vehicleInterest || undefined,
+      scheduledDate: editData.scheduledDate ? new Date(editData.scheduledDate).getTime() : undefined,
+      notes: editData.notes || undefined,
+      isFeirão: editData.isFeirão,
+    });
+  };
 
   const preVendasComp = useMemo(() => {
     return competitions?.find(c => c.category === "pre_vendas" && c.status === "active");
@@ -329,35 +379,138 @@ export default function MeusAgendamentos() {
         </div>
 
         {/* Client Info */}
-        <div>
-          <p className="font-semibold text-foreground">{apt.customerName || "Cliente"}</p>
-          <div className="flex flex-wrap gap-3 mt-1">
-            {apt.customerPhone && (
-              <a href={`tel:${apt.customerPhone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
-                <Phone className="h-3 w-3" /> {apt.customerPhone}
-              </a>
+        {editingId === apt.id ? (
+          /* ===== MODO EDIÇÃO ===== */
+          <div className="space-y-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-blue-400 flex items-center gap-1"><Edit2 className="h-3.5 w-3.5" /> Editando Agendamento</p>
+              <Button size="sm" variant="ghost" onClick={() => { setEditingId(null); setEditData({}); }} className="h-6 w-6 p-0">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="grid gap-2">
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-0.5 block">Nome do Cliente</label>
+                <Input value={editData.customerName} onChange={e => setEditData({...editData, customerName: e.target.value})} className="h-8 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Telefone</label>
+                  <Input value={editData.customerPhone} onChange={e => setEditData({...editData, customerPhone: e.target.value})} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Email</label>
+                  <Input value={editData.customerEmail} onChange={e => setEditData({...editData, customerEmail: e.target.value})} className="h-8 text-sm" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Carro de Interesse</label>
+                  <Input value={editData.vehicleInterest} onChange={e => setEditData({...editData, vehicleInterest: e.target.value})} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Data/Hora</label>
+                  <Input type="datetime-local" value={editData.scheduledDate} onChange={e => setEditData({...editData, scheduledDate: e.target.value})} className="h-8 text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-0.5 block">Observações</label>
+                <Input value={editData.notes} onChange={e => setEditData({...editData, notes: e.target.value})} className="h-8 text-sm" />
+              </div>
+              {/* Toggle Feirão dentro da edição */}
+              <button
+                type="button"
+                onClick={() => setEditData({...editData, isFeirão: !editData.isFeirão})}
+                className={`flex items-center gap-2 p-2 rounded-lg border transition-all w-full text-left ${
+                  editData.isFeirão
+                    ? 'border-orange-500 bg-orange-500/15'
+                    : 'border-border bg-background hover:border-orange-500/50'
+                }`}
+              >
+                <Flame className={`h-4 w-4 ${editData.isFeirão ? 'text-orange-400' : 'text-muted-foreground'}`} />
+                <span className={`text-xs font-semibold ${editData.isFeirão ? 'text-orange-400' : 'text-muted-foreground'}`}>
+                  {editData.isFeirão ? 'Feirão ativado' : 'Marcar como Feirão'}
+                </span>
+                <div className={`ml-auto w-9 h-5 rounded-full transition-all flex items-center px-0.5 ${
+                  editData.isFeirão ? 'bg-orange-500 justify-end' : 'bg-muted justify-start'
+                }`}>
+                  <div className="w-4 h-4 rounded-full bg-white shadow-sm transition-all" />
+                </div>
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => handleSaveEdit(apt.id)} disabled={editByVendedor.isPending} className="flex-1 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs">
+                <Save className="h-3.5 w-3.5" />
+                {editByVendedor.isPending ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditData({}); }} className="text-xs">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* ===== MODO VISUALIZAÇÃO ===== */
+          <div>
+            <p className="font-semibold text-foreground">{apt.customerName || "Cliente"}</p>
+            <div className="flex flex-wrap gap-3 mt-1">
+              {apt.customerPhone && (
+                <a href={`tel:${apt.customerPhone}`} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
+                  <Phone className="h-3 w-3" /> {apt.customerPhone}
+                </a>
+              )}
+              {apt.customerEmail && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Mail className="h-3 w-3" /> {apt.customerEmail}
+                </span>
+              )}
+              {apt.vehicleInterest && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Car className="h-3 w-3" /> {apt.vehicleInterest}
+                </span>
+              )}
+            </div>
+            {scheduled && (
+              <p className={`flex items-center gap-1 text-xs mt-1 ${isOverdue ? "text-red-400" : "text-yellow-400"}`}>
+                <Calendar className="h-3 w-3" />
+                Agendado: {new Date(scheduled).toLocaleString("pt-BR")}
+              </p>
             )}
-            {apt.customerEmail && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Mail className="h-3 w-3" /> {apt.customerEmail}
-              </span>
-            )}
-            {apt.vehicleInterest && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Car className="h-3 w-3" /> {apt.vehicleInterest}
-              </span>
+            {apt.notes && (
+              <p className="text-xs text-muted-foreground mt-1 italic">"{apt.notes}"</p>
             )}
           </div>
-          {scheduled && (
-            <p className={`flex items-center gap-1 text-xs mt-1 ${isOverdue ? "text-red-400" : "text-yellow-400"}`}>
-              <Calendar className="h-3 w-3" />
-              Agendado: {new Date(scheduled).toLocaleString("pt-BR")}
-            </p>
-          )}
-          {apt.notes && (
-            <p className="text-xs text-muted-foreground mt-1 italic">"{apt.notes}"</p>
-          )}
-        </div>
+        )}
+
+        {/* Botões rápidos: Feirão + Editar */}
+        {editingId !== apt.id && (
+          <div className="flex gap-2">
+            {/* Botão Jogar pro Feirão */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => toggleFeirao.mutate({ id: apt.id, sellerId, isFeirão: !apt.isFeirão })}
+              disabled={toggleFeirao.isPending}
+              className={`flex-1 gap-1.5 text-xs ${
+                apt.isFeirão
+                  ? 'border-orange-500 text-orange-400 bg-orange-500/10 hover:bg-orange-500/20'
+                  : 'border-orange-500/50 text-orange-400/70 hover:bg-orange-500/10 hover:text-orange-400'
+              }`}
+            >
+              <Flame className="h-3.5 w-3.5" />
+              {apt.isFeirão ? 'Remover Feirão' : 'Jogar pro Feirão'}
+            </Button>
+            {/* Botão Editar */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => startEditing(apt)}
+              className="flex-1 gap-1.5 text-xs border-blue-500/50 text-blue-400/70 hover:bg-blue-500/10 hover:text-blue-400"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+              Editar / Reagendar
+            </Button>
+          </div>
+        )}
 
         {/* Action Buttons based on visual status */}
         <div className="flex flex-col gap-2 pt-2 border-t border-border">

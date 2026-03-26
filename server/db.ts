@@ -1287,6 +1287,7 @@ export async function updateSdrRecord(id: number, data: {
   scheduledDate?: number | null;
   notes?: string | null;
   attendanceStatus?: string;
+  isFeirão?: boolean;
 }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
@@ -1298,6 +1299,7 @@ export async function updateSdrRecord(id: number, data: {
   if (data.scheduledDate !== undefined) updateData.scheduledDate = data.scheduledDate;
   if (data.notes !== undefined) updateData.notes = data.notes;
   if (data.attendanceStatus !== undefined) updateData.attendanceStatus = data.attendanceStatus;
+  if (data.isFeirão !== undefined) updateData.isFeirão = data.isFeirão;
   if (Object.keys(updateData).length > 0) {
     await db.update(sdrRecords).set(updateData).where(eq(sdrRecords.id, id));
   }

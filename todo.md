@@ -939,3 +939,9 @@
 - [x] Financeiro vê todos os orçamentos pendentes e aprova/reprova cada item
 - [x] Controle de valores: total do orçamento, total aprovado, total reprovado
 - [x] Histórico de aprovações/reprovações no chamado
+
+## Melhorias nos Agendamentos do Vendedor
+- [x] Botão "Jogar pro Feirão" no card do agendamento (marcar como feirão rapidamente)
+- [x] Botão "Editar/Reagendar" para vendedor alterar data, horário, nome, telefone, carro
+- [x] Rota backend para marcar agendamento como feirão (toggle)
+- [x] Rota backend para vendedor editar/reagendar agendamento
