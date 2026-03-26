@@ -1,0 +1,115 @@
+{
+  "query": "SELECT id, sellerId, vehicleModel, value, status FROM sales ORDER BY id DESC LIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, sellerId, vehicleModel, value, status FROM sales ORDER BY id DESC LIMIT 15;",
+  "rows": [
+    {
+      "id": "450001",
+      "sellerId": "7",
+      "vehicleModel": "Fiat Toro 2021",
+      "value": "103000",
+      "status": "approved"
+    },
+    {
+      "id": "420001",
+      "sellerId": "2",
+      "vehicleModel": "Peugeot 207 2010",
+      "value": "19990",
+      "status": "approved"
+    },
+    {
+      "id": "390002",
+      "sellerId": "3",
+      "vehicleModel": "Ônix plus ltz",
+      "value": "92000",
+      "status": "approved"
+    },
+    {
+      "id": "390001",
+      "sellerId": "4",
+      "vehicleModel": "SIENA 2014 ",
+      "value": "24990",
+      "status": "approved"
+    },
+    {
+      "id": "330001",
+      "sellerId": "3",
+      "vehicleModel": "Vw Gol",
+      "value": "41900",
+      "status": "approved"
+    },
+    {
+      "id": "300008",
+      "sellerId": "90001",
+      "vehicleModel": "Triton 2024",
+      "value": "208990",
+      "status": "approved"
+    },
+    {
+      "id": "300007",
+      "sellerId": "4",
+      "vehicleModel": "Sentra 2016",
+      "value": "60990",
+      "status": "approved"
+    },
+    {
+      "id": "300005",
+      "sellerId": "6",
+      "vehicleModel": "OUTLANDER 2015",
+      "value": "78000",
+      "status": "approved"
+    },
+    {
+      "id": "300004",
+      "sellerId": "2",
+      "vehicleModel": "Gol 2009",
+      "value": "14000",
+      "status": "approved"
+    },
+    {
+      "id": "300003",
+      "sellerId": "1",
+      "vehicleModel": "Etios sedan",
+      "value": "46000",
+      "status": "approved"
+    },
+    {
+      "id": "300002",
+      "sellerId": "2",
+      "vehicleModel": "Onix Plus 2022",
+      "value": "67990",
+      "status": "approved"
+    },
+    {
+      "id": "300001",
+      "sellerId": "4",
+      "vehicleModel": "Onix 2019 ",
+      "value": "66990",
+      "status": "approved"
+    },
+    {
+      "id": "270001",
+      "sellerId": "4",
+      "vehicleModel": "Ford ka 2020",
+      "value": "68990",
+      "status": "approved"
+    },
+    {
+      "id": "240001",
+      "sellerId": "4",
+      "vehicleModel": "206 ",
+      "value": "9400",
+      "status": "approved"
+    },
+    {
+      "id": "150027",
+      "sellerId": "1",
+      "vehicleModel": "Tiida",
+      "value": "46000",
+      "status": "approved"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsellerId\tvehicleModel\tvalue\tstatus\n450001\t7\tFiat Toro 2021\t103000\tapproved\n420001\t2\tPeugeot 207 2010\t19990\tapproved\n390002\t3\tÔnix plus ltz\t92000\tapproved\n390001\t4\tSIENA 2014 \t24990\tapproved\n330001\t3\tVw Gol\t41900\tapproved\n300008\t90001\tTriton 2024\t208990\tapproved\n300007\t4\tSentra 2016\t60990\tapproved\n300005\t6\tOUTLANDER 2015\t78000\tapproved\n300004\t2\tGol 2009\t14000\tapproved\n300003\t1\tEtios sedan\t46000\tapproved\n300002\t2\tOnix Plus 2022\t67990\tapproved\n300001\t4\tOnix 2019 \t66990\tapproved\n270001\t4\tFord ka 2020\t68990\tapproved\n240001\t4\t206 \t9400\tapproved\n150027\t1\tTiida\t46000\tapproved\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

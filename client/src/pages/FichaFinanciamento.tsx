@@ -88,7 +88,7 @@ export default function FichaFinanciamento() {
         veiculo: veiculo || undefined,
         placa: placa || undefined,
         anoModelo: anoModelo || undefined,
-        valorFinanciado: valorFinanciado ? Math.round(parseFloat(valorFinanciado.replace(/\D/g, "")) * 100) : undefined,
+        valorFinanciado: valorFinanciado ? Math.round(parseFloat(valorFinanciado.replace(/\D/g, "")) || 0) : undefined,
         nomeCompleto,
         cpf,
         rg: rg || undefined,

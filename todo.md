@@ -1036,3 +1036,27 @@
 - [x] Adicionadas notificações de rejeição (vendas, F&I, consignação, despachante)
 - [x] Push + notificação in-app para vendedor em todas aprovações/rejeições
 - [x] 357 testes passando
+
+## Bug/Melhoria: Painel do Gerente
+- [ ] Gerente está acessando painel admin em vez de painel próprio
+- [ ] Vendas mostra "Nenhuma venda" - gerente deve ver vendas de TODOS os vendedores
+- [ ] Agendamentos mostra 0 - gerente deve ver agendamentos de TODOS
+- [ ] Criar painel do gerente com visual melhor e mais prático
+- [ ] Botão grande e claro na Home para acessar painel gerente
+- [ ] Gerente vê dados consolidados de toda a equipe nos módulos permitidos
+- [ ] Separar completamente painel gerente do painel admin
+
+## Bug: Ranking mostrando pontos errados (pontos > vendas)
+- [x] Wesley tem 8 vendas mas mostra 9 pts - corrigido: agendamentos somavam no totalPoints
+- [x] Matheus tem 4 vendas mas mostra 5 pts - corrigido: agendamentos somavam no totalPoints
+- [x] Investigar cálculo de pontuação no ranking - causa: updateSaleTotals com incrementSales=false somava totalPoints
+- [x] Corrigir lógica de pontuação: totalPoints agora reflete APENAS vendas de veículos, recalculado no banco
+
+## Bug: Valores das vendas divididos por 100
+- [x] Etios sedan mostra R$ 460,00 quando deveria ser R$ 46.000,00 - corrigido: exibição dividia por 100
+- [x] Tiida mostra R$ 460,00 quando deveria ser R$ 46.000,00 - corrigido
+- [x] Cronos mostra R$ 629,00 quando deveria ser R$ 62.900,00 - corrigido
+- [x] Investigar se problema é no salvamento ou exibição - era na exibição (/ 100) e envio (* 100)
+- [x] Corrigir valores existentes no banco de dados - F&I e despachante divididos por 100
+- [x] Garantir que formulário de registro de venda trate valores corretamente - removido * 100
+- [x] Padronizar: todos os valores agora são em reais inteiros, sem centavos

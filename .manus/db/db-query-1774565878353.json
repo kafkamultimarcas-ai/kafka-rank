@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, financedValue FROM fei_records LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, financedValue FROM fei_records LIMIT 5;",
+  "rows": [
+    {
+      "id": "30001",
+      "financedValue": "57000"
+    },
+    {
+      "id": "30002",
+      "financedValue": "46000"
+    },
+    {
+      "id": "60001",
+      "financedValue": "56000"
+    },
+    {
+      "id": "60002",
+      "financedValue": "60000"
+    },
+    {
+      "id": "90001",
+      "financedValue": "29998"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tfinancedValue\n30001\t57000\n30002\t46000\n60001\t56000\n60002\t60000\n90001\t29998\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

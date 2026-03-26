@@ -277,13 +277,10 @@ async function updateSaleTotals(sellerId: number, competitionId: number | null |
       totalPoints: sql`totalPoints + ${points}`,
     }).where(eq(sellers.id, sellerId));
   } else {
-    // Agendamentos/SDR: só vendedores e SDR somam pontos
-    if (!APPOINTMENT_RANKING_DEPARTMENTS.includes(sellerDept)) {
-      return; // Outros setores não somam pontos de agendamento
-    }
-    await db.update(sellers).set({
-      totalPoints: sql`totalPoints + ${points}`,
-    }).where(eq(sellers.id, sellerId));
+    // Agendamentos/SDR/F&I/Consignação/Despachante: NÃO somar no totalPoints do vendedor de vendas
+    // totalPoints do seller deve refletir APENAS vendas de veículos para o ranking principal
+    // Pontos de agendamento/F&I/etc são rastreados separadamente nas competition_participants
+    // Nenhuma atualização no sellers.totalPoints para incrementSales=false
   }
   if (competitionId) {
     await db.update(competitionParticipants).set({

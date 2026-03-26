@@ -1,0 +1,64 @@
+{
+  "query": "SELECT id, name, totalSales, totalPoints FROM sellers WHERE active = true AND (department = 'vendas' OR department IS NULL) ORDER BY totalPoints DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, totalSales, totalPoints FROM sellers WHERE active = true AND (department = 'vendas' OR department IS NULL) ORDER BY totalPoints DESC;",
+  "rows": [
+    {
+      "id": "4",
+      "name": "Wesley",
+      "totalSales": "8",
+      "totalPoints": "9"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "totalSales": "7",
+      "totalPoints": "7"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "totalSales": "4",
+      "totalPoints": "5"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "totalSales": "5",
+      "totalPoints": "5"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "totalSales": "3",
+      "totalPoints": "3"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "totalSales": "3",
+      "totalPoints": "3"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "totalSales": "3",
+      "totalPoints": "3"
+    },
+    {
+      "id": "90001",
+      "name": "LOJA ",
+      "totalSales": "1",
+      "totalPoints": "1"
+    },
+    {
+      "id": "240001",
+      "name": "Nathan Felipe ",
+      "totalSales": "0",
+      "totalPoints": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttotalSales\ttotalPoints\n4\tWesley\t8\t9\n1\tLeonardo\t7\t7\n3\tMatheus\t4\t5\n6\tLucas\t5\t5\n2\tGabriel\t3\t3\n5\tPetherson\t3\t3\n7\tEmanuel\t3\t3\n90001\tLOJA \t1\t1\n240001\tNathan Felipe \t0\t0\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

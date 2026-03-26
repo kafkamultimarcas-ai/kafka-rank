@@ -1,0 +1,52 @@
+{
+  "query": "SELECT cp.sellerId, s.name, cp.points, cp.salesCount FROM competition_participants cp JOIN sellers s ON cp.sellerId = s.id ORDER BY cp.points DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT cp.sellerId, s.name, cp.points, cp.salesCount FROM competition_participants cp JOIN sellers s ON cp.sellerId = s.id ORDER BY cp.points DESC;",
+  "rows": [
+    {
+      "sellerId": "4",
+      "name": "Wesley",
+      "points": "8",
+      "salesCount": "8"
+    },
+    {
+      "sellerId": "1",
+      "name": "Leonardo",
+      "points": "7",
+      "salesCount": "7"
+    },
+    {
+      "sellerId": "6",
+      "name": "Lucas",
+      "points": "5",
+      "salesCount": "5"
+    },
+    {
+      "sellerId": "3",
+      "name": "Matheus",
+      "points": "4",
+      "salesCount": "4"
+    },
+    {
+      "sellerId": "2",
+      "name": "Gabriel",
+      "points": "3",
+      "salesCount": "3"
+    },
+    {
+      "sellerId": "5",
+      "name": "Petherson",
+      "points": "3",
+      "salesCount": "3"
+    },
+    {
+      "sellerId": "7",
+      "name": "Emanuel",
+      "points": "3",
+      "salesCount": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "sellerId\tname\tpoints\tsalesCount\n4\tWesley\t8\t8\n1\tLeonardo\t7\t7\n6\tLucas\t5\t5\n3\tMatheus\t4\t4\n2\tGabriel\t3\t3\n5\tPetherson\t3\t3\n7\tEmanuel\t3\t3\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

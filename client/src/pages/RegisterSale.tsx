@@ -184,13 +184,13 @@ export default function RegisterSale() {
         // Preencher campos baseado na categoria
         if (category === "vendas") {
           if (d.vehicleModel) setVehicleModel(d.vehicleModel);
-          if (d.value) setValue(String(Math.round(d.value / 100)));
+          if (d.value) setValue(String(Math.round(d.value)));
           if (d.description) setDescription(d.description);
         } else if (category === "fei") {
           if (d.vehiclePlate) setVehiclePlate(d.vehiclePlate);
           if (d.customerCpf) setCustomerCpf(d.customerCpf);
           if (d.bankName) setBankName(d.bankName);
-          if (d.value) setFinancedValue(String(Math.round(d.value / 100)));
+          if (d.value) setFinancedValue(String(Math.round(d.value)));
         } else if (category === "consignacao") {
           if (d.vehicleModel) setConsignModel(d.vehicleModel);
           if (d.vehiclePlate) setConsignPlate(d.vehiclePlate);
@@ -198,7 +198,7 @@ export default function RegisterSale() {
           if (d.customerPhone) setOwnerPhone(d.customerPhone);
         } else if (category === "despachante") {
           if (d.vehiclePlate) setDispatchPlate(d.vehiclePlate);
-          if (d.value) setTransferValue(String(Math.round(d.value / 100)));
+          if (d.value) setTransferValue(String(Math.round(d.value)));
         } else if (category === "pre_vendas") {
           if (d.customerName) setCustomerName(d.customerName);
           if (d.customerPhone) setCustomerPhone(d.customerPhone);
@@ -244,7 +244,7 @@ export default function RegisterSale() {
             customerCpf: customerCpf || undefined,
             vehiclePlate: vehiclePlate || undefined,
             bankName, returnType,
-            financedValue: financedValue ? Math.round(parseFloat(financedValue) * 100) : undefined,
+            financedValue: financedValue ? Math.round(parseFloat(financedValue.replace(/\D/g, "")) || 0) : undefined,
             paymentDate: paymentDate ? new Date(paymentDate).getTime() : undefined,
             notes: feiNotes || undefined,
           });
@@ -261,8 +261,8 @@ export default function RegisterSale() {
             entryDate: Date.now(),
             hasAuction,
             vehicleStatus,
-            payoffValue: payoffValue ? Math.round(parseFloat(payoffValue) * 100) : undefined,
-            costValue: costValue ? Math.round(parseFloat(costValue) * 100) : undefined,
+            payoffValue: payoffValue ? Math.round(parseFloat(payoffValue.replace(/\D/g, "")) || 0) : undefined,
+            costValue: costValue ? Math.round(parseFloat(costValue.replace(/\D/g, "")) || 0) : undefined,
             notes: consignNotes || undefined,
           });
           break;
@@ -272,7 +272,7 @@ export default function RegisterSale() {
             sellerId: sid, competitionId: cid,
             vehiclePlate: dispatchPlate || undefined,
             documentType, customerPaid,
-            transferValue: transferValue ? Math.round(parseFloat(transferValue) * 100) : undefined,
+            transferValue: transferValue ? Math.round(parseFloat(transferValue.replace(/\D/g, "")) || 0) : undefined,
           });
           break;
         case "pre_vendas":

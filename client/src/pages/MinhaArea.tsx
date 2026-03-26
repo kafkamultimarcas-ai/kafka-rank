@@ -49,8 +49,8 @@ function formatDate(ts: number | string | Date | null | undefined) {
 }
 
 function formatCurrency(v: number | null | undefined) {
-  if (!v) return "—";
-  return `R$ ${(v / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  if (!v) return "\u2014";
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -762,7 +762,7 @@ export default function MinhaArea() {
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                     {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
                   </span>
-                  {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(r.costValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
+                  {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {r.costValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
                 </div>
               </div>
             ))}
@@ -795,7 +795,7 @@ export default function MinhaArea() {
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                       {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
                     </span>
-                    {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(r.costValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
+                    {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {r.costValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
                   </div>
                   {isOverdue && (
                     <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
@@ -1171,10 +1171,10 @@ export default function MinhaArea() {
                         {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
                       </span>
                       {r.vehicleStatus === 'financiado' && r.payoffValue && (
-                        <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Quit: R$ {(r.payoffValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Quit: R$ {r.payoffValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       )}
                       {r.costValue && (
-                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(r.costValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {r.costValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       )}
                     </div>
                     {r.notes && <p className="text-[10px] text-gray-500 italic mt-0.5">{r.notes}</p>}
@@ -2092,7 +2092,7 @@ function SdrConversionsCard({ sellerId }: { sellerId: number }) {
                   <p className="text-[11px] text-emerald-400 font-bold">Venda fechada!</p>
                   <p className="text-[10px] text-gray-400">
                     Vendedor: {c.vendedorNome} | {c.venda.vehicleModel || "Veículo"}
-                    {c.venda.value ? ` | R$ ${(c.venda.value / 100).toLocaleString("pt-BR")}` : ""}
+                    {c.venda.value ? ` | R$ ${c.venda.value.toLocaleString("pt-BR")}` : ""}
                   </p>
                   <p className="text-[10px] text-gray-500">
                     {new Date(c.venda.createdAt).toLocaleDateString("pt-BR")}
@@ -2130,9 +2130,9 @@ function MinhasFichasFinanciamento({ sellerId }: { sellerId: number }) {
     parcial: "Parcial",
   };
 
-  const formatCurrencyLocal = (cents: number | null | undefined) => {
-    if (!cents) return "—";
-    return `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const formatCurrencyLocal = (val: number | null | undefined) => {
+    if (!val) return "\u2014";
+    return `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   };
 
   return (

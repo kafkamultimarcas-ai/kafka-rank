@@ -32,9 +32,9 @@ const BANCO_STATUS_COLORS: Record<string, string> = {
   recusado: "bg-red-600 text-white",
 };
 
-function formatCurrency(cents: number | null | undefined) {
-  if (!cents) return "—";
-  return `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+function formatCurrency(val: number | null | undefined) {
+  if (!val) return "—";
+  return `R$ ${val.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 }
 
 function TimerDisplay({ startTime }: { startTime: number | null }) {
@@ -148,7 +148,7 @@ export default function MesaCredito() {
       bancoId,
       status,
       observacao: bancoObs || undefined,
-      valorParcela: bancoValorParcela ? Math.round(parseFloat(bancoValorParcela) * 100) : undefined,
+      valorParcela: bancoValorParcela ? Math.round(parseFloat(bancoValorParcela)) : undefined,
       qtdParcelas: bancoQtdParcelas ? parseInt(bancoQtdParcelas) : undefined,
       taxaJuros: bancoTaxa || undefined,
       atualizadoPor: feiName,
@@ -444,7 +444,7 @@ export default function MesaCredito() {
                               </div>
                             ) : (
                               <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setEditingBancoId(banco.id); setBancoObs(banco.observacao || ""); setBancoValorParcela(banco.valorParcela ? String(banco.valorParcela / 100) : ""); setBancoQtdParcelas(banco.qtdParcelas ? String(banco.qtdParcelas) : ""); setBancoTaxa(banco.taxaJuros || ""); }}
+                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setEditingBancoId(banco.id); setBancoObs(banco.observacao || ""); setBancoValorParcela(banco.valorParcela ? String(banco.valorParcela) : ""); setBancoQtdParcelas(banco.qtdParcelas ? String(banco.qtdParcelas) : ""); setBancoTaxa(banco.taxaJuros || ""); }}
                                   className="flex-1 border-gray-700 text-gray-300 text-xs hover:bg-gray-800">
                                   <FileText className="w-3 h-3 mr-1" /> Analisar
                                 </Button>

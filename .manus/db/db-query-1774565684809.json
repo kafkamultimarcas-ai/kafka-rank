@@ -1,0 +1,122 @@
+{
+  "query": "SELECT id, name, totalSales, totalPoints, department FROM sellers WHERE active = true ORDER BY totalPoints DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, totalSales, totalPoints, department FROM sellers WHERE active = true ORDER BY totalPoints DESC;",
+  "rows": [
+    {
+      "id": "4",
+      "name": "Wesley",
+      "totalSales": "8",
+      "totalPoints": "8",
+      "department": "vendas"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "totalSales": "7",
+      "totalPoints": "7",
+      "department": "vendas"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "totalSales": "5",
+      "totalPoints": "5",
+      "department": "vendas"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "totalSales": "4",
+      "totalPoints": "4",
+      "department": "vendas"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "totalSales": "3",
+      "totalPoints": "3",
+      "department": "vendas"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "totalSales": "3",
+      "totalPoints": "3",
+      "department": "vendas"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "totalSales": "3",
+      "totalPoints": "3",
+      "department": "vendas"
+    },
+    {
+      "id": "90001",
+      "name": "LOJA ",
+      "totalSales": "1",
+      "totalPoints": "1",
+      "department": "vendas"
+    },
+    {
+      "id": "60001",
+      "name": "Andréia Vieegas",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "fei"
+    },
+    {
+      "id": "60002",
+      "name": "Jordana claudino",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "consignacao"
+    },
+    {
+      "id": "60003",
+      "name": "Rafaela Simões ",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "despachante"
+    },
+    {
+      "id": "30001",
+      "name": "Letícia ",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "pre_vendas"
+    },
+    {
+      "id": "120001",
+      "name": "Vinicius albuini",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "pos_venda"
+    },
+    {
+      "id": "180001",
+      "name": "Tissiane dos santos ",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "pre_vendas"
+    },
+    {
+      "id": "210001",
+      "name": "Beatriz Eduarda",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "marketing"
+    },
+    {
+      "id": "240001",
+      "name": "Nathan Felipe ",
+      "totalSales": "0",
+      "totalPoints": "0",
+      "department": "vendas"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttotalSales\ttotalPoints\tdepartment\n4\tWesley\t8\t8\tvendas\n1\tLeonardo\t7\t7\tvendas\n6\tLucas\t5\t5\tvendas\n3\tMatheus\t4\t4\tvendas\n2\tGabriel\t3\t3\tvendas\n5\tPetherson\t3\t3\tvendas\n7\tEmanuel\t3\t3\tvendas\n90001\tLOJA \t1\t1\tvendas\n60001\tAndréia Vieegas\t0\t0\tfei\n60002\tJordana claudino\t0\t0\tconsignacao\n60003\tRafaela Simões \t0\t0\tdespachante\n30001\tLetícia \t0\t0\tpre_vendas\n120001\tVinicius albuini\t0\t0\tpos_venda\n180001\tTissiane dos santos \t0\t0\tpre_vendas\n210001\tBeatriz Eduarda\t0\t0\tmarketing\n240001\tNathan Felipe \t0\t0\tvendas\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

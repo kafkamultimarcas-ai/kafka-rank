@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, sellerId, financedValue, vehiclePlate FROM fei_records LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, sellerId, financedValue, vehiclePlate FROM fei_records LIMIT 5;",
+  "rows": [
+    {
+      "id": "30001",
+      "sellerId": "60001",
+      "financedValue": "5700000",
+      "vehiclePlate": "FUW1F47"
+    },
+    {
+      "id": "30002",
+      "sellerId": "60001",
+      "financedValue": "4600000",
+      "vehiclePlate": "FVP4F79"
+    },
+    {
+      "id": "60001",
+      "sellerId": "60001",
+      "financedValue": "5600000",
+      "vehiclePlate": "FML7C03"
+    },
+    {
+      "id": "60002",
+      "sellerId": "60001",
+      "financedValue": "6000000",
+      "vehiclePlate": "FCF4A17"
+    },
+    {
+      "id": "90001",
+      "sellerId": "60001",
+      "financedValue": "2999800",
+      "vehiclePlate": "AZM8F63"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tsellerId\tfinancedValue\tvehiclePlate\n30001\t60001\t5700000\tFUW1F47\n30002\t60001\t4600000\tFVP4F79\n60001\t60001\t5600000\tFML7C03\n60002\t60001\t6000000\tFCF4A17\n90001\t60001\t2999800\tAZM8F63\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

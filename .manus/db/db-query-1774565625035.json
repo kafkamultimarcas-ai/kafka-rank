@@ -1,0 +1,9 @@
+{
+  "query": "SELECT 'fei' as tipo, sellerId, s.name, points, status FROM fei_records fr JOIN sellers s ON fr.sellerId = s.id WHERE status = 'approved' AND sellerId IN (3, 4)\nUNION ALL\nSELECT 'consignacao' as tipo, sellerId, s.name, points, status FROM consignment_records cr JOIN sellers s ON cr.sellerId = s.id WHERE status = 'approved' AND sellerId IN (3, 4)\nUNION ALL\nSELECT 'despachante' as tipo, sellerId, s.name, points, status FROM dispatch_records dr JOIN sellers s ON dr.sellerId = s.id WHERE status = 'approved' AND sellerId IN (3, 4);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT 'fei' as tipo, sellerId, s.name, points, status FROM fei_records fr JOIN sellers s ON fr.sellerId = s.id WHERE status = 'approved' AND sellerId IN (3, 4)\nUNION ALL\nSELECT 'consignacao' as tipo, sellerId, s.name, points, status FROM consignment_records cr JOIN sellers s ON cr.sellerId = s.id WHERE status = 'approved' AND sellerId IN (3, 4)\nUNION ALL\nSELECT 'despachante' as tipo, sellerId, s.name, points, status FROM dispatch_records dr JOIN sellers s ON dr.sellerId = s.id WHERE status = 'approved' AND sellerId IN (3, 4);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 57
+}

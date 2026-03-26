@@ -222,7 +222,7 @@ export default function AdminApprovals() {
                 {record.customerCpf && <span className="text-muted-foreground">CPF: <span className="text-foreground">{record.customerCpf}</span></span>}
                 <span className="text-muted-foreground">Retorno: <span className="text-yellow-400 font-bold">{record.returnType}</span></span>
               </div>
-              {record.financedValue > 0 && <p className="text-green-400 font-bold">Financiado: R$ {(record.financedValue / 100).toLocaleString("pt-BR")}</p>}
+              {record.financedValue > 0 && <p className="text-green-400 font-bold">Financiado: R$ {record.financedValue.toLocaleString("pt-BR")}</p>}
               {record.paymentDate && <p className="text-yellow-400 text-sm">Pago em: {new Date(Number(record.paymentDate)).toLocaleDateString("pt-BR")}</p>}
               <p className="text-muted-foreground/60 text-xs mt-1">{new Date(record.createdAt).toLocaleString("pt-BR")}</p>
             </div>
@@ -292,10 +292,10 @@ export default function AdminApprovals() {
                   {record.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
                 </span>
                 {record.vehicleStatus === 'financiado' && record.payoffValue && (
-                  <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Quit: R$ {(Number(record.payoffValue) / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <span className="text-[10px] bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">Quit: R$ {Number(record.payoffValue).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                 )}
                 {record.costValue && (
-                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {(Number(record.costValue) / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {Number(record.costValue).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                 )}
               </div>
               {record.notes && <p className="text-xs text-muted-foreground italic mt-1">📝 {record.notes}</p>}
@@ -344,7 +344,7 @@ export default function AdminApprovals() {
               </div>
               <div className="flex flex-wrap gap-3 text-sm">
                 {record.vehiclePlate && <span className="text-muted-foreground">Placa: <span className="text-foreground">{record.vehiclePlate}</span></span>}
-                {record.transferValue > 0 && <span className="text-green-400 font-bold">R$ {(record.transferValue / 100).toLocaleString("pt-BR")}</span>}
+                {record.transferValue > 0 && <span className="text-green-400 font-bold">R$ {record.transferValue.toLocaleString("pt-BR")}</span>}
               </div>
               {record.bonusPoints > 0 && (
                 <p className="text-green-400 text-xs mt-1 font-semibold">+{record.bonusPoints} pontos de bônus (cliente pagou)</p>

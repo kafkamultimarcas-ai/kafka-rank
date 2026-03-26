@@ -1,0 +1,66 @@
+{
+  "query": "SELECT s.id, s.name, COUNT(*) as total_vendas, SUM(sa.points) as total_pontos, GROUP_CONCAT(sa.points ORDER BY sa.id) as pontos_individuais FROM sales sa JOIN sellers s ON sa.sellerId = s.id WHERE sa.status = 'approved' GROUP BY s.id, s.name ORDER BY total_vendas DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, COUNT(*) as total_vendas, SUM(sa.points) as total_pontos, GROUP_CONCAT(sa.points ORDER BY sa.id) as pontos_individuais FROM sales sa JOIN sellers s ON sa.sellerId = s.id WHERE sa.status = 'approved' GROUP BY s.id, s.name ORDER BY total_vendas DESC;",
+  "rows": [
+    {
+      "id": "4",
+      "name": "Wesley",
+      "total_vendas": "8",
+      "total_pontos": "8",
+      "pontos_individuais": "1,1,1,1,1,1,1,1"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "total_vendas": "7",
+      "total_pontos": "7",
+      "pontos_individuais": "1,1,1,1,1,1,1"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "total_vendas": "5",
+      "total_pontos": "5",
+      "pontos_individuais": "1,1,1,1,1"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "total_vendas": "4",
+      "total_pontos": "4",
+      "pontos_individuais": "1,1,1,1"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "total_vendas": "3",
+      "total_pontos": "3",
+      "pontos_individuais": "1,1,1"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "total_vendas": "3",
+      "total_pontos": "3",
+      "pontos_individuais": "1,1,1"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "total_vendas": "3",
+      "total_pontos": "3",
+      "pontos_individuais": "1,1,1"
+    },
+    {
+      "id": "90001",
+      "name": "LOJA ",
+      "total_vendas": "1",
+      "total_pontos": "1",
+      "pontos_individuais": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttotal_vendas\ttotal_pontos\tpontos_individuais\n4\tWesley\t8\t8\t1,1,1,1,1,1,1,1\n1\tLeonardo\t7\t7\t1,1,1,1,1,1,1\n6\tLucas\t5\t5\t1,1,1,1,1\n3\tMatheus\t4\t4\t1,1,1,1\n2\tGabriel\t3\t3\t1,1,1\n5\tPetherson\t3\t3\t1,1,1\n7\tEmanuel\t3\t3\t1,1,1\n90001\tLOJA \t1\t1\t1\n",
+  "stderr": "",
+  "execution_time_ms": 189
+}
