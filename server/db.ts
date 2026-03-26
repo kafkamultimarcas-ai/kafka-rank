@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
   sellers, InsertSeller,
+  managerPermissions, InsertManagerPermission,
   competitions, InsertCompetition,
   competitionParticipants, InsertCompetitionParticipant,
   teams, InsertTeam,
@@ -87,6 +88,7 @@ const safeSellerColumns = {
   totalPoints: sellers.totalPoints,
   username: sellers.username,
   lastAccess: sellers.lastAccess,
+  sellerRole: sellers.sellerRole,
   createdAt: sellers.createdAt,
   updatedAt: sellers.updatedAt,
 };
@@ -2325,4 +2327,57 @@ export async function deleteFichaFinanciamento(id: number) {
   if (!db) throw new Error("DB not available");
   await db.delete(fichaBancos).where(eq(fichaBancos.fichaId, id));
   await db.delete(fichasFinanciamento).where(eq(fichasFinanciamento.id, id));
+}
+
+
+// ===== PERMISSÕES DE GERENTE =====
+
+// Módulos disponíveis no sistema
+export const AVAILABLE_MODULES = [
+  { key: 'ranking', label: 'Ranking de Vendas' },
+  { key: 'ranking_agendamentos', label: 'Ranking de Agendamentos' },
+  { key: 'vendas', label: 'Vendas' },
+  { key: 'agendamentos', label: 'Agendamentos' },
+  { key: 'consignacao', label: 'Consignação' },
+  { key: 'fei', label: 'F&I (Financiamento)' },
+  { key: 'fichas', label: 'Mesa de Crédito' },
+  { key: 'despachante', label: 'Despachante' },
+  { key: 'documentos', label: 'Documentos de Venda' },
+  { key: 'pos_venda', label: 'Pós-Venda' },
+  { key: 'financeiro', label: 'Financeiro' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'crm', label: 'CRM' },
+  { key: 'metas', label: 'Metas' },
+  { key: 'treinamentos', label: 'Treinamentos' },
+  { key: 'vendedores', label: 'Gestão de Vendedores' },
+  { key: 'iam', label: 'IAM (Agente IA)' },
+] as const;
+
+export async function getManagerPermissions(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(managerPermissions).where(eq(managerPermissions.sellerId, sellerId));
+}
+
+export async function setManagerPermissions(sellerId: number, permissions: { module: string; canView: boolean; canEdit: boolean }[]) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Deletar permissões antigas
+  await db.delete(managerPermissions).where(eq(managerPermissions.sellerId, sellerId));
+  // Inserir novas
+  if (permissions.length > 0) {
+    await db.insert(managerPermissions).values(
+      permissions.map(p => ({ sellerId, module: p.module, canView: p.canView, canEdit: p.canEdit }))
+    );
+  }
+}
+
+export async function hasManagerPermission(sellerId: number, module: string, action: 'view' | 'edit' = 'view'): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select().from(managerPermissions)
+    .where(and(eq(managerPermissions.sellerId, sellerId), eq(managerPermissions.module, module)))
+    .limit(1);
+  if (!result[0]) return false;
+  return action === 'edit' ? result[0].canEdit : result[0].canView;
 }

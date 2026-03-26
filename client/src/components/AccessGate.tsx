@@ -43,9 +43,13 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const { data: allSellers } = trpc.sellers.list.useQuery({ activeOnly: true });
 
   const loginMutation = trpc.sellers.login.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
-      window.location.reload();
+      if (data.sellerRole === 'gerente') {
+        window.location.href = '/gerente';
+      } else {
+        window.location.reload();
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Usuario ou senha invalidos");
@@ -53,9 +57,13 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   });
 
   const firstAccessMutation = trpc.sellers.firstAccess.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast.success(`Login criado com sucesso! Bem-vindo, ${data.nickname || data.name}!`);
-      window.location.reload();
+      if (data.sellerRole === 'gerente') {
+        window.location.href = '/gerente';
+      } else {
+        window.location.reload();
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao criar login");
@@ -234,9 +242,14 @@ export default function AccessGate({ children }: { children: ReactNode }) {
             </>
           ) : (
             <>
-              <p className="text-sm text-gray-400 text-center mb-6">
+              <p className="text-sm text-gray-400 text-center mb-4">
                 Primeiro acesso - crie seu login
               </p>
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 mb-4">
+                <p className="text-[11px] text-blue-300 text-center">
+                  Apenas colaboradores ja cadastrados pelo gerente podem criar login.
+                </p>
+              </div>
 
               <form onSubmit={handleFirstAccess} className="space-y-4">
                 <div>
@@ -352,9 +365,14 @@ export default function AccessGate({ children }: { children: ReactNode }) {
             </>
           )}
 
-          <p className="text-[10px] text-gray-600 text-center mt-4">
-            Cada colaborador tem acesso apenas aos seus proprios dados.
-          </p>
+          <div className="mt-4 space-y-1">
+            <p className="text-[10px] text-gray-600 text-center">
+              Acesso exclusivo para equipe Kafka Multimarcas.
+            </p>
+            <p className="text-[10px] text-gray-600 text-center">
+              Cada colaborador tem acesso apenas aos seus proprios dados.
+            </p>
+          </div>
         </div>
       </div>
     </div>

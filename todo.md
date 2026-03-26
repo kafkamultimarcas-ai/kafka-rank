@@ -1004,3 +1004,21 @@
 - [x] Admin controla: editar setor, resetar senha, bloquear/desbloquear vendedor
 - [x] Consignação e ranking visíveis para todos (dados compartilhados)
 - [x] Botão de corrigir comparecimento no card do agendamento
+
+## Segurança do Primeiro Acesso
+- [x] Reforçar: só vendedores já cadastrados pelo admin podem criar login
+- [x] Após criar login, vendedor some da lista e não pode criar novamente
+- [x] Esconder link "Primeiro acesso" quando não há vendedores sem login
+- [x] Backend: validar que vendedor existe, está ativo e não tem login antes de permitir primeiro acesso
+- [x] Mensagem clara na tela de que o acesso é exclusivo para equipe Kafka Multimarcas
+
+## Papel de Gerente (acesso intermediário)
+- [x] Adicionar campo sellerRole (vendedor/gerente) na tabela sellers
+- [x] Criar tabela manager_permissions para controlar acesso por módulo
+- [x] Backend: rotas de gerente verificam permissões definidas pelo admin
+- [x] Admin pode marcar colaborador como gerente (toggle no card) e definir permissões
+- [x] Gerente faz login pelo mesmo sistema, mas é redirecionado para painel especial (/gerente)
+- [x] Painel do gerente mostra apenas módulos liberados pelo admin
+- [x] Admin controla: quais módulos o gerente pode ver/editar (17 módulos disponíveis)
+- [x] Botão "Gerente" aparece no header quando logado como gerente
+- [x] 350 testes passando

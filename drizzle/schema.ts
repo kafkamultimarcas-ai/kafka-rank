@@ -31,12 +31,26 @@ export const sellers = mysqlTable("sellers", {
   username: varchar("username", { length: 100 }),
   passwordHash: varchar("passwordHash", { length: 255 }),
   lastAccess: bigint("lastAccess", { mode: "number" }),
+  sellerRole: varchar("sellerRole", { length: 20 }).default("vendedor"), // vendedor, gerente
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Seller = typeof sellers.$inferSelect;
 export type InsertSeller = typeof sellers.$inferInsert;
+
+// Permissões do gerente (quais módulos pode acessar)
+export const managerPermissions = mysqlTable("manager_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(), // gerente
+  module: varchar("module", { length: 50 }).notNull(), // ranking, vendas, agendamentos, treinamentos, consignacao, fei, pos_venda, financeiro, marketing, crm, metas, sorteio, documentos
+  canView: boolean("canView").default(true).notNull(),
+  canEdit: boolean("canEdit").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ManagerPermission = typeof managerPermissions.$inferSelect;
+export type InsertManagerPermission = typeof managerPermissions.$inferInsert;
 
 // Competições - agora com categoria para multi-setor
 export const competitions = mysqlTable("competitions", {

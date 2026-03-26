@@ -125,10 +125,18 @@ export default function Home() {
               <span className="sm:hidden">+</span>
             </Button>
             {sellerSession ? (
-              <Button size="sm" variant="outline" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">{sellerSession.nickname || sellerSession.name}</span>
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">{sellerSession.nickname || sellerSession.name}</span>
+                </Button>
+                {(sellerSession as any).sellerRole === 'gerente' && (
+                  <Button size="sm" onClick={() => setLocation("/gerente")} className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold">
+                    <Shield className="h-4 w-4" />
+                    <span className="hidden sm:inline">Gerente</span>
+                  </Button>
+                )}
+              </>
             ) : (
               <Button size="sm" variant="outline" onClick={() => setLocation("/login-vendedor")} className="gap-1.5 border-blue-600 text-blue-400 hover:bg-blue-600/10">
                 <LogIn className="h-4 w-4" />

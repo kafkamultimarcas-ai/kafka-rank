@@ -64,6 +64,7 @@ export const appRouter = router({
       email: z.string().optional(),
       department: z.string().optional(),
       active: z.boolean().optional(),
+      sellerRole: z.string().optional(),
     })).mutation(async ({ input }) => {
       const { id, ...data } = input;
       await db.updateSeller(id, data);
@@ -109,7 +110,7 @@ export const appRouter = router({
       );
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname };
+      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor' };
     }),
 
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -126,7 +127,7 @@ export const appRouter = router({
         const seller = await db.getSellerById(sellerId);
         if (seller) {
           await db.updateSellerLastAccess(sellerId);
-          return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department };
+          return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department, sellerRole: seller.sellerRole || 'vendedor' };
         }
       }
       // Fallback: verificar cookie seller_session diretamente
@@ -140,7 +141,7 @@ export const appRouter = router({
           const seller = await db.getSellerById(payload.sellerId);
           if (seller && seller.active) {
             await db.updateSellerLastAccess(seller.id);
-            return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department };
+            return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department, sellerRole: seller.sellerRole || 'vendedor' };
           }
         }
       } catch (e) {
@@ -176,7 +177,7 @@ export const appRouter = router({
       );
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie('seller_session', token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname };
+      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor' };
     }),
 
     // Admin define/reseta senha de vendedor
@@ -1872,6 +1873,44 @@ Adapte o formato conforme o assunto, mas sempre inclua:
         }
       } catch (e) { console.error('Erro ao enviar push doc transferido:', e); }
       return { success: true };
+    }),
+  }),
+
+  // ===== PERMISSÕES DE GERENTE =====
+  managerPerms: router({
+    // Listar módulos disponíveis
+    modules: publicProcedure.query(() => db.AVAILABLE_MODULES),
+    // Buscar permissões de um gerente
+    get: adminProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
+      return db.getManagerPermissions(input.sellerId);
+    }),
+    // Definir permissões de um gerente (admin)
+    set: adminProcedure.input(z.object({
+      sellerId: z.number(),
+      permissions: z.array(z.object({
+        module: z.string(),
+        canView: z.boolean(),
+        canEdit: z.boolean(),
+      })),
+    })).mutation(async ({ input }) => {
+      await db.setManagerPermissions(input.sellerId, input.permissions);
+      return { success: true };
+    }),
+    // Gerente verifica suas próprias permissões
+    myPermissions: publicProcedure.query(async ({ ctx }) => {
+      try {
+        const { parse: parseCookie } = await import("cookie");
+        const cookies = parseCookie(ctx.req.headers.cookie || "");
+        const sellerToken = cookies.seller_session;
+        if (sellerToken) {
+          const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
+          const seller = await db.getSellerById(payload.sellerId);
+          if (seller && seller.active && seller.sellerRole === 'gerente') {
+            return db.getManagerPermissions(seller.id);
+          }
+        }
+      } catch (e) {}
+      return [];
     }),
   }),
 });
