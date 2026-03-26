@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 
-export function usePushNotifications() {
+export function usePushNotifications(sellerId?: number) {
   const [permission, setPermission] = useState<string>("default");
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -48,11 +48,12 @@ export function usePushNotifications() {
         throw new Error("Invalid subscription");
       }
 
-      // Save to server
+      // Save to server with sellerId
       await subscribeMutation.mutateAsync({
         endpoint: subJson.endpoint,
         p256dh: subJson.keys.p256dh,
         auth: subJson.keys.auth,
+        ...(sellerId ? { sellerId } : {}),
       });
 
       setIsSubscribed(true);
@@ -61,7 +62,7 @@ export function usePushNotifications() {
       console.error("[Push] Subscribe error:", error);
       return false;
     }
-  }, [isSupported, vapidKeyQuery.data?.key, subscribeMutation]);
+  }, [isSupported, vapidKeyQuery.data?.key, subscribeMutation, sellerId]);
 
   return {
     isSupported,

@@ -445,7 +445,27 @@ export const appRouter = router({
     }),
     // Rejeitar venda (admin)
     reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      // Buscar venda antes de rejeitar para ter os dados
+      const sales = await db.listSales(undefined, undefined);
+      const sale = sales.find((s: any) => s.id === input.id);
       await db.rejectSale(input.id);
+      if (sale) {
+        const seller = await db.getSellerById(sale.sellerId);
+        if (seller) {
+          await db.createNotification({
+            sellerId: sale.sellerId,
+            type: 'sale_rejected',
+            title: 'Venda rejeitada',
+            message: `Sua venda de ${sale.vehicleModel || 've\u00edculo'} foi rejeitada. Verifique os dados.`,
+          });
+          sendPushToSeller(sale.sellerId, {
+            title: '\u274c Venda Rejeitada',
+            body: `Sua venda de ${sale.vehicleModel || 've\u00edculo'} foi rejeitada.`,
+            tag: `sale-rejected-${input.id}`,
+            data: { type: 'sale_rejected', url: `/minha-area/${sale.sellerId}` },
+          }).catch(console.error);
+        }
+      }
       return { success: true };
     }),
     // Editar venda (admin) - ajusta pontos automaticamente
@@ -807,11 +827,38 @@ export const appRouter = router({
           title: 'F&I aprovado!',
           message: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi aprovado!`,
         });
+        sendPushToSeller(record.sellerId, {
+          title: '\u2705 F&I Aprovado!',
+          body: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi aprovado! +${record.points} pts`,
+          tag: `fei-approved-${record.id}`,
+          data: { type: 'fei_approved', url: `/minha-area/${record.sellerId}` },
+          vibrate: [200, 100, 200],
+        }).catch(console.error);
       }
       return { success: true };
     }),
     reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      // Buscar registro antes de rejeitar para ter os dados
+      const records = await db.listFeiRecords();
+      const record = records.find((r: any) => r.id === input.id);
       await db.rejectFeiRecord(input.id);
+      if (record) {
+        const seller = await db.getSellerById(record.sellerId);
+        if (seller) {
+          await db.createNotification({
+            sellerId: record.sellerId,
+            type: 'fei_rejected',
+            title: 'F&I rejeitado',
+            message: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi rejeitado. Verifique os dados e tente novamente.`,
+          });
+          sendPushToSeller(record.sellerId, {
+            title: '\u274c F&I Rejeitado',
+            body: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi rejeitado.`,
+            tag: `fei-rejected-${record.id}`,
+            data: { type: 'fei_rejected', url: `/minha-area/${record.sellerId}` },
+          }).catch(console.error);
+        }
+      }
       return { success: true };
     }),
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
@@ -920,16 +967,42 @@ export const appRouter = router({
         await db.createNotification({
           sellerId: result.sellerId,
           type: 'consignment_approved',
-          title: 'Consigna\u00e7\u00e3o aprovada!',
+          title: 'Consignação aprovada!',
           message: result.isValid
-            ? `Sua consigna\u00e7\u00e3o de ${result.vehicleModel} foi aprovada e j\u00e1 conta pontos!`
-            : `Sua consigna\u00e7\u00e3o de ${result.vehicleModel} foi aprovada. Os pontos ser\u00e3o contados ap\u00f3s 7 dias no p\u00e1tio.`,
+            ? `Sua consignação de ${result.vehicleModel} foi aprovada e já conta pontos!`
+            : `Sua consignação de ${result.vehicleModel} foi aprovada. Os pontos serão contados após 7 dias no pátio.`,
         });
+        sendPushToSeller(result.sellerId, {
+          title: '\u2705 Consignação Aprovada!',
+          body: result.isValid
+            ? `Sua consignação de ${result.vehicleModel} foi aprovada e já conta pontos!`
+            : `Sua consignação de ${result.vehicleModel} foi aprovada. Pontos após 7 dias.`,
+          tag: `consignment-approved-${input.id}`,
+          data: { type: 'consignment_approved', url: `/minha-area/${result.sellerId}` },
+          vibrate: [200, 100, 200],
+        }).catch(console.error);
       }
       return { success: true, isValid: result.isValid };
     }),
     reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      // Buscar registro antes de rejeitar
+      const records = await db.listConsignmentRecords();
+      const record = records.find((r: any) => r.id === input.id);
       await db.rejectConsignmentRecord(input.id);
+      if (record) {
+        await db.createNotification({
+          sellerId: record.sellerId,
+          type: 'consignment_rejected',
+          title: 'Consignação rejeitada',
+          message: `Sua consignação de ${record.vehicleModel} foi rejeitada.`,
+        });
+        sendPushToSeller(record.sellerId, {
+          title: '\u274c Consignação Rejeitada',
+          body: `Sua consignação de ${record.vehicleModel} foi rejeitada.`,
+          tag: `consignment-rejected-${input.id}`,
+          data: { type: 'consignment_rejected', url: `/minha-area/${record.sellerId}` },
+        }).catch(console.error);
+      }
       return { success: true };
     }),
     // Registrar saída do carro do pátio
@@ -995,13 +1068,36 @@ export const appRouter = router({
           sellerId: record.sellerId,
           type: 'dispatch_approved',
           title: 'Documento aprovado!',
-          message: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos${record.bonusPoints > 0 ? ' (inclui b\u00f4nus por cobran\u00e7a do cliente!)' : ''}.`,
+          message: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos${record.bonusPoints > 0 ? ' (inclui bônus por cobrança do cliente!)' : ''}.`,
         });
+        sendPushToSeller(record.sellerId, {
+          title: '\u2705 Documento Aprovado!',
+          body: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos.`,
+          tag: `dispatch-approved-${input.id}`,
+          data: { type: 'dispatch_approved', url: `/minha-area/${record.sellerId}` },
+          vibrate: [200, 100, 200],
+        }).catch(console.error);
       }
       return { success: true };
     }),
     reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const records = await db.listDispatchRecords();
+      const record = records.find((r: any) => r.id === input.id);
       await db.rejectDispatchRecord(input.id);
+      if (record) {
+        await db.createNotification({
+          sellerId: record.sellerId,
+          type: 'dispatch_rejected',
+          title: 'Documento rejeitado',
+          message: `Seu registro de ${record.documentType} foi rejeitado.`,
+        });
+        sendPushToSeller(record.sellerId, {
+          title: '\u274c Documento Rejeitado',
+          body: `Seu registro de ${record.documentType} foi rejeitado.`,
+          tag: `dispatch-rejected-${input.id}`,
+          data: { type: 'dispatch_rejected', url: `/minha-area/${record.sellerId}` },
+        }).catch(console.error);
+      }
       return { success: true };
     }),
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import NotificationCenter from "@/components/NotificationCenter";
 import {
   ArrowLeft,
   LogOut,
@@ -82,7 +83,7 @@ export default function MinhaArea() {
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: unreadCount } = trpc.notifications.unreadCountSeller.useQuery({ sellerId }, { enabled: sellerId > 0 });
-  const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications();
+  const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications(sellerId);
 
   const dept = sellerSession?.department || "vendas";
   const deptInfo = DEPT_CONFIG[dept] || DEPT_CONFIG.vendas;
@@ -320,11 +321,13 @@ export default function MinhaArea() {
                   if (ok) toast.success("Notificações ativadas!");
                 }}
                 className="text-yellow-500 hover:text-yellow-400"
+
               >
                 <Bell className="w-4 h-4" />
               </Button>
             )}
             {isSubscribed && <BellRing className="w-4 h-4 text-emerald-500" />}
+            <NotificationCenter sellerId={sellerId} />
             <Button
               variant="ghost"
               size="sm"

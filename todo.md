@@ -1028,3 +1028,11 @@
 - [x] Frontend: botão de editar (lápis azul) no card F&I com dialog de edição completo
 - [x] Admin pode editar registros aprovados, pendentes ou rejeitados
 - [x] 357 testes passando
+
+## Bug: Notificações não funcionam para vendedores
+- [x] Investigado: push subscribe não enviava sellerId, NotificationCenter não recebia sellerId
+- [x] Corrigido: usePushNotifications agora aceita sellerId e envia ao backend
+- [x] Corrigido: NotificationCenter recebe sellerId na Home e MinhaArea
+- [x] Adicionadas notificações de rejeição (vendas, F&I, consignação, despachante)
+- [x] Push + notificação in-app para vendedor em todas aprovações/rejeições
+- [x] 357 testes passando

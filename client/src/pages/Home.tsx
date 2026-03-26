@@ -31,9 +31,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
-  const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications();
   const [, setLocation] = useLocation();
   const { data: sellerSession } = trpc.sellers.me.useQuery();
+  const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications(sellerSession?.id);
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
   const { data: allCompetitions } = trpc.competitions.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
@@ -114,7 +114,7 @@ export default function Home() {
                 <BellRing className="h-3.5 w-3.5" />
               </div>
             )}
-            <NotificationCenter isAdmin={user?.role === 'admin'} />
+            <NotificationCenter isAdmin={user?.role === 'admin'} sellerId={sellerSession?.id} />
             <Button size="sm" variant="outline" onClick={() => setLocation("/treinamentos")} className="gap-1.5">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Treinar</span>
