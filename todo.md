@@ -253,7 +253,7 @@
 - [x] Sons de alerta nas notificações push (vibração + som no celular)
 - [x] Centro de notificações no app (sino com badge de contagem)
 - [x] Corrigir bug do registro por voz (strict:true com required:[])
-- [ ] Corrigir bug do LiveAlerts (hooks condicionais)
+- [x] Corrigir bug do LiveAlerts (hooks condicionais) - já corrigido, sem hooks condicionais
 
 ## Bug: Agendamento contando no ranking de vendas
 - [x] Separar pontos de agendamento/SDR dos pontos de vendas no ranking
@@ -738,10 +738,10 @@
 - [x] 234 testes passando (9 novos testes do pós-venda)
 
 ## Login Individual por Colaborador
-- [ ] Corrigir bug de criação de login/senha para colaboradores
-- [ ] Remover necessidade de código de acesso geral - cada um entra com seu login
-- [ ] Tela de login individual (nome de usuário + senha)
-- [ ] Cada colaborador acessa sua "Minha Área" com login próprio
+- [x] Corrigir bug de criação de login/senha para colaboradores - já funcional
+- [x] Remover necessidade de código de acesso geral - cada um entra com seu login
+- [x] Tela de login individual (nome de usuário + senha)
+- [x] Cada colaborador acessa sua "Minha Área" com login próprio
 - [ ] Histórico de último acesso (data/hora) registrado no banco
 - [ ] Admin pode ver último acesso de cada colaborador
 - [ ] CRM e sistema acessíveis via login individual
@@ -921,13 +921,13 @@
 - [x] Notificação push para documento transferido (enviada quando despachante marca transferência)
 
 ## Melhoria: Setor Financeiro + Pós-Venda Visual + Login Setorial
-- [ ] Adicionar setor "Financeiro" na lista de setores (schema + frontend)
-- [ ] Financeiro tem acesso a toda tela do Pós-Venda
-- [ ] Aba exclusiva de Contas só para Financeiro (Pós-Venda NÃO acessa)
-- [ ] Login de Financeiro e Pós-Venda pela tela principal com senha
-- [ ] Redesign visual do Pós-Venda - painel organizado com cards por status
-- [ ] Filtro de abas no Pós-Venda (Todos, Abertos, Em Andamento, Resolvidos)
-- [ ] Pós-Venda não precisa selecionar nome - já mostra tudo ao entrar
+- [x] Adicionar setor "Financeiro" na lista de setores (schema + frontend) - já existe no banco
+- [x] Financeiro tem acesso a toda tela do Pós-Venda (página /financeiro com aba Pós-Venda)
+- [x] Aba exclusiva de Contas só para Financeiro (Pós-Venda NÃO acessa)
+- [x] Login de Financeiro e Pós-Venda pela tela principal com senha (redirect por department)
+- [x] Redesign visual do Pós-Venda - painel organizado com cards por status
+- [x] Filtro de abas no Pós-Venda (Todos, Abertos, Em Andamento, Resolvidos)
+- [x] Pós-Venda não precisa selecionar nome - já mostra tudo ao entrar
 - [x] Botões de WhatsApp e Ligação direta no card do chamado do Pós-Venda
 - [x] Campo de observação no card do chamado para pós-venda anotar o que está sendo feito
 - [x] Responsável do pós-venda visível no card do chamado
@@ -978,18 +978,18 @@
 - [x] Campo valor de quitação quando financiado
 - [x] Campo valor de custo (valor que o consignado deixou)
 - [x] Campo observações na consignação
-- [ ] Verificar outros bugs gerais no sistema
+- [x] Verificar outros bugs gerais no sistema (fipePrice 0 fix, privacy filters, gerente bypass)
 
 ## Controle de Acesso por Setor
-- [ ] Primeiro acesso: vendedor cria login/senha no primeiro acesso
-- [ ] Agendamentos privados: cada vendedor vê APENAS os seus agendamentos
-- [ ] Fichas de financiamento privadas: vendedor vê apenas as suas fichas
-- [ ] CRM privado: cada vendedor vê apenas seus dados
-- [ ] Estoque consignação visível para todos (veículos disponíveis)
-- [ ] Ranking e meta visíveis para todos
-- [ ] Admin controla: bloquear/desbloquear vendedor, alterar senha, excluir
-- [ ] Admin define permissões por módulo para cada vendedor/setor
-- [ ] Setores isolados: Pós-Venda não vê Financeiro, Consignação não vê Vendas, etc.
+- [x] Primeiro acesso: vendedor cria login/senha no primeiro acesso
+- [x] Agendamentos privados: cada vendedor vê APENAS os seus agendamentos (getPrivacySellerId)
+- [x] Fichas de financiamento privadas: vendedor vê apenas as suas fichas (getFichaPrivacySellerId)
+- [x] CRM privado: cada vendedor vê apenas seus dados (listBySeller com sellerId)
+- [x] Estoque consignação visível para todos (veículos disponíveis) - página /estoque pública
+- [x] Ranking e meta visíveis para todos - já implementado
+- [x] Admin controla: bloquear/desbloquear vendedor, alterar senha, excluir
+- [x] Admin define permissões por módulo para cada vendedor/setor (managerPerms)
+- [x] Setores isolados: Pós-Venda não vê Financeiro, Consignação não vê Vendas, etc. (department-based routing)
 
 ## Bug: Não consegue alterar comparecimento do agendamento
 - [x] Botão para alternar comparecimento (veio/não veio) no card do agendamento
@@ -1038,13 +1038,13 @@
 - [x] 357 testes passando
 
 ## Bug/Melhoria: Painel do Gerente
-- [ ] Gerente está acessando painel admin em vez de painel próprio
-- [ ] Vendas mostra "Nenhuma venda" - gerente deve ver vendas de TODOS os vendedores
-- [ ] Agendamentos mostra 0 - gerente deve ver agendamentos de TODOS
-- [ ] Criar painel do gerente com visual melhor e mais prático
-- [ ] Botão grande e claro na Home para acessar painel gerente
-- [ ] Gerente vê dados consolidados de toda a equipe nos módulos permitidos
-- [ ] Separar completamente painel gerente do painel admin
+- [x] Gerente está acessando painel admin em vez de painel próprio
+- [x] Vendas mostra "Nenhuma venda" - gerente deve ver vendas de TODOS os vendedores (getPrivacySellerId bypass)
+- [x] Agendamentos mostra 0 - gerente deve ver agendamentos de TODOS (getPrivacySellerId bypass)
+- [x] Criar painel do gerente com visual melhor e mais prático (dashboard com stats, top 5, ações pendentes)
+- [x] Botão grande e claro na Home para acessar painel gerente
+- [x] Gerente vê dados consolidados de toda a equipe nos módulos permitidos
+- [x] Separar completamente painel gerente do painel admin
 
 ## Bug: Ranking mostrando pontos errados (pontos > vendas)
 - [x] Wesley tem 8 vendas mas mostra 9 pts - corrigido: agendamentos somavam no totalPoints
@@ -1080,3 +1080,28 @@
 - [x] Atualizar zapi-service.ts para usar endpoint correto (update-webhook-received)
 - [x] Documentação da API atualizada com formato Z-API
 - [x] Testes do formato Z-API (14 testes passando)
+
+## Disparo em Massa WhatsApp via CRM
+- [ ] Criar rota tRPC para disparo em massa (filtrar leads + enviar mensagem via Z-API)
+- [ ] Suporte a templates de mensagem com variáveis ({nome}, {veiculo}, etc.)
+- [ ] Filtros: por etapa, origem, score, vendedor, data
+- [ ] Controle de rate-limit (delay entre envios para não bloquear Z-API)
+- [ ] Log de disparos (quantos enviados, falhas, etc.)
+- [ ] Interface frontend no CRM para selecionar leads e compor mensagem
+- [ ] Preview da mensagem antes de enviar
+- [ ] Feedback em tempo real do progresso do disparo
+
+## Bugs Reportados
+- [x] Estoque no CRM mostrando dados placeholder (Hyundai HB20 repetido) em vez dos veículos reais do scraper
+- [x] Corrigir seção de estoque do CRM Admin para usar inventory_vehicles (dados reais do site)
+
+## Novas Solicitações - Estoque e CRM na Home
+- [x] Corrigir CRM para usar inventory_vehicles (dados reais) em vez de crm_inventory (placeholder)
+- [x] Adicionar aba Estoque na tela principal (Home) para vendedores verem veículos
+- [x] Adicionar aba CRM/Leads na tela principal para vendedores acessarem seus leads
+- [x] Configurar acesso SDR (pré-vendas) para qualificar e distribuir leads manualmente (assignToSeller, bulkAssign, listUnassigned)
+- [x] Implementar disparo em massa WhatsApp para SDRs
+
+## Sessão Noturna - Tudo pronto para feirão ama- [x] Importar chats recentes do WhatsApp Business via Z-APIra banco de leads do CRM
+- [x] Disparo em massa WhatsApp completo (templates, filtros, preview, rate-limit, log)
+- [ ] Caça aos bugs - revisar e corrigir todos os problemas encontrados

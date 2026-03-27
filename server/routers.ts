@@ -28,6 +28,15 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
 
+// Helper: retorna sellerId logado ou null se for gerente/admin (que vê tudo)
+async function getPrivacySellerId(ctx: any): Promise<number | null> {
+  if (!ctx.user || (ctx.user as any).loginMethod !== 'seller_password') return null;
+  const sellerId = -(ctx.user.id + 1000000);
+  const seller = await db.getSellerById(sellerId);
+  if (seller && seller.sellerRole === 'gerente') return null; // gerente vê tudo
+  return sellerId;
+}
+
 export const appRouter = router({
   system: systemRouter,
   fichas: fichaRouter,
@@ -112,7 +121,7 @@ export const appRouter = router({
       );
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor' };
+      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
     }),
 
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -179,7 +188,7 @@ export const appRouter = router({
       );
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie('seller_session', token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor' };
+      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
     }),
 
     // Admin define/reseta senha de vendedor
@@ -300,11 +309,9 @@ export const appRouter = router({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
     }).optional()).query(async ({ input, ctx }) => {
-      // Vendedor logado só vê seus próprios registros
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        const loggedSellerId = -(ctx.user.id + 1000000);
-        return db.listSales(input?.competitionId, loggedSellerId);
-      }
+      // Vendedor logado só vê seus próprios registros (gerente vê tudo)
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId) return db.listSales(input?.competitionId, privacySellerId);
       return db.listSales(input?.competitionId, input?.sellerId);
     }),
     // Admin cria vendas já aprovadas
@@ -778,11 +785,9 @@ export const appRouter = router({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
     }).optional()).query(async ({ input, ctx }) => {
-      // Vendedor logado só vê seus próprios registros
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        const loggedSellerId = -(ctx.user.id + 1000000);
-        return db.listFeiRecords(input?.competitionId, loggedSellerId);
-      }
+      // Vendedor logado só vê seus próprios registros (gerente vê tudo)
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId) return db.listFeiRecords(input?.competitionId, privacySellerId);
       return db.listFeiRecords(input?.competitionId, input?.sellerId);
     }),
     register: publicProcedure.input(z.object({
@@ -889,11 +894,9 @@ export const appRouter = router({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
     }).optional()).query(async ({ input, ctx }) => {
-      // Vendedor logado só vê seus próprios registros
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        const loggedSellerId = -(ctx.user.id + 1000000);
-        return db.listConsignmentRecords(input?.competitionId, loggedSellerId);
-      }
+      // Vendedor logado só vê seus próprios registros (gerente vê tudo)
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId) return db.listConsignmentRecords(input?.competitionId, privacySellerId);
       return db.listConsignmentRecords(input?.competitionId, input?.sellerId);
     }),
     // Verificar placa antes de registrar (duplicidade 60 dias)
@@ -1023,11 +1026,9 @@ export const appRouter = router({
       competitionId: z.number().optional(),
       sellerId: z.number().optional(),
     }).optional()).query(async ({ input, ctx }) => {
-      // Vendedor logado só vê seus próprios registros
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        const loggedSellerId = -(ctx.user.id + 1000000);
-        return db.listDispatchRecords(input?.competitionId, loggedSellerId);
-      }
+      // Vendedor logado só vê seus próprios registros (gerente vê tudo)
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId) return db.listDispatchRecords(input?.competitionId, privacySellerId);
       return db.listDispatchRecords(input?.competitionId, input?.sellerId);
     }),
     register: publicProcedure.input(z.object({
@@ -1114,12 +1115,10 @@ export const appRouter = router({
     myAppointments: publicProcedure.input(z.object({
       sellerId: z.number(),
     })).query(async ({ input, ctx }) => {
-      // Se vendedor logado, só pode ver seus próprios dados
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        const loggedSellerId = -(ctx.user.id + 1000000);
-        if (input.sellerId !== loggedSellerId) {
-          throw new Error('Voc\u00ea s\u00f3 pode acessar seus pr\u00f3prios agendamentos');
-        }
+      // Se vendedor logado, só pode ver seus próprios dados (gerente vê tudo)
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar seus próprios agendamentos');
       }
       return db.listSdrRecords(undefined, input.sellerId);
     }),
@@ -1455,10 +1454,10 @@ export const appRouter = router({
       category: z.string().optional(),
     }).optional()).query(async ({ input, ctx }) => {
       const allGoals = await db.listGoals(input || {});
-      // Se o usuário é vendedor logado, filtrar: mostra metas da loja + apenas a meta individual dele
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        const loggedSellerId = -(ctx.user.id + 1000000);
-        return allGoals.filter((g: any) => g.type === 'store' || (g.type === 'individual' && g.sellerId === loggedSellerId));
+      // Se o usuário é vendedor logado, filtrar: mostra metas da loja + apenas a meta individual dele (gerente vê tudo)
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId) {
+        return allGoals.filter((g: any) => g.type === 'store' || (g.type === 'individual' && g.sellerId === privacySellerId));
       }
       // Se não é admin/gerente, esconder metas individuais (ranking público)
       if (!ctx.user || ctx.user.role !== 'admin') {

@@ -208,6 +208,54 @@ export const crmLeadsRouter = router({
   getByVehicleInterest: publicProcedure.input(z.object({ query: z.string() })).query(async ({ input }) => {
     return crmDb.getLeadsByVehicleInterest(input.query);
   }),
+
+  // SDR: Assign/transfer lead to a specific seller
+  assignToSeller: publicProcedure.input(z.object({
+    leadId: z.number(),
+    newSellerId: z.number(),
+    currentSellerId: z.number(),
+    notes: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead) throw new Error("Lead n\u00e3o encontrado");
+    await crmDb.updateLead(input.leadId, { sellerId: input.newSellerId });
+    await crmDb.createActivity({
+      leadId: input.leadId,
+      sellerId: input.currentSellerId,
+      type: "transferencia",
+      description: `Lead transferido para vendedor #${input.newSellerId}${input.notes ? ` - ${input.notes}` : ""}`,
+    });
+    return { success: true };
+  }),
+
+  // SDR: Bulk assign leads to a seller
+  bulkAssign: publicProcedure.input(z.object({
+    leadIds: z.array(z.number()),
+    newSellerId: z.number(),
+    currentSellerId: z.number(),
+  })).mutation(async ({ input }) => {
+    let assigned = 0;
+    for (const leadId of input.leadIds) {
+      try {
+        await crmDb.updateLead(leadId, { sellerId: input.newSellerId });
+        await crmDb.createActivity({
+          leadId,
+          sellerId: input.currentSellerId,
+          type: "transferencia",
+          description: `Lead distribu\u00eddo em lote para vendedor #${input.newSellerId}`,
+        });
+        assigned++;
+      } catch {}
+    }
+    return { assigned, total: input.leadIds.length };
+  }),
+
+  // Get unassigned leads (sellerId = 0) for SDR to distribute
+  listUnassigned: publicProcedure.input(z.object({
+    department: z.string().optional(),
+  }).optional()).query(async ({ input }) => {
+    return crmDb.listAllLeads({ sellerId: 0, department: input?.department });
+  }),
 });
 
 // ===== CRM PIPELINE =====
@@ -217,83 +265,110 @@ export const crmPipelineRouter = router({
   }),
 });
 
-// ===== CRM INVENTORY =====
+// ===== CRM INVENTORY (now uses inventory_vehicles - real data from scraper) =====
 export const crmInventoryRouter = router({
-  create: adminProcedure.input(z.object({
-    brand: z.string().min(1),
-    model: z.string().min(1),
-    year: z.string().optional(),
-    plate: z.string().optional(),
-    color: z.string().optional(),
-    mileage: z.number().optional(),
-    fuelType: z.string().optional(),
-    transmission: z.string().optional(),
-    price: z.number(),
-    costPrice: z.number().optional(),
-    notes: z.string().optional(),
-  })).mutation(async ({ input }) => {
-    const id = await crmDb.createInventoryItem(input);
-    // Check for matching leads
-    const searchTerm = `${input.brand} ${input.model}`;
-    const matchingLeads = await crmDb.getLeadsByVehicleInterest(searchTerm);
-    // Create alerts for matching leads
-    for (const lead of matchingLeads) {
-      await crmDb.createInventoryAlert({
-        inventoryId: id,
-        leadId: lead.id,
-        sellerId: lead.sellerId,
-      });
-    }
-    return { id, matchingLeads: matchingLeads.length };
-  }),
-
   getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
-    return crmDb.getInventoryById(input.id);
+    const { getDb } = await import("../db");
+    const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const dbConn = await getDb();
+    if (!dbConn) return null;
+    const result = await dbConn.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.id)).limit(1);
+    const v = result[0];
+    if (!v) return null;
+    // Map to CRM-compatible format
+    return {
+      id: v.id, brand: v.brand, model: v.model, year: v.year ? String(v.year) : null,
+      plate: v.plate, color: v.color, mileage: v.km, fuelType: v.fuel,
+      transmission: v.transmission, price: v.price, costPrice: 0,
+      photoUrl: v.photoUrl, photoKey: null, status: v.status,
+      notes: v.observation, version: v.version, photos: v.photos,
+      fipePrice: v.fipePrice, externalUrl: v.externalUrl,
+      createdAt: v.createdAt, updatedAt: v.updatedAt,
+    };
   }),
 
   list: publicProcedure.input(z.object({
     status: z.string().optional(),
     search: z.string().optional(),
   }).optional()).query(async ({ input }) => {
-    return crmDb.listInventory(input || {});
+    const { getDb } = await import("../db");
+    const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { eq, and, like, or, desc } = await import("drizzle-orm");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const conditions: any[] = [];
+    if (input?.status && input.status !== "all") {
+      conditions.push(eq(inventoryVehicles.status, input.status as any));
+    }
+    if (input?.search) {
+      const p = `%${input.search}%`;
+      conditions.push(or(
+        like(inventoryVehicles.brand, p),
+        like(inventoryVehicles.model, p),
+        like(inventoryVehicles.version, p),
+        like(inventoryVehicles.color, p),
+      ));
+    }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const rows = await dbConn.select().from(inventoryVehicles).where(where).orderBy(desc(inventoryVehicles.createdAt));
+    // Map to CRM-compatible format
+    return rows.map(v => ({
+      id: v.id, brand: v.brand, model: v.model, year: v.year ? String(v.year) : null,
+      plate: v.plate, color: v.color, mileage: v.km, fuelType: v.fuel,
+      transmission: v.transmission, price: v.price, costPrice: 0,
+      photoUrl: v.photoUrl, photoKey: null, status: v.status,
+      notes: v.observation, version: v.version, photos: v.photos,
+      fipePrice: v.fipePrice, externalUrl: v.externalUrl,
+      createdAt: v.createdAt, updatedAt: v.updatedAt,
+    }));
+  }),
+
+  create: adminProcedure.input(z.object({
+    brand: z.string().min(1), model: z.string().min(1),
+    year: z.string().optional(), plate: z.string().optional(),
+    color: z.string().optional(), price: z.number(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const { inventoryVehicles } = await import("../../drizzle/schema");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const result = await dbConn.insert(inventoryVehicles).values({
+      externalId: `manual-${nanoid(8)}`,
+      brand: input.brand, model: input.model,
+      year: input.year ? parseInt(input.year) : null,
+      color: input.color || null, plate: input.plate || null,
+      price: input.price, status: "available",
+      lastSyncedAt: Date.now(),
+    });
+    return { id: Number(result[0].insertId), matchingLeads: 0 };
   }),
 
   update: adminProcedure.input(z.object({
     id: z.number(),
-    brand: z.string().optional(),
-    model: z.string().optional(),
-    year: z.string().optional(),
-    plate: z.string().optional(),
-    color: z.string().optional(),
-    mileage: z.number().optional(),
-    fuelType: z.string().optional(),
-    transmission: z.string().optional(),
-    price: z.number().optional(),
-    costPrice: z.number().optional(),
-    status: z.enum(["available", "reserved", "sold", "consigned"]).optional(),
+    status: z.enum(["available", "reserved", "sold"]).optional(),
     notes: z.string().optional(),
   })).mutation(async ({ input }) => {
-    const { id, ...data } = input;
-    await crmDb.updateInventoryItem(id, data as any);
+    const { getDb } = await import("../db");
+    const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const updates: any = {};
+    if (input.status) updates.status = input.status;
+    if (input.notes !== undefined) updates.observation = input.notes;
+    await dbConn.update(inventoryVehicles).set(updates).where(eq(inventoryVehicles.id, input.id));
     return { success: true };
   }),
 
   delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
-    await crmDb.deleteInventoryItem(input.id);
+    const { getDb } = await import("../db");
+    const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    await dbConn.delete(inventoryVehicles).where(eq(inventoryVehicles.id, input.id));
     return { success: true };
-  }),
-
-  uploadPhoto: adminProcedure.input(z.object({
-    id: z.number(),
-    base64: z.string(),
-    mimeType: z.string(),
-  })).mutation(async ({ input }) => {
-    const ext = input.mimeType.split("/")[1] || "jpg";
-    const fileKey = `inventory/${input.id}-${nanoid(8)}.${ext}`;
-    const buffer = Buffer.from(input.base64, "base64");
-    const { url } = await storagePut(fileKey, buffer, input.mimeType);
-    await crmDb.updateInventoryItem(input.id, { photoUrl: url, photoKey: fileKey });
-    return { url };
   }),
 
   getAlerts: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {

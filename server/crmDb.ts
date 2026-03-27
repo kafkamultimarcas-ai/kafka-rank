@@ -102,7 +102,7 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
   const conditions: any[] = [];
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
-  if (opts?.sellerId) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
+  if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   return db.select().from(crmLeads).where(where).orderBy(desc(crmLeads.updatedAt));
 }

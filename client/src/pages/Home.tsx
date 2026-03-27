@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame } from "lucide-react";
+import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -197,6 +197,18 @@ export default function Home() {
               <Button variant="outline" size="sm" onClick={() => setLocation("/feirao")} className="gap-2 border-red-600 text-red-400 hover:bg-red-600/10">
                 <Flame className="h-4 w-4" /> Feirão
               </Button>
+              <Button variant="outline" size="sm" onClick={() => setLocation("/estoque")} className="gap-2 border-cyan-600 text-cyan-400 hover:bg-cyan-600/10">
+                <Car className="h-4 w-4" /> Estoque
+              </Button>
+              {sellerSession ? (
+                <Button variant="outline" size="sm" onClick={() => setLocation("/crm")} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
+                  <LayoutGrid className="h-4 w-4" /> Meus Leads
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
+                  <LayoutGrid className="h-4 w-4" /> Meus Leads
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => setLocation("/ficha-financiamento")} className="gap-2 border-blue-600 text-blue-400 hover:bg-blue-600/10">
                 <DollarSign className="h-4 w-4" /> Ficha Financiamento
               </Button>

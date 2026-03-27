@@ -266,16 +266,71 @@ function KpiCard({ icon: Icon, label, value, color }: { icon: any; label: string
 // ===== ALL LEADS VIEW (with department filter) =====
 function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filterDept: string | null }) {
   const [, navigate] = useLocation();
-  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false, department: filterDept || undefined });
+  const [showUnassigned, setShowUnassigned] = useState(false);
+  const [selectedLeads, setSelectedLeads] = useState<Set<number>>(new Set());
+  const [assignSellerId, setAssignSellerId] = useState("");
+  const { data: allLeads, refetch } = trpc.crmLeads.listAll.useQuery({ archived: false, department: filterDept || undefined });
+  const { data: unassignedLeads, refetch: refetchUnassigned } = trpc.crmLeads.listUnassigned.useQuery({});
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
     { query: searchQuery },
     { enabled: searchQuery.length >= 2 }
   );
+  const { data: sellers } = trpc.sellers.list.useQuery();
 
-  const leads = searchQuery.length >= 2 ? searchResults : allLeads;
+  const assignLead = trpc.crmLeads.assignToSeller.useMutation({
+    onSuccess: () => { refetch(); refetchUnassigned(); toast.success("Lead transferido!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const bulkAssign = trpc.crmLeads.bulkAssign.useMutation({
+    onSuccess: (r: any) => { refetch(); refetchUnassigned(); setSelectedLeads(new Set()); toast.success(`${r.assigned} leads distribu\u00eddos!`); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggleLead = (id: number) => {
+    const next = new Set(selectedLeads);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedLeads(next);
+  };
+
+  const handleBulkAssign = () => {
+    const sid = parseInt(assignSellerId);
+    if (!sid || selectedLeads.size === 0) return toast.error("Selecione leads e vendedor");
+    bulkAssign.mutate({ leadIds: Array.from(selectedLeads), newSellerId: sid, currentSellerId: 0 });
+  };
+
+  const leads = searchQuery.length >= 2 ? searchResults : (showUnassigned ? unassignedLeads : allLeads);
 
   return (
     <div className="space-y-2">
+      {/* SDR Controls */}
+      {(unassignedLeads?.length || 0) > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-amber-400">{unassignedLeads?.length} leads sem vendedor</span>
+            </div>
+            <Button size="sm" variant={showUnassigned ? "default" : "outline"} className="h-7 text-[10px]" onClick={() => setShowUnassigned(!showUnassigned)}>
+              {showUnassigned ? "Ver Todos" : "Ver Sem Vendedor"}
+            </Button>
+          </div>
+          {showUnassigned && selectedLeads.size > 0 && (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-amber-500/20">
+              <span className="text-[10px] text-foreground shrink-0">{selectedLeads.size} selecionados →</span>
+              <select value={assignSellerId} onChange={e => setAssignSellerId(e.target.value)}
+                className="flex-1 bg-accent/50 border border-border rounded-lg px-2 py-1 text-xs text-foreground">
+                <option value="">Escolher vendedor...</option>
+                {sellers?.map((s: any) => <option key={s.id} value={s.id}>{s.nickname || s.name}</option>)}
+              </select>
+              <Button size="sm" className="h-7 text-[10px]" disabled={!assignSellerId || bulkAssign.isPending}
+                onClick={handleBulkAssign}>
+                {bulkAssign.isPending ? "..." : "Distribuir"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-muted-foreground">{leads?.length || 0} leads</span>
       </div>
@@ -285,10 +340,15 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
           const ScoreIcon = lead.score === "hot" ? Flame : lead.score === "cold" ? Snowflake : Thermometer;
           const scoreColor = lead.score === "hot" ? "text-red-400" : lead.score === "cold" ? "text-blue-400" : "text-amber-400";
           return (
-            <div key={lead.id} onClick={() => navigate(`/crm/lead/${lead.id}`)}
-              className="p-3 rounded-xl border border-border bg-card active:scale-[0.98] transition-all">
+            <div key={lead.id} onClick={() => showUnassigned ? toggleLead(lead.id) : navigate(`/crm/lead/${lead.id}`)}
+              className={`p-3 rounded-xl border bg-card active:scale-[0.98] transition-all ${showUnassigned && selectedLeads.has(lead.id) ? "border-primary bg-primary/5" : "border-border"}`}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-bold text-foreground">{lead.name}</span>
+                <div className="flex items-center gap-2">
+                  {showUnassigned && (
+                    <input type="checkbox" checked={selectedLeads.has(lead.id)} readOnly className="rounded border-border" />
+                  )}
+                  <span className="text-sm font-bold text-foreground">{lead.name}</span>
+                </div>
                 <ScoreIcon className={`w-4 h-4 ${scoreColor}`} />
               </div>
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -760,58 +820,61 @@ function FinScanDocument() {
 
 // ===== INVENTORY VIEW =====
 function InventoryView() {
-  const [showAdd, setShowAdd] = useState(false);
-  const { data: inventory, refetch } = trpc.crmInventory.list.useQuery({});
-
-  const addVehicle = trpc.crmInventory.create.useMutation({
-    onSuccess: () => { refetch(); setShowAdd(false); toast.success("Veículo adicionado!"); },
-    onError: (e: any) => toast.error(e.message),
+  const [searchQ, setSearchQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("available");
+  const { data: inventory } = trpc.crmInventory.list.useQuery({
+    status: statusFilter || undefined,
+    search: searchQ || undefined,
   });
-
-  const [form, setForm] = useState({ brand: "", model: "", year: "", color: "", price: "", plate: "" });
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm text-muted-foreground">{inventory?.length || 0} veículos</span>
-        <Button size="sm" onClick={() => setShowAdd(!showAdd)} className="racing-gradient text-white h-8 text-xs">
-          <Car className="w-3.5 h-3.5 mr-1" /> Adicionar
-        </Button>
+        <div className="flex-1" />
+        <Input placeholder="Buscar..." value={searchQ} onChange={e => setSearchQ(e.target.value)} className="h-8 text-xs w-40" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="h-8 text-xs rounded-lg border border-border bg-card text-foreground px-2">
+          <option value="available">Disponíveis</option>
+          <option value="">Todos</option>
+          <option value="reserved">Reservados</option>
+          <option value="sold">Vendidos</option>
+        </select>
       </div>
-
-      {showAdd && (
-        <div className="p-4 rounded-xl border border-border bg-card space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Marca" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Modelo" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Ano" value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Cor" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Preço" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="h-9 text-sm" type="number" />
-            <Input placeholder="Placa" value={form.plate} onChange={e => setForm({ ...form, plate: e.target.value })} className="h-9 text-sm" />
-          </div>
-          <Button size="sm" onClick={() => {
-            if (!form.brand || !form.model || !form.year) { toast.error("Marca, modelo e ano obrigatórios"); return; }
-            addVehicle.mutate({ brand: form.brand, model: form.model, year: form.year || undefined, color: form.color || undefined, price: form.price ? parseFloat(form.price) : 0, plate: form.plate || undefined });
-          }} disabled={addVehicle.isPending} className="w-full racing-gradient text-white">
-            {addVehicle.isPending ? "Salvando..." : "Salvar Veículo"}
-          </Button>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {inventory?.map(v => (
-          <div key={v.id} className="p-3 rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-bold text-foreground">{v.brand} {v.model}</h3>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${v.status === "available" ? "bg-green-500/20 text-green-400" : v.status === "reserved" ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
-                {v.status === "available" ? "Disponível" : v.status === "reserved" ? "Reservado" : "Vendido"}
-              </span>
+          <div key={v.id} className="rounded-xl border border-border bg-card overflow-hidden">
+            {v.photoUrl && (
+              <div className="h-32 bg-accent/30 overflow-hidden">
+                <img src={v.photoUrl} alt={`${v.brand} ${v.model}`} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+            )}
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-sm font-bold text-foreground truncate">{v.brand} {v.model}</h3>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${v.status === "available" ? "bg-green-500/20 text-green-400" : v.status === "reserved" ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"}`}>
+                  {v.status === "available" ? "Disponível" : v.status === "reserved" ? "Reservado" : "Vendido"}
+                </span>
+              </div>
+              {(v as any).version && <p className="text-[10px] text-muted-foreground truncate">{(v as any).version}</p>}
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                {v.year && <span>{v.year}</span>}
+                {v.color && <><span>•</span><span>{v.color}</span></>}
+                {v.mileage != null && v.mileage > 0 && <><span>•</span><span>{Number(v.mileage).toLocaleString("pt-BR")} km</span></>}
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-sm text-primary font-bold">R$ {Number(v.price).toLocaleString("pt-BR")}</p>
+                {(v as any).fipePrice > 0 && Number(v.price) < (v as any).fipePrice && (
+                  <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Abaixo FIPE</span>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">{v.year} - {v.color || "N/A"}</p>
-            {v.plate && <p className="text-[10px] text-muted-foreground">Placa: {v.plate}</p>}
-            {v.price && <p className="text-sm text-primary font-bold mt-1">R$ {Number(v.price).toLocaleString("pt-BR")}</p>}
           </div>
         ))}
+        {inventory?.length === 0 && (
+          <div className="col-span-full text-center py-8 text-sm text-muted-foreground">Nenhum veículo encontrado</div>
+        )}
       </div>
     </div>
   );
@@ -819,17 +882,304 @@ function InventoryView() {
 
 // ===== CAMPAIGNS VIEW =====
 function CampaignsView() {
+  const [message, setMessage] = useState("");
+  const [filterScore, setFilterScore] = useState<string>("all");
+  const [filterSource, setFilterSource] = useState<string>("all");
+  const [filterDept, setFilterDept] = useState<string>("all");
+  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"compose" | "import" | "history">("compose");
+
+  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false });
+  const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
+  const { data: bulkHistory, refetch: refetchHistory } = trpc.whatsapp.bulkHistory.useQuery();
+
+  const importContacts = trpc.whatsapp.importContacts.useMutation({
+    onSuccess: (r: any) => { toast.success(r.message); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const importChats = trpc.whatsapp.importChats.useMutation({
+    onSuccess: (r: any) => { toast.success(r.message); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const sendBulk = trpc.whatsapp.sendBulk.useMutation({
+    onSuccess: (r: any) => {
+      setSendResult({ sent: r.sent, failed: r.failed });
+      setIsSending(false);
+      refetchHistory();
+      toast.success(`Disparo concluído: ${r.sent} enviados, ${r.failed} falharam`);
+    },
+    onError: (e: any) => { setIsSending(false); toast.error(e.message); },
+  });
+
+  const filteredLeads = useMemo(() => {
+    if (!allLeads) return [];
+    return allLeads.filter(l => {
+      if (!l.phone) return false;
+      if (filterScore !== "all" && l.score !== filterScore) return false;
+      if (filterSource !== "all" && l.source !== filterSource) return false;
+      if (filterDept !== "all" && l.department !== filterDept) return false;
+      return true;
+    });
+  }, [allLeads, filterScore, filterSource, filterDept]);
+
+  const uniqueSources = useMemo(() => {
+    if (!allLeads) return [];
+    return Array.from(new Set(allLeads.map(l => l.source).filter(Boolean)));
+  }, [allLeads]);
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedPhones(new Set());
+    } else {
+      setSelectedPhones(new Set(filteredLeads.map(l => l.phone!).filter(Boolean)));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const togglePhone = (phone: string) => {
+    const next = new Set(selectedPhones);
+    if (next.has(phone)) next.delete(phone); else next.add(phone);
+    setSelectedPhones(next);
+  };
+
+  const handleSend = () => {
+    if (!message.trim()) return toast.error("Digite a mensagem");
+    if (selectedPhones.size === 0) return toast.error("Selecione pelo menos 1 destinatário");
+    if (selectedPhones.size > 500) return toast.error("Máximo 500 por disparo");
+    setIsSending(true);
+    setSendResult(null);
+    sendBulk.mutate({ phones: Array.from(selectedPhones), message: message.trim() });
+  };
+
+  // Templates de mensagem para feirão
+  const templates = [
+    { name: "Feirão Geral", text: "🔥 *FEIRÃO KAFKA MULTIMARCAS* 🔥\n\nOportunidades imperdíveis em veículos seminovos!\n\n✅ Entrada facilitada\n✅ Financiamento na hora\n✅ Troca com troco\n\nVenha conferir! Estamos te esperando.\n📍 Kafka Multimarcas" },
+    { name: "Retorno Lead", text: "Olá! Tudo bem? 😊\n\nVi que você demonstrou interesse em um de nossos veículos.\n\nTemos condições especiais essa semana! Posso te ajudar a encontrar o carro ideal?\n\n🚗 Kafka Multimarcas" },
+    { name: "Promoção Especial", text: "🎉 *PROMOÇÃO ESPECIAL* 🎉\n\nSomente esta semana:\n\n💰 Desconto especial à vista\n📋 Aprovação de crédito em 30 min\n🔄 Aceitamos seu usado como entrada\n\nAgende sua visita!\n📞 Kafka Multimarcas" },
+  ];
+
   return (
-    <div className="text-center py-12">
-      <Megaphone className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-      <h3 className="text-sm font-bold text-foreground mb-1">Campanhas de Disparo</h3>
-      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-        Módulo de campanhas para feirão e disparos em massa via WhatsApp.
-        Configure a integração com WhatsApp Business API para ativar.
-      </p>
-      <Button size="sm" variant="outline" className="mt-4" onClick={() => toast.info("Configure a API do WhatsApp nas configurações para ativar campanhas")}>
-        Configurar WhatsApp API
-      </Button>
+    <div className="space-y-4">
+      {/* Z-API Status */}
+      <div className={`rounded-xl border p-3 flex items-center justify-between ${
+        zapiStatus?.connected ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"
+      }`}>
+        <div className="flex items-center gap-2">
+          <div className={`w-2.5 h-2.5 rounded-full ${zapiStatus?.connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+          <span className="text-xs font-medium text-foreground">
+            WhatsApp {zapiStatus?.connected ? "Conectado" : "Desconectado"}
+          </span>
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          {allLeads?.filter(l => l.phone).length || 0} leads com telefone
+        </span>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-accent/50 rounded-lg p-1">
+        {(["compose", "import", "history"] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+              activeTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            }`}>
+            {tab === "compose" ? "Disparo" : tab === "import" ? "Importar Leads" : "Histórico"}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "compose" && (
+        <div className="space-y-4">
+          {/* Templates */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h4 className="text-xs font-bold text-foreground mb-3">Templates Rápidos</h4>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {templates.map(t => (
+                <button key={t.name} onClick={() => setMessage(t.text)}
+                  className="shrink-0 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary hover:bg-primary/20 transition-all">
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Message Editor */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h4 className="text-xs font-bold text-foreground mb-2">Mensagem</h4>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Digite sua mensagem aqui... Use *texto* para negrito"
+              className="w-full h-32 bg-accent/50 border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">{message.length} caracteres</p>
+          </div>
+
+          {/* Filters */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h4 className="text-xs font-bold text-foreground mb-3">Filtrar Destinatários</h4>
+            <div className="grid grid-cols-3 gap-2">
+              <select value={filterScore} onChange={e => setFilterScore(e.target.value)}
+                className="bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
+                <option value="all">Todos Scores</option>
+                <option value="hot">🔥 Quente</option>
+                <option value="warm">🌡️ Morno</option>
+                <option value="cold">❄️ Frio</option>
+              </select>
+              <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+                className="bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
+                <option value="all">Todas Origens</option>
+                {uniqueSources.map(s => <option key={s} value={s!}>{s}</option>)}
+              </select>
+              <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
+                className="bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
+                <option value="all">Todos Setores</option>
+                <option value="vendas">Vendas</option>
+                <option value="pre_vendas">Pré-Vendas</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Recipients */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-bold text-foreground">
+                Destinatários ({filteredLeads.length})
+              </h4>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-primary font-medium">{selectedPhones.size} selecionados</span>
+                <button onClick={handleSelectAll}
+                  className="text-[10px] text-primary underline">
+                  {selectAll ? "Desmarcar todos" : "Selecionar todos"}
+                </button>
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto space-y-1">
+              {filteredLeads.slice(0, 200).map(l => (
+                <label key={l.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 cursor-pointer">
+                  <input type="checkbox" checked={selectedPhones.has(l.phone!)} onChange={() => togglePhone(l.phone!)}
+                    className="rounded border-border" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-foreground truncate">{l.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{l.phone}</p>
+                  </div>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                    l.score === "hot" ? "bg-red-500/20 text-red-400" :
+                    l.score === "warm" ? "bg-amber-500/20 text-amber-400" :
+                    "bg-blue-500/20 text-blue-400"
+                  }`}>{l.score === "hot" ? "Quente" : l.score === "warm" ? "Morno" : "Frio"}</span>
+                </label>
+              ))}
+              {filteredLeads.length > 200 && (
+                <p className="text-[10px] text-muted-foreground text-center py-2">
+                  Mostrando 200 de {filteredLeads.length}. Todos serão incluídos no disparo.
+                </p>
+              )}
+              {filteredLeads.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">Nenhum lead com telefone encontrado</p>
+              )}
+            </div>
+          </div>
+
+          {/* Send Result */}
+          {sendResult && (
+            <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <h4 className="text-sm font-bold text-foreground">Disparo Concluído</h4>
+              </div>
+              <div className="flex gap-4">
+                <div><p className="text-lg font-bold text-green-400">{sendResult.sent}</p><p className="text-[10px] text-muted-foreground">Enviados</p></div>
+                <div><p className="text-lg font-bold text-red-400">{sendResult.failed}</p><p className="text-[10px] text-muted-foreground">Falharam</p></div>
+              </div>
+            </div>
+          )}
+
+          {/* Send Button */}
+          <Button
+            onClick={handleSend}
+            disabled={isSending || !message.trim() || selectedPhones.size === 0 || !zapiStatus?.connected}
+            className="w-full h-12 text-sm font-bold gap-2"
+          >
+            {isSending ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enviando... (pode levar alguns minutos)</>
+            ) : (
+              <><Megaphone className="w-4 h-4" /> Disparar para {selectedPhones.size} contatos</>
+            )}
+          </Button>
+          {!zapiStatus?.connected && (
+            <p className="text-[10px] text-red-400 text-center">WhatsApp desconectado. Conecte o Z-API para disparar.</p>
+          )}
+        </div>
+      )}
+
+      {activeTab === "import" && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h4 className="text-sm font-bold text-foreground mb-2">Importar do WhatsApp Business</h4>
+            <p className="text-xs text-muted-foreground mb-4">
+              Importe contatos e conversas recentes do seu WhatsApp Business para o banco de leads do CRM.
+              Leads já existentes (mesmo telefone) não serão duplicados.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                onClick={() => importContacts.mutate()}
+                disabled={importContacts.isPending || !zapiStatus?.connected}
+                className="h-20 flex-col gap-2"
+              >
+                {importContacts.isPending ? (
+                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                ) : (
+                  <Users className="w-6 h-6 text-primary" />
+                )}
+                <span className="text-xs">Importar Contatos</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => importChats.mutate()}
+                disabled={importChats.isPending || !zapiStatus?.connected}
+                className="h-20 flex-col gap-2"
+              >
+                {importChats.isPending ? (
+                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                ) : (
+                  <MessageCircle className="w-6 h-6 text-green-400" />
+                )}
+                <span className="text-xs">Importar Chats</span>
+              </Button>
+            </div>
+            {!zapiStatus?.connected && (
+              <p className="text-[10px] text-red-400 text-center mt-3">WhatsApp desconectado. Conecte o Z-API primeiro.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === "history" && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold text-foreground">Histórico de Disparos</h4>
+          {bulkHistory && bulkHistory.length > 0 ? bulkHistory.map((h: any) => (
+            <div key={h.id} className="rounded-xl border border-border bg-card p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-muted-foreground">
+                  {h.createdAt ? new Date(h.createdAt).toLocaleString("pt-BR") : ""}
+                </span>
+                <div className="flex gap-2">
+                  <span className="text-[10px] text-green-400">{h.sent} enviados</span>
+                  {h.failed > 0 && <span className="text-[10px] text-red-400">{h.failed} falharam</span>}
+                </div>
+              </div>
+              <p className="text-xs text-foreground line-clamp-2">{h.message}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{h.totalRecipients} destinatários</p>
+            </div>
+          )) : (
+            <p className="text-xs text-muted-foreground text-center py-8">Nenhum disparo realizado ainda</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

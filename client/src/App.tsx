@@ -52,6 +52,8 @@ const RankingFeirao = lazy(() => import("./pages/RankingFeirao"));
 const FichaFinanciamento = lazy(() => import("./pages/FichaFinanciamento"));
 const MesaCredito = lazy(() => import("./pages/MesaCredito"));
 const GerentePanel = lazy(() => import("./pages/GerentePanel"));
+const Estoque = lazy(() => import("./pages/Estoque"));
+const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -120,6 +122,8 @@ function Router() {
         <Route path="/simulador-financiamento" component={SimuladorFinanciamento} />
         <Route path="/ficha-financiamento" component={FichaFinanciamento} />
         <Route path="/mesa-credito" component={MesaCredito} />
+        <Route path="/estoque" component={Estoque} />
+        <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/gerente" component={GerentePanel} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

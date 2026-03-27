@@ -231,7 +231,7 @@ export default function AdminInventory() {
                     <div className="absolute top-2 right-2">
                       <StatusBadge status={v.status} />
                     </div>
-                    {v.fipePrice && v.fipePrice > 0 && v.price && v.price < v.fipePrice && (
+                    {Number(v.fipePrice) > 0 && Number(v.price) > 0 && Number(v.price) < Number(v.fipePrice) && (
                       <div className="absolute top-2 left-2">
                         <Badge className="bg-green-600/90 text-white text-[10px]">
                           <Tag className="w-3 h-3 mr-1" />

@@ -13,6 +13,17 @@ import {
   getSellerById,
   createNotification,
 } from "../db";
+import { ENV } from "../_core/env";
+import jwt from "jsonwebtoken";
+
+// Privacy helper: returns sellerId if logged in as seller (non-gerente), null otherwise
+async function getFichaPrivacySellerId(ctx: any): Promise<number | null> {
+  if (!ctx.user || (ctx.user as any).loginMethod !== 'seller_password') return null;
+  const sellerId = -(ctx.user.id + 1000000);
+  const seller = await getSellerById(sellerId);
+  if (seller && seller.sellerRole === 'gerente') return null;
+  return sellerId;
+}
 import { storagePut } from "../storage";
 import { BANCOS_FINANCIAMENTO } from "../../drizzle/schema";
 
@@ -123,7 +134,11 @@ export const fichaRouter = router({
   list: publicProcedure.input(z.object({
     sellerId: z.number().optional(),
     status: z.string().optional(),
-  }).optional()).query(async ({ input }) => {
+  }).optional()).query(async ({ input, ctx }) => {
+    const privacySellerId = await getFichaPrivacySellerId(ctx);
+    if (privacySellerId) {
+      return listFichasFinanciamento({ ...input, sellerId: privacySellerId });
+    }
     return listFichasFinanciamento(input);
   }),
 

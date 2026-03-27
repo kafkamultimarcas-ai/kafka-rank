@@ -108,15 +108,65 @@ export async function sendLink(phone: string, url: string, title: string, descri
   }
 }
 
-/** Get all contacts */
-export async function getContacts(): Promise<any[]> {
-  try {
-    const res = await fetch(`${ZAPI_BASE()}/contacts`, { headers: headers() });
-    if (!res.ok) return [];
-    return await res.json();
-  } catch {
-    return [];
+/** Get all contacts (paginated, fetches all pages) */
+export async function getContacts(maxPages = 20): Promise<any[]> {
+  const all: any[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const res = await fetch(`${ZAPI_BASE()}/contacts?page=${page}&pageSize=100`, { headers: headers() });
+      if (!res.ok) break;
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      all.push(...data);
+      if (data.length < 100) break;
+    } catch {
+      break;
+    }
   }
+  return all;
+}
+
+/** Get all chats (paginated, fetches all pages) */
+export async function getChats(maxPages = 20): Promise<any[]> {
+  const all: any[] = [];
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const res = await fetch(`${ZAPI_BASE()}/chats?page=${page}&pageSize=100`, { headers: headers() });
+      if (!res.ok) break;
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      all.push(...data);
+      if (data.length < 100) break;
+    } catch {
+      break;
+    }
+  }
+  return all;
+}
+
+/** Send text to multiple phones with rate limiting (1 msg per 2 seconds to avoid bans) */
+export async function sendTextBulk(
+  phones: string[],
+  message: string,
+  onProgress?: (sent: number, total: number, phone: string, success: boolean) => void
+): Promise<{ sent: number; failed: number; errors: { phone: string; error: string }[] }> {
+  const result = { sent: 0, failed: 0, errors: [] as { phone: string; error: string }[] };
+  for (let i = 0; i < phones.length; i++) {
+    const phone = phones[i];
+    const res = await sendText(phone, message);
+    if (res.success) {
+      result.sent++;
+    } else {
+      result.failed++;
+      result.errors.push({ phone, error: res.error || "Unknown error" });
+    }
+    onProgress?.(i + 1, phones.length, phone, res.success);
+    // Rate limit: wait 2 seconds between messages to avoid WhatsApp bans
+    if (i < phones.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+  return result;
 }
 
 /** Get profile picture */

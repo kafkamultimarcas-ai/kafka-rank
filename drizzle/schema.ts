@@ -888,3 +888,15 @@ export const inventorySyncLogs = mysqlTable("inventory_sync_logs", {
 });
 export type InventorySyncLog = typeof inventorySyncLogs.$inferSelect;
 export type InsertInventorySyncLog = typeof inventorySyncLogs.$inferInsert;
+
+// Log de disparos em massa WhatsApp
+export const crmBulkSendLogs = mysqlTable("crm_bulk_send_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  message: text("message").notNull(),
+  totalRecipients: int("totalRecipients").notNull(),
+  sent: int("sent").default(0),
+  failed: int("failed").default(0),
+  errors: text("errors"),
+  createdAt: bigint("createdAt", { mode: "number" }),
+});
+export type CrmBulkSendLog = typeof crmBulkSendLogs.$inferSelect;

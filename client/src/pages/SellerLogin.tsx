@@ -14,10 +14,19 @@ export default function SellerLogin() {
   const [password, setPassword] = useState("");
 
   const loginMutation = trpc.sellers.login.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
-      // Redirecionar para Minha Área do vendedor
-      navigate(`/minha-area/${data.sellerId}`);
+      // Redirecionar baseado no departamento
+      const dept = data.department || 'vendas';
+      if (dept === 'pos_venda') {
+        navigate('/pos-venda');
+      } else if (dept === 'financeiro') {
+        navigate('/financeiro');
+      } else if (data.sellerRole === 'gerente') {
+        navigate('/gerente');
+      } else {
+        navigate(`/minha-area/${data.sellerId}`);
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Usuário ou senha inválidos");
