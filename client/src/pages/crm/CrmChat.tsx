@@ -211,7 +211,7 @@ function LeadList({
   filterScore: string | null;
   setFilterScore: (s: string | null) => void;
 }) {
-  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false });
+  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 10000 });
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
     { query: searchQuery },
     { enabled: searchQuery.length >= 2 }

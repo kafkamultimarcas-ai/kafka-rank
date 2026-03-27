@@ -1,0 +1,35 @@
+{
+  "query": "SELECT id, brand, model FROM crm_inventory ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, brand, model FROM crm_inventory ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "450003",
+      "brand": "Hyundai",
+      "model": "HB20"
+    },
+    {
+      "id": "450002",
+      "brand": "Hyundai",
+      "model": "HB20"
+    },
+    {
+      "id": "450001",
+      "brand": "Hyundai",
+      "model": "HB20"
+    },
+    {
+      "id": "420008",
+      "brand": "Hyundai",
+      "model": "HB20"
+    },
+    {
+      "id": "420007",
+      "brand": "Hyundai",
+      "model": "HB20"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tbrand\tmodel\n450003\tHyundai\tHB20\n450002\tHyundai\tHB20\n450001\tHyundai\tHB20\n420008\tHyundai\tHB20\n420007\tHyundai\tHB20\n",
+  "stderr": "",
+  "execution_time_ms": 58
+}

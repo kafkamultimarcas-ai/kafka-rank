@@ -722,28 +722,36 @@ export const crmChatRouter = router({
   })).mutation(async ({ input }) => {
     const lead = await crmDb.getLeadById(input.leadId);
     if (!lead || !lead.phone) throw new Error("Lead sem telefone");
-    const vehicle = await crmDb.getInventoryById(input.vehicleId);
-    if (!vehicle) throw new Error("Veículo não encontrado");
+    
+    // Query from inventory_vehicles table (same table the frontend list uses)
+    const { getDb } = await import("../db");
+    const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("Erro de conexão");
+    const rows = await dbConn.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.vehicleId)).limit(1);
+    const v = rows[0];
+    if (!v) throw new Error("Veículo não encontrado");
     
     // Build vehicle message
-    const price = vehicle.price ? `R$ ${Number(vehicle.price).toLocaleString("pt-BR")}` : "Consulte";
-    const msg = `🚗 *${vehicle.brand} ${vehicle.model}*\n` +
-      `📅 Ano: ${vehicle.year || "N/I"}\n` +
+    const price = v.price ? `R$ ${Number(v.price).toLocaleString("pt-BR")}` : "Consulte";
+    const msg = `🚗 *${v.brand} ${v.model}*\n` +
+      `📅 Ano: ${v.year || "N/I"}\n` +
       `💰 Preço: ${price}\n` +
-      `🔧 Câmbio: ${vehicle.transmission || "N/I"}\n` +
-      `⛽ Combustível: ${vehicle.fuelType || "N/I"}\n` +
-      `📏 KM: ${vehicle.mileage ? Number(vehicle.mileage).toLocaleString("pt-BR") + " km" : "N/I"}\n` +
-      (vehicle.color ? `🎨 Cor: ${vehicle.color}\n` : "") +
-      (vehicle.plate ? `🔖 Placa: ${vehicle.plate}\n` : "") +
+      `🔧 Câmbio: ${v.transmission || "N/I"}\n` +
+      `⛽ Combustível: ${v.fuel || "N/I"}\n` +
+      `📏 KM: ${v.km ? Number(v.km).toLocaleString("pt-BR") + " km" : "N/I"}\n` +
+      (v.color ? `🎨 Cor: ${v.color}\n` : "") +
+      (v.plate ? `🔖 Placa: ${v.plate}\n` : "") +
       `\n_Kafka Multimarcas_`;
     
     // Send text first
     await zapi.sendText(lead.phone, msg);
     
     // Send first image if available
-    if (vehicle.photoUrl) {
+    if (v.photoUrl) {
       try {
-        await zapi.sendImage(lead.phone, vehicle.photoUrl, `${vehicle.brand} ${vehicle.model}`);
+        await zapi.sendImage(lead.phone, v.photoUrl, `${v.brand} ${v.model}`);
       } catch {}
     }
     
@@ -752,8 +760,8 @@ export const crmChatRouter = router({
       messageType: "text", content: msg, mediaUrl: null,
       senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
     });
-    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now(), vehicleInterest: `${vehicle.brand} ${vehicle.model}` });
-    return { success: true, vehicleName: `${vehicle.brand} ${vehicle.model}` };
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now(), vehicleInterest: `${v.brand} ${v.model}` });
+    return { success: true, vehicleName: `${v.brand} ${v.model}` };
   }),
 
   // Upload media file (base64) and return S3 URL

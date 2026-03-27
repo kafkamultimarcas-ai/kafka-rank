@@ -595,10 +595,10 @@ export default function CrmCommandCenter() {
 
   // SDRs see ALL leads via listForSDR, sellers see their own
   const { data: sellerLeads, refetch: refetchSellerLeads } = trpc.crmLeads.listBySeller.useQuery(
-    { sellerId, archived: false }, { enabled: sellerId > 0 && !isSDR }
+    { sellerId, archived: false }, { enabled: sellerId > 0 && !isSDR, refetchInterval: 10000 }
   );
   const { data: sdrLeads, refetch: refetchSDR } = trpc.crmLeads.listForSDR.useQuery(
-    { archived: false }, { enabled: isSDR }
+    { archived: false }, { enabled: isSDR, refetchInterval: 10000 }
   );
   const leads = isSDR ? sdrLeads : sellerLeads;
   const refetchLeads = isSDR ? refetchSDR : refetchSellerLeads;

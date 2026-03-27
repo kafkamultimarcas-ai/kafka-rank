@@ -1,0 +1,18 @@
+{
+  "query": "SELECT 'crm_inventory' as tbl, COUNT(*) as cnt FROM crm_inventory UNION ALL SELECT 'inventory_vehicles', COUNT(*) FROM inventory_vehicles;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT 'crm_inventory' as tbl, COUNT(*) as cnt FROM crm_inventory UNION ALL SELECT 'inventory_vehicles', COUNT(*) FROM inventory_vehicles;",
+  "rows": [
+    {
+      "tbl": "crm_inventory",
+      "cnt": "62"
+    },
+    {
+      "tbl": "inventory_vehicles",
+      "cnt": "110"
+    }
+  ],
+  "messages": [],
+  "stdout": "tbl\tcnt\ncrm_inventory\t62\ninventory_vehicles\t110\n",
+  "stderr": "",
+  "execution_time_ms": 108
+}

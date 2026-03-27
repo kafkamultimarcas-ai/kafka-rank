@@ -1207,3 +1207,7 @@
 - [x] Botão de gravar áudio no chat (segurar para gravar, soltar para enviar)
 - [x] Envio do áudio gravado via Z-API como mensagem de voz para o cliente
 - [x] Feedback visual durante gravação (ícone pulsando, tempo de gravação)
+
+## Bugs Reportados - 27/03/2026
+- [x] Leads não atualizam automaticamente - precisa dar refresh na tela para ver novos leads
+- [x] Erro "Veículo não encontrado" ao clicar para enviar veículo do estoque no chat
