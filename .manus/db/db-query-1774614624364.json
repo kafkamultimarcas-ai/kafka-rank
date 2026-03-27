@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `crm_messages` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `leadId` int NOT NULL,\n  `phone` varchar(20) NOT NULL,\n  `direction` enum('inbound','outbound') NOT NULL,\n  `messageType` varchar(20) NOT NULL DEFAULT 'text',\n  `content` text,\n  `mediaUrl` text,\n  `senderName` varchar(255),\n  `sentBy` int,\n  `zapiMessageId` varchar(255),\n  `timestamp` bigint NOT NULL,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `crm_messages_id` PRIMARY KEY(`id`),\n  INDEX `idx_crm_messages_leadId` (`leadId`),\n  INDEX `idx_crm_messages_phone` (`phone`),\n  INDEX `idx_crm_messages_timestamp` (`timestamp`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute CREATE TABLE IF NOT EXISTS `crm_messages` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `leadId` int NOT NULL,\n  `phone` varchar(20) NOT NULL,\n  `direction` enum('inbound','outbound') NOT NULL,\n  `messageType` varchar(20) NOT NULL DEFAULT 'text',\n  `content` text,\n  `mediaUrl` text,\n  `senderName` varchar(255),\n  `sentBy` int,\n  `zapiMessageId` varchar(255),\n  `timestamp` bigint NOT NULL,\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `crm_messages_id` PRIMARY KEY(`id`),\n  INDEX `idx_crm_messages_leadId` (`leadId`),\n  INDEX `idx_crm_messages_phone` (`phone`),\n  INDEX `idx_crm_messages_timestamp` (`timestamp`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 163
+}

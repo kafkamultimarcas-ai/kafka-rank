@@ -9,6 +9,7 @@ import {
   crmInventoryAlerts, InsertCrmInventoryAlert,
   crmIntegrations, InsertCrmIntegration,
   crmCampaigns, InsertCrmCampaign,
+  crmMessages, InsertCrmMessage,
   sellers,
 } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -402,4 +403,141 @@ export async function getMarketingStats(startDate?: number, endDate?: number) {
   const conversionRate = totalLeads > 0 ? (totalConverted / totalLeads) * 100 : 0;
 
   return { bySource, byDepartment, conversionRate, totalLeads, totalConverted };
+}
+
+// ===== MESSAGES =====
+
+export async function createMessage(data: InsertCrmMessage) {
+  const db = await getDb();
+  if (!db) return 0;
+  const [result] = await db.insert(crmMessages).values(data).$returningId();
+  return result.id;
+}
+
+export async function listMessagesByLead(leadId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crmMessages).where(eq(crmMessages.leadId, leadId)).orderBy(asc(crmMessages.timestamp)).limit(limit);
+}
+
+export async function listMessagesByPhone(phone: string, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crmMessages).where(eq(crmMessages.phone, phone)).orderBy(asc(crmMessages.timestamp)).limit(limit);
+}
+
+export async function getLastMessageByLead(leadId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(crmMessages).where(eq(crmMessages.leadId, leadId)).orderBy(desc(crmMessages.timestamp)).limit(1);
+  return rows[0] || null;
+}
+
+// ===== PERFORMANCE & ALERTS =====
+
+/** Get leads that haven't been responded to within a time threshold */
+export async function getUnrespondedLeads(thresholdMinutes: number, sellerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const cutoff = Date.now() - thresholdMinutes * 60 * 1000;
+  const conditions = [
+    eq(crmLeads.archived, false),
+    lte(crmLeads.createdAt, new Date(cutoff)),
+  ];
+  if (sellerId !== undefined) {
+    conditions.push(eq(crmLeads.sellerId, sellerId));
+  }
+  const leads = await db.select().from(crmLeads).where(and(...conditions));
+  // Filter: leads that have NO outbound message after their creation
+  const result = [];
+  for (const lead of leads) {
+    const outbound = await db.select({ id: crmMessages.id }).from(crmMessages)
+      .where(and(eq(crmMessages.leadId, lead.id), eq(crmMessages.direction, "outbound")))
+      .limit(1);
+    if (outbound.length === 0) {
+      result.push(lead);
+    }
+  }
+  return result;
+}
+
+/** Get average response time for a seller (in minutes) */
+export async function getSellerResponseStats(sellerId: number) {
+  const db = await getDb();
+  if (!db) return { avgResponseMinutes: 0, totalLeads: 0, respondedLeads: 0, conversionRate: 0 };
+  
+  const sellerLeads = await db.select().from(crmLeads).where(eq(crmLeads.sellerId, sellerId));
+  let totalResponseTime = 0;
+  let respondedCount = 0;
+  let convertedCount = 0;
+  
+  for (const lead of sellerLeads) {
+    if (lead.convertedToSale) convertedCount++;
+    // Find first inbound and first outbound message
+    const firstInbound = await db.select().from(crmMessages)
+      .where(and(eq(crmMessages.leadId, lead.id), eq(crmMessages.direction, "inbound")))
+      .orderBy(asc(crmMessages.timestamp)).limit(1);
+    if (firstInbound.length === 0) continue;
+    
+    const firstOutbound = await db.select().from(crmMessages)
+      .where(and(
+        eq(crmMessages.leadId, lead.id),
+        eq(crmMessages.direction, "outbound"),
+        gte(crmMessages.timestamp, firstInbound[0].timestamp)
+      ))
+      .orderBy(asc(crmMessages.timestamp)).limit(1);
+    if (firstOutbound.length > 0) {
+      const diff = (firstOutbound[0].timestamp - firstInbound[0].timestamp) / 60000; // minutes
+      totalResponseTime += diff;
+      respondedCount++;
+    }
+  }
+  
+  return {
+    avgResponseMinutes: respondedCount > 0 ? Math.round(totalResponseTime / respondedCount) : 0,
+    totalLeads: sellerLeads.length,
+    respondedLeads: respondedCount,
+    conversionRate: sellerLeads.length > 0 ? Math.round((convertedCount / sellerLeads.length) * 100) : 0,
+  };
+}
+
+/** Auto-reassign lead to next available seller in same department */
+export async function autoReassignLead(leadId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const lead = await getLeadById(leadId);
+  if (!lead || lead.sellerId === 0) return null;
+  
+  // Get all active sellers in same department, excluding current
+  const allSellers = await db.select().from(sellers)
+    .where(and(
+      eq(sellers.department, lead.department),
+      eq(sellers.active, true),
+      ne(sellers.id, lead.sellerId)
+    ));
+  if (allSellers.length === 0) return null;
+  
+  // Pick seller with fewest active leads (round-robin by load)
+  let minLeads = Infinity;
+  let targetSeller = allSellers[0];
+  for (const s of allSellers) {
+    const count = await db.select({ cnt: sql<number>`COUNT(*)` }).from(crmLeads)
+      .where(and(eq(crmLeads.sellerId, s.id), eq(crmLeads.archived, false)));
+    const cnt = Number(count[0]?.cnt || 0);
+    if (cnt < minLeads) {
+      minLeads = cnt;
+      targetSeller = s;
+    }
+  }
+  
+  const oldSellerId = lead.sellerId;
+  await updateLead(leadId, { sellerId: targetSeller.id });
+  await createActivity({
+    leadId,
+    sellerId: targetSeller.id,
+    type: "observacao",
+    description: `Lead transferido automaticamente (vendedor anterior não respondeu em 10 min). De vendedor #${oldSellerId} para ${targetSeller.name}.`,
+  });
+  
+  return { newSellerId: targetSeller.id, newSellerName: targetSeller.name, oldSellerId };
 }

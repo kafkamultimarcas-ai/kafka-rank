@@ -15,7 +15,7 @@ import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
-import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter } from "./routers/crmRouter";
+import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
@@ -1678,6 +1678,8 @@ export const appRouter = router({
   crmCampaigns: crmCampaignsRouter,
   crmMarketing: crmMarketingRouter,
   crmVoice: crmVoiceRouter,
+  crmChat: crmChatRouter,
+  crmPerformance: crmPerformanceRouter,
   crmTemplates: crmTemplatesRouter,
   crmFollowUp: crmFollowUpRouter,
   crmDistribution: crmDistributionRouter,

@@ -1,0 +1,53 @@
+{
+  "query": "SELECT id, name, phone, source, notes, createdAt FROM crm_leads ORDER BY createdAt DESC LIMIT 6;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, phone, source, notes, createdAt FROM crm_leads ORDER BY createdAt DESC LIMIT 6;",
+  "rows": [
+    {
+      "id": "481159",
+      "name": "Kafka multimarcas",
+      "phone": "554797170253",
+      "source": "whatsapp",
+      "notes": "Primeira mensagem: Sim",
+      "createdAt": "2026-03-27 12:46:56"
+    },
+    {
+      "id": "481158",
+      "name": "Lothar Gode",
+      "phone": "554788113644",
+      "source": "whatsapp",
+      "notes": "Primeira mensagem: Bom dia",
+      "createdAt": "2026-03-27 12:41:47"
+    },
+    {
+      "id": "481156",
+      "name": "Denise 🥰",
+      "phone": "554199941172",
+      "source": "whatsapp",
+      "notes": "Primeira mensagem: Nao",
+      "createdAt": "2026-03-27 12:35:50"
+    },
+    {
+      "id": "481155",
+      "name": "Cauly Müller",
+      "phone": "554799624285",
+      "source": "whatsapp",
+      "notes": "Primeira mensagem: Olá! Tenho interesse e queria mais informações, por favor.",
+      "createdAt": "2026-03-27 12:33:34"
+    },
+    {
+      "id": "481154",
+      "name": "Weiber",
+      "phone": "554799118936",
+      "source": "whatsapp",
+      "notes": "NULL",
+      "createdAt": "2026-03-27 12:31:20"
+    }
+  ],
+  "messages": [
+    "481157\tPr. Sandro Lima IMCVN\t554789113237\twhatsapp\tPrimeira mensagem: Esse carro ",
+    "Quanto é a entrada??\t2026-03-27 12:39:05"
+  ],
+  "stdout": "id\tname\tphone\tsource\tnotes\tcreatedAt\n481159\tKafka multimarcas\t554797170253\twhatsapp\tPrimeira mensagem: Sim\t2026-03-27 12:46:56\n481158\tLothar Gode\t554788113644\twhatsapp\tPrimeira mensagem: Bom dia\t2026-03-27 12:41:47\n481157\tPr. Sandro Lima IMCVN\t554789113237\twhatsapp\tPrimeira mensagem: Esse carro \nQuanto é a entrada??\t2026-03-27 12:39:05\n481156\tDenise 🥰\t554199941172\twhatsapp\tPrimeira mensagem: Nao\t2026-03-27 12:35:50\n481155\tCauly Müller\t554799624285\twhatsapp\tPrimeira mensagem: Olá! Tenho interesse e queria mais informações, por favor.\t2026-03-27 12:33:34\n481154\tWeiber\t554799118936\twhatsapp\tNULL\t2026-03-27 12:31:20\n",
+  "stderr": "",
+  "execution_time_ms": 84
+}

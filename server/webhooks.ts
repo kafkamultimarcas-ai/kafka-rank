@@ -731,16 +731,22 @@ export function registerWebhookRoutes(app: Express) {
         const phone = rawPhone.replace(/\D/g, "");
         const existingLeads = await crmDb.searchLeads(phone);
         if (existingLeads.length > 0) {
-          const desc = mediaUrl
-            ? `[${messageType.toUpperCase()}] ${messageText || "Mídia recebida"} (${mediaUrl})`
-            : `Mensagem recebida: ${(messageText || "").substring(0, 200)}`;
-          await crmDb.createActivity({
+          // Save message to crm_messages
+          await crmDb.createMessage({
             leadId: existingLeads[0].id,
-            sellerId: existingLeads[0].sellerId,
-            type: "whatsapp",
-            description: desc.substring(0, 500),
+            phone,
+            direction: "inbound",
+            messageType,
+            content: messageText || null,
+            mediaUrl: mediaUrl || null,
+            senderName: senderName || null,
+            sentBy: null,
+            zapiMessageId: body.messageId || body.ids?.messageId || null,
+            timestamp: typeof timestamp === 'string' ? new Date(timestamp).getTime() : (timestamp > 9999999999 ? timestamp : timestamp * 1000),
           });
-          res.json({ success: true, action: "activity_added", leadId: existingLeads[0].id });
+          // Update lastContactDate on lead
+          await crmDb.updateLead(existingLeads[0].id, { lastContactDate: Date.now() });
+          res.json({ success: true, action: "message_saved", leadId: existingLeads[0].id });
           return;
         }
 
@@ -760,11 +766,18 @@ export function registerWebhookRoutes(app: Express) {
           sellerId: 0,
           notes: messageText ? `Primeira mensagem: ${messageText.substring(0, 500)}` : null,
         });
-        await crmDb.createActivity({
+        // Save the first message
+        await crmDb.createMessage({
           leadId,
-          sellerId: 0,
-          type: "whatsapp",
-          description: `Lead criado via WhatsApp. Msg: ${(messageText || "").substring(0, 200)}`,
+          phone,
+          direction: "inbound",
+          messageType,
+          content: messageText || null,
+          mediaUrl: mediaUrl || null,
+          senderName: senderName || null,
+          sentBy: null,
+          zapiMessageId: body.messageId || body.ids?.messageId || null,
+          timestamp: typeof timestamp === 'string' ? new Date(timestamp).getTime() : (timestamp > 9999999999 ? timestamp : timestamp * 1000),
         });
         // SDR Flow: leads from WhatsApp stay unassigned (sellerId=0) for SDRs to qualify and distribute
         res.json({ success: true, action: "lead_created", leadId, assignedTo: null, note: "Lead aguardando distribui\u00e7\u00e3o pela pr\u00e9-vendas (SDR)" });

@@ -1123,3 +1123,24 @@
 ## Bug: Mensagens WhatsApp não viram leads no CRM
 - [x] Investigar webhook Z-API - mensagens chegam no WhatsApp mas não aparecem no CRM
 - [x] Corrigir processamento do webhook para criar leads automaticamente (removido validateToken do webhook WhatsApp + reconfigurado URL na Z-API)
+
+## Reformulação Completa do CRM
+- [x] Chat WhatsApp integrado no CRM (enviar/receber mensagens, histórico de conversas)
+- [x] Armazenar mensagens WhatsApp no banco de dados (tabela crm_messages)
+- [x] Backend: procedures para listar mensagens e enviar mensagem via Z-API
+- [x] Redesenhar CRM Admin: layout simples, visual, sem abas desnecessárias
+- [x] Tela principal: lista de leads à esquerda + chat à direita (estilo WhatsApp Web)
+- [x] Redesenhar tela vendedor (Meus Leads): mesma UX simplificada com chat
+- [x] Remover abas/menus confusos, manter só o essencial
+
+## CRM Overhaul Completo
+- [x] Tabela crm_messages para histórico de chat WhatsApp
+- [x] Webhook salva mensagens recebidas na tabela crm_messages
+- [x] Procedures: listar mensagens por lead, enviar mensagem via Z-API
+- [x] Alerta 5 min SDR: lead novo sem resposta gera alerta visual
+- [x] Alerta 10 min vendedor: sem resposta auto-transfere para outro vendedor + aviso
+- [x] Análise de atendimento por IA: nota visual por conversa (tempo, qualidade, conversão)
+- [x] Dashboard performance vendedor: tempo médio resposta, taxa conversão, nota IA
+- [x] Frontend: CRM estilo WhatsApp Web (lista leads esquerda + chat direita)
+- [x] Frontend: alertas visuais de tempo de resposta
+- [x] Frontend: painel de notas IA e performance

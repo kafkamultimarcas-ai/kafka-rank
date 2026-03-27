@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
@@ -34,12 +35,12 @@ const DEPT_COLORS: Record<string, string> = {
   financeiro: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
 };
 
-type AdminView = "dashboard" | "leads" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial";
+type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial";
 
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
   const { admin, isLoading, isAuthenticated, logout } = useAdminAuth();
-  const [activeView, setActiveView] = useState<AdminView>("leads");
+  const [activeView, setActiveView] = useState<AdminView>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -58,6 +59,8 @@ export default function CrmAdminDashboard() {
   }
 
   const menuItems = [
+    { key: "chat" as const, icon: MessageCircle, label: "Chat / Leads" },
+    { key: "performance" as const, icon: TrendingUp, label: "Performance" },
     { key: "dashboard" as const, icon: LayoutDashboard, label: "Painel Geral" },
     { key: "leads" as const, icon: Users, label: "Todos os Leads" },
     { key: "pipeline" as const, icon: SlidersHorizontal, label: "Pipeline" },
@@ -163,6 +166,8 @@ export default function CrmAdminDashboard() {
           </div>
         </div>
 
+        {activeView === "chat" && <CrmChat isSdr={true} />}
+        {activeView === "performance" && <PerformanceDashboard />}
         <div className="p-4">
           {activeView === "dashboard" && <DashboardView onSelectDept={handleDeptClick} />}
           {activeView === "leads" && <AllLeadsView searchQuery={searchQuery} filterDept={selectedDept} />}

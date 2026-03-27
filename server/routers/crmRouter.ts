@@ -569,3 +569,194 @@ export const crmVoiceRouter = router({
     return { text: result.text };
   }),
 });
+
+
+// ===== CHAT MESSAGES =====
+import * as zapi from "../zapi-service";
+import { invokeLLM } from "../_core/llm";
+
+export const crmChatRouter = router({
+  // Get messages for a lead
+  getMessages: publicProcedure.input(z.object({
+    leadId: z.number(),
+  })).query(async ({ input }) => {
+    return crmDb.listMessagesByLead(input.leadId, 200);
+  }),
+
+  // Send a message via Z-API and save to DB
+  sendMessage: publicProcedure.input(z.object({
+    leadId: z.number(),
+    message: z.string(),
+    sellerId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead || !lead.phone) throw new Error("Lead sem telefone");
+    
+    const result = await zapi.sendText(lead.phone, input.message);
+    if (!result.success) throw new Error(result.error || "Erro ao enviar mensagem");
+    
+    await crmDb.createMessage({
+      leadId: input.leadId,
+      phone: lead.phone,
+      direction: "outbound",
+      messageType: "text",
+      content: input.message,
+      mediaUrl: null,
+      senderName: null,
+      sentBy: input.sellerId || null,
+      zapiMessageId: result.messageId || null,
+      timestamp: Date.now(),
+    });
+    
+    // Update lastContactDate
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now() });
+    
+    return { success: true, messageId: result.messageId };
+  }),
+
+  // Send image via Z-API
+  sendImage: publicProcedure.input(z.object({
+    leadId: z.number(),
+    imageUrl: z.string(),
+    caption: z.string().optional(),
+    sellerId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead || !lead.phone) throw new Error("Lead sem telefone");
+    
+    const result = await zapi.sendImage(lead.phone, input.imageUrl, input.caption);
+    if (!result.success) throw new Error("Erro ao enviar imagem");
+    
+    await crmDb.createMessage({
+      leadId: input.leadId,
+      phone: lead.phone,
+      direction: "outbound",
+      messageType: "image",
+      content: input.caption || null,
+      mediaUrl: input.imageUrl,
+      senderName: null,
+      sentBy: input.sellerId || null,
+      zapiMessageId: null,
+      timestamp: Date.now(),
+    });
+    
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now() });
+    return { success: true };
+  }),
+});
+
+// ===== PERFORMANCE & ALERTS =====
+export const crmPerformanceRouter = router({
+  // Get unresponded leads (for alerts)
+  getAlerts: publicProcedure.input(z.object({
+    thresholdMinutes: z.number().default(5),
+    sellerId: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    const threshold = input?.thresholdMinutes || 5;
+    const unresponded = await crmDb.getUnrespondedLeads(threshold, input?.sellerId);
+    return unresponded.map(lead => ({
+      ...lead,
+      minutesSinceCreation: Math.round((Date.now() - new Date(lead.createdAt).getTime()) / 60000),
+      alertLevel: Math.round((Date.now() - new Date(lead.createdAt).getTime()) / 60000) > 10 ? "critical" : "warning",
+    }));
+  }),
+
+  // Get seller performance stats
+  getSellerStats: publicProcedure.input(z.object({
+    sellerId: z.number(),
+  })).query(async ({ input }) => {
+    return crmDb.getSellerResponseStats(input.sellerId);
+  }),
+
+  // Get all sellers performance for dashboard
+  getAllSellersStats: adminProcedure.query(async () => {
+    const allSellers = await db.listSellers(true);
+    const stats = [];
+    for (const seller of allSellers) {
+      if (seller.department === "vendas" || seller.department === "pre_vendas") {
+        const s = await crmDb.getSellerResponseStats(seller.id);
+        stats.push({
+          sellerId: seller.id,
+          sellerName: seller.name,
+          department: seller.department,
+          ...s,
+        });
+      }
+    }
+    return stats;
+  }),
+
+  // Auto-reassign unresponsive seller's lead
+  autoReassign: adminProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    const result = await crmDb.autoReassignLead(input.leadId);
+    if (!result) throw new Error("Não foi possível reatribuir o lead");
+    return result;
+  }),
+
+  // Run check for all unresponsive leads and auto-reassign (called by cron or admin)
+  runAutoReassignCheck: adminProcedure.mutation(async () => {
+    // Get leads assigned to sellers (sellerId > 0) that haven't been responded in 10 min
+    const unresponded = await crmDb.getUnrespondedLeads(10);
+    const reassigned = [];
+    for (const lead of unresponded) {
+      if (lead.sellerId > 0) {
+        const result = await crmDb.autoReassignLead(lead.id);
+        if (result) {
+          reassigned.push({ leadId: lead.id, leadName: lead.name, ...result });
+        }
+      }
+    }
+    return { checked: unresponded.length, reassigned };
+  }),
+
+  // AI analysis of a conversation
+  analyzeConversation: publicProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    const messages = await crmDb.listMessagesByLead(input.leadId, 200);
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead) throw new Error("Lead não encontrado");
+    if (messages.length < 2) return { score: 0, analysis: "Conversa insuficiente para análise (mínimo 2 mensagens).", tips: [] };
+
+    const chatLog = messages.map(m => 
+      `[${m.direction === "inbound" ? "CLIENTE" : "VENDEDOR"}] ${m.content || `[${m.messageType}]`}`
+    ).join("\n");
+
+    const response = await invokeLLM({
+      messages: [
+        { role: "system", content: `Você é um analista de vendas de veículos. Analise a conversa entre vendedor e cliente e dê uma nota de 0 a 10 para o atendimento. Considere: tempo de resposta, cordialidade, técnica de vendas, quebra de objeções, uso de gatilhos mentais, proatividade. Responda em JSON.` },
+        { role: "user", content: `Lead: ${lead.name}\nVeículo de interesse: ${lead.vehicleInterest || "não informado"}\nConversa:\n${chatLog}` },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "conversation_analysis",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              score: { type: "number", description: "Nota de 0 a 10" },
+              analysis: { type: "string", description: "Resumo da análise em 2-3 frases" },
+              strengths: { type: "array", items: { type: "string" }, description: "Pontos fortes do atendimento" },
+              improvements: { type: "array", items: { type: "string" }, description: "Pontos a melhorar" },
+              tips: { type: "array", items: { type: "string" }, description: "Dicas práticas para melhorar" },
+            },
+            required: ["score", "analysis", "strengths", "improvements", "tips"],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const rawContent = response.choices?.[0]?.message?.content as unknown;
+    if (!rawContent) return { score: 0, analysis: "Erro na análise", strengths: [], improvements: [], tips: [] };
+    const text = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { score: 0, analysis: text, strengths: [], improvements: [], tips: [] };
+    }
+  }),
+});

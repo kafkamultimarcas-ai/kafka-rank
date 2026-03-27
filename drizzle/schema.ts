@@ -900,3 +900,21 @@ export const crmBulkSendLogs = mysqlTable("crm_bulk_send_logs", {
   createdAt: bigint("createdAt", { mode: "number" }),
 });
 export type CrmBulkSendLog = typeof crmBulkSendLogs.$inferSelect;
+
+// CRM Messages - histórico de mensagens WhatsApp por lead
+export const crmMessages = mysqlTable("crm_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(), // referência ao lead
+  phone: varchar("phone", { length: 20 }).notNull(), // telefone do contato
+  direction: mysqlEnum("direction", ["inbound", "outbound"]).notNull(), // recebida ou enviada
+  messageType: varchar("messageType", { length: 20 }).default("text").notNull(), // text, image, audio, video, document
+  content: text("content"), // texto da mensagem
+  mediaUrl: text("mediaUrl"), // URL da mídia (imagem, áudio, vídeo, documento)
+  senderName: varchar("senderName", { length: 255 }), // nome do remetente
+  sentBy: int("sentBy"), // sellerId de quem enviou (null se recebida)
+  zapiMessageId: varchar("zapiMessageId", { length: 255 }), // ID da mensagem na Z-API
+  timestamp: bigint("timestamp", { mode: "number" }).notNull(), // timestamp da mensagem
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CrmMessage = typeof crmMessages.$inferSelect;
+export type InsertCrmMessage = typeof crmMessages.$inferInsert;

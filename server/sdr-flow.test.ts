@@ -79,6 +79,6 @@ describe("SDR Lead Distribution Flow", () => {
       path.join(__dirname, "../client/src/pages/crm/CrmAdminDashboard.tsx"),
       "utf-8"
     );
-    expect(dashboardSource).toContain('useState<AdminView>("leads")');
+    expect(dashboardSource).toContain('useState<AdminView>("chat")');
   });
 });
