@@ -39,7 +39,7 @@ type AdminView = "dashboard" | "leads" | "pipeline" | "inventory" | "campaigns" 
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
   const { admin, isLoading, isAuthenticated, logout } = useAdminAuth();
-  const [activeView, setActiveView] = useState<AdminView>("dashboard");
+  const [activeView, setActiveView] = useState<AdminView>("leads");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -264,11 +264,53 @@ function KpiCard({ icon: Icon, label, value, color }: { icon: any; label: string
 }
 
 // ===== ALL LEADS VIEW (with department filter) =====
+const SOURCE_LABELS_CRM: Record<string, { label: string; color: string; bg: string }> = {
+  manual: { label: "Manual", color: "text-gray-400", bg: "bg-gray-500/20" },
+  whatsapp: { label: "WhatsApp", color: "text-green-400", bg: "bg-green-500/20" },
+  olx: { label: "OLX", color: "text-orange-400", bg: "bg-orange-500/20" },
+  webmotors: { label: "Webmotors", color: "text-blue-400", bg: "bg-blue-500/20" },
+  socarrao: { label: "SoCarrao", color: "text-yellow-400", bg: "bg-yellow-500/20" },
+  facebook: { label: "Facebook", color: "text-blue-500", bg: "bg-blue-600/20" },
+  instagram: { label: "Instagram", color: "text-pink-400", bg: "bg-pink-500/20" },
+  instagram_ads: { label: "Insta Ads", color: "text-pink-400", bg: "bg-pink-500/20" },
+  facebook_ads: { label: "FB Ads", color: "text-blue-500", bg: "bg-blue-600/20" },
+  google_ads: { label: "Google Ads", color: "text-emerald-400", bg: "bg-emerald-500/20" },
+  trafego_pago: { label: "Trafego", color: "text-purple-400", bg: "bg-purple-500/20" },
+  indicacao: { label: "Indicacao", color: "text-cyan-400", bg: "bg-cyan-500/20" },
+  loja: { label: "Loja", color: "text-amber-400", bg: "bg-amber-500/20" },
+  landing_page: { label: "Landing", color: "text-indigo-400", bg: "bg-indigo-500/20" },
+  icarros: { label: "iCarros", color: "text-red-400", bg: "bg-red-500/20" },
+  manychat: { label: "ManyChat", color: "text-blue-300", bg: "bg-blue-400/20" },
+  webhook: { label: "API", color: "text-violet-400", bg: "bg-violet-500/20" },
+};
+
+const SCORE_CFG_CRM = {
+  hot: { label: "Quente", icon: Flame, color: "text-red-400", bg: "bg-red-500/10 border-red-500/30", badge: "bg-red-500/20 text-red-400 border-red-500/30" },
+  warm: { label: "Morno", icon: Thermometer, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/30", badge: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  cold: { label: "Frio", icon: Snowflake, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/30", badge: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+};
+
+function crmTimeAgo(ts: number | string | Date | null | undefined) {
+  if (!ts) return "Sem contato";
+  const numTs = typeof ts === "number" ? ts : (ts instanceof Date ? ts.getTime() : new Date(ts).getTime());
+  const diff = Date.now() - numTs;
+  const mins = Math.floor(diff / (1000 * 60));
+  if (mins < 1) return "Agora";
+  if (mins < 60) return `${mins}min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h atr\u00e1s`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Ontem";
+  return `${days}d atr\u00e1s`;
+}
+
 function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filterDept: string | null }) {
   const [, navigate] = useLocation();
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<Set<number>>(new Set());
   const [assignSellerId, setAssignSellerId] = useState("");
+  const [filterScore, setFilterScore] = useState<string | null>(null);
+  const [filterSource, setFilterSource] = useState<string | null>(null);
   const { data: allLeads, refetch } = trpc.crmLeads.listAll.useQuery({ archived: false, department: filterDept || undefined });
   const { data: unassignedLeads, refetch: refetchUnassigned } = trpc.crmLeads.listUnassigned.useQuery({});
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
@@ -298,31 +340,111 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
     bulkAssign.mutate({ leadIds: Array.from(selectedLeads), newSellerId: sid, currentSellerId: 0 });
   };
 
-  const leads = searchQuery.length >= 2 ? searchResults : (showUnassigned ? unassignedLeads : allLeads);
+  // Stats
+  const stats = useMemo(() => {
+    if (!allLeads) return { total: 0, hot: 0, warm: 0, cold: 0 };
+    return {
+      total: allLeads.length,
+      hot: allLeads.filter(l => l.score === "hot").length,
+      warm: allLeads.filter(l => l.score === "warm").length,
+      cold: allLeads.filter(l => l.score === "cold").length,
+    };
+  }, [allLeads]);
+
+  // Available sources
+  const availableSources = useMemo(() => {
+    if (!allLeads) return [];
+    return Array.from(new Set(allLeads.map(l => l.source).filter(Boolean)));
+  }, [allLeads]);
+
+  // Seller name map
+  const sellerMap = useMemo(() => {
+    if (!sellers) return {} as Record<number, string>;
+    return sellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
+  }, [sellers]);
+
+  // Apply filters
+  const baseLeads = searchQuery.length >= 2 ? searchResults : (showUnassigned ? unassignedLeads : allLeads);
+  const leads = useMemo(() => {
+    if (!baseLeads) return [];
+    return baseLeads.filter(l => {
+      if (filterScore && l.score !== filterScore) return false;
+      if (filterSource && l.source !== filterSource) return false;
+      return true;
+    });
+  }, [baseLeads, filterScore, filterSource]);
 
   return (
-    <div className="space-y-2">
-      {/* SDR Controls */}
+    <div className="space-y-3">
+      {/* Quick stats bar */}
+      <div className="grid grid-cols-4 gap-2">
+        <button onClick={() => setFilterScore(null)}
+          className={`rounded-xl border p-2.5 text-center transition-all ${!filterScore ? "bg-primary/10 border-primary/40" : "bg-card border-border"}`}>
+          <p className="text-lg font-bold text-foreground">{stats.total}</p>
+          <p className="text-[10px] text-muted-foreground">Total</p>
+        </button>
+        <button onClick={() => setFilterScore(filterScore === "hot" ? null : "hot")}
+          className={`rounded-xl border p-2.5 text-center transition-all ${filterScore === "hot" ? "bg-red-500/15 border-red-500/40" : "bg-card border-border"}`}>
+          <p className="text-lg font-bold text-red-400 flex items-center justify-center gap-1"><Flame className="w-4 h-4" />{stats.hot}</p>
+          <p className="text-[10px] text-red-400/70">Quentes</p>
+        </button>
+        <button onClick={() => setFilterScore(filterScore === "warm" ? null : "warm")}
+          className={`rounded-xl border p-2.5 text-center transition-all ${filterScore === "warm" ? "bg-amber-500/15 border-amber-500/40" : "bg-card border-border"}`}>
+          <p className="text-lg font-bold text-amber-400 flex items-center justify-center gap-1"><Thermometer className="w-4 h-4" />{stats.warm}</p>
+          <p className="text-[10px] text-amber-400/70">Mornos</p>
+        </button>
+        <button onClick={() => setFilterScore(filterScore === "cold" ? null : "cold")}
+          className={`rounded-xl border p-2.5 text-center transition-all ${filterScore === "cold" ? "bg-blue-500/15 border-blue-500/40" : "bg-card border-border"}`}>
+          <p className="text-lg font-bold text-blue-400 flex items-center justify-center gap-1"><Snowflake className="w-4 h-4" />{stats.cold}</p>
+          <p className="text-[10px] text-blue-400/70">Frios</p>
+        </button>
+      </div>
+
+      {/* Source filter chips */}
+      {availableSources.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+          <button onClick={() => setFilterSource(null)}
+            className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all ${!filterSource ? "bg-primary/20 border-primary/40 text-primary" : "bg-accent/50 border-border text-muted-foreground"}`}>
+            Todas origens
+          </button>
+          {availableSources.map(src => {
+            const cfg = SOURCE_LABELS_CRM[src] || { label: src, color: "text-gray-400", bg: "bg-gray-500/20" };
+            return (
+              <button key={src} onClick={() => setFilterSource(filterSource === src ? null : src)}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all ${filterSource === src ? `${cfg.bg} ${cfg.color} border-current` : "bg-accent/50 border-border text-muted-foreground"}`}>
+                {cfg.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* SDR Controls - Leads sem vendedor */}
       {(unassignedLeads?.length || 0) > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 mb-3">
+        <div className="rounded-xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-orange-500/5 p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-bold text-amber-400">{unassignedLeads?.length} leads sem vendedor</span>
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Users className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <span className="text-sm font-bold text-amber-400">{unassignedLeads?.length} leads novos</span>
+                <p className="text-[10px] text-amber-400/70">Aguardando distribui\u00e7\u00e3o para vendedores</p>
+              </div>
             </div>
-            <Button size="sm" variant={showUnassigned ? "default" : "outline"} className="h-7 text-[10px]" onClick={() => setShowUnassigned(!showUnassigned)}>
-              {showUnassigned ? "Ver Todos" : "Ver Sem Vendedor"}
+            <Button size="sm" variant={showUnassigned ? "default" : "outline"} className="h-8 text-xs" onClick={() => setShowUnassigned(!showUnassigned)}>
+              {showUnassigned ? "Ver Todos" : "Ver Novos"}
             </Button>
           </div>
           {showUnassigned && selectedLeads.size > 0 && (
             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-amber-500/20">
-              <span className="text-[10px] text-foreground shrink-0">{selectedLeads.size} selecionados →</span>
+              <span className="text-xs text-foreground shrink-0 font-medium">{selectedLeads.size} selecionados</span>
               <select value={assignSellerId} onChange={e => setAssignSellerId(e.target.value)}
-                className="flex-1 bg-accent/50 border border-border rounded-lg px-2 py-1 text-xs text-foreground">
+                className="flex-1 bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
                 <option value="">Escolher vendedor...</option>
                 {sellers?.map((s: any) => <option key={s.id} value={s.id}>{s.nickname || s.name}</option>)}
               </select>
-              <Button size="sm" className="h-7 text-[10px]" disabled={!assignSellerId || bulkAssign.isPending}
+              <Button size="sm" className="h-8 text-xs font-bold" disabled={!assignSellerId || bulkAssign.isPending}
                 onClick={handleBulkAssign}>
                 {bulkAssign.isPending ? "..." : "Distribuir"}
               </Button>
@@ -331,47 +453,83 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-muted-foreground">{leads?.length || 0} leads</span>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{leads?.length || 0} leads{filterScore ? ` (${SCORE_CFG_CRM[filterScore as keyof typeof SCORE_CFG_CRM]?.label})` : ""}{filterSource ? ` - ${SOURCE_LABELS_CRM[filterSource]?.label || filterSource}` : ""}</span>
       </div>
-      {/* Mobile-friendly cards */}
+
+      {/* Lead cards - mobile optimized */}
       <div className="space-y-2 sm:hidden">
         {leads?.map(lead => {
-          const ScoreIcon = lead.score === "hot" ? Flame : lead.score === "cold" ? Snowflake : Thermometer;
-          const scoreColor = lead.score === "hot" ? "text-red-400" : lead.score === "cold" ? "text-blue-400" : "text-amber-400";
+          const scoreCfg = SCORE_CFG_CRM[lead.score as keyof typeof SCORE_CFG_CRM] || SCORE_CFG_CRM.warm;
+          const ScoreIcon = scoreCfg.icon;
+          const sourceCfg = SOURCE_LABELS_CRM[lead.source] || { label: lead.source || "--", color: "text-gray-400", bg: "bg-gray-500/20" };
+          const sellerName = lead.sellerId && lead.sellerId > 0 ? sellerMap[lead.sellerId] : null;
           return (
-            <div key={lead.id} onClick={() => showUnassigned ? toggleLead(lead.id) : navigate(`/crm/lead/${lead.id}`)}
-              className={`p-3 rounded-xl border bg-card active:scale-[0.98] transition-all ${showUnassigned && selectedLeads.has(lead.id) ? "border-primary bg-primary/5" : "border-border"}`}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
+            <div key={lead.id}
+              className={`rounded-xl border p-3 transition-all active:scale-[0.98] ${showUnassigned && selectedLeads.has(lead.id) ? "border-primary bg-primary/5" : scoreCfg.bg}`}>
+              {/* Header: name + score + checkbox */}
+              <div className="flex items-start justify-between mb-1.5" onClick={() => showUnassigned ? toggleLead(lead.id) : navigate(`/crm/lead/${lead.id}`)}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   {showUnassigned && (
-                    <input type="checkbox" checked={selectedLeads.has(lead.id)} readOnly className="rounded border-border" />
+                    <input type="checkbox" checked={selectedLeads.has(lead.id)} readOnly className="rounded border-border mt-0.5" />
                   )}
-                  <span className="text-sm font-bold text-foreground">{lead.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-foreground truncate">{lead.name}</span>
+                      <ScoreIcon className={`w-4 h-4 shrink-0 ${scoreCfg.color}`} />
+                    </div>
+                    {lead.vehicleInterest && (
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">\ud83d\ude97 {lead.vehicleInterest}</p>
+                    )}
+                  </div>
                 </div>
-                <ScoreIcon className={`w-4 h-4 ${scoreColor}`} />
               </div>
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                <span className="px-1.5 py-0.5 rounded bg-accent border border-border">{DEPT_LABELS[lead.department] || lead.department}</span>
-                <span>{lead.stage}</span>
+
+              {/* Info badges */}
+              <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${sourceCfg.bg} ${sourceCfg.color}`}>{sourceCfg.label}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-medium">{lead.stage}</span>
+                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                  <Clock className="w-2.5 h-2.5" /> {crmTimeAgo(lead.lastContactDate || lead.createdAt)}
+                </span>
+                {sellerName && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-medium">\ud83d\udc64 {sellerName}</span>
+                )}
+                {!sellerName && lead.sellerId === 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-medium">Sem vendedor</span>
+                )}
               </div>
+
+              {/* Action buttons - bigger and more visible */}
               {lead.phone && (
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                   <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
-                    onClick={e => e.stopPropagation()}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-500/20 text-green-400 text-[10px] font-medium">
-                    <MessageCircle className="w-3 h-3" /> WhatsApp
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 transition-all active:scale-95">
+                    <MessageCircle className="w-4 h-4 text-green-400" />
+                    <span className="text-xs font-bold text-green-400">WhatsApp</span>
                   </a>
-                  <a href={`tel:${lead.phone}`} onClick={e => e.stopPropagation()}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/20 text-blue-400 text-[10px] font-medium">
-                    <Phone className="w-3 h-3" /> Ligar
+                  <a href={`tel:${lead.phone}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 transition-all active:scale-95">
+                    <Phone className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold text-blue-400">Ligar</span>
                   </a>
+                  <button onClick={() => navigate(`/crm/lead/${lead.id}`)}
+                    className="flex items-center justify-center p-2.5 rounded-xl bg-accent/50 hover:bg-accent border border-border transition-all active:scale-95">
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                  </button>
                 </div>
+              )}
+              {!lead.phone && (
+                <button onClick={() => navigate(`/crm/lead/${lead.id}`)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-accent/50 hover:bg-accent border border-border transition-all text-xs text-muted-foreground">
+                  <Eye className="w-3.5 h-3.5" /> Ver detalhes
+                </button>
               )}
             </div>
           );
         })}
       </div>
+
       {/* Desktop table */}
       <div className="overflow-x-auto hidden sm:block">
         <table className="w-full text-sm">
@@ -379,36 +537,43 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
             <tr className="border-b border-border text-left">
               <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Nome</th>
               <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Telefone</th>
-              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Setor</th>
+              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Origem</th>
               <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Etapa</th>
               <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Score</th>
-              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Veículo</th>
-              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Ações</th>
+              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Vendedor</th>
+              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">Tempo</th>
+              <th className="py-2 px-2 text-xs text-muted-foreground font-medium">A\u00e7\u00f5es</th>
             </tr>
           </thead>
           <tbody>
             {leads?.map(lead => {
-              const ScoreIcon = lead.score === "hot" ? Flame : lead.score === "cold" ? Snowflake : Thermometer;
-              const scoreColor = lead.score === "hot" ? "text-red-400" : lead.score === "cold" ? "text-blue-400" : "text-amber-400";
+              const scoreCfg = SCORE_CFG_CRM[lead.score as keyof typeof SCORE_CFG_CRM] || SCORE_CFG_CRM.warm;
+              const ScoreIcon = scoreCfg.icon;
+              const sourceCfg = SOURCE_LABELS_CRM[lead.source] || { label: lead.source || "--", color: "text-gray-400", bg: "bg-gray-500/20" };
+              const sellerName = lead.sellerId && lead.sellerId > 0 ? sellerMap[lead.sellerId] : null;
               return (
                 <tr key={lead.id} onClick={() => navigate(`/crm/lead/${lead.id}`)}
                   className="border-b border-border/50 hover:bg-accent/50 cursor-pointer transition-all">
-                  <td className="py-2 px-2 text-foreground font-medium">{lead.name}</td>
+                  <td className="py-2 px-2">
+                    <span className="text-foreground font-medium">{lead.name}</span>
+                    {lead.vehicleInterest && <span className="block text-[10px] text-muted-foreground">{lead.vehicleInterest}</span>}
+                  </td>
                   <td className="py-2 px-2 text-muted-foreground">{lead.phone || "--"}</td>
                   <td className="py-2 px-2">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent border border-border">{DEPT_LABELS[lead.department] || lead.department}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${sourceCfg.bg} ${sourceCfg.color}`}>{sourceCfg.label}</span>
                   </td>
-                  <td className="py-2 px-2 text-muted-foreground">{lead.stage}</td>
-                  <td className="py-2 px-2"><ScoreIcon className={`w-4 h-4 ${scoreColor}`} /></td>
-                  <td className="py-2 px-2 text-muted-foreground truncate max-w-[150px]">{lead.vehicleInterest || "--"}</td>
+                  <td className="py-2 px-2"><span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">{lead.stage}</span></td>
+                  <td className="py-2 px-2"><ScoreIcon className={`w-4 h-4 ${scoreCfg.color}`} /></td>
+                  <td className="py-2 px-2 text-muted-foreground text-xs">{sellerName || <span className="text-amber-400">Sem vendedor</span>}</td>
+                  <td className="py-2 px-2 text-muted-foreground text-xs">{crmTimeAgo(lead.lastContactDate || lead.createdAt)}</td>
                   <td className="py-2 px-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       {lead.phone && (
                         <>
                           <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
-                            className="p-1 rounded hover:bg-green-500/20 text-green-400"><MessageCircle className="w-3.5 h-3.5" /></a>
+                            className="p-1.5 rounded-lg hover:bg-green-500/20 text-green-400"><MessageCircle className="w-4 h-4" /></a>
                           <a href={`tel:${lead.phone}`}
-                            className="p-1 rounded hover:bg-blue-500/20 text-blue-400"><Phone className="w-3.5 h-3.5" /></a>
+                            className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-400"><Phone className="w-4 h-4" /></a>
                         </>
                       )}
                     </div>
@@ -419,10 +584,12 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
           </tbody>
         </table>
       </div>
+
       {(!leads || leads.length === 0) && (
         <div className="text-center py-12">
-          <Users className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Nenhum lead encontrado</p>
+          <Users className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">Nenhum lead encontrado</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Leads do WhatsApp aparecer\u00e3o aqui automaticamente</p>
         </div>
       )}
     </div>

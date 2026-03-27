@@ -4,6 +4,7 @@ import { sdk } from "./sdk";
 import jwt from "jsonwebtoken";
 import { ENV } from "./env";
 import { getManagerById, getSellerById } from "../db";
+import { getAdminById } from "../crmDb";
 import { parse as parseCookieHeader } from "cookie";
 
 export type TrpcContext = {
@@ -52,7 +53,36 @@ export async function createContext(
     }
   }
 
-  // 3) If no OAuth user and no manager, try seller JWT cookie
+  // 3) If no OAuth/manager, try CRM admin Bearer token (for SDR/admin CRM access)
+  if (!user) {
+    try {
+      const authHeader = opts.req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.slice(7);
+        const payload = jwt.verify(token, ENV.cookieSecret) as { adminId: number; role: string; type: string };
+        if (payload.type === "admin_auth" && payload.adminId) {
+          const admin = await getAdminById(payload.adminId);
+          if (admin && admin.active) {
+            user = {
+              id: -(2000000 + admin.id),
+              openId: `crm_admin_${admin.id}`,
+              name: admin.name,
+              email: null,
+              loginMethod: "crm_admin",
+              role: "admin",
+              createdAt: admin.createdAt,
+              updatedAt: admin.updatedAt,
+              lastSignedIn: new Date(),
+            } as User;
+          }
+        }
+      }
+    } catch (error) {
+      // Invalid or expired CRM admin token, ignore
+    }
+  }
+
+  // 4) If no OAuth user, no manager, no CRM admin, try seller JWT cookie
   if (!user) {
     try {
       const cookies2 = parseCookieHeader(opts.req.headers.cookie || "");

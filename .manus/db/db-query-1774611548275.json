@@ -1,0 +1,36 @@
+{
+  "query": "SELECT * FROM crm_leads LIMIT 5; SELECT * FROM crm_activities LIMIT 5",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT * FROM crm_leads LIMIT 5; SELECT * FROM crm_activities LIMIT 5",
+  "rows": [
+    {
+      "id": "480004",
+      "sellerId": "999",
+      "department": "vendas",
+      "name": "Cliente Teste CRM",
+      "phone": "11999998888",
+      "email": "NULL",
+      "vehicleInterest": "HB20 2023",
+      "vehiclePlate": "NULL",
+      "source": "manual",
+      "stage": "Em Negociacao",
+      "score": "hot",
+      "notes": "NULL",
+      "nextContactDate": "NULL",
+      "lastContactDate": "1774611485459",
+      "archived": "0",
+      "convertedToSale": "0",
+      "saleValue": "0",
+      "createdAt": "2026-03-27 11:38:05",
+      "updatedAt": "2026-03-27 11:38:05"
+    }
+  ],
+  "messages": [
+    "id\tleadId\tsellerId\ttype\tdescription\tmetadata\tcreatedAt",
+    "510010\t480004\t999\tcriacao\tLead criado: Cliente Teste CRM\tNULL\t2026-03-27 11:38:05",
+    "510011\t480004\t999\tmudanca_etapa\tEtapa: Novo Lead → Em Negociacao\t{\"from\":\"Novo Lead\",\"to\":\"Em Negociacao\"}\t2026-03-27 11:38:05",
+    "510012\t480004\t999\tligacao\tLigacao de teste\tNULL\t2026-03-27 11:38:05"
+  ],
+  "stdout": "id\tsellerId\tdepartment\tname\tphone\temail\tvehicleInterest\tvehiclePlate\tsource\tstage\tscore\tnotes\tnextContactDate\tlastContactDate\tarchived\tconvertedToSale\tsaleValue\tcreatedAt\tupdatedAt\n480004\t999\tvendas\tCliente Teste CRM\t11999998888\tNULL\tHB20 2023\tNULL\tmanual\tEm Negociacao\thot\tNULL\tNULL\t1774611485459\t0\t0\t0\t2026-03-27 11:38:05\t2026-03-27 11:38:05\nid\tleadId\tsellerId\ttype\tdescription\tmetadata\tcreatedAt\n510010\t480004\t999\tcriacao\tLead criado: Cliente Teste CRM\tNULL\t2026-03-27 11:38:05\n510011\t480004\t999\tmudanca_etapa\tEtapa: Novo Lead → Em Negociacao\t{\"from\":\"Novo Lead\",\"to\":\"Em Negociacao\"}\t2026-03-27 11:38:05\n510012\t480004\t999\tligacao\tLigacao de teste\tNULL\t2026-03-27 11:38:05\n",
+  "stderr": "",
+  "execution_time_ms": 70
+}

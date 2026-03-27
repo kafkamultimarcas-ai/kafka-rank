@@ -1105,3 +1105,17 @@
 ## Sessão Noturna - Tudo pronto para feirão ama- [x] Importar chats recentes do WhatsApp Business via Z-APIra banco de leads do CRM
 - [x] Disparo em massa WhatsApp completo (templates, filtros, preview, rate-limit, log)
 - [ ] Caça aos bugs - revisar e corrigir todos os problemas encontrados
+
+## Limpeza e UX do CRM Admin
+- [x] Limpar leads de teste ("Cliente Teste CRM") do banco de dados (64 removidos)
+- [x] CRM Admin abre direto na tela "Todos os Leads" como primeira página (em vez do Painel Geral)
+
+## Sistema CRM 100% Produção - Visual e Funcional
+- [x] Limpar todos os resíduos de teste do banco (leads, atividades, logs)
+- [x] Verificar API Z-API conectada e webhook recebendo leads reais
+- [x] Melhorar visual dos cards de leads no CRM Admin (nome, telefone, origem, tempo, ações rápidas)
+- [x] Melhorar tela "Meus Leads" do vendedor - visual intuitivo com ações rápidas (WhatsApp, ligar, agendar)
+- [x] Cards com cores por status/temperatura do lead (quente=vermelho, morno=amarelo, frio=azul)
+- [x] Mostrar tempo desde último contato no card do lead
+- [x] Botões de ação rápida maiores e mais visíveis (WhatsApp, Ligar)
+- [x] Filtros visuais por status/temperatura na listagem de leads

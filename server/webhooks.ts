@@ -766,8 +766,8 @@ export function registerWebhookRoutes(app: Express) {
           type: "whatsapp",
           description: `Lead criado via WhatsApp. Msg: ${(messageText || "").substring(0, 200)}`,
         });
-        const assignment = await autoAssignLead(leadId, dept);
-        res.json({ success: true, action: "lead_created", leadId, assignedTo: assignment.sellerName });
+        // SDR Flow: leads from WhatsApp stay unassigned (sellerId=0) for SDRs to qualify and distribute
+        res.json({ success: true, action: "lead_created", leadId, assignedTo: null, note: "Lead aguardando distribui\u00e7\u00e3o pela pr\u00e9-vendas (SDR)" });
         return;
       }
 

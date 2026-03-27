@@ -1,0 +1,25 @@
+{
+  "query": "SELECT COUNT(*) as total_test FROM crm_leads WHERE name LIKE '%Teste%' OR name LIKE '%teste%' OR name LIKE '%Test%'; SELECT COUNT(*) as total_all FROM crm_leads; SELECT COUNT(*) as total_real FROM crm_leads WHERE name NOT LIKE '%Teste%' AND name NOT LIKE '%teste%' AND name NOT LIKE '%Test%'",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT COUNT(*) as total_test FROM crm_leads WHERE name LIKE '%Teste%' OR name LIKE '%teste%' OR name LIKE '%Test%'; SELECT COUNT(*) as total_all FROM crm_leads; SELECT COUNT(*) as total_real FROM crm_leads WHERE name NOT LIKE '%Teste%' AND name NOT LIKE '%teste%' AND name NOT LIKE '%Test%'",
+  "rows": [
+    {
+      "total_test": "64"
+    },
+    {
+      "total_test": "total_all"
+    },
+    {
+      "total_test": "64"
+    },
+    {
+      "total_test": "total_real"
+    },
+    {
+      "total_test": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_test\n64\ntotal_all\n64\ntotal_real\n0\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}
