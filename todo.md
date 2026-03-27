@@ -1202,3 +1202,8 @@
 - [x] Vídeos mostrando como "Arquivo" - renderizar como player de vídeo inline
 - [x] Adicionar envio de fotos, vídeos e arquivos pelo chat (botões de anexo)
 - [x] Aba de Estoque no chat - enviar ficha de veículo cadastrado direto pro cliente
+
+## Gravação e Envio de Áudio no Chat
+- [x] Botão de gravar áudio no chat (segurar para gravar, soltar para enviar)
+- [x] Envio do áudio gravado via Z-API como mensagem de voz para o cliente
+- [x] Feedback visual durante gravação (ícone pulsando, tempo de gravação)

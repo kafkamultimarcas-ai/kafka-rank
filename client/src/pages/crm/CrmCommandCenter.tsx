@@ -10,7 +10,7 @@ import {
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
-  Volume2, Download, Play, File
+  Volume2, Download, Play, File, Square
 } from "lucide-react";
 
 // Detect media type from URL extension as fallback
@@ -183,6 +183,11 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
   const [showVehicles, setShowVehicles] = useState(false);
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -276,6 +281,68 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
     else handleFileUpload(file, "document");
     e.target.value = "";
   };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (blob.size < 1000) { toast.error("Áudio muito curto"); return; }
+        setUploading(true);
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve((reader.result as string).split(",")[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          const ext = mimeType.includes("webm") ? "webm" : "ogg";
+          const { url } = await uploadMedia.mutateAsync({ base64, filename: `audio-${Date.now()}.${ext}`, mimeType });
+          sendAudioMut.mutate({ leadId, audioUrl: url, sellerId });
+        } catch (err: any) {
+          toast.error("Erro ao enviar áudio: " + err.message);
+        } finally {
+          setUploading(false);
+        }
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      recordingTimerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch {
+      toast.error("Permissão de microfone negada");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = () => {
+        mediaRecorderRef.current?.stream?.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    audioChunksRef.current = [];
+  };
+
+  const formatRecTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -456,24 +523,52 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
             <input ref={imageInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleImageSelect} />
             <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={handleFileSelect} />
 
-            <div className="flex-1 relative">
-              <textarea
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Digite uma mensagem..."
-                rows={1}
-                className="w-full bg-accent/30 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ minHeight: 42, maxHeight: 120 }}
-              />
-            </div>
-            <Button
-              onClick={handleSend}
-              disabled={!message.trim() || sendMsg.isPending}
-              className="h-[42px] w-[42px] rounded-full bg-green-600 hover:bg-green-700 p-0 shrink-0"
-            >
-              <Send className="w-5 h-5 text-white" />
-            </Button>
+            {isRecording ? (
+              <div className="flex-1 flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-sm font-mono text-red-400">{formatRecTime(recordingTime)}</span>
+                <span className="text-xs text-muted-foreground">Gravando...</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <button onClick={cancelRecording} className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-red-500/20 text-red-400" title="Cancelar">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button onClick={stopRecording} className="h-8 w-8 rounded-full flex items-center justify-center bg-green-600 hover:bg-green-700 text-white" title="Enviar áudio">
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 relative">
+                  <textarea
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Digite uma mensagem..."
+                    rows={1}
+                    className="w-full bg-accent/30 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    style={{ minHeight: 42, maxHeight: 120 }}
+                  />
+                </div>
+                {message.trim() ? (
+                  <Button
+                    onClick={handleSend}
+                    disabled={sendMsg.isPending}
+                    className="h-[42px] w-[42px] rounded-full bg-green-600 hover:bg-green-700 p-0 shrink-0"
+                  >
+                    <Send className="w-5 h-5 text-white" />
+                  </Button>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    className="h-[42px] w-[42px] rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center shrink-0 transition-all"
+                    title="Gravar áudio"
+                  >
+                    <Mic className="w-5 h-5 text-white" />
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
