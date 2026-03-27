@@ -1,0 +1,40 @@
+CREATE TABLE `inventory_sync_logs` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`sync_status` enum('success','error') NOT NULL,
+	`vehiclesFound` int DEFAULT 0,
+	`vehiclesAdded` int DEFAULT 0,
+	`vehiclesUpdated` int DEFAULT 0,
+	`vehiclesRemoved` int DEFAULT 0,
+	`errorMessage` text,
+	`duration` int DEFAULT 0,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `inventory_sync_logs_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `inventory_vehicles` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`externalId` varchar(20) NOT NULL,
+	`brand` varchar(100) NOT NULL,
+	`model` varchar(100) NOT NULL,
+	`version` varchar(255),
+	`motor` varchar(50),
+	`year` int,
+	`color` varchar(50),
+	`fuel` varchar(50),
+	`km` int DEFAULT 0,
+	`price` int DEFAULT 0,
+	`photoUrl` text,
+	`photos` text,
+	`optionals` text,
+	`externalUrl` text,
+	`slug` varchar(500),
+	`bodyType` varchar(50),
+	`transmission` varchar(50),
+	`inventory_status` enum('available','reserved','sold') NOT NULL DEFAULT 'available',
+	`soldBySellerId` int,
+	`soldAt` bigint,
+	`lastSyncedAt` bigint,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `inventory_vehicles_id` PRIMARY KEY(`id`)
+);

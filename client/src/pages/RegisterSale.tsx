@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone } from "lucide-react";
+import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X } from "lucide-react";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -19,6 +19,99 @@ const CATEGORIES: { value: Category; label: string; icon: typeof Car; color: str
   { value: "despachante", label: "Despachante", icon: FileText, color: "text-purple-400" },
   { value: "pre_vendas", label: "SDR", icon: Headphones, color: "text-orange-400" },
 ];
+
+/** Vehicle Selector - search from inventory or type manually */
+function VehicleSelector({ value, onChange }: { value: string; onChange: (model: string, price?: number) => void }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const { data: vehicles } = trpc.inventory.list.useQuery(
+    { status: "available", search: searchTerm || undefined },
+    { enabled: searchTerm.length >= 2 }
+  );
+
+  const handleSelect = (v: any) => {
+    const label = `${v.brand} ${v.model} ${v.version || ""} ${v.year || ""}`.trim();
+    onChange(label, v.price || undefined);
+    setSearchTerm("");
+    setShowDropdown(false);
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <Input
+            value={value || searchTerm}
+            onChange={e => {
+              if (value) {
+                onChange("");
+                setSearchTerm(e.target.value);
+              } else {
+                setSearchTerm(e.target.value);
+              }
+              setShowDropdown(true);
+            }}
+            onFocus={() => searchTerm.length >= 2 && setShowDropdown(true)}
+            placeholder="Buscar no estoque ou digitar..."
+            className="pl-10 bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+          />
+        </div>
+        {value && (
+          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white" onClick={() => { onChange(""); setSearchTerm(""); }}>
+            <X className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+      {showDropdown && vehicles && vehicles.length > 0 && !value && (
+        <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+          {vehicles.slice(0, 8).map((v: any) => (
+            <button
+              key={v.id}
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-gray-700 flex items-center gap-3 border-b border-gray-700/50 last:border-0"
+              onClick={() => handleSelect(v)}
+            >
+              {v.photoUrl ? (
+                <img src={v.photoUrl} alt="" className="w-12 h-8 object-cover rounded" />
+              ) : (
+                <div className="w-12 h-8 bg-gray-700 rounded flex items-center justify-center">
+                  <Car className="w-4 h-4 text-gray-500" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium truncate">{v.brand} {v.model}</p>
+                <p className="text-gray-400 text-[10px] truncate">{v.version} | {v.year} | {v.color}</p>
+              </div>
+              <span className="text-emerald-400 text-sm font-semibold whitespace-nowrap">
+                {v.price ? `R$ ${v.price.toLocaleString("pt-BR")}` : ""}
+              </span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left hover:bg-gray-700 text-gray-400 text-sm"
+            onClick={() => { onChange(searchTerm); setShowDropdown(false); }}
+          >
+            Usar texto: "{searchTerm}"
+          </button>
+        </div>
+      )}
+      {showDropdown && searchTerm.length >= 2 && vehicles && vehicles.length === 0 && !value && (
+        <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-3">
+          <p className="text-gray-400 text-sm">Nenhum veículo encontrado no estoque</p>
+          <button
+            type="button"
+            className="text-blue-400 text-sm mt-1 hover:underline"
+            onClick={() => { onChange(searchTerm); setShowDropdown(false); }}
+          >
+            Usar "{searchTerm}" mesmo assim
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RegisterSale() {
   const [category, setCategory] = useState<Category>("vendas");
@@ -561,10 +654,15 @@ export default function RegisterSale() {
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">
                     <Car className="w-4 h-4 text-blue-400" />
-                    Modelo do veículo *
+                    Veículo *
                   </Label>
-                  <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
-                    placeholder="Ex: Honda Civic 2024" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  <VehicleSelector
+                    value={vehicleModel}
+                    onChange={(model, price) => {
+                      setVehicleModel(model);
+                      if (price && !value) setValue(String(price));
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">

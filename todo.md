@@ -1060,3 +1060,23 @@
 - [x] Corrigir valores existentes no banco de dados - F&I e despachante divididos por 100
 - [x] Garantir que formulário de registro de venda trate valores corretamente - removido * 100
 - [x] Padronizar: todos os valores agora são em reais inteiros, sem centavos
+
+## Integração de Estoque (kafkamultimarcas.com.br)
+- [x] Criar tabela inventory_vehicles no banco de dados
+- [x] Criar scraper backend para puxar veículos do site (API LitoralCar com session cookie)
+- [x] Implementar job de sincronização automática (a cada 15 min) - 93 veículos sincronizados
+- [x] Criar rotas tRPC para listar/buscar estoque (list, getById, brands, stats, sync, reserve, markSold)
+- [x] Criar página de Estoque no frontend (AdminInventory com grid, filtros, galeria, ações)
+- [x] Integrar seleção de veículo do estoque no registro de vendas (VehicleSelector com busca + foto + preço auto)
+- [x] Mostrar estoque no painel do gerente (sidebar Estoque no DashboardLayout)
+- [x] Testes para scraper e rotas (14 testes, 385 total passando)
+
+## Webhook WhatsApp Z-API
+- [x] Atualizar webhook /api/webhooks/whatsapp para aceitar formato Z-API nativo (phone, text.message, momment, fromMe, isGroup)
+- [x] Suporte a mídia: imagem, áudio, vídeo, documento (URLs Z-API)
+- [x] Ignorar mensagens enviadas por nós (fromMe) e de grupos (isGroup)
+- [x] Usar senderName do Z-API para nome do lead
+- [x] Rota configureWebhook no whatsappRouter para configurar URL do webhook no Z-API
+- [x] Atualizar zapi-service.ts para usar endpoint correto (update-webhook-received)
+- [x] Documentação da API atualizada com formato Z-API
+- [x] Testes do formato Z-API (14 testes passando)

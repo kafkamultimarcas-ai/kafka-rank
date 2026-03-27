@@ -836,3 +836,55 @@ export const fichaBancos = mysqlTable("ficha_bancos", {
 });
 export type FichaBanco = typeof fichaBancos.$inferSelect;
 export type InsertFichaBanco = typeof fichaBancos.$inferInsert;
+
+// Estoque de veículos (sincronizado do site kafkamultimarcas.com.br)
+export const inventoryVehicles = mysqlTable("inventory_vehicles", {
+  id: int("id").autoincrement().primaryKey(),
+  externalId: varchar("externalId", { length: 20 }).notNull(), // ID do veículo no site externo
+  brand: varchar("brand", { length: 100 }).notNull(), // Volkswagen, Ford, etc.
+  model: varchar("model", { length: 100 }).notNull(), // Saveiro, Ranger, etc.
+  version: varchar("version", { length: 255 }), // ROBUST TOTAL FLEX, XLS 4X4, etc.
+  motor: varchar("motor", { length: 50 }), // 1.6, 2.0, etc.
+  year: int("year"), // 2025
+  color: varchar("color", { length: 50 }), // Branco, Prata, etc.
+  fuel: varchar("fuel", { length: 50 }), // Flex, Diesel, Gasolina
+  km: int("km").default(0), // quilometragem
+  price: int("price").default(0), // preço em reais inteiros
+  photoUrl: text("photoUrl"), // URL da foto principal
+  photos: text("photos"), // JSON array de URLs de fotos
+  optionals: text("optionals"), // JSON array de opcionais
+  externalUrl: text("externalUrl"), // link para o veículo no site original
+  slug: varchar("slug", { length: 500 }), // slug da URL original
+  bodyType: varchar("bodyType", { length: 50 }), // Hatch, Sedan, SUV, Picape, etc.
+  transmission: varchar("transmission", { length: 50 }), // Manual, Automático
+  plate: varchar("plate", { length: 10 }), // placa do veículo
+  doors: varchar("doors", { length: 5 }), // número de portas
+  fipePrice: int("fipePrice").default(0), // preço FIPE em reais inteiros
+  offerPrice: int("offerPrice").default(0), // preço de oferta em reais inteiros
+  vehicleState: varchar("vehicleState", { length: 20 }), // novo, usado
+  category: varchar("category", { length: 50 }), // Carro/Camionetas, Moto
+  observation: text("observation"), // observações do veículo
+  status: mysqlEnum("inventory_status", ["available", "reserved", "sold"]).default("available").notNull(),
+  soldBySellerId: int("soldBySellerId"), // vendedor que vendeu (quando status = sold)
+  soldAt: bigint("soldAt", { mode: "number" }), // data da venda
+  lastSyncedAt: bigint("lastSyncedAt", { mode: "number" }), // última sincronização
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
+export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
+
+// Log de sincronização do estoque
+export const inventorySyncLogs = mysqlTable("inventory_sync_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  status: mysqlEnum("sync_status", ["success", "error"]).notNull(),
+  vehiclesFound: int("vehiclesFound").default(0),
+  vehiclesAdded: int("vehiclesAdded").default(0),
+  vehiclesUpdated: int("vehiclesUpdated").default(0),
+  vehiclesRemoved: int("vehiclesRemoved").default(0),
+  errorMessage: text("errorMessage"),
+  duration: int("duration").default(0), // duração em ms
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InventorySyncLog = typeof inventorySyncLogs.$inferSelect;
+export type InsertInventorySyncLog = typeof inventorySyncLogs.$inferInsert;

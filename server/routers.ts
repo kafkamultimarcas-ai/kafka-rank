@@ -21,6 +21,8 @@ import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter"
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
+import { inventoryRouter } from "./routers/inventoryRouter";
+import { whatsappRouter } from "./routers/whatsappRouter";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1986,7 +1988,12 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     }),
   }),
 
-  // ===== PERMISSÕES DE GERENTE =====
+  // ===== ESTOQUE DE VEÍCULOS =====
+  inventory: inventoryRouter,
+
+  // ===== WHATSAPP (Z-API) =====
+  whatsapp: whatsappRouter,
+
   managerPerms: router({
     // Listar módulos disponíveis
     modules: publicProcedure.query(() => db.AVAILABLE_MODULES),

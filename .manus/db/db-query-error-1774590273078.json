@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE inventory_vehicles \nADD COLUMN IF NOT EXISTS plate VARCHAR(10) DEFAULT NULL AFTER transmission,\nADD COLUMN IF NOT EXISTS doors VARCHAR(5) DEFAULT NULL AFTER plate,\nADD COLUMN IF NOT EXISTS fipePrice INT DEFAULT 0 AFTER price,\nADD COLUMN IF NOT EXISTS offerPrice INT DEFAULT 0 AFTER fipePrice,\nADD COLUMN IF NOT EXISTS vehicleState VARCHAR(20) DEFAULT NULL AFTER doors,\nADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT NULL AFTER vehicleState,\nADD COLUMN IF NOT EXISTS observation TEXT DEFAULT NULL AFTER category;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute ALTER TABLE inventory_vehicles \nADD COLUMN IF NOT EXISTS plate VARCHAR(10) DEFAULT NULL AFTER transmission,\nADD COLUMN IF NOT EXISTS doors VARCHAR(5) DEFAULT NULL AFTER plate,\nADD COLUMN IF NOT EXISTS fipePrice INT DEFAULT 0 AFTER price,\nADD COLUMN IF NOT EXISTS offerPrice INT DEFAULT 0 AFTER fipePrice,\nADD COLUMN IF NOT EXISTS vehicleState VARCHAR(20) DEFAULT NULL AFTER doors,\nADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT NULL AFTER vehicleState,\nADD COLUMN IF NOT EXISTS observation TEXT DEFAULT NULL AFTER category;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'plate' in 'inventory_vehicles'"
+  ]
+}

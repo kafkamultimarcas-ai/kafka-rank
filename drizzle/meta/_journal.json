@@ -232,6 +232,13 @@
       "when": 1774559764685,
       "tag": "0032_sad_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1774585824260,
+      "tag": "0033_mute_radioactive_man",
+      "breakpoints": true
     }
   ]
 }

@@ -124,6 +124,8 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    // Start inventory sync from kafkamultimarcas.com.br every 15 minutes
+    import("../inventory-scraper").then(m => m.startInventorySync(15)).catch(e => console.error("[Inventory Sync] Failed to start:", e));
   });
 }
 

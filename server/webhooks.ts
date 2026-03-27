@@ -702,22 +702,43 @@ export function registerWebhookRoutes(app: Express) {
   });
 
   // ===== WHATSAPP WEBHOOK =====
+  // Accepts both Z-API format (phone, text.message, momment) and generic format (from, message, timestamp)
   app.post("/api/webhooks/whatsapp", async (req: Request, res: Response) => {
     try {
       if (!(await validateToken(req, res))) return;
 
-      const { from, message, timestamp } = req.body;
-      console.log(`WhatsApp webhook: from=${from}, message=${message}, ts=${timestamp}`);
+      const body = req.body;
 
-      if (from) {
-        const phone = from.replace(/\D/g, "");
+      // Normalize Z-API format vs generic format
+      const rawPhone = body.phone || body.from || "";
+      const messageText = body.text?.message || body.message || body.image?.caption || body.video?.caption || "";
+      const timestamp = body.momment || body.timestamp || Math.floor(Date.now() / 1000);
+      const fromMe = body.fromMe === true;
+      const isGroup = body.isGroup === true;
+      const senderName = body.senderName || body.contact?.displayName || "";
+      const mediaUrl = body.image?.imageUrl || body.audio?.audioUrl || body.video?.videoUrl || body.document?.documentUrl || null;
+      const messageType = body.image ? "image" : body.audio ? "audio" : body.video ? "video" : body.document ? "document" : "text";
+
+      console.log(`WhatsApp webhook: phone=${rawPhone}, msg=${messageText?.substring(0, 50)}, fromMe=${fromMe}, isGroup=${isGroup}, type=${messageType}`);
+
+      // Skip messages sent by us or from groups (unless you want group tracking)
+      if (fromMe || isGroup) {
+        res.json({ success: true, action: "skipped", reason: fromMe ? "from_me" : "group" });
+        return;
+      }
+
+      if (rawPhone) {
+        const phone = rawPhone.replace(/\D/g, "");
         const existingLeads = await crmDb.searchLeads(phone);
         if (existingLeads.length > 0) {
+          const desc = mediaUrl
+            ? `[${messageType.toUpperCase()}] ${messageText || "Mídia recebida"} (${mediaUrl})`
+            : `Mensagem recebida: ${(messageText || "").substring(0, 200)}`;
           await crmDb.createActivity({
             leadId: existingLeads[0].id,
             sellerId: existingLeads[0].sellerId,
             type: "whatsapp",
-            description: `Mensagem recebida: ${(message || "").substring(0, 200)}`,
+            description: desc.substring(0, 500),
           });
           res.json({ success: true, action: "activity_added", leadId: existingLeads[0].id });
           return;
@@ -727,7 +748,7 @@ export function registerWebhookRoutes(app: Express) {
         const dept = "vendas";
         const defaultStage = await crmDb.getDefaultStage(dept);
         const leadId = await crmDb.createLead({
-          name: `WhatsApp ${phone}`,
+          name: senderName || `WhatsApp ${phone}`,
           phone,
           email: null,
           vehicleInterest: null,
@@ -737,13 +758,13 @@ export function registerWebhookRoutes(app: Express) {
           stage: defaultStage?.name || "Novo Lead",
           score: "warm",
           sellerId: 0,
-          notes: message ? `Primeira mensagem: ${message.substring(0, 500)}` : null,
+          notes: messageText ? `Primeira mensagem: ${messageText.substring(0, 500)}` : null,
         });
         await crmDb.createActivity({
           leadId,
           sellerId: 0,
           type: "whatsapp",
-          description: `Lead criado via WhatsApp. Msg: ${(message || "").substring(0, 200)}`,
+          description: `Lead criado via WhatsApp. Msg: ${(messageText || "").substring(0, 200)}`,
         });
         const assignment = await autoAssignLead(leadId, dept);
         res.json({ success: true, action: "lead_created", leadId, assignedTo: assignment.sellerName });
@@ -957,12 +978,16 @@ export function registerWebhookRoutes(app: Express) {
         {
           method: "POST",
           path: "/api/webhooks/whatsapp",
-          description: "Receber mensagens do WhatsApp (Z-API, Evolution API, Twilio). Cria lead automaticamente se telefone nao existe.",
+          description: "Receber mensagens do WhatsApp (Z-API nativo, Evolution API, Twilio). Aceita formato Z-API (phone, text.message, momment) e generico (from, message, timestamp). Cria lead automaticamente se telefone nao existe. Ignora mensagens enviadas por nos (fromMe) e de grupos.",
           auth: true,
           body: {
-            from: { type: "string", description: "Numero do remetente" },
-            message: { type: "string", description: "Texto da mensagem" },
-            timestamp: { type: "number", description: "Timestamp da mensagem" },
+            phone: { type: "string", description: "Numero do remetente (Z-API format)" },
+            from: { type: "string", description: "Numero do remetente (formato generico, alternativa a phone)" },
+            "text.message": { type: "string", description: "Texto da mensagem (Z-API format)" },
+            message: { type: "string", description: "Texto da mensagem (formato generico)" },
+            momment: { type: "number", description: "Timestamp (Z-API format)" },
+            fromMe: { type: "boolean", description: "Se a mensagem foi enviada por nos (ignorada)" },
+            isGroup: { type: "boolean", description: "Se eh mensagem de grupo (ignorada)" },
           },
         },
         {

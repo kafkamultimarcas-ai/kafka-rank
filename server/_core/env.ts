@@ -7,4 +7,8 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  zapiInstanceId: process.env.ZAPI_INSTANCE_ID ?? "",
+  zapiToken: process.env.ZAPI_TOKEN ?? "",
+  zapiApiUrl: process.env.ZAPI_API_URL ?? "https://api.z-api.io",
+  zapiClientToken: process.env.ZAPI_CLIENT_TOKEN ?? "",
 };
