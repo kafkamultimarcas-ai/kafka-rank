@@ -1519,8 +1519,16 @@ function IntegrationItem({ name, status, description }: { name: string; status: 
 function AdminPipelineView() {
   const [dept, setDept] = useState("vendas");
   const { data: stages } = trpc.crmPipeline.getStages.useQuery({ department: dept });
-  const { data: leads } = trpc.crmLeads.listAll.useQuery({ department: dept, archived: false });
+  const { data: leads, refetch } = trpc.crmLeads.listAll.useQuery({ department: dept, archived: false }, { refetchInterval: 10000 });
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const [, navigate] = useLocation();
+  const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+
+  const moveStage = trpc.crmLeads.moveStage.useMutation({
+    onSuccess: () => { refetch(); toast.success("Lead movido!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const leadsByStage = useMemo(() => {
     if (!leads || !stages) return {};
@@ -1531,6 +1539,48 @@ function AdminPipelineView() {
     }
     return map;
   }, [leads, stages]);
+
+  const handleDragStart = (e: React.DragEvent, leadId: number) => {
+    setDraggedLeadId(leadId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(leadId));
+    // Make the dragged element semi-transparent
+    if (e.currentTarget instanceof HTMLElement) {
+      setTimeout(() => { (e.currentTarget as HTMLElement).style.opacity = "0.4"; }, 0);
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedLeadId(null);
+    setDragOverStage(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = "1";
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, stageName: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverStage(stageName);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if leaving the column entirely
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setDragOverStage(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStage: string) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    const leadId = parseInt(e.dataTransfer.getData("text/plain"));
+    if (!leadId || !leads) return;
+    const lead = leads.find((l: any) => l.id === leadId);
+    if (!lead || lead.stage === targetStage) return;
+    moveStage.mutate({ id: leadId, newStage: targetStage, sellerId: sellerSession?.id || 0 });
+  };
 
   return (
     <div className="space-y-3">
@@ -1546,17 +1596,32 @@ function AdminPipelineView() {
       <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
         {stages?.map(s => {
           const stageLeads = leadsByStage[s.name] || [];
+          const isOver = dragOverStage === s.name;
           return (
-            <div key={s.id} className="shrink-0 w-64 rounded-xl border border-border bg-card">
+            <div key={s.id}
+              onDragOver={(e) => handleDragOver(e, s.name)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, s.name)}
+              className={`shrink-0 w-64 rounded-xl border-2 bg-card transition-all duration-200 ${
+                isOver ? "border-primary/60 bg-primary/5 scale-[1.02] shadow-lg shadow-primary/10" : "border-border"
+              }`}>
               <div className="p-3 border-b border-border flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
                 <span className="text-sm font-bold text-foreground">{s.name}</span>
                 <span className="text-[10px] text-muted-foreground ml-auto">{stageLeads.length}</span>
               </div>
-              <div className="p-2 space-y-1.5 max-h-96 overflow-y-auto">
+              <div className={`p-2 space-y-1.5 max-h-96 overflow-y-auto min-h-[60px] ${
+                isOver && stageLeads.length === 0 ? "flex items-center justify-center" : ""
+              }`}>
                 {stageLeads.map(l => (
-                  <div key={l.id} onClick={() => navigate(`/crm/lead/${l.id}`)}
-                    className="p-2 rounded-lg bg-accent/50 border border-border cursor-pointer hover:bg-accent transition-all">
+                  <div key={l.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, l.id)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => navigate(`/crm/lead/${l.id}`)}
+                    className={`p-2 rounded-lg bg-accent/50 border border-border cursor-grab hover:bg-accent transition-all active:cursor-grabbing ${
+                      draggedLeadId === l.id ? "opacity-40 ring-2 ring-primary" : ""
+                    }`}>
                     <p className="text-xs font-medium text-foreground truncate">{l.name}</p>
                     {l.vehicleInterest && <p className="text-[10px] text-muted-foreground truncate">{l.vehicleInterest}</p>}
                     {l.phone && (
@@ -1569,7 +1634,9 @@ function AdminPipelineView() {
                   </div>
                 ))}
                 {stageLeads.length === 0 && (
-                  <p className="text-[10px] text-muted-foreground text-center py-4">Vazio</p>
+                  <p className={`text-[10px] text-muted-foreground text-center py-4 ${
+                    isOver ? "text-primary font-medium" : ""
+                  }`}>{isOver ? "Soltar aqui" : "Vazio"}</p>
                 )}
               </div>
             </div>

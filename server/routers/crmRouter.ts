@@ -743,15 +743,61 @@ export const crmChatRouter = router({
       `📏 KM: ${v.km ? Number(v.km).toLocaleString("pt-BR") + " km" : "N/I"}\n` +
       (v.color ? `🎨 Cor: ${v.color}\n` : "") +
       (v.plate ? `🔖 Placa: ${v.plate}\n` : "") +
+      (v.externalUrl ? `🔗 ${v.externalUrl}\n` : "") +
       `\n_Kafka Multimarcas_`;
     
     // Send text first
     await zapi.sendText(lead.phone, msg);
     
-    // Send first image if available
-    if (v.photoUrl) {
+    // Collect ALL photo URLs from photos[] JSON array, fallback to photoUrl
+    let photoUrls: string[] = [];
+    if (v.photos) {
       try {
-        await zapi.sendImage(lead.phone, v.photoUrl, `${v.brand} ${v.model}`);
+        const parsed = typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos;
+        if (Array.isArray(parsed)) photoUrls = parsed.filter((u: any) => typeof u === "string" && u.length > 0);
+      } catch {}
+    }
+    if (photoUrls.length === 0 && v.photoUrl) {
+      photoUrls = [v.photoUrl];
+    }
+    
+    // Helper: download image and re-upload to S3 to avoid blocked URLs
+    const { storagePut } = await import("../storage");
+    async function proxyImageToS3(url: string, index: number): Promise<string | null> {
+      try {
+        const res = await fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.kafkamultimarcas.com.br/" },
+          redirect: "follow",
+        });
+        if (!res.ok) return null;
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const contentType = res.headers.get("content-type") || "image/jpeg";
+        const ext = url.includes(".webp") ? "webp" : url.includes(".png") ? "png" : "jpg";
+        const key = `vehicle-photos/${input.vehicleId}-${index}-${Date.now()}.${ext}`;
+        const { url: s3Url } = await storagePut(key, buffer, contentType);
+        return s3Url;
+      } catch {
+        return null;
+      }
+    }
+    
+    // Send ALL photos - proxy each through S3 then send via Z-API
+    let sentCount = 0;
+    for (let i = 0; i < photoUrls.length; i++) {
+      try {
+        // First try direct URL
+        let sendUrl = photoUrls[i];
+        let result = await zapi.sendImage(lead.phone, sendUrl, i === 0 ? `${v.brand} ${v.model}` : "");
+        if (!result.success) {
+          // If direct fails, proxy through S3
+          const s3Url = await proxyImageToS3(photoUrls[i], i);
+          if (s3Url) {
+            result = await zapi.sendImage(lead.phone, s3Url, i === 0 ? `${v.brand} ${v.model}` : "");
+          }
+        }
+        if (result.success) sentCount++;
+        // Small delay between images to avoid rate limiting
+        if (i < photoUrls.length - 1) await new Promise(r => setTimeout(r, 500));
       } catch {}
     }
     
@@ -761,7 +807,7 @@ export const crmChatRouter = router({
       senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
     });
     await crmDb.updateLead(input.leadId, { lastContactDate: Date.now(), vehicleInterest: `${v.brand} ${v.model}` });
-    return { success: true, vehicleName: `${v.brand} ${v.model}` };
+    return { success: true, vehicleName: `${v.brand} ${v.model}`, photosSent: sentCount, photosTotal: photoUrls.length };
   }),
 
   // Upload media file (base64) and return S3 URL

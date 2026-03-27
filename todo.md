@@ -1211,3 +1211,12 @@
 ## Bugs Reportados - 27/03/2026
 - [x] Leads não atualizam automaticamente - precisa dar refresh na tela para ver novos leads
 - [x] Erro "Veículo não encontrado" ao clicar para enviar veículo do estoque no chat
+
+## Bug - Foto do veículo não enviada - 27/03/2026
+- [x] Corrigir envio de foto do veículo junto com a ficha no WhatsApp (pelo menos 1 foto)
+- [x] Fallback: se photoUrl vazio, tentar buscar do campo photos ou do site da loja (externalUrl)
+
+## Melhorias Pipeline e Foto - 27/03/2026
+- [x] Foto do veículo: proxy via S3 para contornar bloqueio de URL do litoralcar.com.br
+- [x] Foto do veículo: enviar TODAS as fotos disponíveis no campo photos[] (não só 1)
+- [x] Pipeline: implementar drag & drop para arrastar leads entre colunas (estágios)
