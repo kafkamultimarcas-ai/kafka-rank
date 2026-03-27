@@ -17,7 +17,7 @@ import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
-import { finCategoriesRouter, finTransactionsRouter } from "./routers/finRouter";
+import { finCategoriesRouter, finTransactionsRouter, fuelRouter } from "./routers/finRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
@@ -1689,6 +1689,7 @@ export const appRouter = router({
   crmSellerStats: crmSellerStatsRouter,
   finCategories: finCategoriesRouter,
   finTransactions: finTransactionsRouter,
+  fuel: fuelRouter,
   pvChamados: pvChamadosRouter,
   pvGastos: pvGastosRouter,
   pvOrcamentos: pvOrcamentosRouter,

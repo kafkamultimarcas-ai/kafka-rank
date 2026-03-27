@@ -1188,3 +1188,17 @@
 ## SDR Chat Panel
 - [x] Adicionar painel de chat inline na tela da SDR para conversar com leads direto pelo CRM
 - [x] SDR deve poder clicar no lead e ver histórico de mensagens + campo para enviar mensagem
+
+## Reformulação Minha Área - Financeiro
+- [x] Minha Área do Financeiro: remover ações irrelevantes (Agendamento, Ranking) e mostrar ações do setor
+- [x] Botão direto para Contas a Pagar/Receber com permissão de editar
+- [x] Botão direto para Pós-Venda
+- [x] Nova aba de Gasolina: lançamento de abastecimentos (veículo, litros, valor, km, posto)
+- [x] Lançamento por áudio: gravar áudio que IA transcreve e preenche campos automaticamente (contas e gasolina)
+
+## Melhorias Chat CRM
+- [x] Áudios mostrando como "Arquivo" - renderizar como player de áudio inline (play/pause)
+- [x] Fotos/imagens mostrando como "Arquivo" - renderizar como thumbnail clicável
+- [x] Vídeos mostrando como "Arquivo" - renderizar como player de vídeo inline
+- [x] Adicionar envio de fotos, vídeos e arquivos pelo chat (botões de anexo)
+- [x] Aba de Estoque no chat - enviar ficha de veículo cadastrado direto pro cliente

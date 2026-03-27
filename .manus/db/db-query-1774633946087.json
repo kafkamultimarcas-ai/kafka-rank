@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `fuel_records` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`vehicleModel` varchar(255) NOT NULL,\n\t`vehiclePlate` varchar(20),\n\t`fuelType` enum('gasolina','etanol','diesel','gnv') NOT NULL DEFAULT 'gasolina',\n\t`liters` decimal(8,2) NOT NULL,\n\t`pricePerLiter` decimal(8,3) NOT NULL,\n\t`totalCost` decimal(10,2) NOT NULL,\n\t`odometer` int,\n\t`gasStation` varchar(255),\n\t`notes` text,\n\t`receiptUrl` text,\n\t`receiptKey` varchar(500),\n\t`fuelDate` bigint NOT NULL,\n\t`createdBy` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `fuel_records_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute CREATE TABLE `fuel_records` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`vehicleModel` varchar(255) NOT NULL,\n\t`vehiclePlate` varchar(20),\n\t`fuelType` enum('gasolina','etanol','diesel','gnv') NOT NULL DEFAULT 'gasolina',\n\t`liters` decimal(8,2) NOT NULL,\n\t`pricePerLiter` decimal(8,3) NOT NULL,\n\t`totalCost` decimal(10,2) NOT NULL,\n\t`odometer` int,\n\t`gasStation` varchar(255),\n\t`notes` text,\n\t`receiptUrl` text,\n\t`receiptKey` varchar(500),\n\t`fuelDate` bigint NOT NULL,\n\t`createdBy` int,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `fuel_records_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 185
+}

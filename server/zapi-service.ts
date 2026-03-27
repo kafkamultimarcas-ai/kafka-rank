@@ -82,6 +82,44 @@ export async function sendDocument(phone: string, documentUrl: string, fileName:
   }
 }
 
+/** Send an audio message */
+export async function sendAudio(phone: string, audioUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const normalizedPhone = normalizePhone(phone);
+    const res = await fetch(`${ZAPI_BASE()}/send-audio`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ phone: normalizedPhone, audio: audioUrl }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `HTTP ${res.status}: ${err}` };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/** Send a video */
+export async function sendVideo(phone: string, videoUrl: string, caption?: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const normalizedPhone = normalizePhone(phone);
+    const res = await fetch(`${ZAPI_BASE()}/send-video`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ phone: normalizedPhone, video: videoUrl, caption: caption || "" }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: `HTTP ${res.status}: ${err}` };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 /** Send a link with preview */
 export async function sendLink(phone: string, url: string, title: string, description?: string, imageUrl?: string): Promise<{ success: boolean; error?: string }> {
   try {

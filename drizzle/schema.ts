@@ -918,3 +918,25 @@ export const crmMessages = mysqlTable("crm_messages", {
 });
 export type CrmMessage = typeof crmMessages.$inferSelect;
 export type InsertCrmMessage = typeof crmMessages.$inferInsert;
+
+// Registros de abastecimento (gasolina)
+export const fuelRecords = mysqlTable("fuel_records", {
+  id: int("id").autoincrement().primaryKey(),
+  vehicleModel: varchar("vehicleModel", { length: 255 }).notNull(),
+  vehiclePlate: varchar("vehiclePlate", { length: 20 }),
+  fuelType: mysqlEnum("fuelType", ["gasolina", "etanol", "diesel", "gnv"]).default("gasolina").notNull(),
+  liters: decimal("liters", { precision: 8, scale: 2 }).notNull(),
+  pricePerLiter: decimal("pricePerLiter", { precision: 8, scale: 3 }).notNull(),
+  totalCost: decimal("totalCost", { precision: 10, scale: 2 }).notNull(),
+  odometer: int("odometer"), // km atual
+  gasStation: varchar("gasStation", { length: 255 }), // posto
+  notes: text("notes"),
+  receiptUrl: text("receiptUrl"),
+  receiptKey: varchar("receiptKey", { length: 500 }),
+  fuelDate: bigint("fuelDate", { mode: "number" }).notNull(), // data do abastecimento
+  createdBy: int("createdBy"), // seller que registrou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type FuelRecord = typeof fuelRecords.$inferSelect;
+export type InsertFuelRecord = typeof fuelRecords.$inferInsert;

@@ -1,0 +1,50 @@
+{
+  "query": "SELECT id, messageType, mediaUrl, content, direction, leadId FROM crm_messages WHERE messageType IN ('audio', 'image', 'video', 'document') ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, messageType, mediaUrl, content, direction, leadId FROM crm_messages WHERE messageType IN ('audio', 'image', 'video', 'document') ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "266",
+      "messageType": "image",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3A2C0339527A34C651AC/8YE4coqYrQ0_xCPWUJMPsg==.jpg",
+      "content": "NULL",
+      "direction": "inbound",
+      "leadId": "481220"
+    },
+    {
+      "id": "265",
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3A24290664532DBD8A4E/TvWqQByEuSrnTwe6ALD0NA==.ogg",
+      "content": "NULL",
+      "direction": "inbound",
+      "leadId": "481220"
+    },
+    {
+      "id": "264",
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC603804A96640CEFE99E3E80478F53A/w48XTSca90-8mo4IWkWtwg==.ogg",
+      "content": "NULL",
+      "direction": "inbound",
+      "leadId": "481217"
+    },
+    {
+      "id": "263",
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC91C58255133EC94D07804670E7C5A9/mVkvnq38p0n_zPl_9M8ZMQ==.ogg",
+      "content": "NULL",
+      "direction": "inbound",
+      "leadId": "481217"
+    },
+    {
+      "id": "262",
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC874065E925B6DA6EF699529E5AC866/z8ytZyNqap-r7kU7k-OuZw==.ogg",
+      "content": "NULL",
+      "direction": "inbound",
+      "leadId": "481217"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tmessageType\tmediaUrl\tcontent\tdirection\tleadId\n266\timage\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3A2C0339527A34C651AC/8YE4coqYrQ0_xCPWUJMPsg==.jpg\tNULL\tinbound\t481220\n265\taudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3A24290664532DBD8A4E/TvWqQByEuSrnTwe6ALD0NA==.ogg\tNULL\tinbound\t481220\n264\taudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC603804A96640CEFE99E3E80478F53A/w48XTSca90-8mo4IWkWtwg==.ogg\tNULL\tinbound\t481217\n263\taudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC91C58255133EC94D07804670E7C5A9/mVkvnq38p0n_zPl_9M8ZMQ==.ogg\tNULL\tinbound\t481217\n262\taudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC874065E925B6DA6EF699529E5AC866/z8ytZyNqap-r7kU7k-OuZw==.ogg\tNULL\tinbound\t481217\n",
+  "stderr": "",
+  "execution_time_ms": 130
+}

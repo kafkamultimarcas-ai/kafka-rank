@@ -7,6 +7,7 @@ import {
   updateFinTransaction, deleteFinTransaction, markAsPaid,
   getFinDashboard, parseDocumentWithLLM,
   getOverdueTransactions, getUpcomingDueTransactions,
+  listFuelRecords, createFuelRecord, updateFuelRecord, deleteFuelRecord, getFuelDashboard,
 } from "../finDb";
 import { invokeLLM } from "../_core/llm";
 import { storagePut } from "../storage";
@@ -186,5 +187,131 @@ export const finTransactionsRouter = router({
     const { url, key } = await storagePut(`financial/receipts/${fileName}`, buffer, input.mimeType);
     await updateFinTransaction(input.transactionId, { receiptUrl: url, receiptKey: key });
     return { url, key };
+  }),
+
+  // Parse audio transcription to create a financial transaction automatically
+  parseAudio: protectedProcedure.input(z.object({
+    audioUrl: z.string(),
+    context: z.enum(["conta_pagar", "conta_receber", "gasolina"]).default("conta_pagar"),
+  })).mutation(async ({ input }) => {
+    try {
+      const { transcribeAudio } = await import("../_core/voiceTranscription");
+      const transcription = await transcribeAudio({
+        audioUrl: input.audioUrl,
+        language: "pt",
+        prompt: "Transcrição de lançamento financeiro de loja de carros",
+      });
+      
+      if ('error' in transcription) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro na transcrição: ${transcription.error}` });
+      }
+      
+      const text = transcription.text;
+      
+      const systemPrompt = input.context === "gasolina"
+        ? `Você é um assistente financeiro de uma loja de carros. Analise o texto transcrito de um áudio e extraia informações de abastecimento. Retorne APENAS JSON válido:
+{
+  "vehicleModel": "modelo do veículo mencionado (ex: Corolla, Civic, HB20)",
+  "vehiclePlate": "placa do veículo se mencionada (ex: ABC1D23)",
+  "fuelType": "gasolina, etanol, diesel ou gnv",
+  "liters": número de litros (decimal),
+  "pricePerLiter": preço por litro (decimal),
+  "totalCost": valor total (decimal),
+  "gasStation": "nome do posto se mencionado",
+  "odometer": quilometragem se mencionada (inteiro),
+  "notes": "observações adicionais"
+}
+Se algum campo não for mencionado, use null. Se o total não for mencionado mas litros e preço sim, calcule. Se litros não forem mencionados mas total e preço sim, calcule.`
+        : `Você é um assistente financeiro de uma loja de carros. Analise o texto transcrito de um áudio e extraia informações de uma conta ${input.context === "conta_pagar" ? "a pagar" : "a receber"}. Retorne APENAS JSON válido:
+{
+  "type": "${input.context === "conta_pagar" ? "payable" : "receivable"}",
+  "description": "descrição da conta",
+  "amount": valor em reais (decimal, ex: 500.00),
+  "supplier": "fornecedor ou cliente mencionado",
+  "category": "categoria sugerida: IPVA, Transferência, Seguro, Mecânica, Funilaria, Lavagem, Gasolina, Comissões, Aluguel, Energia, Internet, Venda de Veículo, Financiamento, Consignação ou Outros",
+  "dueDate": "data de vencimento se mencionada no formato DD/MM/YYYY",
+  "notes": "observações adicionais"
+}
+Se algum campo não for mencionado, use null.`;
+      
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Texto transcrito: "${text}"` },
+        ],
+      });
+      
+      const rawContent = response.choices?.[0]?.message?.content;
+      const content = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent) || "{}";
+      let parsed: any = {};
+      try {
+        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+        parsed = JSON.parse(jsonMatch[1]?.trim() || content.trim());
+      } catch {
+        parsed = { raw: content };
+      }
+      
+      return { success: true, transcription: text, data: parsed };
+    } catch (error: any) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Erro ao processar áudio: ${error.message}`,
+      });
+    }
+  }),
+});
+
+// ===== FUEL ROUTER =====
+export const fuelRouter = router({
+  list: protectedProcedure.input(z.object({
+    month: z.number().optional(),
+    year: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    return listFuelRecords(input || undefined);
+  }),
+  
+  create: protectedProcedure.input(z.object({
+    vehicleModel: z.string().min(1),
+    vehiclePlate: z.string().optional(),
+    fuelType: z.enum(["gasolina", "etanol", "diesel", "gnv"]).default("gasolina"),
+    liters: z.string(),
+    pricePerLiter: z.string(),
+    totalCost: z.string(),
+    odometer: z.number().optional(),
+    gasStation: z.string().optional(),
+    notes: z.string().optional(),
+    receiptUrl: z.string().optional(),
+    receiptKey: z.string().optional(),
+    fuelDate: z.number(),
+  })).mutation(async ({ input, ctx }) => {
+    return createFuelRecord({ ...input, createdBy: ctx.user?.id });
+  }),
+  
+  update: protectedProcedure.input(z.object({
+    id: z.number(),
+    vehicleModel: z.string().optional(),
+    vehiclePlate: z.string().optional(),
+    fuelType: z.enum(["gasolina", "etanol", "diesel", "gnv"]).optional(),
+    liters: z.string().optional(),
+    pricePerLiter: z.string().optional(),
+    totalCost: z.string().optional(),
+    odometer: z.number().optional(),
+    gasStation: z.string().optional(),
+    notes: z.string().optional(),
+    fuelDate: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const { id, ...data } = input;
+    return updateFuelRecord(id, data);
+  }),
+  
+  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    return deleteFuelRecord(input.id);
+  }),
+  
+  dashboard: protectedProcedure.input(z.object({
+    month: z.number().optional(),
+    year: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    return getFuelDashboard(input?.month, input?.year);
   }),
 });

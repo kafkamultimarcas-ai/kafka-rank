@@ -1,5 +1,5 @@
 import { eq, and, desc, asc, sql, gte, lte, or } from "drizzle-orm";
-import { finCategories, InsertFinCategory, finTransactions, InsertFinTransaction } from "../drizzle/schema";
+import { finCategories, InsertFinCategory, finTransactions, InsertFinTransaction, fuelRecords, type InsertFuelRecord } from "../drizzle/schema";
 import { getDb } from "./db";
 
 // ===== CATEGORIES =====
@@ -232,6 +232,69 @@ export async function getUpcomingDueTransactions(days: number = 3) {
   return db.select().from(finTransactions)
     .where(and(eq(finTransactions.status, "pending"), gte(finTransactions.dueDate, now), lte(finTransactions.dueDate, futureDate)))
     .orderBy(asc(finTransactions.dueDate));
+}
+
+// ==================== FUEL RECORDS ====================
+
+export async function listFuelRecords(filters?: { month?: number; year?: number }) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const conditions: any[] = [];
+  if (filters?.month && filters?.year) {
+    const start = new Date(filters.year, filters.month - 1, 1).getTime();
+    const end = new Date(filters.year, filters.month, 0, 23, 59, 59).getTime();
+    conditions.push(gte(fuelRecords.fuelDate, start));
+    conditions.push(lte(fuelRecords.fuelDate, end));
+  }
+  
+  return db.select().from(fuelRecords)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(fuelRecords.fuelDate));
+}
+
+export async function createFuelRecord(data: InsertFuelRecord) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(fuelRecords).values(data);
+  return { id: result[0].insertId };
+}
+
+export async function updateFuelRecord(id: number, data: Partial<InsertFuelRecord>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(fuelRecords).set(data).where(eq(fuelRecords.id, id));
+  return { success: true };
+}
+
+export async function deleteFuelRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(fuelRecords).where(eq(fuelRecords.id, id));
+  return { success: true };
+}
+
+export async function getFuelDashboard(month?: number, year?: number) {
+  const db = await getDb();
+  if (!db) return { totalLiters: 0, totalCost: 0, recordCount: 0 };
+  
+  const now = new Date();
+  const m = month || (now.getMonth() + 1);
+  const y = year || now.getFullYear();
+  const start = new Date(y, m - 1, 1).getTime();
+  const end = new Date(y, m, 0, 23, 59, 59).getTime();
+  
+  const [result] = await db.select({
+    totalLiters: sql<string>`COALESCE(SUM(liters), 0)`,
+    totalCost: sql<string>`COALESCE(SUM(totalCost), 0)`,
+    recordCount: sql<number>`COUNT(*)`,
+  }).from(fuelRecords).where(and(gte(fuelRecords.fuelDate, start), lte(fuelRecords.fuelDate, end)));
+  
+  return {
+    totalLiters: parseFloat(result?.totalLiters || '0'),
+    totalCost: parseFloat(result?.totalCost || '0'),
+    recordCount: result?.recordCount || 0,
+  };
 }
 
 // Auto-update overdue status

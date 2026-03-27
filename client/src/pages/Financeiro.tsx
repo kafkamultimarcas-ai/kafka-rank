@@ -1,12 +1,15 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { 
   DollarSign, ArrowLeft, Wrench, Clock, ChevronDown, ChevronUp, Phone, Car, 
   User, AlertTriangle, MapPin, FileText, MessageCircle, PhoneCall, Search,
-  Plus, CheckCircle, X, Calendar, Receipt, TrendingUp, TrendingDown, LogOut
+  Plus, CheckCircle, X, Calendar, Receipt, TrendingUp, TrendingDown, LogOut,
+  Fuel, Mic, MicOff, Loader2
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
@@ -28,7 +31,7 @@ function formatCurrency(value: string | number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
 }
 
-type MainTab = "pos-venda" | "contas";
+type MainTab = "pos-venda" | "contas" | "gasolina";
 
 export default function Financeiro() {
   const [, navigate] = useLocation();
@@ -92,10 +95,21 @@ export default function Financeiro() {
             <Receipt className="h-4 w-4 inline mr-1.5" />
             Contas
           </button>
+          <button
+            onClick={() => setMainTab("gasolina")}
+            className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-all ${
+              mainTab === "gasolina"
+                ? "border-yellow-500 text-yellow-400"
+                : "border-transparent text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            <Fuel className="h-4 w-4 inline mr-1.5" />
+            Gasolina
+          </button>
         </div>
       </div>
 
-      {mainTab === "pos-venda" ? <PosVendaTab /> : <ContasTab />}
+      {mainTab === "pos-venda" ? <PosVendaTab /> : mainTab === "contas" ? <ContasTab /> : <GasolinaTab />}
     </div>
   );
 }
@@ -346,6 +360,337 @@ function ContasTab() {
           <Receipt className="w-10 h-10 text-gray-700 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">Nenhuma conta encontrada.</p>
         </div>
+      )}
+    </div>
+  );
+}
+
+
+// ===== GASOLINA TAB =====
+function GasolinaTab() {
+  const { data: fuelRecords, refetch } = trpc.fuel.list.useQuery({});
+  const { data: inventory } = trpc.crmInventory.list.useQuery();
+  const createFuel = trpc.fuel.create.useMutation({
+    onSuccess: () => { refetch(); setShowForm(false); resetForm(); toast.success("Abastecimento registrado!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const [showForm, setShowForm] = useState(false);
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [fuelType, setFuelType] = useState("gasolina");
+  const [liters, setLiters] = useState("");
+  const [pricePerLiter, setPricePerLiter] = useState("");
+  const [totalCost, setTotalCost] = useState("");
+  const [odometer, setOdometer] = useState("");
+  const [gasStation, setGasStation] = useState("");
+  const [notes, setNotes] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const resetForm = () => {
+    setVehiclePlate(""); setVehicleModel(""); setFuelType("gasolina");
+    setLiters(""); setPricePerLiter(""); setTotalCost("");
+    setOdometer(""); setGasStation(""); setNotes("");
+  };
+
+  // Auto-calculate total
+  const calcTotal = () => {
+    const l = parseFloat(liters);
+    const p = parseFloat(pricePerLiter);
+    if (l > 0 && p > 0) setTotalCost((l * p).toFixed(2));
+  };
+
+  // Auto-fill vehicle model from plate
+  const handlePlateChange = (plate: string) => {
+    setVehiclePlate(plate.toUpperCase());
+    if (inventory && plate.length >= 7) {
+      const match = inventory.find((v: any) => v.plate?.toUpperCase() === plate.toUpperCase());
+      if (match) setVehicleModel(`${match.brand} ${match.model}`);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!vehiclePlate || !totalCost || !vehicleModel) {
+      toast.error("Preencha pelo menos a placa, veículo e o valor total.");
+      return;
+    }
+    createFuel.mutate({
+      vehiclePlate: vehiclePlate.toUpperCase(),
+      vehicleModel,
+      fuelType: fuelType as "gasolina" | "etanol" | "diesel" | "gnv",
+      liters: liters || "0",
+      pricePerLiter: pricePerLiter || "0",
+      totalCost: totalCost,
+      odometer: odometer ? parseInt(odometer) : undefined,
+      gasStation: gasStation || undefined,
+      notes: notes || undefined,
+      fuelDate: Date.now(),
+    });
+  };
+
+  const allRecords: any[] = fuelRecords || [];
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return allRecords;
+    const q = searchQuery.toLowerCase();
+    return allRecords.filter((r: any) =>
+      r.vehiclePlate?.toLowerCase().includes(q) ||
+      r.vehicleModel?.toLowerCase().includes(q) ||
+      r.gasStation?.toLowerCase().includes(q)
+    );
+  }, [allRecords, searchQuery]);
+
+  const stats = useMemo(() => {
+    const thisMonth = allRecords.filter((r: any) => {
+      const d = new Date(r.createdAt);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    const totalLiters = thisMonth.reduce((s: number, r: any) => s + Number(r.liters || 0), 0);
+    const totalCost = thisMonth.reduce((s: number, r: any) => s + Number(r.totalCost || 0), 0);
+    return { count: thisMonth.length, totalLiters, totalCost };
+  }, [allRecords]);
+
+  return (
+    <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl p-3 border text-center bg-yellow-500/10 border-yellow-500/20">
+          <p className="text-xl font-bold text-yellow-400">{stats.count}</p>
+          <p className="text-[10px] text-gray-500">Abastec. mês</p>
+        </div>
+        <div className="rounded-xl p-3 border text-center bg-blue-500/10 border-blue-500/20">
+          <p className="text-xl font-bold text-blue-400">{stats.totalLiters.toFixed(1)}L</p>
+          <p className="text-[10px] text-gray-500">Litros mês</p>
+        </div>
+        <div className="rounded-xl p-3 border text-center bg-emerald-500/10 border-emerald-500/20">
+          <p className="text-xl font-bold text-emerald-400">{formatCurrency(stats.totalCost)}</p>
+          <p className="text-[10px] text-gray-500">Gasto mês</p>
+        </div>
+      </div>
+
+      {/* Add button */}
+      <button
+        onClick={() => setShowForm(!showForm)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-sm transition-all"
+      >
+        {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+        {showForm ? "Cancelar" : "Novo Abastecimento"}
+      </button>
+
+      {/* Form */}
+      {showForm && (
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Placa *</label>
+              <Input value={vehiclePlate} onChange={e => handlePlateChange(e.target.value)}
+                placeholder="ABC1D23" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" maxLength={7} />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Veículo</label>
+              <Input value={vehicleModel} onChange={e => setVehicleModel(e.target.value)}
+                placeholder="Marca / Modelo" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Combustível</label>
+              <select value={fuelType} onChange={e => setFuelType(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+                <option value="gasolina">Gasolina</option>
+                <option value="etanol">Etanol</option>
+                <option value="diesel">Diesel</option>
+                <option value="gnv">GNV</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Litros</label>
+              <Input type="number" value={liters} onChange={e => setLiters(e.target.value)} onBlur={calcTotal}
+                placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">R$/Litro</label>
+              <Input type="number" value={pricePerLiter} onChange={e => setPricePerLiter(e.target.value)} onBlur={calcTotal}
+                placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Total (R$) *</label>
+              <Input type="number" value={totalCost} onChange={e => setTotalCost(e.target.value)}
+                placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm font-bold" />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">KM</label>
+              <Input type="number" value={odometer} onChange={e => setOdometer(e.target.value)}
+                placeholder="Odômetro" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Posto</label>
+            <Input value={gasStation} onChange={e => setGasStation(e.target.value)}
+              placeholder="Nome do posto" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Observações</label>
+            <Input value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Ex: Abastecimento para test drive" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+
+          {/* Audio launcher */}
+          <AudioLauncher onResult={(parsed: any) => {
+            if (parsed.vehiclePlate) setVehiclePlate(parsed.vehiclePlate);
+            if (parsed.vehicleModel) setVehicleModel(parsed.vehicleModel);
+            if (parsed.fuelType) setFuelType(parsed.fuelType);
+            if (parsed.liters) setLiters(String(parsed.liters));
+            if (parsed.pricePerLiter) setPricePerLiter(String(parsed.pricePerLiter));
+            if (parsed.totalCost) setTotalCost(String(parsed.totalCost));
+            if (parsed.odometer) setOdometer(String(parsed.odometer));
+            if (parsed.gasStation) setGasStation(parsed.gasStation);
+            if (parsed.notes) setNotes(parsed.notes);
+            toast.success("Dados preenchidos pelo áudio!");
+          }} context="gasolina" />
+
+          <Button onClick={handleSubmit} disabled={createFuel.isPending}
+            className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold">
+            {createFuel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Fuel className="h-4 w-4 mr-2" /> Registrar Abastecimento</>}
+          </Button>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Buscar por placa, veículo ou posto..."
+          className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-yellow-500 focus:outline-none" />
+      </div>
+
+      {/* Records list */}
+      {filtered.length > 0 ? (
+        <div className="space-y-2">
+          {filtered.map((r: any) => (
+            <div key={r.id} className="rounded-xl border bg-gray-900/60 border-gray-800 p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Fuel className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
+                    <p className="text-sm font-bold text-white">{r.vehiclePlate}</p>
+                    {r.vehicleModel && <span className="text-xs text-gray-400">{r.vehicleModel}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
+                    <span className="bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold">{r.fuelType}</span>
+                    {r.liters && <span>{Number(r.liters).toFixed(1)}L</span>}
+                    {r.pricePerLiter && <span>R${Number(r.pricePerLiter).toFixed(2)}/L</span>}
+                    {r.odometer && <span>{r.odometer.toLocaleString("pt-BR")} km</span>}
+                    {r.gasStation && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{r.gasStation}</span>}
+                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(r.createdAt)}</span>
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-yellow-400 shrink-0 ml-2">{formatCurrency(Number(r.totalCost))}</p>
+              </div>
+              {r.notes && <p className="text-[11px] text-gray-500 mt-2">{r.notes}</p>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-10 text-center">
+          <Fuel className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Nenhum abastecimento registrado.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== AUDIO LAUNCHER (reusable for Contas and Gasolina) =====
+function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void; context: "conta_pagar" | "conta_receber" | "gasolina" }) {
+  const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const uploadMedia = trpc.crmChat.uploadMedia.useMutation();
+  const parseAudio = trpc.finTransactions.parseAudio.useMutation({
+    onSuccess: (data: any) => {
+      onResult(data);
+      setProcessing(false);
+    },
+    onError: (e: any) => {
+      toast.error("Erro ao processar áudio: " + e.message);
+      setProcessing(false);
+    },
+  });
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setProcessing(true);
+
+        // Upload audio first, then parse
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64 = (reader.result as string).split(",")[1];
+            const { url } = await uploadMedia.mutateAsync({ base64, filename: "audio.webm", mimeType: "audio/webm" });
+            parseAudio.mutate({ audioUrl: url, context });
+          } catch (err: any) {
+            toast.error("Erro no upload do áudio: " + err.message);
+            setProcessing(false);
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+      toast.info("Gravando... Fale os dados do lançamento.");
+    } catch (err) {
+      toast.error("Não foi possível acessar o microfone.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {processing ? (
+        <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 w-full">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Processando áudio com IA...
+        </div>
+      ) : recording ? (
+        <button onClick={stopRecording}
+          className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2.5 w-full animate-pulse">
+          <MicOff className="h-4 w-4" />
+          Gravando... Toque para parar
+        </button>
+      ) : (
+        <button onClick={startRecording}
+          className="flex items-center gap-2 text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 w-full hover:bg-gray-700 hover:text-white transition-all">
+          <Mic className="h-4 w-4" />
+          {context === "gasolina" ? "Lançar por áudio (ex: 'Abasteci 40 litros no Corolla placa ABC1D23')" : "Lançar conta por áudio"}
+        </button>
       )}
     </div>
   );

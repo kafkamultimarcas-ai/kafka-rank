@@ -27,7 +27,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 
@@ -72,6 +72,37 @@ function StatusBadge({ status }: { status: string }) {
     <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">
       <XCircle className="w-3 h-3" /> Rejeitado
     </span>
+  );
+}
+
+function FinanceiroStatsCards() {
+  const { data: dashboard } = trpc.finTransactions.dashboard.useQuery({});
+  const overdueCount = dashboard?.overdue || 0;
+  const totalPayable = dashboard?.totalPayable || 0;
+  const totalReceivable = dashboard?.totalReceivable || 0;
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 text-center">
+        <AlertCircle className="w-4 h-4 text-red-400 mx-auto mb-1" />
+        <p className="text-xl font-black text-red-400">{overdueCount}</p>
+        <p className="text-[10px] text-red-400/70">Vencidas</p>
+      </div>
+      <div className="bg-orange-950/40 border border-orange-500/30 rounded-xl p-3 text-center">
+        <Banknote className="w-4 h-4 text-orange-400 mx-auto mb-1" />
+        <p className="text-lg font-black text-orange-400">
+          {totalPayable > 0 ? `${(totalPayable / 1000).toFixed(0)}k` : '0'}
+        </p>
+        <p className="text-[10px] text-orange-400/70">A Pagar (mês)</p>
+      </div>
+      <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 text-center">
+        <DollarSign className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+        <p className="text-lg font-black text-emerald-400">
+          {totalReceivable > 0 ? `${(totalReceivable / 1000).toFixed(0)}k` : '0'}
+        </p>
+        <p className="text-[10px] text-emerald-400/70">A Receber (mês)</p>
+      </div>
+    </div>
   );
 }
 
@@ -342,8 +373,10 @@ export default function MinhaArea() {
 
       {/* Content */}
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Stats Cards - Pós-Venda tem painel próprio */}
-        {dept === 'pos_venda' ? (
+        {/* Stats Cards - Pós-Venda e Financeiro têm painel próprio */}
+        {dept === 'financeiro' ? (
+          <FinanceiroStatsCards />
+        ) : dept === 'pos_venda' ? (
           <div className="grid grid-cols-4 gap-2">
             <div className="bg-blue-950/40 border border-blue-500/30 rounded-xl p-3 text-center">
               <Clipboard className="w-4 h-4 text-blue-400 mx-auto mb-1" />
@@ -959,6 +992,48 @@ export default function MinhaArea() {
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Ações Rápidas</h2>
 
+          {/* Financeiro - Ações específicas do setor */}
+          {dept === 'financeiro' && (
+            <>
+              <button
+                onClick={() => navigate('/financeiro')}
+                className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <Receipt className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-white font-bold">Contas a Pagar / Receber</p>
+                  <p className="text-gray-400 text-sm">Gerenciar todas as contas</p>
+                </div>
+              </button>
+              <button
+                onClick={() => navigate('/financeiro?tab=gasolina')}
+                className="w-full bg-gradient-to-r from-amber-600/20 to-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-amber-500/60 transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Car className="w-6 h-6 text-amber-400" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-white font-bold">Gasolina / Abastecimento</p>
+                  <p className="text-gray-400 text-sm">Controle de combustível dos veículos</p>
+                </div>
+              </button>
+              <button
+                onClick={() => navigate('/financeiro?tab=pos-venda')}
+                className="w-full bg-gradient-to-r from-orange-600/20 to-orange-500/10 border border-orange-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-orange-500/60 transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+                  <Wrench className="w-6 h-6 text-orange-400" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="text-white font-bold">Pós-Venda</p>
+                  <p className="text-gray-400 text-sm">Acompanhar chamados e orçamentos</p>
+                </div>
+              </button>
+            </>
+          )}
+
           {/* Agendamentos - para Vendas e Pré-Vendas */}
           {(dept === "vendas" || dept === "pre_vendas") && (
             <button
@@ -1006,7 +1081,8 @@ export default function MinhaArea() {
             <SdrConversionsCard sellerId={Number(sellerId)} />
           )}
 
-          {/* Registrar - botão específico por setor */}
+          {/* Registrar - botão específico por setor (não mostrar para financeiro) */}
+          {dept !== 'financeiro' && (
           <button
             onClick={() => navigate("/registrar-venda")}
             className={`w-full bg-gradient-to-r ${deptInfo.gradient} rounded-xl p-4 flex items-center gap-4 hover:opacity-80 transition-all`}
@@ -1025,6 +1101,7 @@ export default function MinhaArea() {
               <p className="text-gray-400 text-sm">Enviar para aprovação do gerente</p>
             </div>
           </button>
+          )}
 
           {/* Pós-Venda - Abrir Chamado */}
           <button
@@ -1107,7 +1184,8 @@ export default function MinhaArea() {
             </button>
           )}
 
-          {/* Ver Ranking */}
+          {/* Ver Ranking - não mostrar para financeiro */}
+          {dept !== 'financeiro' && (
           <button
             onClick={() => navigate("/")}
             className="w-full bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-yellow-500/60 transition-all"
@@ -1120,6 +1198,7 @@ export default function MinhaArea() {
               <p className="text-gray-400 text-sm">Confira sua posição na competição</p>
             </div>
           </button>
+          )}
         </div>
 
         {/* Histórico de registros aprovados (para setores que NÃO são F&I, pois F&I já tem painel completo acima) */}

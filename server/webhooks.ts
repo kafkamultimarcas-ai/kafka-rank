@@ -716,8 +716,8 @@ export function registerWebhookRoutes(app: Express) {
       const fromMe = body.fromMe === true;
       const isGroup = body.isGroup === true;
       const senderName = body.senderName || body.contact?.displayName || "";
-      const mediaUrl = body.image?.imageUrl || body.audio?.audioUrl || body.video?.videoUrl || body.document?.documentUrl || null;
-      const messageType = body.image ? "image" : body.audio ? "audio" : body.video ? "video" : body.document ? "document" : "text";
+      const mediaUrl = body.image?.imageUrl || body.audio?.audioUrl || body.video?.videoUrl || body.document?.documentUrl || body.sticker?.stickerUrl || null;
+      const messageType = body.image ? "image" : body.audio ? (body.audio.ptt ? "ptt" : "audio") : body.video ? "video" : body.document ? "document" : body.sticker ? "sticker" : "text";
 
       console.log(`WhatsApp webhook: phone=${rawPhone}, msg=${messageText?.substring(0, 50)}, fromMe=${fromMe}, isGroup=${isGroup}, type=${messageType}`);
 

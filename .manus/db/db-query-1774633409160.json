@@ -1,0 +1,172 @@
+{
+  "query": "SELECT * FROM fin_categories WHERE active = 1 ORDER BY type, name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT * FROM fin_categories WHERE active = 1 ORDER BY type, name;",
+  "rows": [
+    {
+      "id": "5",
+      "name": "Água",
+      "type": "expense",
+      "icon": "droplets",
+      "color": "#06b6d4",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "3",
+      "name": "Aluguel",
+      "type": "expense",
+      "icon": "building",
+      "color": "#8b5cf6",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "8",
+      "name": "Comissões",
+      "type": "expense",
+      "icon": "percent",
+      "color": "#f43f5e",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "11",
+      "name": "Despachante",
+      "type": "expense",
+      "icon": "clipboard",
+      "color": "#14b8a6",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "4",
+      "name": "Energia/Luz",
+      "type": "expense",
+      "icon": "zap",
+      "color": "#eab308",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "9",
+      "name": "Impostos/IPVA",
+      "type": "expense",
+      "icon": "file-text",
+      "color": "#6b7280",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "6",
+      "name": "Internet/Telefone",
+      "type": "expense",
+      "icon": "wifi",
+      "color": "#3b82f6",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "2",
+      "name": "Manutenção/Reparo",
+      "type": "expense",
+      "icon": "wrench",
+      "color": "#f97316",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "10",
+      "name": "Marketing/Anúncios",
+      "type": "expense",
+      "icon": "megaphone",
+      "color": "#a855f7",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "12",
+      "name": "Outros (Despesa)",
+      "type": "expense",
+      "icon": "receipt",
+      "color": "#6b7280",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "7",
+      "name": "Salários",
+      "type": "expense",
+      "icon": "users",
+      "color": "#ec4899",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "1",
+      "name": "Veículos (Compra)",
+      "type": "expense",
+      "icon": "car",
+      "color": "#ef4444",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "17",
+      "name": "Acessórios/Peças",
+      "type": "income",
+      "icon": "package",
+      "color": "#f59e0b",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "15",
+      "name": "Consignação",
+      "type": "income",
+      "icon": "handshake",
+      "color": "#06b6d4",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "16",
+      "name": "Despachante (Receita)",
+      "type": "income",
+      "icon": "clipboard",
+      "color": "#14b8a6",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "14",
+      "name": "Financiamento (F&I)",
+      "type": "income",
+      "icon": "dollar-sign",
+      "color": "#10b981",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "18",
+      "name": "Outros (Receita)",
+      "type": "income",
+      "icon": "receipt",
+      "color": "#6b7280",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    },
+    {
+      "id": "13",
+      "name": "Venda de Veículo",
+      "type": "income",
+      "icon": "car",
+      "color": "#22c55e",
+      "active": "1",
+      "createdAt": "2026-03-21 06:00:48"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\ttype\ticon\tcolor\tactive\tcreatedAt\n5\tÁgua\texpense\tdroplets\t#06b6d4\t1\t2026-03-21 06:00:48\n3\tAluguel\texpense\tbuilding\t#8b5cf6\t1\t2026-03-21 06:00:48\n8\tComissões\texpense\tpercent\t#f43f5e\t1\t2026-03-21 06:00:48\n11\tDespachante\texpense\tclipboard\t#14b8a6\t1\t2026-03-21 06:00:48\n4\tEnergia/Luz\texpense\tzap\t#eab308\t1\t2026-03-21 06:00:48\n9\tImpostos/IPVA\texpense\tfile-text\t#6b7280\t1\t2026-03-21 06:00:48\n6\tInternet/Telefone\texpense\twifi\t#3b82f6\t1\t2026-03-21 06:00:48\n2\tManutenção/Reparo\texpense\twrench\t#f97316\t1\t2026-03-21 06:00:48\n10\tMarketing/Anúncios\texpense\tmegaphone\t#a855f7\t1\t2026-03-21 06:00:48\n12\tOutros (Despesa)\texpense\treceipt\t#6b7280\t1\t2026-03-21 06:00:48\n7\tSalários\texpense\tusers\t#ec4899\t1\t2026-03-21 06:00:48\n1\tVeículos (Compra)\texpense\tcar\t#ef4444\t1\t2026-03-21 06:00:48\n17\tAcessórios/Peças\tincome\tpackage\t#f59e0b\t1\t2026-03-21 06:00:48\n15\tConsignação\tincome\thandshake\t#06b6d4\t1\t2026-03-21 06:00:48\n16\tDespachante (Receita)\tincome\tclipboard\t#14b8a6\t1\t2026-03-21 06:00:48\n14\tFinanciamento (F&I)\tincome\tdollar-sign\t#10b981\t1\t2026-03-21 06:00:48\n18\tOutros (Receita)\tincome\treceipt\t#6b7280\t1\t2026-03-21 06:00:48\n13\tVenda de Veículo\tincome\tcar\t#22c55e\t1\t2026-03-21 06:00:48\n",
+  "stderr": "",
+  "execution_time_ms": 116
+}

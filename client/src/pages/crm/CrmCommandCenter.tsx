@@ -7,10 +7,113 @@ import { toast } from "sonner";
 import {
   Search, Phone, MessageCircle, Calendar, ChevronRight, Flame, Thermometer,
   Snowflake, Plus, ArrowLeft, Clock, AlertTriangle, User, Car,
-  Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target,
+  Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
-  MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip
+  MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
+  Volume2, Download, Play, File
 } from "lucide-react";
+
+// Detect media type from URL extension as fallback
+function detectMediaTypeFromUrl(url: string): string | null {
+  const lower = url.toLowerCase();
+  if (lower.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)/)) return "image";
+  if (lower.match(/\.(ogg|mp3|wav|m4a|aac|opus|webm)/)) return "audio";
+  if (lower.match(/\.(mp4|avi|mov|mkv|3gp)/)) return "video";
+  if (lower.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar)/)) return "document";
+  return null;
+}
+
+// Reusable media renderer for chat messages
+function ChatMediaRenderer({ msg }: { msg: any }) {
+  if (!msg.mediaUrl) return null;
+  
+  // Determine effective type: use messageType, fallback to URL detection
+  const effectiveType = (msg.messageType && msg.messageType !== "text")
+    ? msg.messageType
+    : detectMediaTypeFromUrl(msg.mediaUrl) || msg.messageType;
+  
+  if (effectiveType === "image") {
+    return (
+      <a href={msg.mediaUrl} target="_blank" rel="noopener" className="block mb-1">
+        <img
+          src={msg.mediaUrl}
+          alt=""
+          className="rounded-lg max-w-full cursor-pointer hover:opacity-90"
+          style={{ maxHeight: 200 }}
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.style.display = "none";
+            const fallback = target.nextElementSibling as HTMLElement;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+        <div className="hidden items-center gap-2 text-xs bg-black/20 rounded-lg px-3 py-2">
+          <Image className="w-4 h-4 text-blue-400" />
+          <span>Imagem</span>
+          <Download className="w-3 h-3 ml-auto" />
+        </div>
+      </a>
+    );
+  }
+  
+  if (effectiveType === "audio" || effectiveType === "ptt") {
+    return (
+      <div className="mb-1">
+        <div className="flex items-center gap-2 bg-black/10 rounded-xl px-2 py-1.5" style={{ minWidth: 200, maxWidth: 260 }}>
+          <Volume2 className="w-4 h-4 text-green-400 shrink-0" />
+          <audio controls preload="metadata" className="flex-1 h-8" style={{ minWidth: 0 }}>
+            <source src={msg.mediaUrl} type="audio/ogg; codecs=opus" />
+            <source src={msg.mediaUrl} type="audio/ogg" />
+            <source src={msg.mediaUrl} />
+          </audio>
+        </div>
+      </div>
+    );
+  }
+  
+  if (effectiveType === "video") {
+    return (
+      <div className="mb-1">
+        <video
+          controls
+          preload="metadata"
+          className="rounded-lg max-w-full"
+          style={{ maxHeight: 200, maxWidth: 240 }}
+          onError={(e) => {
+            const target = e.currentTarget;
+            target.style.display = "none";
+            const fallback = target.nextElementSibling as HTMLElement;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        >
+          <source src={msg.mediaUrl} />
+        </video>
+        <a href={msg.mediaUrl} target="_blank" rel="noopener" className="hidden items-center gap-2 text-xs bg-black/20 rounded-lg px-3 py-2">
+          <Play className="w-4 h-4 text-blue-400" /> Vídeo <Download className="w-3 h-3 ml-auto" />
+        </a>
+      </div>
+    );
+  }
+  
+  if (effectiveType === "sticker") {
+    return <img src={msg.mediaUrl} alt="sticker" className="mb-1" style={{ maxHeight: 100, maxWidth: 100 }} />;
+  }
+  
+  // Document or unknown with media URL
+  const fileName = msg.mediaUrl.split("/").pop()?.split("?")[0] || "Arquivo";
+  const ext = fileName.split(".").pop()?.toUpperCase() || "";
+  return (
+    <a href={msg.mediaUrl} target="_blank" rel="noopener"
+      className="flex items-center gap-2 text-xs mb-1 bg-black/20 rounded-lg px-3 py-2.5 hover:bg-black/30 transition-colors">
+      <File className="w-4 h-4 text-orange-400 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="truncate font-medium">{effectiveType === "document" ? "Documento" : "Arquivo"}</p>
+        {ext && <p className="text-[10px] opacity-60">{ext}</p>}
+      </div>
+      <Download className="w-3.5 h-3.5 opacity-60 shrink-0" />
+    </a>
+  );
+}
 
 const SOURCE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   manual: { label: "Manual", color: "text-gray-400", bg: "bg-gray-500/20" },
@@ -76,7 +179,13 @@ function formatChatDate(ts: number) {
 // ===== INLINE CHAT PANEL =====
 function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; sellerId: number; onClose: () => void }) {
   const [message, setMessage] = useState("");
+  const [showAttach, setShowAttach] = useState(false);
+  const [showVehicles, setShowVehicles] = useState(false);
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const { data: lead } = trpc.crmLeads.getById.useQuery({ id: leadId });
   const { data: messages, refetch: refetchMessages } = trpc.crmChat.getMessages.useQuery(
     { leadId }, { refetchInterval: 5000 }
@@ -96,6 +205,77 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
     onSuccess: () => toast.success("Lead transferido!"),
     onError: (e: any) => toast.error(e.message),
   });
+
+  const sendImage = trpc.crmChat.sendImage.useMutation({
+    onSuccess: () => { refetchMessages(); toast.success("Imagem enviada!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const sendAudioMut = trpc.crmChat.sendAudio.useMutation({
+    onSuccess: () => { refetchMessages(); toast.success("Áudio enviado!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const sendVideo = trpc.crmChat.sendVideo.useMutation({
+    onSuccess: () => { refetchMessages(); toast.success("Vídeo enviado!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const sendDoc = trpc.crmChat.sendDocument.useMutation({
+    onSuccess: () => { refetchMessages(); toast.success("Documento enviado!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const sendVehicle = trpc.crmChat.sendVehicle.useMutation({
+    onSuccess: (data: any) => { refetchMessages(); setShowVehicles(false); toast.success(`Veículo ${data.vehicleName} enviado!`); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const uploadMedia = trpc.crmChat.uploadMedia.useMutation();
+  const { data: vehicles } = trpc.crmInventory.list.useQuery(undefined, { enabled: showVehicles });
+
+  const filteredVehicles = useMemo(() => {
+    if (!vehicles) return [];
+    if (!vehicleSearch) return vehicles.filter((v: any) => v.status === "available");
+    const q = vehicleSearch.toLowerCase();
+    return vehicles.filter((v: any) => v.status === "available" && (`${v.brand} ${v.model}`.toLowerCase().includes(q) || v.plate?.toLowerCase().includes(q)));
+  }, [vehicles, vehicleSearch]);
+
+  const handleFileUpload = async (file: File, type: "image" | "video" | "audio" | "document") => {
+    setUploading(true);
+    setShowAttach(false);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => { resolve((reader.result as string).split(",")[1]); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadMedia.mutateAsync({ base64, filename: file.name, mimeType: file.type });
+      if (type === "image") sendImage.mutate({ leadId, imageUrl: url, sellerId });
+      else if (type === "audio") sendAudioMut.mutate({ leadId, audioUrl: url, sellerId });
+      else if (type === "video") sendVideo.mutate({ leadId, videoUrl: url, sellerId });
+      else sendDoc.mutate({ leadId, documentUrl: url, fileName: file.name, sellerId });
+    } catch (err: any) {
+      toast.error("Erro no upload: " + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type.startsWith("image/")) handleFileUpload(file, "image");
+    else if (file.type.startsWith("video/")) handleFileUpload(file, "video");
+    else handleFileUpload(file, "document");
+    e.target.value = "";
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type.startsWith("audio/")) handleFileUpload(file, "audio");
+    else if (file.type.startsWith("video/")) handleFileUpload(file, "video");
+    else if (file.type.startsWith("image/")) handleFileUpload(file, "image");
+    else handleFileUpload(file, "document");
+    e.target.value = "";
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -189,15 +369,8 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
                     {msg.direction === "inbound" && msg.senderName && (
                       <p className="text-[9px] font-medium text-primary mb-0.5">{msg.senderName}</p>
                     )}
-                    {msg.mediaUrl && msg.messageType === "image" && (
-                      <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full mb-1" style={{ maxHeight: 200 }} />
-                    )}
-                    {msg.mediaUrl && msg.messageType !== "image" && (
-                      <a href={msg.mediaUrl} target="_blank" rel="noopener" className="flex items-center gap-1.5 text-xs underline mb-1">
-                        <Paperclip className="w-3 h-3" /> Arquivo
-                      </a>
-                    )}
-                    {msg.content && <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
+                    <ChatMediaRenderer msg={msg} />
+                    {msg.content && msg.content !== "NULL" && <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
                     <p className={`text-[9px] mt-0.5 text-right ${msg.direction === "outbound" ? "opacity-60" : "text-muted-foreground"}`}>
                       {formatChatTime(msg.timestamp)}
                     </p>
@@ -216,9 +389,73 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Vehicle picker */}
+        {showVehicles && (
+          <div className="border-t border-border bg-card/95 backdrop-blur max-h-[250px] overflow-hidden flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <span className="text-xs font-bold text-foreground">🚗 Enviar Veículo do Estoque</span>
+              <button onClick={() => setShowVehicles(false)} className="p-1 hover:bg-accent rounded"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="px-3 py-2">
+              <Input value={vehicleSearch} onChange={e => setVehicleSearch(e.target.value)} placeholder="Buscar marca, modelo ou placa..." className="h-8 text-xs" />
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-1">
+              {filteredVehicles.map((v: any) => (
+                <button key={v.id} onClick={() => sendVehicle.mutate({ leadId, vehicleId: v.id, sellerId })}
+                  disabled={sendVehicle.isPending}
+                  className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-all text-left">
+                  {v.photoUrl ? (
+                    <img src={v.photoUrl} alt="" className="w-12 h-9 rounded object-cover" />
+                  ) : (
+                    <div className="w-12 h-9 rounded bg-accent/50 flex items-center justify-center text-muted-foreground text-[10px]">🚗</div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{v.brand} {v.model}</p>
+                    <p className="text-[10px] text-muted-foreground">{v.year} • {v.mileage?.toLocaleString("pt-BR")} km • R$ {(v.price / 100).toLocaleString("pt-BR")}</p>
+                  </div>
+                </button>
+              ))}
+              {filteredVehicles.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum veículo disponível</p>}
+            </div>
+          </div>
+        )}
+
         {/* Message input */}
         <div className="border-t border-border bg-card p-3 rounded-b-2xl shrink-0">
+          {uploading && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Enviando arquivo...
+            </div>
+          )}
           <div className="flex items-end gap-2">
+            {/* Attachment menu */}
+            <div className="relative">
+              <button onClick={() => { setShowAttach(!showAttach); setShowVehicles(false); }}
+                className="h-[42px] w-[42px] rounded-full flex items-center justify-center hover:bg-accent text-muted-foreground transition-all shrink-0">
+                <Paperclip className="w-5 h-5" />
+              </button>
+              {showAttach && (
+                <div className="absolute bottom-12 left-0 bg-popover border border-border rounded-xl shadow-xl p-2 min-w-[160px] z-50">
+                  <button onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-foreground">
+                    <Image className="w-4 h-4 text-blue-400" /> Foto / Vídeo
+                  </button>
+                  <button onClick={() => { fileInputRef.current?.click(); setShowAttach(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-foreground">
+                    <Paperclip className="w-4 h-4 text-orange-400" /> Arquivo
+                  </button>
+                  <button onClick={() => { setShowVehicles(true); setShowAttach(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-foreground">
+                    <span className="text-base">🚗</span> Veículo do Estoque
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <input ref={imageInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleImageSelect} />
+            <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={handleFileSelect} />
+
             <div className="flex-1 relative">
               <textarea
                 value={message}

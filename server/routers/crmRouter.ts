@@ -654,6 +654,120 @@ export const crmChatRouter = router({
     await crmDb.updateLead(input.leadId, { lastContactDate: Date.now() });
     return { success: true };
   }),
+
+  // Send audio via Z-API
+  sendAudio: publicProcedure.input(z.object({
+    leadId: z.number(),
+    audioUrl: z.string(),
+    sellerId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead || !lead.phone) throw new Error("Lead sem telefone");
+    const result = await zapi.sendAudio(lead.phone, input.audioUrl);
+    if (!result.success) throw new Error("Erro ao enviar áudio");
+    await crmDb.createMessage({
+      leadId: input.leadId, phone: lead.phone, direction: "outbound",
+      messageType: "audio", content: null, mediaUrl: input.audioUrl,
+      senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
+    });
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now() });
+    return { success: true };
+  }),
+
+  // Send video via Z-API
+  sendVideo: publicProcedure.input(z.object({
+    leadId: z.number(),
+    videoUrl: z.string(),
+    caption: z.string().optional(),
+    sellerId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead || !lead.phone) throw new Error("Lead sem telefone");
+    const result = await zapi.sendVideo(lead.phone, input.videoUrl, input.caption);
+    if (!result.success) throw new Error("Erro ao enviar vídeo");
+    await crmDb.createMessage({
+      leadId: input.leadId, phone: lead.phone, direction: "outbound",
+      messageType: "video", content: input.caption || null, mediaUrl: input.videoUrl,
+      senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
+    });
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now() });
+    return { success: true };
+  }),
+
+  // Send document via Z-API
+  sendDocument: publicProcedure.input(z.object({
+    leadId: z.number(),
+    documentUrl: z.string(),
+    fileName: z.string(),
+    sellerId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead || !lead.phone) throw new Error("Lead sem telefone");
+    const result = await zapi.sendDocument(lead.phone, input.documentUrl, input.fileName);
+    if (!result.success) throw new Error("Erro ao enviar documento");
+    await crmDb.createMessage({
+      leadId: input.leadId, phone: lead.phone, direction: "outbound",
+      messageType: "document", content: input.fileName, mediaUrl: input.documentUrl,
+      senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
+    });
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now() });
+    return { success: true };
+  }),
+
+  // Send vehicle from inventory to lead
+  sendVehicle: publicProcedure.input(z.object({
+    leadId: z.number(),
+    vehicleId: z.number(),
+    sellerId: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead || !lead.phone) throw new Error("Lead sem telefone");
+    const vehicle = await crmDb.getInventoryById(input.vehicleId);
+    if (!vehicle) throw new Error("Veículo não encontrado");
+    
+    // Build vehicle message
+    const price = vehicle.price ? `R$ ${Number(vehicle.price).toLocaleString("pt-BR")}` : "Consulte";
+    const msg = `🚗 *${vehicle.brand} ${vehicle.model}*\n` +
+      `📅 Ano: ${vehicle.year || "N/I"}\n` +
+      `💰 Preço: ${price}\n` +
+      `🔧 Câmbio: ${vehicle.transmission || "N/I"}\n` +
+      `⛽ Combustível: ${vehicle.fuelType || "N/I"}\n` +
+      `📏 KM: ${vehicle.mileage ? Number(vehicle.mileage).toLocaleString("pt-BR") + " km" : "N/I"}\n` +
+      (vehicle.color ? `🎨 Cor: ${vehicle.color}\n` : "") +
+      (vehicle.plate ? `🔖 Placa: ${vehicle.plate}\n` : "") +
+      `\n_Kafka Multimarcas_`;
+    
+    // Send text first
+    await zapi.sendText(lead.phone, msg);
+    
+    // Send first image if available
+    if (vehicle.photoUrl) {
+      try {
+        await zapi.sendImage(lead.phone, vehicle.photoUrl, `${vehicle.brand} ${vehicle.model}`);
+      } catch {}
+    }
+    
+    await crmDb.createMessage({
+      leadId: input.leadId, phone: lead.phone, direction: "outbound",
+      messageType: "text", content: msg, mediaUrl: null,
+      senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
+    });
+    await crmDb.updateLead(input.leadId, { lastContactDate: Date.now(), vehicleInterest: `${vehicle.brand} ${vehicle.model}` });
+    return { success: true, vehicleName: `${vehicle.brand} ${vehicle.model}` };
+  }),
+
+  // Upload media file (base64) and return S3 URL
+  uploadMedia: publicProcedure.input(z.object({
+    base64: z.string(),
+    filename: z.string(),
+    mimeType: z.string(),
+  })).mutation(async ({ input }) => {
+    const buffer = Buffer.from(input.base64, "base64");
+    const ext = input.filename.split(".").pop() || "bin";
+    const key = `crm-media/${Date.now()}-${nanoid(6)}.${ext}`;
+    const { url } = await storagePut(key, buffer, input.mimeType);
+    return { url };
+  }),
 });
 
 // ===== PERFORMANCE & ALERTS =====

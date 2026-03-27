@@ -1,0 +1,130 @@
+{
+  "query": "SELECT messageType, mediaUrl, content, direction FROM crm_messages WHERE messageType != 'text' LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT messageType, mediaUrl, content, direction FROM crm_messages WHERE messageType != 'text' LIMIT 20;",
+  "rows": [
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC1FA04FA8114E332F20BF8E08296F21/grUfRB0Yz3cROr4v-NRIFg==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC9890539A763F4692898693BE656971/IWiMr258eED_Y26_WoiV9A==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACB3A589A15D99DB7869DFFADEFDE1EB/O_eHFETKyxrnS5dif7ybVg==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC888E7D405A922653268CA8CD6C8F28/Bvxao3o3WoZQ5D-0kw16sQ==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACCF805FF0D503517932463888747ADA/_8UGhMUNqmxgQJjq65kbUw==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "image",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3AAD181FF5F0C504DA34/69BPHZ-3WkNypvlKy3nJmg==.jpg",
+      "content": "Que nome é este?",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC54C049735932A76576922D49854B14/X7g-ljrP0Kryp_-MbL-m-w==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC6386B0D11842538AD26848FA8CDC79/cHCA7nPbJ5w6_M37yw_G0g==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC19D8384E2E0A510FF87992FFDE66A0/gFlMnLNA51ra0aACGf506Q==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC305709D54A405B9E8177BDB7AAD9E4/ul7HD_QrepMNP8NFjkqpdg==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "document",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3ADECBD192A9D65D5515/pUf9QZWKvkfhnwh6Qwk89w==.pdf",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC000C211F34B437D2BB1ECDD6A75A64/_IB-n1V4y_JoiD_qKEvCtw==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC15B395911880AA4B78C09C355B294E/SCvs9K8S_02Wg-bXpQLn8g==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC40B47B5AFD3C469C0E7AB379387A2D/90MpXj9yMavrzjN2vP2SGw==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC8AE59D8E4C73455554293E0D22F0A0/v6CdcQQOlOC43AyCwf0A0g==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACD445A86089CE385D267D66F2DB40CB/zlm0BqvD8K5dBZ9yU6PR3g==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACBA74290B2EE3317A28645138CA6C30/lsn3366X9Iku87q2H8n1iQ==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC01586CFC31722E5AE396D0F3927F60/MvhPDiv9xYamUcO016UROw==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACE7DD220DC2A7B03D37331C45DFB615/gdXq9ogxm0keIZB-QUybxQ==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    },
+    {
+      "messageType": "audio",
+      "mediaUrl": "https://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC52F897048DADDBF5618E9EDCC3FED7/cMhRCNSNS2hDgKOT3AkSxw==.ogg",
+      "content": "NULL",
+      "direction": "inbound"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageType\tmediaUrl\tcontent\tdirection\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC1FA04FA8114E332F20BF8E08296F21/grUfRB0Yz3cROr4v-NRIFg==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC9890539A763F4692898693BE656971/IWiMr258eED_Y26_WoiV9A==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACB3A589A15D99DB7869DFFADEFDE1EB/O_eHFETKyxrnS5dif7ybVg==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC888E7D405A922653268CA8CD6C8F28/Bvxao3o3WoZQ5D-0kw16sQ==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACCF805FF0D503517932463888747ADA/_8UGhMUNqmxgQJjq65kbUw==.ogg\tNULL\tinbound\nimage\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3AAD181FF5F0C504DA34/69BPHZ-3WkNypvlKy3nJmg==.jpg\tQue nome é este?\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC54C049735932A76576922D49854B14/X7g-ljrP0Kryp_-MbL-m-w==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC6386B0D11842538AD26848FA8CDC79/cHCA7nPbJ5w6_M37yw_G0g==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC19D8384E2E0A510FF87992FFDE66A0/gFlMnLNA51ra0aACGf506Q==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC305709D54A405B9E8177BDB7AAD9E4/ul7HD_QrepMNP8NFjkqpdg==.ogg\tNULL\tinbound\ndocument\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/3ADECBD192A9D65D5515/pUf9QZWKvkfhnwh6Qwk89w==.pdf\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC000C211F34B437D2BB1ECDD6A75A64/_IB-n1V4y_JoiD_qKEvCtw==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC15B395911880AA4B78C09C355B294E/SCvs9K8S_02Wg-bXpQLn8g==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC40B47B5AFD3C469C0E7AB379387A2D/90MpXj9yMavrzjN2vP2SGw==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC8AE59D8E4C73455554293E0D22F0A0/v6CdcQQOlOC43AyCwf0A0g==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACD445A86089CE385D267D66F2DB40CB/zlm0BqvD8K5dBZ9yU6PR3g==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACBA74290B2EE3317A28645138CA6C30/lsn3366X9Iku87q2H8n1iQ==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC01586CFC31722E5AE396D0F3927F60/MvhPDiv9xYamUcO016UROw==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/ACE7DD220DC2A7B03D37331C45DFB615/gdXq9ogxm0keIZB-QUybxQ==.ogg\tNULL\tinbound\naudio\thttps://f004.backblazeb2.com/file/temp-file-download/instances/3F0BC625790692D6DE63BAD0D5D4584A/AC52F897048DADDBF5618E9EDCC3FED7/cMhRCNSNS2hDgKOT3AkSxw==.ogg\tNULL\tinbound\n",
+  "stderr": "",
+  "execution_time_ms": 70
+}
