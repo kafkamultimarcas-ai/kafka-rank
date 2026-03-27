@@ -256,6 +256,17 @@ export const crmLeadsRouter = router({
   }).optional()).query(async ({ input }) => {
     return crmDb.listAllLeads({ sellerId: 0, department: input?.department });
   }),
+
+  // SDR full access: see ALL leads (assigned + unassigned) to manage and distribute
+  listForSDR: publicProcedure.input(z.object({
+    archived: z.boolean().optional(),
+    filterAssignment: z.enum(["all", "unassigned", "assigned"]).optional(),
+  }).optional()).query(async ({ input }) => {
+    const allLeads = await crmDb.listAllLeads({ archived: input?.archived ?? false });
+    if (!input?.filterAssignment || input.filterAssignment === "all") return allLeads;
+    if (input.filterAssignment === "unassigned") return allLeads.filter(l => l.sellerId === 0);
+    return allLeads.filter(l => l.sellerId > 0);
+  }),
 });
 
 // ===== CRM PIPELINE =====

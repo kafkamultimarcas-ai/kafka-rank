@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import {
   Snowflake, Plus, ArrowLeft, Clock, AlertTriangle, User, Car,
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
-  MessageSquare, Send, X, ChevronDown, FileText
+  MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft
 } from "lucide-react";
 
 const SOURCE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -58,6 +58,7 @@ function minutesSinceCreation(createdAt: any): number {
 }
 
 type TabView = "dashboard" | "leads" | "pipeline" | "templates";
+type AssignmentFilter = "all" | "unassigned" | "assigned";
 
 export default function CrmCommandCenter() {
   const [, navigate] = useLocation();
@@ -68,48 +69,86 @@ export default function CrmCommandCenter() {
   const [showNewLead, setShowNewLead] = useState(false);
   const [activeTab, setActiveTab] = useState<TabView>("leads");
   const [showTemplates, setShowTemplates] = useState<number | null>(null);
+  const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("all");
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const sellerId = sellerSession?.id || 0;
   const dept = sellerSession?.department || "vendas";
+  const isSDR = dept === "pre_vendas";
 
-  const { data: leads, refetch: refetchLeads } = trpc.crmLeads.listBySeller.useQuery(
-    { sellerId, archived: false }, { enabled: sellerId > 0 }
+  // SDRs see ALL leads via listForSDR, sellers see their own
+  const { data: sellerLeads, refetch: refetchSellerLeads } = trpc.crmLeads.listBySeller.useQuery(
+    { sellerId, archived: false }, { enabled: sellerId > 0 && !isSDR }
   );
+  const { data: sdrLeads, refetch: refetchSDR } = trpc.crmLeads.listForSDR.useQuery(
+    { archived: false }, { enabled: isSDR }
+  );
+  const leads = isSDR ? sdrLeads : sellerLeads;
+  const refetchLeads = isSDR ? refetchSDR : refetchSellerLeads;
+
+  // Sellers list for SDR assign dropdown
+  const { data: allSellers } = trpc.sellers.list.useQuery({ activeOnly: true }, { enabled: isSDR });
+  const vendorSellers = useMemo(() => {
+    if (!allSellers) return [];
+    return allSellers.filter((s: any) => s.department === "vendas" && s.active);
+  }, [allSellers]);
+  const sellerMap = useMemo(() => {
+    if (!allSellers) return {} as Record<number, string>;
+    return allSellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
+  }, [allSellers]);
+
   const { data: followUps } = trpc.crmLeads.getFollowUps.useQuery(
-    { sellerId }, { enabled: sellerId > 0 }
+    { sellerId }, { enabled: sellerId > 0 && !isSDR }
   );
   const { data: stages } = trpc.crmPipeline.getStages.useQuery({ department: dept });
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
-    { query: searchQuery, sellerId }, { enabled: searchQuery.length >= 2 && sellerId > 0 }
+    { query: searchQuery, sellerId: isSDR ? undefined : sellerId }, { enabled: searchQuery.length >= 2 }
   );
   const { data: stats } = trpc.crmLeads.getStats.useQuery(
-    { sellerId }, { enabled: sellerId > 0 }
+    { sellerId: isSDR ? undefined : sellerId }, { enabled: sellerId > 0 }
   );
   const { data: inventoryAlerts } = trpc.crmInventory.getAlerts.useQuery(
-    { sellerId }, { enabled: sellerId > 0 }
+    { sellerId }, { enabled: sellerId > 0 && !isSDR }
   );
   const { data: templates } = trpc.crmTemplates.list.useQuery({ department: dept });
   const { data: sellerDashboard } = trpc.crmSellerStats.getDashboard.useQuery(
-    { sellerId }, { enabled: sellerId > 0 }
+    { sellerId }, { enabled: sellerId > 0 && !isSDR }
   );
   const { data: overdueTasks } = trpc.crmFollowUp.listOverdue.useQuery(
-    { sellerId }, { enabled: sellerId > 0 }
+    { sellerId }, { enabled: sellerId > 0 && !isSDR }
   );
 
-  // Leads with urgency alerts
-  const { urgentLeads, warningLeads, normalLeads, filteredLeads } = useMemo(() => {
+  // Assign lead mutation for SDR
+  const assignLead = trpc.crmLeads.assignToSeller.useMutation({
+    onSuccess: () => { refetchLeads(); toast.success("Lead atribuído com sucesso!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Leads with urgency alerts + assignment filter
+  const { urgentLeads, warningLeads, normalLeads, filteredLeads, assignmentStats } = useMemo(() => {
     const displayLeads = searchQuery.length >= 2 ? searchResults : leads;
-    if (!displayLeads) return { urgentLeads: [], warningLeads: [], normalLeads: [], filteredLeads: [] };
+    if (!displayLeads) return { urgentLeads: [], warningLeads: [], normalLeads: [], filteredLeads: [], assignmentStats: { total: 0, unassigned: 0, assigned: 0 } };
+
+    // Assignment stats
+    const total = displayLeads.length;
+    const unassigned = displayLeads.filter((l: any) => l.sellerId === 0).length;
+    const assigned = total - unassigned;
+
+    // Apply assignment filter for SDR
+    let filtered = displayLeads;
+    if (isSDR && assignmentFilter !== "all") {
+      filtered = assignmentFilter === "unassigned"
+        ? displayLeads.filter((l: any) => l.sellerId === 0)
+        : displayLeads.filter((l: any) => l.sellerId > 0);
+    }
 
     const urgent: any[] = [];
     const warning: any[] = [];
     const normal: any[] = [];
 
-    displayLeads.forEach(lead => {
+    filtered.forEach((lead: any) => {
       const mins = minutesSinceCreation(lead.createdAt);
       const lastContact = lead.lastContactDate ? Math.floor((Date.now() - lead.lastContactDate) / (1000 * 60)) : 999;
-      // New lead without contact: 20min+ = URGENT (auto-transfer), 5min+ = WARNING
       if (lastContact === 999 && mins >= 20) {
         urgent.push({ ...lead, _alertType: "transfer" });
       } else if (lastContact === 999 && mins >= 5) {
@@ -123,8 +162,8 @@ export default function CrmCommandCenter() {
     if (filterScore) all = all.filter(l => l.score === filterScore);
     if (filterSource) all = all.filter(l => l.source === filterSource);
 
-    return { urgentLeads: urgent, warningLeads: warning, normalLeads: normal, filteredLeads: all };
-  }, [leads, searchResults, searchQuery, filterScore, filterSource]);
+    return { urgentLeads: urgent, warningLeads: warning, normalLeads: normal, filteredLeads: all, assignmentStats: { total, unassigned, assigned } };
+  }, [leads, searchResults, searchQuery, filterScore, filterSource, isSDR, assignmentFilter]);
 
   const moveStage = trpc.crmLeads.moveStage.useMutation({
     onSuccess: () => { refetchLeads(); toast.success("Etapa atualizada!"); },
@@ -160,6 +199,10 @@ export default function CrmCommandCenter() {
     }
   };
 
+  const handleAssign = useCallback((leadId: number, newSellerId: number) => {
+    assignLead.mutate({ leadId, newSellerId, currentSellerId: sellerId });
+  }, [assignLead, sellerId]);
+
   if (!sellerSession) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -181,7 +224,7 @@ export default function CrmCommandCenter() {
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div>
-              <h1 className="text-sm font-bold text-foreground">Meu CRM</h1>
+              <h1 className="text-sm font-bold text-foreground">{isSDR ? 'Pré-Vendas / SDR' : 'Meu CRM'}</h1>
               <p className="text-[10px] text-muted-foreground">{sellerSession.nickname || sellerSession.name}</p>
             </div>
           </div>
@@ -276,20 +319,51 @@ export default function CrmCommandCenter() {
 
       {/* Content based on active tab */}
       {activeTab === "dashboard" && (
-        <SellerDashboard
-          dashboard={sellerDashboard}
-          stats={stats}
-          followUps={followUps}
-          overdueTasks={overdueTasks}
-          inventoryAlerts={inventoryAlerts}
-          onWhatsApp={handleWhatsApp}
-          onCall={handleCall}
-          sellerId={sellerId}
-        />
+        isSDR ? (
+          <SDRDashboard
+            stats={stats}
+            assignmentStats={assignmentStats}
+            leads={leads || []}
+            sellerMap={sellerMap}
+            vendorSellers={vendorSellers}
+            onAssign={handleAssign}
+            onWhatsApp={handleWhatsApp}
+            onCall={handleCall}
+          />
+        ) : (
+          <SellerDashboard
+            dashboard={sellerDashboard}
+            stats={stats}
+            followUps={followUps}
+            overdueTasks={overdueTasks}
+            inventoryAlerts={inventoryAlerts}
+            onWhatsApp={handleWhatsApp}
+            onCall={handleCall}
+            sellerId={sellerId}
+          />
+        )
       )}
 
       {activeTab === "leads" && (
         <div className="px-3 mt-3">
+          {/* SDR Assignment filter */}
+          {isSDR && (
+            <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
+              <button onClick={() => setAssignmentFilter("all")}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${assignmentFilter === "all" ? "bg-primary/20 border-primary/40 text-primary" : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <LayoutGrid className="w-3 h-3" /> Todos ({assignmentStats.total})
+              </button>
+              <button onClick={() => setAssignmentFilter("unassigned")}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${assignmentFilter === "unassigned" ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <UserPlus className="w-3 h-3" /> Novos ({assignmentStats.unassigned})
+              </button>
+              <button onClick={() => setAssignmentFilter("assigned")}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${assignmentFilter === "assigned" ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400" : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <CheckCircle className="w-3 h-3" /> Atribuídos ({assignmentStats.assigned})
+              </button>
+            </div>
+          )}
+
           {/* Search bar */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -338,10 +412,14 @@ export default function CrmCommandCenter() {
               filteredLeads.map((lead: any) => (
                 <LeadCard key={lead.id} lead={lead} stages={stages || []} sellerId={sellerId}
                   templates={templates || []}
+                  isSDR={isSDR}
+                  vendorSellers={vendorSellers}
+                  sellerMap={sellerMap}
                   onWhatsApp={() => handleWhatsApp(lead)} onCall={() => handleCall(lead)}
                   onMoveStage={(newStage) => moveStage.mutate({ id: lead.id, newStage, sellerId })}
                   onView={() => navigate(`/crm/lead/${lead.id}`)}
                   onTemplateSelect={(tId) => handleTemplateSelect(lead, tId)}
+                  onAssign={(newSellerId) => handleAssign(lead.id, newSellerId)}
                   showTemplates={showTemplates === lead.id}
                   onToggleTemplates={() => setShowTemplates(showTemplates === lead.id ? null : lead.id)}
                 />
@@ -360,14 +438,15 @@ export default function CrmCommandCenter() {
       )}
 
       {activeTab === "pipeline" && (
-        <PipelineView sellerId={sellerId} dept={dept} stages={stages || []} leads={leads || []}
+        <PipelineView sellerId={sellerId} dept={dept} stages={stages || []} leads={filteredLeads || []}
+          isSDR={isSDR} sellerMap={sellerMap}
           onMoveStage={(id, stage) => moveStage.mutate({ id, newStage: stage, sellerId })}
           onView={(id) => navigate(`/crm/lead/${id}`)} />
       )}
 
       {/* Modal novo lead */}
       {showNewLead && (
-        <NewLeadModal sellerId={sellerId} department={dept}
+        <NewLeadModal sellerId={isSDR ? 0 : sellerId} department={dept}
           onClose={() => setShowNewLead(false)}
           onCreated={() => { setShowNewLead(false); refetchLeads(); }} />
       )}
@@ -386,6 +465,136 @@ export default function CrmCommandCenter() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===== SDR DASHBOARD =====
+function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers, onAssign, onWhatsApp, onCall }: any) {
+  const unassignedLeads = useMemo(() => leads.filter((l: any) => l.sellerId === 0), [leads]);
+  const recentLeads = useMemo(() => {
+    return [...leads]
+      .sort((a: any, b: any) => {
+        const aTime = a.lastContactDate || new Date(a.createdAt).getTime();
+        const bTime = b.lastContactDate || new Date(b.createdAt).getTime();
+        return bTime - aTime;
+      })
+      .slice(0, 5);
+  }, [leads]);
+
+  // Count leads per seller
+  const sellerLeadCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    leads.forEach((l: any) => {
+      if (l.sellerId > 0) {
+        counts[l.sellerId] = (counts[l.sellerId] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [leads]);
+
+  return (
+    <div className="px-3 mt-3 space-y-3">
+      {/* Stats cards */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-border bg-card p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Target className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[10px] text-muted-foreground uppercase">Total</span>
+          </div>
+          <p className="text-xl font-bold text-foreground">{assignmentStats.total}</p>
+        </div>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <UserPlus className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[10px] text-muted-foreground uppercase">Novos</span>
+          </div>
+          <p className="text-xl font-bold text-amber-400">{assignmentStats.unassigned}</p>
+        </div>
+        <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <CheckCircle className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[10px] text-muted-foreground uppercase">Atribuídos</span>
+          </div>
+          <p className="text-xl font-bold text-cyan-400">{assignmentStats.assigned}</p>
+        </div>
+      </div>
+
+      {/* Unassigned leads needing attention */}
+      {unassignedLeads.length > 0 && (
+        <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/5 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold text-amber-400">{unassignedLeads.length} leads aguardando atribuição</span>
+          </div>
+          {unassignedLeads.slice(0, 5).map((lead: any) => (
+            <div key={lead.id} className="flex items-center justify-between py-2 border-t border-amber-500/15">
+              <div className="flex-1 min-w-0 mr-2">
+                <span className="text-xs font-medium text-foreground truncate block">{lead.name}</span>
+                <span className="text-[10px] text-muted-foreground">{lead.phone || "Sem tel."} • {timeAgo(lead.lastContactDate || (typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt).getTime()))}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <select
+                  defaultValue=""
+                  onChange={e => { const v = parseInt(e.target.value); if (v) onAssign(lead.id, v); }}
+                  className="h-7 px-2 text-[10px] rounded-lg border border-border bg-background text-foreground min-w-[100px]"
+                >
+                  <option value="">Atribuir →</option>
+                  {vendorSellers.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                  ))}
+                </select>
+                <button onClick={() => onWhatsApp(lead)} className="p-1.5 rounded bg-green-500/20 hover:bg-green-500/30 active:scale-95">
+                  <MessageCircle className="w-3.5 h-3.5 text-green-400" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Leads per seller */}
+      {vendorSellers.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-3">
+          <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+            <BarChart3 className="w-3.5 h-3.5 text-primary" /> Leads por Vendedor
+          </h3>
+          <div className="space-y-1.5">
+            {vendorSellers.map((s: any) => {
+              const count = sellerLeadCounts[s.id] || 0;
+              const maxCount = Math.max(...Object.values(sellerLeadCounts), 1);
+              return (
+                <div key={s.id} className="flex items-center gap-2">
+                  <span className="text-[11px] text-foreground w-24 truncate">{s.nickname || s.name}</span>
+                  <div className="flex-1 h-4 bg-accent/30 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary/40 rounded-full transition-all duration-500" style={{ width: `${(count / maxCount) * 100}%` }} />
+                  </div>
+                  <span className="text-[11px] font-bold text-foreground w-6 text-right">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Recent activity */}
+      {recentLeads.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-3">
+          <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-muted-foreground" /> Atividade Recente
+          </h3>
+          {recentLeads.map((lead: any) => (
+            <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-border/50">
+              <div className="flex-1 min-w-0">
+                <span className="text-[11px] font-medium text-foreground truncate block">{lead.name}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {lead.sellerId > 0 ? sellerMap[lead.sellerId] || `#${lead.sellerId}` : "Sem vendedor"} • {timeAgo(lead.lastContactDate || (typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt).getTime()))}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -508,9 +717,10 @@ function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryA
 }
 
 // ===== PIPELINE VIEW =====
-function PipelineView({ sellerId, dept, stages, leads, onMoveStage, onView }: {
+function PipelineView({ sellerId, dept, stages, leads, onMoveStage, onView, isSDR, sellerMap }: {
   sellerId: number; dept: string; stages: any[]; leads: any[];
   onMoveStage: (id: number, stage: string) => void; onView: (id: number) => void;
+  isSDR?: boolean; sellerMap?: Record<number, string>;
 }) {
   return (
     <div className="px-3 mt-3">
@@ -531,7 +741,19 @@ function PipelineView({ sellerId, dept, stages, leads, onMoveStage, onView }: {
                       className="w-full px-3 py-2 flex items-center justify-between hover:bg-accent/50 transition-colors text-left">
                       <div className="flex-1 min-w-0">
                         <span className="text-xs font-medium text-foreground truncate block">{lead.name}</span>
-                        {lead.vehicleInterest && <span className="text-[10px] text-muted-foreground">{lead.vehicleInterest}</span>}
+                        <div className="flex items-center gap-1.5">
+                          {lead.vehicleInterest && <span className="text-[10px] text-muted-foreground">{lead.vehicleInterest}</span>}
+                          {isSDR && lead.sellerId > 0 && sellerMap && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400">
+                              {sellerMap[lead.sellerId] || `#${lead.sellerId}`}
+                            </span>
+                          )}
+                          {isSDR && lead.sellerId === 0 && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+                              Novo
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <span className="text-[10px] text-muted-foreground">{timeAgo(lead.lastContactDate)}</span>
@@ -552,18 +774,22 @@ function PipelineView({ sellerId, dept, stages, leads, onMoveStage, onView }: {
 }
 
 // ===== LEAD CARD =====
-function LeadCard({ lead, stages, sellerId, templates, onWhatsApp, onCall, onMoveStage, onView, onTemplateSelect, showTemplates, onToggleTemplates }: {
+function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sellerMap, onWhatsApp, onCall, onMoveStage, onView, onTemplateSelect, onAssign, showTemplates, onToggleTemplates }: {
   lead: any; stages: any[]; sellerId: number; templates: any[];
+  isSDR?: boolean; vendorSellers?: any[]; sellerMap?: Record<number, string>;
   onWhatsApp: () => void; onCall: () => void;
   onMoveStage: (stage: string) => void; onView: () => void;
   onTemplateSelect: (tId: number) => void;
+  onAssign?: (newSellerId: number) => void;
   showTemplates: boolean; onToggleTemplates: () => void;
 }) {
   const [showStages, setShowStages] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
   const scoreCfg = SCORE_CONFIG[lead.score as keyof typeof SCORE_CONFIG] || SCORE_CONFIG.warm;
   const ScoreIcon = scoreCfg.icon;
   const isUrgent = lead._alertType === "transfer";
   const isWarning = lead._alertType === "priority";
+  const isUnassigned = lead.sellerId === 0;
 
   return (
     <div className={`rounded-xl border p-3 transition-all ${isUrgent ? "bg-red-500/10 border-red-500/50 shadow-lg shadow-red-500/10 animate-pulse" : isWarning ? "bg-amber-500/10 border-amber-500/40" : scoreCfg.bg}`}>
@@ -602,6 +828,17 @@ function LeadCard({ lead, stages, sellerId, templates, onWhatsApp, onCall, onMov
                 {SOURCE_LABELS[lead.source]?.label || lead.source}
               </span>
             )}
+            {/* SDR: show assignment status */}
+            {isSDR && isUnassigned && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
+                NOVO
+              </span>
+            )}
+            {isSDR && !isUnassigned && sellerMap && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">
+                → {sellerMap[lead.sellerId] || `#${lead.sellerId}`}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -622,6 +859,13 @@ function LeadCard({ lead, stages, sellerId, templates, onWhatsApp, onCall, onMov
           <Phone className="w-4 h-4 text-blue-400" />
           <span className="text-[10px] font-medium text-blue-400">Ligar</span>
         </button>
+        {/* SDR: Assign button */}
+        {isSDR && (
+          <button onClick={() => setShowAssign(!showAssign)}
+            className={`flex items-center justify-center p-2 rounded-lg transition-all active:scale-95 ${showAssign ? "bg-cyan-500/30 border-cyan-500/40" : "bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/30"} border`}>
+            <ArrowRightLeft className="w-4 h-4 text-cyan-400" />
+          </button>
+        )}
         <button onClick={() => setShowStages(!showStages)}
           className="flex items-center justify-center p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 transition-all active:scale-95">
           <ChevronRight className={`w-4 h-4 text-purple-400 transition-transform ${showStages ? "rotate-90" : ""}`} />
@@ -631,6 +875,28 @@ function LeadCard({ lead, stages, sellerId, templates, onWhatsApp, onCall, onMov
           <Eye className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
+
+      {/* SDR: Assign dropdown */}
+      {isSDR && showAssign && vendorSellers && vendorSellers.length > 0 && (
+        <div className="mt-2 p-2 rounded-lg bg-card border border-cyan-500/20 space-y-1">
+          <p className="text-[10px] text-cyan-400 font-medium mb-1 flex items-center gap-1">
+            <ArrowRightLeft className="w-3 h-3" /> Atribuir a vendedor:
+          </p>
+          <div className="grid grid-cols-2 gap-1">
+            {vendorSellers.map((s: any) => (
+              <button key={s.id} onClick={() => { if (onAssign) onAssign(s.id); setShowAssign(false); }}
+                className={`text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
+                  lead.sellerId === s.id
+                    ? "bg-cyan-500/20 text-cyan-400 font-bold"
+                    : "hover:bg-accent text-foreground"
+                }`}>
+                <User className="w-3 h-3 shrink-0 text-muted-foreground" />
+                <span className="truncate">{s.nickname || s.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Templates dropdown */}
       {showTemplates && templates.length > 0 && (

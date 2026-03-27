@@ -1144,3 +1144,14 @@
 - [x] Frontend: CRM estilo WhatsApp Web (lista leads esquerda + chat direita)
 - [x] Frontend: alertas visuais de tempo de resposta
 - [x] Frontend: painel de notas IA e performance
+
+## Bug: SDR não vê leads + Financeiro bloqueado + Painel Permissões
+- [ ] SDR (pre_vendas) deve ver leads não atribuídos (sellerId=0) no CRM /crm
+- [ ] Financeiro deve conseguir lançar contas (verificar bloqueio)
+- [ ] Criar painel de permissões por função no gerente (controlar o que cada cargo acessa/faz)
+- [ ] Gerente define permissões: quem vê leads, quem pode lançar financeiro, quem acessa ranking, etc.
+
+## Bug: Senha Tissiane + SDR acesso total
+- [x] Resetar senha da Tissiane para 111025
+- [x] Investigar bug de troca de senha (hash não bate após mudar)
+- [x] SDR deve ter acesso TOTAL a todos os leads (não só os não atribuídos) para administrar e transferir

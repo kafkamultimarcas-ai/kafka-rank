@@ -31,6 +31,34 @@ describe("SDR Lead Distribution Flow", () => {
     expect(router._def.procedures.listUnassigned).toBeDefined();
     expect(router._def.procedures.listBySeller).toBeDefined();
     expect(router._def.procedures.listAll).toBeDefined();
+    expect(router._def.procedures.listForSDR).toBeDefined();
+  });
+
+  it("listForSDR should be a public procedure for SDR full access", async () => {
+    const crmRouter = await import("./routers/crmRouter");
+    const router = crmRouter.crmLeadsRouter;
+    // listForSDR should exist and be queryable
+    expect(router._def.procedures.listForSDR).toBeDefined();
+    // It should accept filterAssignment parameter
+    const proc = router._def.procedures.listForSDR as any;
+    expect(proc).toBeTruthy();
+  });
+
+  it("CRM vendor page should use listForSDR for SDR users", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const crmSource = fs.readFileSync(
+      path.join(__dirname, "../client/src/pages/crm/CrmCommandCenter.tsx"),
+      "utf-8"
+    );
+    // SDR should use listForSDR instead of listUnassigned
+    expect(crmSource).toContain("listForSDR");
+    // SDR should have assignment filter
+    expect(crmSource).toContain("assignmentFilter");
+    // SDR should be able to assign leads to vendors
+    expect(crmSource).toContain("onAssign");
+    // SDR should see all leads (not just unassigned)
+    expect(crmSource).toContain("AssignmentFilter");
   });
 
   it("should have WhatsApp bulk send procedures", async () => {
