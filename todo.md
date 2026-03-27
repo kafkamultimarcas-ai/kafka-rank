@@ -1119,3 +1119,7 @@
 - [x] Mostrar tempo desde último contato no card do lead
 - [x] Botões de ação rápida maiores e mais visíveis (WhatsApp, Ligar)
 - [x] Filtros visuais por status/temperatura na listagem de leads
+
+## Bug: Mensagens WhatsApp não viram leads no CRM
+- [x] Investigar webhook Z-API - mensagens chegam no WhatsApp mas não aparecem no CRM
+- [x] Corrigir processamento do webhook para criar leads automaticamente (removido validateToken do webhook WhatsApp + reconfigurado URL na Z-API)

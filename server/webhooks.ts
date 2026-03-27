@@ -705,8 +705,8 @@ export function registerWebhookRoutes(app: Express) {
   // Accepts both Z-API format (phone, text.message, momment) and generic format (from, message, timestamp)
   app.post("/api/webhooks/whatsapp", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
-
+      // WhatsApp webhook does NOT require x-api-token auth
+      // Z-API sends messages directly without custom headers
       const body = req.body;
 
       // Normalize Z-API format vs generic format
