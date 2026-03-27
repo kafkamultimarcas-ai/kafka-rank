@@ -721,9 +721,9 @@ export function registerWebhookRoutes(app: Express) {
 
       console.log(`WhatsApp webhook: phone=${rawPhone}, msg=${messageText?.substring(0, 50)}, fromMe=${fromMe}, isGroup=${isGroup}, type=${messageType}`);
 
-      // Skip messages sent by us or from groups (unless you want group tracking)
-      if (fromMe || isGroup) {
-        res.json({ success: true, action: "skipped", reason: fromMe ? "from_me" : "group" });
+      // Skip group messages
+      if (isGroup) {
+        res.json({ success: true, action: "skipped", reason: "group" });
         return;
       }
 
@@ -731,11 +731,13 @@ export function registerWebhookRoutes(app: Express) {
         const phone = rawPhone.replace(/\D/g, "");
         const existingLeads = await crmDb.searchLeads(phone);
         if (existingLeads.length > 0) {
+          // Determine direction: fromMe = outbound (seller replied via WhatsApp), else inbound
+          const direction = fromMe ? "outbound" : "inbound";
           // Save message to crm_messages
           await crmDb.createMessage({
             leadId: existingLeads[0].id,
             phone,
-            direction: "inbound",
+            direction,
             messageType,
             content: messageText || null,
             mediaUrl: mediaUrl || null,
@@ -750,7 +752,13 @@ export function registerWebhookRoutes(app: Express) {
           return;
         }
 
-        // Create new lead from WhatsApp
+        // If fromMe and no existing lead, skip (we sent to unknown number, don't create lead)
+        if (fromMe) {
+          res.json({ success: true, action: "skipped", reason: "from_me_no_lead" });
+          return;
+        }
+
+        // Create new lead from WhatsApp (only from inbound messages)
         const dept = "vendas";
         const defaultStage = await crmDb.getDefaultStage(dept);
         const leadId = await crmDb.createLead({

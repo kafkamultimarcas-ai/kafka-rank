@@ -1155,3 +1155,36 @@
 - [x] Resetar senha da Tissiane para 111025
 - [x] Investigar bug de troca de senha (hash não bate após mudar)
 - [x] SDR deve ter acesso TOTAL a todos os leads (não só os não atribuídos) para administrar e transferir
+
+## Financeiro Bloqueado
+- [ ] Investigar o que bloqueia o acesso ao módulo financeiro
+- [ ] Corrigir e liberar acesso ao financeiro
+
+## AI Lead Scoring
+- [ ] Criar tabela/campos para armazenar score do lead (quente/morno/frio)
+- [ ] Implementar algoritmo de scoring baseado em: tempo de resposta, mensagens trocadas, agendamento, simulação financiamento
+- [ ] Exibir indicador visual (quente/morno/frio) no card do lead no CRM
+- [ ] Atualizar score automaticamente quando lead interage
+- [ ] Filtro por temperatura no painel SDR e vendedor
+
+## Automação de Follow-up WhatsApp
+- [ ] Criar tabela para sequências de follow-up (templates + intervalos)
+- [ ] Tela admin para criar/editar sequências de follow-up
+- [ ] Motor de execução automática que envia mensagens via Z-API nos intervalos definidos
+- [ ] Parar sequência quando lead responde
+- [ ] Log de mensagens enviadas automaticamente
+- [ ] Indicador visual de "em sequência automática" no card do lead
+
+## Integração com Portais de Anúncio
+- [ ] Pesquisar APIs disponíveis (OLX, Webmotors, iCarros, Mobiauto, Instagram)
+- [ ] Tela de configuração para credenciais dos portais
+- [ ] Publicação de veículos do estoque nos portais com 1 clique
+- [ ] Sincronização de status (vendido/disponível)
+- [ ] Recebimento de leads dos portais direto no CRM
+
+## Bug Fixes
+- [x] Leads mostram "SEM RESPOSTA" mesmo quando cliente já respondeu no WhatsApp (corrigido: webhook agora registra mensagens fromMe como outbound)
+
+## SDR Chat Panel
+- [x] Adicionar painel de chat inline na tela da SDR para conversar com leads direto pelo CRM
+- [x] SDR deve poder clicar no lead e ver histórico de mensagens + campo para enviar mensagem

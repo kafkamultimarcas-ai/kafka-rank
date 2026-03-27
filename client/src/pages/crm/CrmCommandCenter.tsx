@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import {
   Snowflake, Plus, ArrowLeft, Clock, AlertTriangle, User, Car,
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
-  MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft
+  MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip
 } from "lucide-react";
 
 const SOURCE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -60,6 +60,190 @@ function minutesSinceCreation(createdAt: any): number {
 type TabView = "dashboard" | "leads" | "pipeline" | "templates";
 type AssignmentFilter = "all" | "unassigned" | "assigned";
 
+function formatChatTime(ts: number) {
+  return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+function formatChatDate(ts: number) {
+  const d = new Date(ts);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return "Hoje";
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Ontem";
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+// ===== INLINE CHAT PANEL =====
+function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; sellerId: number; onClose: () => void }) {
+  const [message, setMessage] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { data: lead } = trpc.crmLeads.getById.useQuery({ id: leadId });
+  const { data: messages, refetch: refetchMessages } = trpc.crmChat.getMessages.useQuery(
+    { leadId }, { refetchInterval: 5000 }
+  );
+  const { data: sellers } = trpc.sellers.list.useQuery();
+  const sellerMap = useMemo(() => {
+    if (!sellers) return {} as Record<number, string>;
+    return sellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
+  }, [sellers]);
+
+  const sendMsg = trpc.crmChat.sendMessage.useMutation({
+    onSuccess: () => { setMessage(""); refetchMessages(); },
+    onError: (e: any) => toast.error("Erro ao enviar: " + e.message),
+  });
+
+  const assignLead = trpc.crmLeads.assignToSeller.useMutation({
+    onSuccess: () => toast.success("Lead transferido!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = () => {
+    if (!message.trim()) return;
+    sendMsg.mutate({ leadId, message: message.trim(), sellerId });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  };
+
+  const groupedMessages = useMemo(() => {
+    if (!messages) return [];
+    const groups: { date: string; messages: any[] }[] = [];
+    let currentDate = "";
+    for (const msg of messages as any[]) {
+      const date = formatChatDate(msg.timestamp);
+      if (date !== currentDate) {
+        currentDate = date;
+        groups.push({ date, messages: [msg] });
+      } else {
+        groups[groups.length - 1].messages.push(msg);
+      }
+    }
+    return groups;
+  }, [messages]);
+
+  const scoreCfg = lead ? (SCORE_CONFIG[lead.score as keyof typeof SCORE_CONFIG] || SCORE_CONFIG.warm) : SCORE_CONFIG.warm;
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-black/60 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-background w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl border border-border flex flex-col" style={{ maxHeight: "90vh", height: "90vh" }} onClick={e => e.stopPropagation()}>
+        {/* Chat header */}
+        <div className="border-b border-border bg-card px-3 py-2.5 rounded-t-2xl shrink-0">
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="p-1 hover:bg-accent rounded-lg">
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${scoreCfg.bg} border`}>
+              <scoreCfg.icon className={`w-3.5 h-3.5 ${scoreCfg.color}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-foreground truncate">{lead?.name || "..."}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span>{lead?.phone}</span>
+                <span>•</span>
+                <span className={scoreCfg.color}>{scoreCfg.label}</span>
+                <span>•</span>
+                <span>{lead?.stage}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {lead?.phone && (
+                <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
+                  className="p-2 rounded-lg hover:bg-green-500/10 text-green-400" title="Abrir WhatsApp">
+                  <MessageCircle className="w-4 h-4" />
+                </a>
+              )}
+              {lead?.phone && (
+                <a href={`tel:${lead.phone}`}
+                  className="p-2 rounded-lg hover:bg-blue-500/10 text-blue-400" title="Ligar">
+                  <Phone className="w-4 h-4" />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, rgba(16,185,129,0.03), transparent 50%)" }}>
+          {groupedMessages.map((group, gi) => (
+            <div key={gi}>
+              <div className="flex items-center justify-center my-3">
+                <span className="text-[10px] text-muted-foreground bg-accent/80 px-3 py-1 rounded-full">{group.date}</span>
+              </div>
+              {group.messages.map((msg: any) => (
+                <div key={msg.id} className={`flex mb-1.5 ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                    msg.direction === "outbound"
+                      ? "bg-green-600/90 text-white rounded-br-md"
+                      : "bg-card border border-border text-foreground rounded-bl-md"
+                  }`}>
+                    {msg.direction === "outbound" && msg.sentBy && (
+                      <p className="text-[9px] font-medium opacity-70 mb-0.5">{sellerMap[msg.sentBy] || "Você"}</p>
+                    )}
+                    {msg.direction === "inbound" && msg.senderName && (
+                      <p className="text-[9px] font-medium text-primary mb-0.5">{msg.senderName}</p>
+                    )}
+                    {msg.mediaUrl && msg.messageType === "image" && (
+                      <img src={msg.mediaUrl} alt="" className="rounded-lg max-w-full mb-1" style={{ maxHeight: 200 }} />
+                    )}
+                    {msg.mediaUrl && msg.messageType !== "image" && (
+                      <a href={msg.mediaUrl} target="_blank" rel="noopener" className="flex items-center gap-1.5 text-xs underline mb-1">
+                        <Paperclip className="w-3 h-3" /> Arquivo
+                      </a>
+                    )}
+                    {msg.content && <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
+                    <p className={`text-[9px] mt-0.5 text-right ${msg.direction === "outbound" ? "opacity-60" : "text-muted-foreground"}`}>
+                      {formatChatTime(msg.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+          {(!messages || messages.length === 0) && (
+            <div className="text-center py-8">
+              <MessageCircle className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhuma mensagem ainda</p>
+              <p className="text-xs text-muted-foreground/60">Envie a primeira mensagem para este lead</p>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Message input */}
+        <div className="border-t border-border bg-card p-3 rounded-b-2xl shrink-0">
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Digite uma mensagem..."
+                rows={1}
+                className="w-full bg-accent/30 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                style={{ minHeight: 42, maxHeight: 120 }}
+              />
+            </div>
+            <Button
+              onClick={handleSend}
+              disabled={!message.trim() || sendMsg.isPending}
+              className="h-[42px] w-[42px] rounded-full bg-green-600 hover:bg-green-700 p-0 shrink-0"
+            >
+              <Send className="w-5 h-5 text-white" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmCommandCenter() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,6 +254,7 @@ export default function CrmCommandCenter() {
   const [activeTab, setActiveTab] = useState<TabView>("leads");
   const [showTemplates, setShowTemplates] = useState<number | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("all");
+  const [chatLeadId, setChatLeadId] = useState<number | null>(null);
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const sellerId = sellerSession?.id || 0;
@@ -276,7 +461,7 @@ export default function CrmCommandCenter() {
                 <span className="text-[10px] text-red-300">{minutesSinceCreation(lead.createdAt)}min sem resposta</span>
               </div>
               <div className="flex gap-1">
-                <button onClick={() => handleWhatsApp(lead)} className="p-2 rounded-lg bg-green-500/30 hover:bg-green-500/40 active:scale-95">
+                <button onClick={() => setChatLeadId(lead.id)} className="p-2 rounded-lg bg-green-500/30 hover:bg-green-500/40 active:scale-95" title="Abrir Chat">
                   <MessageCircle className="w-4 h-4 text-green-400" />
                 </button>
                 <button onClick={() => handleCall(lead)} className="p-2 rounded-lg bg-blue-500/30 hover:bg-blue-500/40 active:scale-95">
@@ -305,7 +490,7 @@ export default function CrmCommandCenter() {
                 <span className="text-[10px] text-amber-300">{minutesSinceCreation(lead.createdAt)}min aguardando</span>
               </div>
               <div className="flex gap-1">
-                <button onClick={() => handleWhatsApp(lead)} className="p-1.5 rounded bg-green-500/20 hover:bg-green-500/30 active:scale-95">
+                <button onClick={() => setChatLeadId(lead.id)} className="p-1.5 rounded bg-green-500/20 hover:bg-green-500/30 active:scale-95" title="Abrir Chat">
                   <MessageCircle className="w-3.5 h-3.5 text-green-400" />
                 </button>
                 <button onClick={() => handleCall(lead)} className="p-1.5 rounded bg-blue-500/20 hover:bg-blue-500/30 active:scale-95">
@@ -416,6 +601,7 @@ export default function CrmCommandCenter() {
                   vendorSellers={vendorSellers}
                   sellerMap={sellerMap}
                   onWhatsApp={() => handleWhatsApp(lead)} onCall={() => handleCall(lead)}
+                  onChat={() => setChatLeadId(lead.id)}
                   onMoveStage={(newStage) => moveStage.mutate({ id: lead.id, newStage, sellerId })}
                   onView={() => navigate(`/crm/lead/${lead.id}`)}
                   onTemplateSelect={(tId) => handleTemplateSelect(lead, tId)}
@@ -449,6 +635,11 @@ export default function CrmCommandCenter() {
         <NewLeadModal sellerId={isSDR ? 0 : sellerId} department={dept}
           onClose={() => setShowNewLead(false)}
           onCreated={() => { setShowNewLead(false); refetchLeads(); }} />
+      )}
+
+      {/* Inline Chat Panel */}
+      {chatLeadId && (
+        <InlineChatPanel leadId={chatLeadId} sellerId={sellerId} onClose={() => setChatLeadId(null)} />
       )}
 
       {/* Bottom nav */}
@@ -774,10 +965,10 @@ function PipelineView({ sellerId, dept, stages, leads, onMoveStage, onView, isSD
 }
 
 // ===== LEAD CARD =====
-function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sellerMap, onWhatsApp, onCall, onMoveStage, onView, onTemplateSelect, onAssign, showTemplates, onToggleTemplates }: {
+function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sellerMap, onWhatsApp, onCall, onChat, onMoveStage, onView, onTemplateSelect, onAssign, showTemplates, onToggleTemplates }: {
   lead: any; stages: any[]; sellerId: number; templates: any[];
   isSDR?: boolean; vendorSellers?: any[]; sellerMap?: Record<number, string>;
-  onWhatsApp: () => void; onCall: () => void;
+  onWhatsApp: () => void; onCall: () => void; onChat: () => void;
   onMoveStage: (stage: string) => void; onView: () => void;
   onTemplateSelect: (tId: number) => void;
   onAssign?: (newSellerId: number) => void;
@@ -845,10 +1036,14 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
 
       {/* Action buttons */}
       <div className="flex gap-1.5 mt-2">
-        <button onClick={onWhatsApp}
+        <button onClick={onChat}
           className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 transition-all active:scale-95">
           <MessageCircle className="w-4 h-4 text-green-400" />
-          <span className="text-[10px] font-medium text-green-400">WhatsApp</span>
+          <span className="text-[10px] font-medium text-green-400">Chat</span>
+        </button>
+        <button onClick={onWhatsApp}
+          className="flex items-center justify-center p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 transition-all active:scale-95" title="Abrir WhatsApp externo">
+          <ArrowUpRight className="w-4 h-4 text-green-300" />
         </button>
         <button onClick={onToggleTemplates}
           className="flex items-center justify-center p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 transition-all active:scale-95">
