@@ -11,6 +11,23 @@ import { transcribeAudio } from "../_core/voiceTranscription";
 
 // ===== ADMIN AUTH (Login próprio) =====
 export const adminAuthRouter = router({
+  // Auto-login for Manus OAuth owner - enters CRM admin without password
+  autoLogin: protectedProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.user || ctx.user.openId !== ENV.ownerOpenId) {
+      throw new Error("Acesso negado");
+    }
+    const admin = await crmDb.getAdminByUsername("kafka");
+    if (!admin || !admin.active) {
+      throw new Error("Conta admin n\u00e3o encontrada");
+    }
+    const token = jwt.sign(
+      { adminId: admin.id, role: admin.role, type: "admin_auth" },
+      ENV.cookieSecret,
+      { expiresIn: "30d" }
+    );
+    return { token, admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role } };
+  }),
+
   login: publicProcedure.input(z.object({
     username: z.string().min(1),
     password: z.string().min(1),

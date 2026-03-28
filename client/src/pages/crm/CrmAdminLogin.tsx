@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { Lock, User, LogIn, Eye, EyeOff, Shield } from "lucide-react";
+import { Lock, User, LogIn, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 const ADMIN_TOKEN_KEY = "crm_admin_token";
@@ -27,6 +28,43 @@ export default function CrmAdminLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
+  const autoLoginTriedRef = useRef(false);
+
+  // Check if user is already logged in via Manus OAuth (owner)
+  const { user: manusUser, loading: manusLoading } = useAuth();
+
+  // Auto-login mutation for Manus OAuth owner
+  const autoLoginMutation = trpc.adminAuth.autoLogin.useMutation({
+    onSuccess: (data) => {
+      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+      toast.success(`Bem-vindo, ${data.admin.name}!`);
+      navigate("/crm/admin");
+    },
+    onError: () => {
+      // Auto-login failed (not owner or no admin account), show manual login
+      setAutoLoginAttempted(true);
+    },
+  });
+
+  // Try auto-login when Manus OAuth user is detected
+  useEffect(() => {
+    if (manusLoading || autoLoginTriedRef.current) return;
+    if (manusUser) {
+      autoLoginTriedRef.current = true;
+      // Check if already has a valid CRM admin token
+      const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+      if (existingToken) {
+        // Already logged in, just navigate
+        navigate("/crm/admin");
+        return;
+      }
+      // Try auto-login
+      autoLoginMutation.mutate();
+    } else {
+      setAutoLoginAttempted(true);
+    }
+  }, [manusUser, manusLoading]);
 
   const loginMutation = trpc.adminAuth.login.useMutation({
     onSuccess: (data) => {
@@ -47,6 +85,18 @@ export default function CrmAdminLogin() {
     }
     loginMutation.mutate({ username: username.trim(), password: password.trim() });
   };
+
+  // Show loading while trying auto-login
+  if (manusLoading || (!autoLoginAttempted && autoLoginMutation.isPending)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+          <p className="text-gray-400 text-sm">Entrando automaticamente...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">

@@ -1,0 +1,405 @@
+{
+  "query": "SELECT id, username, role FROM admins;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, username, role FROM admins;",
+  "rows": [
+    {
+      "id": "30001",
+      "username": "kafka",
+      "role": "owner"
+    },
+    {
+      "id": "90003",
+      "username": "testadmin_1774074453271",
+      "role": "admin"
+    },
+    {
+      "id": "120001",
+      "username": "testadmin_1774139241630",
+      "role": "admin"
+    },
+    {
+      "id": "120002",
+      "username": "testadmin_1774139250978",
+      "role": "admin"
+    },
+    {
+      "id": "150001",
+      "username": "testadmin_1774242806295",
+      "role": "admin"
+    },
+    {
+      "id": "150002",
+      "username": "testadmin_1774242816159",
+      "role": "admin"
+    },
+    {
+      "id": "150003",
+      "username": "testadmin_1774242826352",
+      "role": "admin"
+    },
+    {
+      "id": "180001",
+      "username": "testadmin_1774323571442",
+      "role": "admin"
+    },
+    {
+      "id": "180002",
+      "username": "testadmin_1774323596218",
+      "role": "admin"
+    },
+    {
+      "id": "180003",
+      "username": "testadmin_1774323604442",
+      "role": "admin"
+    },
+    {
+      "id": "180004",
+      "username": "testadmin_1774323650862",
+      "role": "admin"
+    },
+    {
+      "id": "180005",
+      "username": "testadmin_1774323659329",
+      "role": "admin"
+    },
+    {
+      "id": "180006",
+      "username": "testadmin_1774323668366",
+      "role": "admin"
+    },
+    {
+      "id": "180007",
+      "username": "testadmin_1774323677476",
+      "role": "admin"
+    },
+    {
+      "id": "180008",
+      "username": "testadmin_1774323688403",
+      "role": "admin"
+    },
+    {
+      "id": "180009",
+      "username": "testadmin_1774325126569",
+      "role": "admin"
+    },
+    {
+      "id": "210001",
+      "username": "testadmin_1774326387895",
+      "role": "admin"
+    },
+    {
+      "id": "240001",
+      "username": "testadmin_1774372479359",
+      "role": "admin"
+    },
+    {
+      "id": "270001",
+      "username": "testadmin_1774377713353",
+      "role": "admin"
+    },
+    {
+      "id": "300001",
+      "username": "testadmin_1774387777218",
+      "role": "admin"
+    },
+    {
+      "id": "300002",
+      "username": "testadmin_1774388495498",
+      "role": "admin"
+    },
+    {
+      "id": "330001",
+      "username": "testadmin_1774411140819",
+      "role": "admin"
+    },
+    {
+      "id": "330002",
+      "username": "testadmin_1774411989134",
+      "role": "admin"
+    },
+    {
+      "id": "330003",
+      "username": "testadmin_1774412435719",
+      "role": "admin"
+    },
+    {
+      "id": "330004",
+      "username": "testadmin_1774412758415",
+      "role": "admin"
+    },
+    {
+      "id": "330005",
+      "username": "testadmin_1774413625944",
+      "role": "admin"
+    },
+    {
+      "id": "330006",
+      "username": "testadmin_1774414255538",
+      "role": "admin"
+    },
+    {
+      "id": "330007",
+      "username": "testadmin_1774414845588",
+      "role": "admin"
+    },
+    {
+      "id": "330008",
+      "username": "testadmin_1774414948576",
+      "role": "admin"
+    },
+    {
+      "id": "360001",
+      "username": "testadmin_1774440729201",
+      "role": "admin"
+    },
+    {
+      "id": "360002",
+      "username": "testadmin_1774440855864",
+      "role": "admin"
+    },
+    {
+      "id": "360003",
+      "username": "testadmin_1774443086938",
+      "role": "admin"
+    },
+    {
+      "id": "360004",
+      "username": "testadmin_1774443489430",
+      "role": "admin"
+    },
+    {
+      "id": "360005",
+      "username": "testadmin_1774443500651",
+      "role": "admin"
+    },
+    {
+      "id": "360006",
+      "username": "testadmin_1774443558563",
+      "role": "admin"
+    },
+    {
+      "id": "360007",
+      "username": "testadmin_1774443616150",
+      "role": "admin"
+    },
+    {
+      "id": "390001",
+      "username": "testadmin_1774497470192",
+      "role": "admin"
+    },
+    {
+      "id": "390002",
+      "username": "testadmin_1774497484664",
+      "role": "admin"
+    },
+    {
+      "id": "390003",
+      "username": "testadmin_1774497562485",
+      "role": "admin"
+    },
+    {
+      "id": "420001",
+      "username": "testadmin_1774536126561",
+      "role": "admin"
+    },
+    {
+      "id": "420002",
+      "username": "testadmin_1774537235346",
+      "role": "admin"
+    },
+    {
+      "id": "420003",
+      "username": "testadmin_1774537810852",
+      "role": "admin"
+    },
+    {
+      "id": "420004",
+      "username": "testadmin_1774537830861",
+      "role": "admin"
+    },
+    {
+      "id": "420005",
+      "username": "testadmin_1774539789016",
+      "role": "admin"
+    },
+    {
+      "id": "420006",
+      "username": "testadmin_1774541068644",
+      "role": "admin"
+    },
+    {
+      "id": "450001",
+      "username": "testadmin_1774556820052",
+      "role": "admin"
+    },
+    {
+      "id": "450002",
+      "username": "testadmin_1774557803938",
+      "role": "admin"
+    },
+    {
+      "id": "450003",
+      "username": "testadmin_1774558558027",
+      "role": "admin"
+    },
+    {
+      "id": "450004",
+      "username": "testadmin_1774559413848",
+      "role": "admin"
+    },
+    {
+      "id": "450005",
+      "username": "testadmin_1774560588094",
+      "role": "admin"
+    },
+    {
+      "id": "450006",
+      "username": "testadmin_1774561644213",
+      "role": "admin"
+    },
+    {
+      "id": "450007",
+      "username": "testadmin_1774563503351",
+      "role": "admin"
+    },
+    {
+      "id": "450008",
+      "username": "testadmin_1774566228810",
+      "role": "admin"
+    },
+    {
+      "id": "480001",
+      "username": "testadmin_1774588824258",
+      "role": "admin"
+    },
+    {
+      "id": "480002",
+      "username": "testadmin_1774589383517",
+      "role": "admin"
+    },
+    {
+      "id": "480003",
+      "username": "testadmin_1774591079489",
+      "role": "admin"
+    },
+    {
+      "id": "480004",
+      "username": "testadmin_1774595556402",
+      "role": "admin"
+    },
+    {
+      "id": "510001",
+      "username": "testadmin_1774608960104",
+      "role": "admin"
+    },
+    {
+      "id": "510002",
+      "username": "leticia",
+      "role": "admin"
+    },
+    {
+      "id": "510003",
+      "username": "tissiane",
+      "role": "admin"
+    },
+    {
+      "id": "510004",
+      "username": "testadmin_1774609491609",
+      "role": "admin"
+    },
+    {
+      "id": "510005",
+      "username": "testadmin_1774609544190",
+      "role": "admin"
+    },
+    {
+      "id": "510006",
+      "username": "testadmin_1774611484969",
+      "role": "admin"
+    },
+    {
+      "id": "510007",
+      "username": "testadmin_1774611854975",
+      "role": "admin"
+    },
+    {
+      "id": "510008",
+      "username": "testadmin_1774613397102",
+      "role": "admin"
+    },
+    {
+      "id": "510009",
+      "username": "testadmin_1774615873283",
+      "role": "admin"
+    },
+    {
+      "id": "510010",
+      "username": "testadmin_1774615911576",
+      "role": "admin"
+    },
+    {
+      "id": "510011",
+      "username": "testadmin_1774621851801",
+      "role": "admin"
+    },
+    {
+      "id": "510012",
+      "username": "testadmin_1774621897955",
+      "role": "admin"
+    },
+    {
+      "id": "510013",
+      "username": "testadmin_1774630818449",
+      "role": "admin"
+    },
+    {
+      "id": "510014",
+      "username": "testadmin_1774631257586",
+      "role": "admin"
+    },
+    {
+      "id": "510015",
+      "username": "testadmin_1774635032785",
+      "role": "admin"
+    },
+    {
+      "id": "510016",
+      "username": "testadmin_1774635525604",
+      "role": "admin"
+    },
+    {
+      "id": "510017",
+      "username": "testadmin_1774635970629",
+      "role": "admin"
+    },
+    {
+      "id": "510018",
+      "username": "testadmin_1774642791101",
+      "role": "admin"
+    },
+    {
+      "id": "510019",
+      "username": "testadmin_1774652494280",
+      "role": "admin"
+    },
+    {
+      "id": "510020",
+      "username": "testadmin_1774655215835",
+      "role": "admin"
+    },
+    {
+      "id": "510021",
+      "username": "testadmin_1774656185270",
+      "role": "admin"
+    },
+    {
+      "id": "510022",
+      "username": "testadmin_1774657693112",
+      "role": "admin"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tusername\trole\n30001\tkafka\towner\n90003\ttestadmin_1774074453271\tadmin\n120001\ttestadmin_1774139241630\tadmin\n120002\ttestadmin_1774139250978\tadmin\n150001\ttestadmin_1774242806295\tadmin\n150002\ttestadmin_1774242816159\tadmin\n150003\ttestadmin_1774242826352\tadmin\n180001\ttestadmin_1774323571442\tadmin\n180002\ttestadmin_1774323596218\tadmin\n180003\ttestadmin_1774323604442\tadmin\n180004\ttestadmin_1774323650862\tadmin\n180005\ttestadmin_1774323659329\tadmin\n180006\ttestadmin_1774323668366\tadmin\n180007\ttestadmin_1774323677476\tadmin\n180008\ttestadmin_1774323688403\tadmin\n180009\ttestadmin_1774325126569\tadmin\n210001\ttestadmin_1774326387895\tadmin\n240001\ttestadmin_1774372479359\tadmin\n270001\ttestadmin_1774377713353\tadmin\n300001\ttestadmin_1774387777218\tadmin\n300002\ttestadmin_1774388495498\tadmin\n330001\ttestadmin_1774411140819\tadmin\n330002\ttestadmin_1774411989134\tadmin\n330003\ttestadmin_1774412435719\tadmin\n330004\ttestadmin_1774412758415\tadmin\n330005\ttestadmin_1774413625944\tadmin\n330006\ttestadmin_1774414255538\tadmin\n330007\ttestadmin_1774414845588\tadmin\n330008\ttestadmin_1774414948576\tadmin\n360001\ttestadmin_1774440729201\tadmin\n360002\ttestadmin_1774440855864\tadmin\n360003\ttestadmin_1774443086938\tadmin\n360004\ttestadmin_1774443489430\tadmin\n360005\ttestadmin_1774443500651\tadmin\n360006\ttestadmin_1774443558563\tadmin\n360007\ttestadmin_1774443616150\tadmin\n390001\ttestadmin_1774497470192\tadmin\n390002\ttestadmin_1774497484664\tadmin\n390003\ttestadmin_1774497562485\tadmin\n420001\ttestadmin_1774536126561\tadmin\n420002\ttestadmin_1774537235346\tadmin\n420003\ttestadmin_1774537810852\tadmin\n420004\ttestadmin_1774537830861\tadmin\n420005\ttestadmin_1774539789016\tadmin\n420006\ttestadmin_1774541068644\tadmin\n450001\ttestadmin_1774556820052\tadmin\n450002\ttestadmin_1774557803938\tadmin\n450003\ttestadmin_1774558558027\tadmin\n450004\ttestadmin_1774559413848\tadmin\n450005\ttestadmin_1774560588094\tadmin\n450006\ttestadmin_1774561644213\tadmin\n450007\ttestadmin_1774563503351\tadmin\n450008\ttestadmin_1774566228810\tadmin\n480001\ttestadmin_1774588824258\tadmin\n480002\ttestadmin_1774589383517\tadmin\n480003\ttestadmin_1774591079489\tadmin\n480004\ttestadmin_1774595556402\tadmin\n510001\ttestadmin_1774608960104\tadmin\n510002\tleticia\tadmin\n510003\ttissiane\tadmin\n510004\ttestadmin_1774609491609\tadmin\n510005\ttestadmin_1774609544190\tadmin\n510006\ttestadmin_1774611484969\tadmin\n510007\ttestadmin_1774611854975\tadmin\n510008\ttestadmin_1774613397102\tadmin\n510009\ttestadmin_1774615873283\tadmin\n510010\ttestadmin_1774615911576\tadmin\n510011\ttestadmin_1774621851801\tadmin\n510012\ttestadmin_1774621897955\tadmin\n510013\ttestadmin_1774630818449\tadmin\n510014\ttestadmin_1774631257586\tadmin\n510015\ttestadmin_1774635032785\tadmin\n510016\ttestadmin_1774635525604\tadmin\n510017\ttestadmin_1774635970629\tadmin\n510018\ttestadmin_1774642791101\tadmin\n510019\ttestadmin_1774652494280\tadmin\n510020\ttestadmin_1774655215835\tadmin\n510021\ttestadmin_1774656185270\tadmin\n510022\ttestadmin_1774657693112\tadmin\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

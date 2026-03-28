@@ -1240,3 +1240,8 @@
 - [x] Tela Aprovar: rejeição com motivo "Veículo não aceito - Fora de parâmetro da loja"
 - [x] Tela Aprovar: campo de observação ao rejeitar para explicar o motivo
 - [x] Consignação: exibir motivo da rejeição para o setor de consignação
+
+## Login Automático CRM - 28/03/2026
+- [x] Resetar senha do admin 'kafka' (nova senha: kafka2026)
+- [x] Login automático: owner do Manus entra direto no CRM admin sem digitar senha
+- [x] Limpar contas de teste da tabela admins (78 contas removidas)

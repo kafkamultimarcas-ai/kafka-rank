@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE admins SET passwordHash = '$2b$10$HiAoyCMXyVG3Fbq2jYQgxOTGYgt.awbjrC73/ZFlrlXsoATqc.geS' WHERE username = 'kafka'; DELETE FROM admins WHERE username LIKE 'testadmin_%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute UPDATE admins SET passwordHash = '$2b$10$HiAoyCMXyVG3Fbq2jYQgxOTGYgt.awbjrC73/ZFlrlXsoATqc.geS' WHERE username = 'kafka'; DELETE FROM admins WHERE username LIKE 'testadmin_%';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 81
+}
