@@ -2030,6 +2030,20 @@ export async function getSaleDocumentById(id: number) {
   return result[0] || null;
 }
 
+// Update notes on a sale document
+export async function updateSaleDocNotes(id: number, notes: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(saleDocuments).set({ notes }).where(eq(saleDocuments.id, id));
+}
+
+// Delete a sale document record
+export async function deleteSaleDocument(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(saleDocuments).where(eq(saleDocuments.id, id));
+}
+
 
 // ===== MÓDULO ORÇAMENTOS PÓS-VENDA =====
 

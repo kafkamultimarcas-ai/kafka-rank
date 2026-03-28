@@ -1,0 +1,8 @@
+{
+  "query": "DELETE FROM crm_messages WHERE lead_id IN (SELECT id FROM crm_leads WHERE name LIKE '%Cliente Teste CRM%');",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute DELETE FROM crm_messages WHERE lead_id IN (SELECT id FROM crm_leads WHERE name LIKE '%Cliente Teste CRM%');",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'lead_id' in 'where clause'"
+  ]
+}

@@ -48,6 +48,7 @@ const menuItems = [
   { icon: DollarSign, label: "Gastos PV", path: "/admin/pv-financeiro" },
   { icon: Flag, label: "Marketing", path: "/admin/marketing" },
   { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
+  { icon: DollarSign, label: "Financeiro Op.", path: "/financeiro" },
   { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
   { icon: Bot, label: "Configurar IAM", path: "/admin/iam" },
   { icon: FileText, label: "Documentos", path: "/admin/documentos" },

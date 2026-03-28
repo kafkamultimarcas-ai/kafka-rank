@@ -2016,6 +2016,19 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       } catch (e) { console.error('Erro ao enviar push doc transferido:', e); }
       return { success: true };
     }),
+    // Admin: update notes on a document
+    updateNotes: adminProcedure.input(z.object({
+      id: z.number(),
+      notes: z.string().nullable(),
+    })).mutation(async ({ input }) => {
+      await db.updateSaleDocNotes(input.id, input.notes);
+      return { success: true };
+    }),
+    // Admin: delete a document record
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteSaleDocument(input.id);
+      return { success: true };
+    }),
   }),
 
   // ===== ESTOQUE DE VEÍCULOS =====

@@ -84,6 +84,9 @@ export async function createFinTransaction(data: {
   installmentNumber?: number;
   installmentTotal?: number;
   createdBy?: number;
+  needsApproval?: boolean;
+  approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
+  createdByName?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -103,6 +106,10 @@ export async function updateFinTransaction(id: number, data: Partial<{
   notes: string;
   receiptUrl: string;
   receiptKey: string;
+  needsApproval: boolean;
+  approvalStatus: "none" | "pending_approval" | "approved" | "rejected";
+  approvedBy: string;
+  approvedAt: number;
 }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

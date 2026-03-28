@@ -368,6 +368,27 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
     return sellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
   }, [sellers]);
 
+  // Color map for sellers
+  const SELLER_COLORS_ADMIN = [
+    "bg-cyan-500/15 text-cyan-400",
+    "bg-violet-500/15 text-violet-400",
+    "bg-pink-500/15 text-pink-400",
+    "bg-teal-500/15 text-teal-400",
+    "bg-orange-500/15 text-orange-400",
+    "bg-lime-500/15 text-lime-400",
+    "bg-sky-500/15 text-sky-400",
+    "bg-rose-500/15 text-rose-400",
+    "bg-indigo-500/15 text-indigo-400",
+    "bg-emerald-500/15 text-emerald-400",
+  ];
+  const sellerColorMap = useMemo(() => {
+    if (!sellers) return {} as Record<number, string>;
+    return sellers.reduce((acc: Record<number, string>, s: any, i: number) => {
+      acc[s.id] = SELLER_COLORS_ADMIN[i % SELLER_COLORS_ADMIN.length];
+      return acc;
+    }, {});
+  }, [sellers]);
+
   // Apply filters
   const baseLeads = searchQuery.length >= 2 ? searchResults : (showUnassigned ? unassignedLeads : allLeads);
   const leads = useMemo(() => {
@@ -498,7 +519,7 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
                   <Clock className="w-2.5 h-2.5" /> {crmTimeAgo(lead.lastContactDate || lead.createdAt)}
                 </span>
                 {sellerName && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-medium">\ud83d\udc64 {sellerName}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${sellerColorMap[lead.sellerId] || 'bg-cyan-500/15 text-cyan-400'}`}>👤 {sellerName}</span>
                 )}
                 {!sellerName && lead.sellerId === 0 && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-medium">Sem vendedor</span>

@@ -224,6 +224,27 @@ function LeadList({
     return sellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
   }, [sellers]);
 
+  // Color map for sellers - each seller gets a unique color badge
+  const SELLER_COLORS = [
+    "bg-cyan-500/15 text-cyan-400",
+    "bg-violet-500/15 text-violet-400",
+    "bg-pink-500/15 text-pink-400",
+    "bg-teal-500/15 text-teal-400",
+    "bg-orange-500/15 text-orange-400",
+    "bg-lime-500/15 text-lime-400",
+    "bg-sky-500/15 text-sky-400",
+    "bg-rose-500/15 text-rose-400",
+    "bg-indigo-500/15 text-indigo-400",
+    "bg-emerald-500/15 text-emerald-400",
+  ];
+  const sellerColorMap = useMemo(() => {
+    if (!sellers) return {} as Record<number, string>;
+    return sellers.reduce((acc: Record<number, string>, s: any, i: number) => {
+      acc[s.id] = SELLER_COLORS[i % SELLER_COLORS.length];
+      return acc;
+    }, {});
+  }, [sellers]);
+
   const alertLeadIds = useMemo(() => new Set(alerts?.map((a: any) => a.id) || []), [alerts]);
 
   const leads = useMemo(() => {
@@ -369,18 +390,24 @@ function LeadList({
                   </div>
 
                   <div className="flex items-center gap-1 mt-1">
-                    {isAlert && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold flex items-center gap-0.5 animate-pulse">
-                        <AlertTriangle className="w-2.5 h-2.5" /> SEM RESPOSTA
-                      </span>
-                    )}
+                    {isAlert && (() => {
+                      const mins = Math.floor((Date.now() - (lead.createdAt || Date.now())) / 60000);
+                      const threshold = lead.sellerId > 0 ? 10 : 5;
+                      const remaining = Math.max(0, threshold - mins);
+                      return (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold flex items-center gap-0.5 animate-pulse">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          {remaining > 0 ? `${remaining}min restante` : `${mins}min sem resposta`}
+                        </span>
+                      );
+                    })()}
                     {!sellerName && lead.sellerId === 0 && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
                         Novo
                       </span>
                     )}
                     {sellerName && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${sellerColorMap[lead.sellerId] || 'bg-cyan-500/15 text-cyan-400'}`}>
                         {sellerName}
                       </span>
                     )}
@@ -444,9 +471,9 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
     onSuccess: (data) => { setAiSuggestion(data.suggestion); },
     onError: (e: any) => toast.error("Erro IA: " + e.message),
   });
-  const { data: autoReplyData } = trpc.crmAi.getAutoReply.useQuery({ leadId });
+  const { data: autoReplyData, refetch: refetchAutoReply } = trpc.crmAi.getAutoReply.useQuery({ leadId });
   const setAutoReplyMut = trpc.crmAi.setAutoReply.useMutation({
-    onSuccess: () => toast.success("Configura\u00e7\u00e3o salva!"),
+    onSuccess: () => { toast.success("Configura\u00e7\u00e3o salva!"); refetchAutoReply(); },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const handleAiSuggest = (customPrompt?: string) => {
@@ -905,10 +932,11 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                 <span className="text-xs text-muted-foreground">IA Automática</span>
               </div>
               <button
-                onClick={() => setAutoReplyMut.mutate({ leadId, enabled: !autoReplyData?.enabled })}
-                className={`relative w-9 h-5 rounded-full transition-colors ${autoReplyData?.enabled ? 'bg-purple-600' : 'bg-accent'}`}
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoReplyMut.mutate({ leadId, enabled: !autoReplyData?.enabled }); }}
+                className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer z-10 ${autoReplyData?.enabled ? 'bg-purple-600' : 'bg-accent'}`}
               >
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoReplyData?.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform pointer-events-none ${autoReplyData?.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
             </div>
           </div>

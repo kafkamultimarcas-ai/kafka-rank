@@ -11,6 +11,7 @@ import {
 } from "../finDb";
 import { invokeLLM } from "../_core/llm";
 import { storagePut } from "../storage";
+import { notifyOwner } from "../_core/notification";
 
 // ===== CATEGORIES ROUTER =====
 export const finCategoriesRouter = router({
@@ -79,8 +80,24 @@ export const finTransactionsRouter = router({
     recurrence: z.enum(["none", "monthly", "weekly", "yearly"]).optional(),
     installmentNumber: z.number().optional(),
     installmentTotal: z.number().optional(),
+    needsApproval: z.boolean().optional(),
+    createdByName: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
-    const id = await createFinTransaction({ ...input, categoryId: input.categoryId ?? undefined, createdBy: ctx.user?.id });
+    const approvalStatus = input.needsApproval ? "pending_approval" as const : "none" as const;
+    const id = await createFinTransaction({
+      ...input,
+      categoryId: input.categoryId ?? undefined,
+      createdBy: ctx.user?.id,
+      approvalStatus,
+    });
+    // Send notification to owner when approval is needed
+    if (input.needsApproval) {
+      const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(input.amount) || 0);
+      notifyOwner({
+        title: "Autoriza\u00e7\u00e3o de Pagamento",
+        content: `${input.createdByName || "Financeiro"} lan\u00e7ou uma conta que precisa de autoriza\u00e7\u00e3o:\n\n${input.description} - ${amt}\n${input.supplier ? "Fornecedor: " + input.supplier : ""}\nVencimento: ${new Date(input.dueDate).toLocaleDateString("pt-BR")}`,
+      }).catch(() => {});
+    }
     return { id };
   }),
   
@@ -112,6 +129,20 @@ export const finTransactionsRouter = router({
     paidDate: z.number().optional(),
   })).mutation(async ({ input }) => {
     await markAsPaid(input.id, input.paidDate || Date.now());
+    return { success: true };
+  }),
+
+  approveTransaction: protectedProcedure.input(z.object({
+    id: z.number(),
+    approved: z.boolean(),
+    approvedBy: z.string(),
+  })).mutation(async ({ input }) => {
+    const status = input.approved ? "approved" as const : "rejected" as const;
+    await updateFinTransaction(input.id, {
+      approvalStatus: status,
+      approvedBy: input.approvedBy,
+      approvedAt: Date.now(),
+    });
     return { success: true };
   }),
   

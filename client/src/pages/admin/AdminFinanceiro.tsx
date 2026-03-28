@@ -173,6 +173,14 @@ export default function AdminFinanceiro() {
       toast.success("Marcado como pago!");
     },
   });
+  const approveTx = trpc.finTransactions.approveTransaction.useMutation({
+    onSuccess: (_, vars) => {
+      utils.finTransactions.list.invalidate();
+      utils.finTransactions.dashboard.invalidate();
+      toast.success(vars.approved ? "Pagamento autorizado!" : "Pagamento rejeitado!");
+      setShowDetails(false);
+    },
+  });
 
   const categories = categoriesQuery.data || [];
   const transactions = transactionsQuery.data?.items || [];
@@ -181,14 +189,19 @@ export default function AdminFinanceiro() {
 
   // Filter by search
   const filteredTransactions = useMemo(() => {
-    if (!searchText.trim()) return transactions;
+    let list = transactions;
+    // Client-side filter for pending_approval since backend only filters by status field
+    if (statusFilter === "pending_approval") {
+      list = list.filter((t: any) => (t as any).approvalStatus === "pending_approval");
+    }
+    if (!searchText.trim()) return list;
     const q = searchText.toLowerCase();
-    return transactions.filter((t: any) =>
+    return list.filter((t: any) =>
       t.description?.toLowerCase().includes(q) ||
       t.supplier?.toLowerCase().includes(q) ||
       t.notes?.toLowerCase().includes(q)
     );
-  }, [transactions, searchText]);
+  }, [transactions, searchText, statusFilter]);
 
   function resetCategoryForm() {
     setCatName("");
@@ -363,6 +376,7 @@ export default function AdminFinanceiro() {
               <SelectItem value="paid">Pago</SelectItem>
               <SelectItem value="overdue">Vencido</SelectItem>
               <SelectItem value="cancelled">Cancelado</SelectItem>
+              <SelectItem value="pending_approval">Aguardando Autoriza\u00e7\u00e3o</SelectItem>
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -414,6 +428,16 @@ export default function AdminFinanceiro() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
+                        {(tx as any).approvalStatus === "pending_approval" && (
+                          <Badge className="bg-purple-500/20 text-purple-400 border-0 animate-pulse">
+                            Autorizar
+                          </Badge>
+                        )}
+                        {(tx as any).approvalStatus === "approved" && (
+                          <Badge className="bg-green-500/20 text-green-400 border-0">
+                            Autorizada
+                          </Badge>
+                        )}
                         <Badge className={statusInfo.color + " border-0"}>
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusInfo.label}
@@ -708,8 +732,29 @@ export default function AdminFinanceiro() {
                     {tx.supplier && <div className="flex justify-between"><span className="text-muted-foreground">Fornecedor</span><span>{tx.supplier}</span></div>}
                     {tx.barcode && <div className="flex justify-between"><span className="text-muted-foreground">Código Barras</span><span className="text-xs font-mono truncate max-w-[200px]">{tx.barcode}</span></div>}
                     {tx.recurrence && tx.recurrence !== "none" && <div className="flex justify-between"><span className="text-muted-foreground">Recorrência</span><span className="capitalize">{tx.recurrence === "monthly" ? "Mensal" : tx.recurrence === "weekly" ? "Semanal" : "Anual"}</span></div>}
-                    {tx.notes && <div><span className="text-muted-foreground">Observações:</span><p className="mt-1 text-xs bg-muted/30 p-2 rounded">{tx.notes}</p></div>}
+                    {tx.notes && <div><span className="text-muted-foreground">Observa\u00e7\u00f5es:</span><p className="mt-1 text-xs bg-muted/30 p-2 rounded">{tx.notes}</p></div>}
+                    {(tx as any).createdByName && <div className="flex justify-between"><span className="text-muted-foreground">Lan\u00e7ado por</span><span>{(tx as any).createdByName}</span></div>}
+                    {(tx as any).approvalStatus && (tx as any).approvalStatus !== "none" && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Autoriza\u00e7\u00e3o</span>
+                        <span className={`font-bold text-xs px-2 py-0.5 rounded ${(tx as any).approvalStatus === "pending_approval" ? "bg-purple-500/20 text-purple-400" : (tx as any).approvalStatus === "approved" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                          {(tx as any).approvalStatus === "pending_approval" ? "Aguardando" : (tx as any).approvalStatus === "approved" ? "Autorizada" : "Rejeitada"}
+                        </span>
+                      </div>
+                    )}
+                    {(tx as any).approvedBy && <div className="flex justify-between"><span className="text-muted-foreground">Autorizado por</span><span>{(tx as any).approvedBy}</span></div>}
                   </div>
+                  {/* Approval buttons */}
+                  {(tx as any).approvalStatus === "pending_approval" && (
+                    <div className="flex gap-2 pt-2 border-t border-purple-500/20">
+                      <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => approveTx.mutate({ id: tx.id, approved: true, approvedBy: "Admin" })} disabled={approveTx.isPending}>
+                        Autorizar Pagamento
+                      </Button>
+                      <Button variant="destructive" className="flex-1" onClick={() => approveTx.mutate({ id: tx.id, approved: false, approvedBy: "Admin" })} disabled={approveTx.isPending}>
+                        Rejeitar
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex gap-2 pt-2">
                     {tx.status !== "paid" && (
                       <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => markPaid.mutate({ id: tx.id })} disabled={markPaid.isPending}>

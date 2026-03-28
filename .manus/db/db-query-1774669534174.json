@@ -1,0 +1,130 @@
+{
+  "query": "SELECT l.id, l.name, l.score, COUNT(m.id) as msg_count, SUM(CASE WHEN m.direction='inbound' THEN 1 ELSE 0 END) as inbound_count, MAX(m.timestamp) as last_msg FROM crm_leads l LEFT JOIN crm_messages m ON m.leadId = l.id GROUP BY l.id, l.name, l.score ORDER BY msg_count DESC LIMIT 15",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT l.id, l.name, l.score, COUNT(m.id) as msg_count, SUM(CASE WHEN m.direction='inbound' THEN 1 ELSE 0 END) as inbound_count, MAX(m.timestamp) as last_msg FROM crm_leads l LEFT JOIN crm_messages m ON m.leadId = l.id GROUP BY l.id, l.name, l.score ORDER BY msg_count DESC LIMIT 15",
+  "rows": [
+    {
+      "id": "481225",
+      "name": "Italo Alfredo 😎",
+      "score": "warm",
+      "msg_count": "38",
+      "inbound_count": "38",
+      "last_msg": "1774639198000"
+    },
+    {
+      "id": "481168",
+      "name": "Wesley Consultor De Vendas",
+      "score": "warm",
+      "msg_count": "26",
+      "inbound_count": "23",
+      "last_msg": "1774654326000"
+    },
+    {
+      "id": "481242",
+      "name": "Santana🇹🇭",
+      "score": "warm",
+      "msg_count": "22",
+      "inbound_count": "22",
+      "last_msg": "1774645684000"
+    },
+    {
+      "id": "481231",
+      "name": "WILSON ZANDONA",
+      "score": "warm",
+      "msg_count": "21",
+      "inbound_count": "21",
+      "last_msg": "1774638741002"
+    },
+    {
+      "id": "481250",
+      "name": "Keila Francieli Velozo",
+      "score": "warm",
+      "msg_count": "20",
+      "inbound_count": "20",
+      "last_msg": "1774649538000"
+    },
+    {
+      "id": "481214",
+      "name": "Elenilson",
+      "score": "warm",
+      "msg_count": "20",
+      "inbound_count": "20",
+      "last_msg": "1774635027000"
+    },
+    {
+      "id": "481206",
+      "name": "Matheus Souza",
+      "score": "warm",
+      "msg_count": "19",
+      "inbound_count": "19",
+      "last_msg": "1774657285000"
+    },
+    {
+      "id": "481235",
+      "name": "André Alex 🙏🏼💪🏼🥋🚵🏻‍♀️⚽🏐",
+      "score": "warm",
+      "msg_count": "19",
+      "inbound_count": "19",
+      "last_msg": "1774642305000"
+    },
+    {
+      "id": "481227",
+      "name": "Wesley Rodrigues",
+      "score": "warm",
+      "msg_count": "18",
+      "inbound_count": "17",
+      "last_msg": "1774654751254"
+    },
+    {
+      "id": "481207",
+      "name": "Luiz",
+      "score": "warm",
+      "msg_count": "17",
+      "inbound_count": "17",
+      "last_msg": "1774631877000"
+    },
+    {
+      "id": "481217",
+      "name": "nanybiblio somer",
+      "score": "warm",
+      "msg_count": "17",
+      "inbound_count": "17",
+      "last_msg": "1774638647000"
+    },
+    {
+      "id": "481224",
+      "name": "Edgar",
+      "score": "warm",
+      "msg_count": "17",
+      "inbound_count": "17",
+      "last_msg": "1774640374000"
+    },
+    {
+      "id": "481163",
+      "name": "❤️",
+      "score": "warm",
+      "msg_count": "17",
+      "inbound_count": "17",
+      "last_msg": "1774619586000"
+    },
+    {
+      "id": "481255",
+      "name": "• Rafaela Trindade",
+      "score": "warm",
+      "msg_count": "16",
+      "inbound_count": "16",
+      "last_msg": "1774649245000"
+    },
+    {
+      "id": "481184",
+      "name": "José araldo",
+      "score": "warm",
+      "msg_count": "16",
+      "inbound_count": "16",
+      "last_msg": "1774628758002"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tscore\tmsg_count\tinbound_count\tlast_msg\n481225\tItalo Alfredo 😎\twarm\t38\t38\t1774639198000\n481168\tWesley Consultor De Vendas\twarm\t26\t23\t1774654326000\n481242\tSantana🇹🇭\twarm\t22\t22\t1774645684000\n481231\tWILSON ZANDONA\twarm\t21\t21\t1774638741002\n481250\tKeila Francieli Velozo\twarm\t20\t20\t1774649538000\n481214\tElenilson\twarm\t20\t20\t1774635027000\n481206\tMatheus Souza\twarm\t19\t19\t1774657285000\n481235\tAndré Alex 🙏🏼💪🏼🥋🚵🏻‍♀️⚽🏐\twarm\t19\t19\t1774642305000\n481227\tWesley Rodrigues\twarm\t18\t17\t1774654751254\n481207\tLuiz\twarm\t17\t17\t1774631877000\n481217\tnanybiblio somer\twarm\t17\t17\t1774638647000\n481224\tEdgar\twarm\t17\t17\t1774640374000\n481163\t❤️\twarm\t17\t17\t1774619586000\n481255\t• Rafaela Trindade\twarm\t16\t16\t1774649245000\n481184\tJosé araldo\twarm\t16\t16\t1774628758002\n",
+  "stderr": "",
+  "execution_time_ms": 67
+}

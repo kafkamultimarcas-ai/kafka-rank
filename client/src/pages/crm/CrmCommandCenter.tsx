@@ -213,9 +213,9 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
     onSuccess: (data) => { setAiSuggestion(data.suggestion); },
     onError: (e: any) => toast.error("Erro IA: " + e.message),
   });
-  const { data: autoReplyData } = trpc.crmAi.getAutoReply.useQuery({ leadId });
+  const { data: autoReplyData, refetch: refetchAutoReply } = trpc.crmAi.getAutoReply.useQuery({ leadId });
   const setAutoReply = trpc.crmAi.setAutoReply.useMutation({
-    onSuccess: () => toast.success("Configura\u00e7\u00e3o salva!"),
+    onSuccess: () => { toast.success("Configura\u00e7\u00e3o salva!"); refetchAutoReply(); },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
 
@@ -621,10 +621,11 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
               <span className="text-xs text-muted-foreground">IA Automática</span>
             </div>
             <button
-              onClick={() => setAutoReply.mutate({ leadId, enabled: !autoReplyData?.enabled })}
-              className={`relative w-9 h-5 rounded-full transition-colors ${autoReplyData?.enabled ? 'bg-purple-600' : 'bg-accent'}`}
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoReply.mutate({ leadId, enabled: !autoReplyData?.enabled }); }}
+              className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer z-10 ${autoReplyData?.enabled ? 'bg-purple-600' : 'bg-accent'}`}
             >
-              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoReplyData?.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform pointer-events-none ${autoReplyData?.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
             </button>
           </div>
         </div>

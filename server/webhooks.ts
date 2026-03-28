@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import crypto from "crypto";
 import * as crmDb from "./crmDb";
 import { getDb } from "./db";
-import { sellers, crmLeadDistribution, inventoryVehicles } from "../drizzle/schema";
+import { sellers, crmLeadDistribution, inventoryVehicles, crmMessages } from "../drizzle/schema";
 import { eq, and, asc, like, or, sql, desc } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import * as zapi from "./zapi-service";
@@ -751,6 +751,33 @@ export function registerWebhookRoutes(app: Express) {
           // Update lastContactDate on lead
           await crmDb.updateLead(existingLeads[0].id, { lastContactDate: Date.now() });
 
+          // Auto-classify lead temperature based on inbound message engagement
+          if (!fromMe) {
+            try {
+              const dbConn = await getDb();
+              if (dbConn) {
+                const [countResult] = await dbConn.select({ cnt: sql<number>`COUNT(*)` })
+                  .from(crmMessages).where(and(
+                    eq(crmMessages.leadId, existingLeads[0].id),
+                    eq(crmMessages.direction, "inbound")
+                  ));
+                const inboundCount = Number(countResult?.cnt || 0);
+                const currentScore = existingLeads[0].score;
+                let newScore = currentScore;
+                // Classification rules: 1-3 msgs = cold, 4-8 msgs = warm, 9+ msgs = hot
+                if (inboundCount >= 9 && currentScore !== "hot") newScore = "hot";
+                else if (inboundCount >= 4 && inboundCount < 9 && currentScore === "cold") newScore = "warm";
+                else if (inboundCount < 4 && currentScore !== "cold") newScore = "cold";
+                if (newScore !== currentScore) {
+                  await crmDb.updateLead(existingLeads[0].id, { score: newScore as any });
+                  console.log(`[Lead Score] Lead #${existingLeads[0].id} auto-classified: ${currentScore} -> ${newScore} (${inboundCount} inbound msgs)`);
+                }
+              }
+            } catch (scoreErr) {
+              // Silently fail score check
+            }
+          }
+
           // AI Auto-reply: check if enabled for this lead (only for inbound text messages)
           if (!fromMe && messageText && messageType === "text") {
             try {
@@ -778,8 +805,8 @@ export function registerWebhookRoutes(app: Express) {
                         const r = m.direction === "inbound" ? "CLIENTE" : "VENDEDOR";
                         return `${r}: ${m.content || "[M\u00eddia]"}`;
                       }).join("\n");
-                      const sysPrompt = `Voc\u00ea \u00e9 a IA de vendas da Kafka Multimarcas. Responda o cliente de forma natural, humanizada e profissional. Use portugu\u00eas brasileiro informal mas educado. Seja objetivo e direto (mensagens curtas para WhatsApp). Foque em converter: criar rapport, entender necessidade, apresentar benef\u00edcios, quebrar obje\u00e7\u00f5es, agendar visita. N\u00c3O use markdown/negrito. M\u00e1ximo 1-2 emojis.\n\nLEAD: ${leadForAi.name} | Interesse: ${leadForAi.vehicleInterest || "N\u00e3o especificado"} | Score: ${leadForAi.score}${vehicleCtx}\n\nCONVERSA:\n${chatHist}`;
-                      const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Gere a pr\u00f3xima resposta do vendedor para o cliente. Apenas o texto da mensagem, sem prefixos." }] });
+                      const sysPrompt = `Voc\u00ea \u00e9 vendedor da Kafka Multimarcas respondendo pelo WhatsApp.\n\nREGRAS:\n- M\u00c1XIMO 2-3 linhas (como mensagem real de WhatsApp)\n- Linguagem natural e informal, como amigo\n- SEM formata\u00e7\u00e3o (sem negrito, asteriscos, markdown)\n- M\u00e1ximo 1 emoji (ou nenhum)\n- NUNCA invente dados de ve\u00edculos\n- Foque em UMA coisa: ou pergunta, ou resposta, ou convite pra visita\n- Chame pelo primeiro nome quando poss\u00edvel\n\nLEAD: ${leadForAi.name} | Interesse: ${leadForAi.vehicleInterest || "N/A"} | Score: ${leadForAi.score}${vehicleCtx}\n\nCONVERSA:\n${chatHist}`;
+                      const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Gere a pr\u00f3xima mensagem do vendedor. M\u00e1ximo 2-3 linhas curtas. Apenas o texto, sem prefixos." }] });
                       const aiText = ((aiResp.choices?.[0]?.message?.content as string) || "").trim();
                       if (aiText && phone) {
                         await zapi.sendText(phone, aiText);

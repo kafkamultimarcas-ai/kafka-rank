@@ -551,7 +551,12 @@ export const finTransactions = mysqlTable("fin_transactions", {
   recurrence: mysqlEnum("recurrence", ["none", "monthly", "weekly", "yearly"]).default("none"),
   installmentNumber: int("installmentNumber"), // parcela atual
   installmentTotal: int("installmentTotal"), // total de parcelas
+  needsApproval: boolean("needsApproval").default(false), // conta que precisa de autorização de pagamento
+  approvalStatus: mysqlEnum("approvalStatus", ["none", "pending_approval", "approved", "rejected"]).default("none"), // status da autorização
+  approvedBy: varchar("approvedBy", { length: 255 }), // quem autorizou
+  approvedAt: bigint("approvedAt", { mode: "number" }), // quando autorizou
   createdBy: int("createdBy"), // admin que criou
+  createdByName: varchar("createdByName", { length: 255 }), // nome de quem criou
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

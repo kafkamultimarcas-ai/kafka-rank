@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   FileText, FileCheck, FileWarning, Upload, Eye, Clock,
-  CheckCircle2, ArrowRight, Filter, Search, Download, Loader2
+  CheckCircle2, ArrowRight, Filter, Search, Download, Loader2,
+  Trash2, MessageSquare, X, ArrowLeft
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
@@ -25,17 +26,26 @@ export default function AdminDocumentos() {
   const [filter, setFilter] = useState<string>("todos");
   const [search, setSearch] = useState("");
   const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
+  const [notesText, setNotesText] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: docs, refetch } = trpc.saleDocuments.listAll.useQuery(
-    filter !== "todos" ? { filterStatus: filter } : {}
-  );
+  const { data: docs, refetch } = trpc.saleDocuments.listAll.useQuery({});
   const markInTransfer = trpc.saleDocuments.markInTransfer.useMutation({
     onSuccess: () => { toast.success("Marcado como em transferência!"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
   const markTransferred = trpc.saleDocuments.markTransferred.useMutation({
     onSuccess: () => { toast.success("Transferência concluída! Documento emitido salvo."); refetch(); setUploadingId(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateNotes = trpc.saleDocuments.updateNotes.useMutation({
+    onSuccess: () => { toast.success("Observação salva!"); refetch(); setEditingNotesId(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteDoc = trpc.saleDocuments.delete.useMutation({
+    onSuccess: () => { toast.success("Documento removido!"); refetch(); setDeletingId(null); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -57,14 +67,30 @@ export default function AdminDocumentos() {
     e.target.value = "";
   };
 
+  const startEditNotes = (doc: any) => {
+    setEditingNotesId(doc.id);
+    setNotesText(doc.notes || "");
+  };
+
+  const saveNotes = () => {
+    if (editingNotesId === null) return;
+    updateNotes.mutate({ id: editingNotesId, notes: notesText || null });
+  };
+
+  const confirmDelete = (id: number) => {
+    setDeletingId(id);
+  };
+
   const allDocs = docs || [];
+  // Filter by dispatchStatus (client-side) since backend filter uses docStatus
+  const statusFiltered = filter !== "todos" ? allDocs.filter((d: any) => d.dispatchStatus === filter) : allDocs;
   const filteredDocs = search
-    ? allDocs.filter((d: any) =>
+    ? statusFiltered.filter((d: any) =>
         (d.clienteNome || "").toLowerCase().includes(search.toLowerCase()) ||
         (d.vehicleModel || "").toLowerCase().includes(search.toLowerCase()) ||
         (d.vehiclePlate || "").toLowerCase().includes(search.toLowerCase())
       )
-    : allDocs;
+    : statusFiltered;
 
   const counts = {
     total: allDocs.length,
@@ -78,25 +104,31 @@ export default function AdminDocumentos() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary" /> Documentos de Venda
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Gerencie documentos enviados pelos vendedores para transferência
-          </p>
+          <div className="flex items-center gap-3 mb-1">
+            <button onClick={() => window.history.back()} className="p-1.5 rounded-lg hover:bg-accent transition-colors">
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <h1 className="text-2xl font-black text-foreground">Despachante / Documentos</h1>
+          </div>
+          <p className="text-muted-foreground text-sm ml-10">Gerencie transferências e documentos de vendas</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <FileText className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+            <p className="text-2xl font-black text-foreground">{counts.total}</p>
+            <p className="text-xs text-muted-foreground">Total</p>
+          </div>
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
             <FileWarning className="w-5 h-5 text-red-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-red-400">{counts.aguardando}</p>
-            <p className="text-xs text-red-400/70">Aguardando Docs</p>
+            <p className="text-xs text-red-400/70">Aguardando</p>
           </div>
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
             <FileCheck className="w-5 h-5 text-blue-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-blue-400">{counts.recebidos}</p>
-            <p className="text-xs text-blue-400/70">Docs Recebidos</p>
+            <p className="text-xs text-blue-400/70">Recebidos</p>
           </div>
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-center">
             <Clock className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
@@ -143,7 +175,7 @@ export default function AdminDocumentos() {
                 placeholder="Buscar por cliente, veículo ou placa..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground"
+                className="w-full pl-9 pr-3 py-2 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground border border-border focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -151,6 +183,59 @@ export default function AdminDocumentos() {
 
         {/* Hidden file input */}
         <input ref={docInputRef} type="file" accept="image/*,.pdf" className="hidden" onChange={processDocUpload} />
+
+        {/* Delete confirmation modal */}
+        {deletingId !== null && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setDeletingId(null)}>
+            <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-bold text-foreground mb-2">Confirmar exclusão</h3>
+              <p className="text-sm text-muted-foreground mb-4">Tem certeza que deseja excluir este registro de documento? Esta ação não pode ser desfeita.</p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setDeletingId(null)}>Cancelar</Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => deleteDoc.mutate({ id: deletingId })}
+                  disabled={deleteDoc.isPending}
+                  className="gap-1.5"
+                >
+                  {deleteDoc.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Excluir
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notes editing modal */}
+        {editingNotesId !== null && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setEditingNotesId(null)}>
+            <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-foreground">Observações</h3>
+                <button onClick={() => setEditingNotesId(null)} className="p-1 rounded-lg hover:bg-accent"><X className="w-4 h-4" /></button>
+              </div>
+              <textarea
+                value={notesText}
+                onChange={(e) => setNotesText(e.target.value)}
+                placeholder="Adicione observações sobre este documento..."
+                className="w-full h-32 bg-muted border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:border-primary focus:outline-none"
+              />
+              <div className="flex gap-2 justify-end mt-3">
+                <Button variant="outline" size="sm" onClick={() => setEditingNotesId(null)}>Cancelar</Button>
+                <Button
+                  size="sm"
+                  onClick={saveNotes}
+                  disabled={updateNotes.isPending}
+                  className="gap-1.5"
+                >
+                  {updateNotes.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Documents List */}
         <div className="space-y-3">
@@ -179,6 +264,26 @@ export default function AdminDocumentos() {
                       <p className="text-xs text-muted-foreground mt-1">
                         Venda #{doc.saleId} • Vendedor #{doc.sellerId} • {formatDate(doc.createdAt)}
                       </p>
+                      {doc.notes && (
+                        <p className="text-xs text-amber-400/80 mt-1 italic">📝 {doc.notes}</p>
+                      )}
+                    </div>
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => startEditNotes(doc)}
+                        className="p-1.5 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                        title="Observações"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(doc.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-400"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 

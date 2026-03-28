@@ -747,17 +747,10 @@ export const crmChatRouter = router({
     const v = rows[0];
     if (!v) throw new Error("Veículo não encontrado");
     
-    // Build vehicle message
-    const price = v.price ? `R$ ${Number(v.price).toLocaleString("pt-BR")}` : "Consulte";
+    // Build simplified vehicle message (only name + year + link)
     const msg = `🚗 *${v.brand} ${v.model}*\n` +
       `📅 Ano: ${v.year || "N/I"}\n` +
-      `💰 Preço: ${price}\n` +
-      `🔧 Câmbio: ${v.transmission || "N/I"}\n` +
-      `⛽ Combustível: ${v.fuel || "N/I"}\n` +
-      `📏 KM: ${v.km ? Number(v.km).toLocaleString("pt-BR") + " km" : "N/I"}\n` +
-      (v.color ? `🎨 Cor: ${v.color}\n` : "") +
-      (v.plate ? `🔖 Placa: ${v.plate}\n` : "") +
-      (v.externalUrl ? `🔗 ${v.externalUrl}\n` : "") +
+      (v.externalUrl ? `\n🔗 ${v.externalUrl}\n` : "") +
       `\n_Kafka Multimarcas_`;
     
     // Send text first
@@ -797,6 +790,7 @@ export const crmChatRouter = router({
     
     // Send ALL photos - proxy each through S3 then send via Z-API
     let sentCount = 0;
+    const sentPhotoUrls: string[] = [];
     for (let i = 0; i < photoUrls.length; i++) {
       try {
         // First try direct URL
@@ -806,20 +800,30 @@ export const crmChatRouter = router({
           // If direct fails, proxy through S3
           const s3Url = await proxyImageToS3(photoUrls[i], i);
           if (s3Url) {
+            sendUrl = s3Url;
             result = await zapi.sendImage(lead.phone, s3Url, i === 0 ? `${v.brand} ${v.model}` : "");
           }
         }
-        if (result.success) sentCount++;
+        if (result.success) { sentCount++; sentPhotoUrls.push(sendUrl); }
         // Small delay between images to avoid rate limiting
         if (i < photoUrls.length - 1) await new Promise(r => setTimeout(r, 500));
       } catch {}
     }
     
+    // Save text message
     await crmDb.createMessage({
       leadId: input.leadId, phone: lead.phone, direction: "outbound",
       messageType: "text", content: msg, mediaUrl: null,
       senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
     });
+    // Save each sent photo as a separate image message so sender can see them in chat
+    for (const photoUrl of sentPhotoUrls) {
+      await crmDb.createMessage({
+        leadId: input.leadId, phone: lead.phone, direction: "outbound",
+        messageType: "image", content: null, mediaUrl: photoUrl,
+        senderName: null, sentBy: input.sellerId || null, zapiMessageId: null, timestamp: Date.now(),
+      });
+    }
     await crmDb.updateLead(input.leadId, { lastContactDate: Date.now(), vehicleInterest: `${v.brand} ${v.model}` });
     return { success: true, vehicleName: `${v.brand} ${v.model}`, photosSent: sentCount, photosTotal: photoUrls.length };
   }),
@@ -881,36 +885,27 @@ export const crmAiRouter = router({
       return `${role}: ${text}`;
     }).join("\n");
 
-    // 5. Call LLM
-    const systemPrompt = `Você é um assistente de vendas especializado em veículos seminovos e usados da loja Kafka Multimarcas. Seu objetivo é ajudar o vendedor a converter leads em vendas.
+    // 5. Call LLM - optimized for short, humanized WhatsApp messages
+    const systemPrompt = `Você é vendedor da Kafka Multimarcas. Responda como um vendedor real de loja de carros pelo WhatsApp.
 
-REGRAS IMPORTANTES:
-- Responda SEMPRE em português brasileiro, de forma natural e humanizada
-- Use linguagem informal mas profissional (como um vendedor experiente)
-- NUNCA invente informações sobre veículos - use APENAS os dados fornecidos
-- Foque em: criar rapport, entender necessidade, apresentar benefícios, quebrar objeções, agendar visita
-- Use gatilhos mentais: escassez ("esse modelo sai rápido"), prova social, urgência, autoridade
-- Se o cliente perguntar sobre financiamento, diga que a loja trabalha com os melhores bancos e condições
-- Sempre tente agendar uma visita à loja ou test drive
-- Seja direto e objetivo - mensagens curtas e impactantes para WhatsApp
-- NÃO use emojis em excesso, máximo 1-2 por mensagem
-- NÃO use markdown, negrito ou formatação - texto puro para WhatsApp
-- Se não souber algo, sugira que o vendedor confirme antes de enviar
+REGRAS OBRIGATÓRIAS:
+- MÁXIMO 2-3 linhas por mensagem (como uma pessoa real digitaria no WhatsApp)
+- Linguagem natural, informal, como se estivesse conversando com um amigo
+- SEM formatação (sem negrito, sem markdown, sem asteriscos)
+- Máximo 1 emoji por mensagem (ou nenhum)
+- NUNCA invente dados de veículos
+- Foque em UMA coisa por mensagem: ou pergunta, ou resposta, ou convite pra visita
+- Se puder, chame pelo primeiro nome
+- Tente sempre levar pra visita na loja ou test drive
 
-INFORMAÇÕES DO LEAD:
-- Nome: ${lead.name}
-- Telefone: ${lead.phone || "N/A"}
-- Veículo de interesse: ${lead.vehicleInterest || "Não especificado"}
-- Temperatura: ${lead.score === "hot" ? "Quente (muito interessado)" : lead.score === "warm" ? "Morno (interessado)" : "Frio (pouco interesse)"}
-- Fonte: ${lead.source}
-- Etapa: ${lead.stage}${vehicleContext}
+LEAD: ${lead.name} | Interesse: ${lead.vehicleInterest || "N/A"} | Etapa: ${lead.stage}${vehicleContext}
 
-HISTÓRICO DA CONVERSA:
-${chatHistory || "(Sem mensagens anteriores)"}`;
+CONVERSA:
+${chatHistory || "(Primeira mensagem)"}`;
 
     const userMessage = input.customPrompt
-      ? `O vendedor pediu: "${input.customPrompt}". Gere uma resposta para enviar ao cliente considerando o contexto acima.`
-      : "Analise a conversa acima e sugira a MELHOR resposta para o vendedor enviar ao cliente agora. Considere o momento da conversa e o que faria sentido para avançar a negociação.";
+      ? `${input.customPrompt}. Responda em no máximo 2-3 linhas curtas.`
+      : "Gere a próxima mensagem do vendedor. Máximo 2-3 linhas curtas, como uma mensagem real de WhatsApp. Apenas o texto, sem prefixos.";
 
     const response = await invokeLLM({
       messages: [

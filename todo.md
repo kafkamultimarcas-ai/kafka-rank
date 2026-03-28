@@ -1248,3 +1248,63 @@
 
 ## Fix Login Automático - 28/03/2026
 - [x] Auto-login sem depender do Manus OAuth - gerar token direto ao acessar a página de login
+
+## Correções Múltiplas - 28/03/2026
+- [ ] Documentos de venda: tornar cards clicáveis para acessar/visualizar documentos
+- [ ] Documentos de venda: botões de editar e excluir
+- [ ] Botão voltar em todas as abas/páginas internas
+- [ ] Filtro de leads por temperatura (Morno/Quente/Frio) não funciona - todos aparecem como Morno
+- [ ] Bug: toggle IA Automática não clicável
+- [ ] IA automática: mensagens muito longas - precisa ser mais curta e humanizada, objetiva
+- [ ] Envio de veículo simplificado: só nome do veículo + ano + fotos (sem câmbio, combustível, placa, etc)
+- [ ] Fotos enviadas do veículo não aparecem no chat do remetente (só aparece pro destinatário)
+
+## Integração Instagram + Facebook - 28/03/2026
+- [ ] Pesquisar e configurar Meta Graph API para Instagram e Facebook
+- [ ] Backend: webhook para receber mensagens do Instagram Direct
+- [ ] Backend: webhook para receber mensagens do Facebook Messenger
+- [ ] Backend: enviar mensagens via Instagram Direct API
+- [ ] Backend: enviar mensagens via Facebook Messenger API
+- [ ] Frontend: indicador de origem (WhatsApp/Instagram/Facebook) nos leads e chat
+- [ ] Frontend: seletor de canal ao enviar mensagem (quando lead tem múltiplos canais)
+- [ ] Leads do Instagram e Facebook entram automaticamente no CRM
+
+## Melhorias Solicitadas - 28/03/2026 (Sessão 2)
+
+### Despachante - Acesso Completo
+- [ ] Visualizar todos os documentos lançados com det- [x] Permitir editar notas/observações de documentos
+- [x] Permitir excluir registros de documentos
+- [x] Filtros funcionando corretamente por status
+
+### Financeiro - Notificações de Autorização de Pagamento
+- [x] Separar contas operacionais (aluguel, água, luz) das que precisam autorização
+- [x] Campo "requer autorização" ao lançar conta especial
+- [x] Notificação push quando conta que precisa autorização é lançada
+- [x] Fluxo: lançou → conferiu → pede autorização → notificação ao admin/gerente
+
+### Distribuição de Leads com Timers
+- [x] Distribuição automática por ordem de chegada (round-robin entre SDRs)
+- [x] Identificação visual por cor/nome de cada SDR
+- [x] Timer SDR: aviso em 5 minutos se não respondeu
+- [x] Timer SDR: transfere para outra SDR se não responder em 5 minutos
+- [x] Timer Vendedor: aviso em 5 minutos que cliente aguardando
+- [x] Timer Vendedor: transfere lead se passar de 10 minutos sem resposta
+- [x] Notificação visual de "cliente aguardando" com contagem regressiva
+
+### Visual e UX Geral
+- [x] Destacar áreas mais importantes com cores e tamanhos
+- [x] Adicionar botões faltando em todas as abas
+- [x] Melhorar praticidade geral - menos cliques, mais ações diretas
+- [x] Tornar interface mais visual e intuitiva
+
+### Varredura Completa de Bugs
+- [x] Análise de todas as telas e módulos
+- [x] Corrigir todos os bugs encontrados na varredura
+- [x] Verificar botões não funcionais em todas as páginas
+- [x] Verificar abas sem funcionalidade de edição
+
+## Financeiro - Acesso e Funcionalidades (28/03 sessão 2)
+- [x] Financeiro deve conseguir lançar tudo por áudio (contas a pagar, receber, gasolina)
+- [x] Admin deve ter acesso à tela do Financeiro (ver tudo que o financeiro vê)
+- [x] Verificar se tela do financeiro está acessível e funcional
+- [x] Garantir que lançamento por áudio funciona na tela principal do financeiro

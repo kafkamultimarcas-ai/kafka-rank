@@ -6,7 +6,7 @@ import {
   DollarSign, ArrowLeft, Wrench, Clock, ChevronDown, ChevronUp, Phone, Car, 
   User, AlertTriangle, MapPin, FileText, MessageCircle, PhoneCall, Search,
   Plus, CheckCircle, X, Calendar, Receipt, TrendingUp, TrendingDown, LogOut,
-  Fuel, Mic, MicOff, Loader2
+  Fuel, Mic, MicOff, Loader2, Shield, ShieldCheck, ShieldAlert, Edit2, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -251,9 +251,33 @@ function PosVendaTab() {
 // ===== CONTAS TAB (Exclusivo Financeiro) =====
 function ContasTab() {
   const { data: categories } = trpc.finCategories.list.useQuery();
-  const { data: transactionsData } = trpc.finTransactions.list.useQuery({});
-  const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue">("all");
+  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery({});
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
+  const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  
+  // Form state
+  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
+  const [txDescription, setTxDescription] = useState("");
+  const [txAmount, setTxAmount] = useState("");
+  const [txDueDate, setTxDueDate] = useState("");
+  const [txSupplier, setTxSupplier] = useState("");
+  const [txNotes, setTxNotes] = useState("");
+  const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
+  const [txNeedsApproval, setTxNeedsApproval] = useState(false);
+  const [txRecurrence, setTxRecurrence] = useState("none");
+  
+  const createTransaction = trpc.finTransactions.create.useMutation({
+    onSuccess: () => { refetch(); setShowForm(false); resetForm(); toast.success("Conta lan\u00e7ada com sucesso!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  
+  const resetForm = () => {
+    setTxType("payable"); setTxDescription(""); setTxAmount("");
+    setTxDueDate(""); setTxSupplier(""); setTxNotes("");
+    setTxCategoryId(null); setTxNeedsApproval(false); setTxRecurrence("none");
+  };
 
   const allTransactions: any[] = (transactionsData as any)?.items || (Array.isArray(transactionsData) ? transactionsData : []);
   
@@ -263,6 +287,7 @@ function ContasTab() {
     if (filter === "pending") list = list.filter((t: any) => t.status === "pending" && t.dueDate >= now);
     else if (filter === "paid") list = list.filter((t: any) => t.status === "paid");
     else if (filter === "overdue") list = list.filter((t: any) => t.status === "pending" && t.dueDate < now);
+    else if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((t: any) => t.description?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q));
@@ -275,37 +300,169 @@ function ContasTab() {
     const pending = allTransactions.filter((t: any) => t.status === "pending");
     const paid = allTransactions.filter((t: any) => t.status === "paid");
     const overdue = pending.filter((t: any) => t.dueDate < now);
+    const needApproval = allTransactions.filter((t: any) => t.approvalStatus === "pending_approval");
     const totalPending = pending.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
     const totalPaid = paid.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
     const totalOverdue = overdue.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    return { pending: pending.length, paid: paid.length, overdue: overdue.length, totalPending, totalPaid, totalOverdue };
+    return { pending: pending.length, paid: paid.length, overdue: overdue.length, needApproval: needApproval.length, totalPending, totalPaid, totalOverdue };
   }, [allTransactions]);
 
   const getCategoryName = (catId: number) => {
     const cat = (categories || []).find((c: any) => c.id === catId);
     return cat?.name || "Sem categoria";
   };
+  
+  const handleAudioResult = (parsed: any) => {
+    if (parsed.description) setTxDescription(parsed.description);
+    if (parsed.amount) setTxAmount(String(parsed.amount));
+    if (parsed.supplier) setTxSupplier(parsed.supplier);
+    if (parsed.notes) setTxNotes(parsed.notes);
+    if (parsed.type === "receivable") setTxType("receivable");
+    if (parsed.dueDate) {
+      try {
+        const d = new Date(parsed.dueDate);
+        setTxDueDate(d.toISOString().split("T")[0]);
+      } catch {}
+    }
+    setShowForm(true);
+    toast.success("Dados preenchidos pelo \u00e1udio!");
+  };
 
   return (
     <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => setFilter(f => f === "overdue" ? "all" : "overdue")} className={`rounded-xl p-3 border text-center transition-all bg-red-500/10 border-red-500/20 ${filter === "overdue" ? 'ring-2 ring-red-500/50' : ''}`}>
-          <p className="text-xl font-bold text-red-400">{stats.overdue}</p>
-          <p className="text-[10px] text-gray-500">Vencidas</p>
-          <p className="text-[9px] text-red-400/70">{formatCurrency(stats.totalOverdue)}</p>
+      <div className="grid grid-cols-4 gap-2">
+        <button onClick={() => setFilter(f => f === "overdue" ? "all" : "overdue")} className={`rounded-xl p-2.5 border text-center transition-all bg-red-500/10 border-red-500/20 ${filter === "overdue" ? 'ring-2 ring-red-500/50' : ''}`}>
+          <p className="text-lg font-bold text-red-400">{stats.overdue}</p>
+          <p className="text-[9px] text-gray-500">Vencidas</p>
         </button>
-        <button onClick={() => setFilter(f => f === "pending" ? "all" : "pending")} className={`rounded-xl p-3 border text-center transition-all bg-amber-500/10 border-amber-500/20 ${filter === "pending" ? 'ring-2 ring-amber-500/50' : ''}`}>
-          <p className="text-xl font-bold text-amber-400">{stats.pending}</p>
-          <p className="text-[10px] text-gray-500">Pendentes</p>
-          <p className="text-[9px] text-amber-400/70">{formatCurrency(stats.totalPending)}</p>
+        <button onClick={() => setFilter(f => f === "pending" ? "all" : "pending")} className={`rounded-xl p-2.5 border text-center transition-all bg-amber-500/10 border-amber-500/20 ${filter === "pending" ? 'ring-2 ring-amber-500/50' : ''}`}>
+          <p className="text-lg font-bold text-amber-400">{stats.pending}</p>
+          <p className="text-[9px] text-gray-500">Pendentes</p>
         </button>
-        <button onClick={() => setFilter(f => f === "paid" ? "all" : "paid")} className={`rounded-xl p-3 border text-center transition-all bg-emerald-500/10 border-emerald-500/20 ${filter === "paid" ? 'ring-2 ring-emerald-500/50' : ''}`}>
-          <p className="text-xl font-bold text-emerald-400">{stats.paid}</p>
-          <p className="text-[10px] text-gray-500">Pagas</p>
-          <p className="text-[9px] text-emerald-400/70">{formatCurrency(stats.totalPaid)}</p>
+        <button onClick={() => setFilter(f => f === "paid" ? "all" : "paid")} className={`rounded-xl p-2.5 border text-center transition-all bg-emerald-500/10 border-emerald-500/20 ${filter === "paid" ? 'ring-2 ring-emerald-500/50' : ''}`}>
+          <p className="text-lg font-bold text-emerald-400">{stats.paid}</p>
+          <p className="text-[9px] text-gray-500">Pagas</p>
+        </button>
+        <button onClick={() => setFilter(f => f === "approval" ? "all" : "approval")} className={`rounded-xl p-2.5 border text-center transition-all bg-purple-500/10 border-purple-500/20 ${filter === "approval" ? 'ring-2 ring-purple-500/50' : ''}`}>
+          <p className="text-lg font-bold text-purple-400">{stats.needApproval}</p>
+          <p className="text-[9px] text-gray-500">Autorizar</p>
         </button>
       </div>
+
+      {/* Bot\u00e3o Nova Conta + Audio */}
+      <div className="space-y-2">
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
+        >
+          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showForm ? "Cancelar" : "Nova Conta"}
+        </button>
+        {!showForm && (
+          <AudioLauncher onResult={handleAudioResult} context="conta_pagar" />
+        )}
+      </div>
+
+      {/* Formul\u00e1rio de nova conta */}
+      {showForm && (
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Tipo *</label>
+              <select value={txType} onChange={e => setTxType(e.target.value as any)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+                <option value="payable">A Pagar</option>
+                <option value="receivable">A Receber</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Categoria</label>
+              <select value={txCategoryId?.toString() || ""} onChange={e => setTxCategoryId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+                <option value="">Sem categoria</option>
+                {(categories || []).map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Descri\u00e7\u00e3o *</label>
+            <Input value={txDescription} onChange={e => setTxDescription(e.target.value)}
+              placeholder="Ex: Boleto energia, Aluguel loja..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Valor (R$) *</label>
+              <Input type="number" step="0.01" value={txAmount} onChange={e => setTxAmount(e.target.value)}
+                placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Vencimento *</label>
+              <Input type="date" value={txDueDate} onChange={e => setTxDueDate(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Fornecedor</label>
+            <Input value={txSupplier} onChange={e => setTxSupplier(e.target.value)}
+              placeholder="Ex: CEMIG, Imobili\u00e1ria..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Recorr\u00eancia</label>
+            <select value={txRecurrence} onChange={e => setTxRecurrence(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+              <option value="none">Sem recorr\u00eancia</option>
+              <option value="monthly">Mensal</option>
+              <option value="weekly">Semanal</option>
+              <option value="yearly">Anual</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Observa\u00e7\u00f5es</label>
+            <Input value={txNotes} onChange={e => setTxNotes(e.target.value)}
+              placeholder="Notas adicionais..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+          
+          {/* Toggle Precisa Autoriza\u00e7\u00e3o */}
+          <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-purple-400" />
+              <div>
+                <p className="text-xs font-bold text-purple-300">Precisa de Autoriza\u00e7\u00e3o</p>
+                <p className="text-[10px] text-gray-500">Envia notifica\u00e7\u00e3o para o gestor aprovar</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => setTxNeedsApproval(!txNeedsApproval)}
+              className={`w-11 h-6 rounded-full transition-all relative ${txNeedsApproval ? 'bg-purple-500' : 'bg-gray-700'}`}>
+              <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all pointer-events-none ${txNeedsApproval ? 'left-5.5' : 'left-0.5'}`} />
+            </button>
+          </div>
+          
+          {/* Audio dentro do form */}
+          <AudioLauncher onResult={handleAudioResult} context={txType === "receivable" ? "conta_receber" : "conta_pagar"} />
+          
+          <Button onClick={() => {
+            if (!txDescription.trim() || !txAmount || !txDueDate) return toast.error("Preencha descri\u00e7\u00e3o, valor e vencimento");
+            createTransaction.mutate({
+              type: txType,
+              description: txDescription,
+              amount: txAmount,
+              dueDate: new Date(txDueDate + "T12:00:00").getTime(),
+              categoryId: txCategoryId,
+              supplier: txSupplier || undefined,
+              notes: txNotes || undefined,
+              recurrence: txRecurrence as any,
+              needsApproval: txNeedsApproval,
+              createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
+            });
+          }} disabled={createTransaction.isPending}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
+            {createTransaction.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Receipt className="h-4 w-4 mr-2" /> Lan\u00e7ar Conta</>}
+          </Button>
+        </div>
+      )}
 
       {/* Busca */}
       <div className="relative">
@@ -314,21 +471,25 @@ function ContasTab() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar por descrição..."
+          placeholder="Buscar por descri\u00e7\u00e3o..."
           className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none"
         />
       </div>
 
-      {/* Lista de transações */}
+      {/* Lista de transa\u00e7\u00f5es */}
       {filtered.length > 0 ? (
         <div className="space-y-2">
           {filtered.map((t: any) => {
             const now = Date.now();
             const isOverdue = t.status === "pending" && t.dueDate < now;
             const isPaid = t.status === "paid";
-            const isExpense = t.type === "expense";
+            const isPayable = t.type === "payable";
+            const needsAuth = t.approvalStatus === "pending_approval";
+            const isApproved = t.approvalStatus === "approved";
+            const isRejected = t.approvalStatus === "rejected";
             return (
               <div key={t.id} className={`rounded-xl border p-4 transition-all ${
+                needsAuth ? "bg-purple-500/10 border-purple-500/30" :
                 isOverdue ? "bg-red-500/10 border-red-500/30" :
                 isPaid ? "bg-emerald-500/10 border-emerald-500/30" :
                 "bg-gray-900/60 border-gray-800"
@@ -336,18 +497,23 @@ function ContasTab() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      {isExpense ? <TrendingDown className="h-3.5 w-3.5 text-red-400 shrink-0" /> : <TrendingUp className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
+                      {isPayable ? <TrendingDown className="h-3.5 w-3.5 text-red-400 shrink-0" /> : <TrendingUp className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
                       <p className="text-sm font-bold text-white truncate">{t.description}</p>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
                       <span className="bg-gray-800 px-1.5 py-0.5 rounded">{getCategoryName(t.categoryId)}</span>
                       <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(t.dueDate)}</span>
+                      {t.supplier && <span className="text-gray-400">{t.supplier}</span>}
                       {isOverdue && <span className="text-red-400 font-bold">VENCIDA</span>}
                       {isPaid && <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle className="h-3 w-3" /> Paga</span>}
+                      {needsAuth && <span className="text-purple-400 font-bold flex items-center gap-0.5"><Shield className="h-3 w-3" /> Aguardando Autoriza\u00e7\u00e3o</span>}
+                      {isApproved && <span className="text-green-400 font-bold flex items-center gap-0.5"><ShieldCheck className="h-3 w-3" /> Autorizada</span>}
+                      {isRejected && <span className="text-red-400 font-bold flex items-center gap-0.5"><ShieldAlert className="h-3 w-3" /> Rejeitada</span>}
                     </div>
+                    {t.createdByName && <p className="text-[10px] text-gray-600 mt-1">Lan\u00e7ado por: {t.createdByName}</p>}
                   </div>
-                  <p className={`text-sm font-bold shrink-0 ml-2 ${isExpense ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {isExpense ? '-' : '+'}{formatCurrency(t.amount)}
+                  <p className={`text-sm font-bold shrink-0 ml-2 ${isPayable ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {isPayable ? '-' : '+'}{formatCurrency(t.amount)}
                   </p>
                 </div>
                 {t.notes && <p className="text-[11px] text-gray-500 mt-2 line-clamp-1">{t.notes}</p>}
