@@ -824,6 +824,124 @@ export const crmChatRouter = router({
   }),
 });
 
+// ===== AI SALES ASSISTANT =====
+export const crmAiRouter = router({
+  // Generate AI suggestion for a reply
+  suggestReply: publicProcedure.input(z.object({
+    leadId: z.number(),
+    customPrompt: z.string().optional(), // optional extra instruction from seller
+  })).mutation(async ({ input }) => {
+    // 1. Get lead info
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead) throw new Error("Lead não encontrado");
+
+    // 2. Get recent messages (last 30)
+    const messages = await crmDb.listMessagesByLead(input.leadId, 30);
+
+    // 3. Get vehicle of interest from inventory if available
+    let vehicleContext = "";
+    if (lead.vehicleInterest) {
+      const { getDb } = await import("../db");
+      const { inventoryVehicles } = await import("../../drizzle/schema");
+      const { like, or, and, eq } = await import("drizzle-orm");
+      const dbConn = await getDb();
+      if (dbConn) {
+        const search = `%${lead.vehicleInterest}%`;
+        const vehicles = await dbConn.select().from(inventoryVehicles)
+          .where(and(
+            eq(inventoryVehicles.status, "available"),
+            or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))
+          )).limit(5);
+        if (vehicles.length > 0) {
+          vehicleContext = "\n\nVEÍCULOS DISPONÍVEIS NO ESTOQUE:\n" + vehicles.map(v =>
+            `- ${v.brand} ${v.model} ${v.version || ""} ${v.year || ""} | Cor: ${v.color || "N/A"} | KM: ${v.km?.toLocaleString("pt-BR") || "N/A"} | Preço: R$ ${v.price?.toLocaleString("pt-BR") || "N/A"} | Câmbio: ${v.transmission || "N/A"} | Combustível: ${v.fuel || "N/A"} | Placa: ${v.plate || "N/A"}`
+          ).join("\n");
+        }
+      }
+    }
+
+    // 4. Build conversation history for context
+    const chatHistory = messages.slice(-20).map(m => {
+      const role = m.direction === "inbound" ? "CLIENTE" : "VENDEDOR";
+      const text = m.content || (m.messageType === "audio" || m.messageType === "ptt" ? "[Áudio]" : m.messageType === "image" ? "[Imagem]" : "[Mídia]");
+      return `${role}: ${text}`;
+    }).join("\n");
+
+    // 5. Call LLM
+    const systemPrompt = `Você é um assistente de vendas especializado em veículos seminovos e usados da loja Kafka Multimarcas. Seu objetivo é ajudar o vendedor a converter leads em vendas.
+
+REGRAS IMPORTANTES:
+- Responda SEMPRE em português brasileiro, de forma natural e humanizada
+- Use linguagem informal mas profissional (como um vendedor experiente)
+- NUNCA invente informações sobre veículos - use APENAS os dados fornecidos
+- Foque em: criar rapport, entender necessidade, apresentar benefícios, quebrar objeções, agendar visita
+- Use gatilhos mentais: escassez ("esse modelo sai rápido"), prova social, urgência, autoridade
+- Se o cliente perguntar sobre financiamento, diga que a loja trabalha com os melhores bancos e condições
+- Sempre tente agendar uma visita à loja ou test drive
+- Seja direto e objetivo - mensagens curtas e impactantes para WhatsApp
+- NÃO use emojis em excesso, máximo 1-2 por mensagem
+- NÃO use markdown, negrito ou formatação - texto puro para WhatsApp
+- Se não souber algo, sugira que o vendedor confirme antes de enviar
+
+INFORMAÇÕES DO LEAD:
+- Nome: ${lead.name}
+- Telefone: ${lead.phone || "N/A"}
+- Veículo de interesse: ${lead.vehicleInterest || "Não especificado"}
+- Temperatura: ${lead.score === "hot" ? "Quente (muito interessado)" : lead.score === "warm" ? "Morno (interessado)" : "Frio (pouco interesse)"}
+- Fonte: ${lead.source}
+- Etapa: ${lead.stage}${vehicleContext}
+
+HISTÓRICO DA CONVERSA:
+${chatHistory || "(Sem mensagens anteriores)"}`;
+
+    const userMessage = input.customPrompt
+      ? `O vendedor pediu: "${input.customPrompt}". Gere uma resposta para enviar ao cliente considerando o contexto acima.`
+      : "Analise a conversa acima e sugira a MELHOR resposta para o vendedor enviar ao cliente agora. Considere o momento da conversa e o que faria sentido para avançar a negociação.";
+
+    const response = await invokeLLM({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    });
+
+    const suggestion = (response.choices?.[0]?.message?.content as string) || "Não foi possível gerar sugestão.";
+    return { suggestion: suggestion.trim() };
+  }),
+
+  // Get/Set AI auto-reply setting for a lead
+  getAutoReply: publicProcedure.input(z.object({
+    leadId: z.number(),
+  })).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { enabled: false };
+    // Check if crm_ai_settings table exists, use raw query
+    try {
+      const { sql } = await import("drizzle-orm");
+      const result = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${input.leadId} LIMIT 1`);
+      const rows = result as any;
+      if (rows && rows.length > 0) return { enabled: !!rows[0].enabled };
+      return { enabled: false };
+    } catch {
+      return { enabled: false };
+    }
+  }),
+
+  setAutoReply: publicProcedure.input(z.object({
+    leadId: z.number(),
+    enabled: z.boolean(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    const val = input.enabled ? 1 : 0;
+    await dbConn.execute(sql`INSERT INTO crm_ai_settings (leadId, enabled) VALUES (${input.leadId}, ${val}) ON DUPLICATE KEY UPDATE enabled = ${val}`);
+    return { success: true };
+  }),
+});
+
 // ===== PERFORMANCE & ALERTS =====
 export const crmPerformanceRouter = router({
   // Get unresponded leads (for alerts)

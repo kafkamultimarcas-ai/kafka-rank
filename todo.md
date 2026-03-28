@@ -1220,3 +1220,16 @@
 - [x] Foto do veículo: proxy via S3 para contornar bloqueio de URL do litoralcar.com.br
 - [x] Foto do veículo: enviar TODAS as fotos disponíveis no campo photos[] (não só 1)
 - [x] Pipeline: implementar drag & drop para arrastar leads entre colunas (estágios)
+
+## IA Assistente de Vendas no Chat - 27/03/2026
+- [x] Backend: procedure tRPC aiSuggestReply que gera sugestão de resposta com contexto (lead, histórico, estoque)
+- [x] Backend: tabela crm_ai_settings para salvar config por lead (autoReply on/off)
+- [x] Frontend: botão IA (raio/Zap) no chat ao lado do campo de mensagem
+- [x] Frontend: modal de sugestão com opção de editar antes de enviar ou enviar direto
+- [x] Frontend: prompts rápidos (Quebrar objeção de preço, Agendar visita, Oferecer financiamento, Criar urgência)
+- [x] Frontend: campo de prompt customizado para pedir algo específico à IA
+- [x] Frontend: toggle de IA Automática por lead (ativar/desativar)
+- [x] Modo automático: webhook detecta mensagem inbound e responde via IA quando ativado
+- [x] System prompt especializado em vendas automotivas, conversão, agendamento, quebra de objeções
+- [x] IA com contexto: nome do lead, interesse, score, histórico de conversa, estoque disponível
+- [x] Funciona tanto no painel admin (CrmCommandCenter) quanto na tela SDR (CrmChat)

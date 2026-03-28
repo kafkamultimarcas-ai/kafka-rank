@@ -415,6 +415,9 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
   const [uploading, setUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [showAiSuggestion, setShowAiSuggestion] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState("");
+  const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -436,6 +439,33 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
     },
     onError: (e: any) => toast.error("Erro ao enviar: " + e.message),
   });
+
+  const aiSuggest = trpc.crmAi.suggestReply.useMutation({
+    onSuccess: (data) => { setAiSuggestion(data.suggestion); },
+    onError: (e: any) => toast.error("Erro IA: " + e.message),
+  });
+  const { data: autoReplyData } = trpc.crmAi.getAutoReply.useQuery({ leadId });
+  const setAutoReplyMut = trpc.crmAi.setAutoReply.useMutation({
+    onSuccess: () => toast.success("Configura\u00e7\u00e3o salva!"),
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const handleAiSuggest = (customPrompt?: string) => {
+    setShowAiSuggestion(true);
+    setAiSuggestion("");
+    aiSuggest.mutate({ leadId, customPrompt });
+  };
+  const handleUseAiSuggestion = () => {
+    setMessage(aiSuggestion);
+    setShowAiSuggestion(false);
+    setAiCustomPrompt("");
+  };
+  const handleSendAiSuggestion = () => {
+    if (!aiSuggestion.trim() || !lead?.phone) return;
+    sendMessage.mutate({ leadId, message: aiSuggestion, sellerId: sellerId || 0 });
+    setShowAiSuggestion(false);
+    setAiSuggestion("");
+    setAiCustomPrompt("");
+  };
 
   const assignLead = trpc.crmLeads.assignToSeller.useMutation({
     onSuccess: () => toast.success("Lead transferido!"),
@@ -825,6 +855,18 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                 </div>
               ) : (
                 <>
+                  <button
+                    onClick={() => handleAiSuggest()}
+                    disabled={aiSuggest.isPending}
+                    className="h-[42px] w-[42px] rounded-full bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 flex items-center justify-center shrink-0 transition-all shadow-lg shadow-purple-500/20"
+                    title="Sugestão da IA"
+                  >
+                    {aiSuggest.isPending ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Zap className="w-5 h-5 text-white" />
+                    )}
+                  </button>
                   <div className="flex-1 relative">
                     <textarea
                       value={message}
@@ -856,8 +898,85 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                 </>
               )}
             </div>
+            {/* AI Auto-reply toggle */}
+            <div className="flex items-center justify-between px-4 py-1.5 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs text-muted-foreground">IA Automática</span>
+              </div>
+              <button
+                onClick={() => setAutoReplyMut.mutate({ leadId, enabled: !autoReplyData?.enabled })}
+                className={`relative w-9 h-5 rounded-full transition-colors ${autoReplyData?.enabled ? 'bg-purple-600' : 'bg-accent'}`}
+              >
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoReplyData?.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* AI Suggestion Modal */}
+        {showAiSuggestion && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowAiSuggestion(false)}>
+            <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 p-4 border-b border-border">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Assistente IA de Vendas</h3>
+                  <p className="text-xs text-muted-foreground">Sugestão de resposta para o cliente</p>
+                </div>
+                <button onClick={() => setShowAiSuggestion(false)} className="ml-auto p-1 hover:bg-accent rounded">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                {aiSuggest.isPending ? (
+                  <div className="flex flex-col items-center gap-3 py-8">
+                    <div className="w-10 h-10 border-3 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                    <p className="text-sm text-muted-foreground">Analisando conversa e gerando sugestão...</p>
+                  </div>
+                ) : aiSuggestion ? (
+                  <div className="space-y-3">
+                    <div className="bg-green-600/10 border border-green-600/30 rounded-xl p-4">
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{aiSuggestion}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleUseAiSuggestion} variant="outline" className="flex-1 text-sm">
+                        Editar antes de enviar
+                      </Button>
+                      <Button onClick={handleSendAiSuggestion} className="flex-1 bg-green-600 hover:bg-green-700 text-sm">
+                        <Send className="w-4 h-4 mr-1" /> Enviar direto
+                      </Button>
+                    </div>
+                    <div className="border-t border-border pt-3">
+                      <p className="text-xs text-muted-foreground mb-2">Pedir algo específico:</p>
+                      <div className="flex gap-2">
+                        <input
+                          value={aiCustomPrompt}
+                          onChange={e => setAiCustomPrompt(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && aiCustomPrompt.trim()) handleAiSuggest(aiCustomPrompt); }}
+                          placeholder="Ex: Ofereça desconto, agende visita..."
+                          className="flex-1 bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm"
+                        />
+                        <Button onClick={() => handleAiSuggest(aiCustomPrompt)} disabled={!aiCustomPrompt.trim()} size="sm" className="bg-purple-600 hover:bg-purple-700">
+                          <Zap className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {["Quebrar objeção de preço", "Agendar visita", "Oferecer financiamento", "Criar urgência"].map(p => (
+                          <button key={p} onClick={() => handleAiSuggest(p)} className="text-xs bg-accent hover:bg-accent/80 px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground transition-colors">
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Info sidebar */}
         {showInfo && (

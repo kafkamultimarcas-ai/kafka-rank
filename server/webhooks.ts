@@ -2,8 +2,10 @@ import type { Express, Request, Response } from "express";
 import crypto from "crypto";
 import * as crmDb from "./crmDb";
 import { getDb } from "./db";
-import { sellers, crmLeadDistribution } from "../drizzle/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { sellers, crmLeadDistribution, inventoryVehicles } from "../drizzle/schema";
+import { eq, and, asc, like, or, sql, desc } from "drizzle-orm";
+import { invokeLLM } from "./_core/llm";
+import * as zapi from "./zapi-service";
 
 // ===== META GRAPH API HELPER =====
 async function fetchMetaLeadData(leadgenId: string, pageAccessToken: string): Promise<{ name: string; phone: string | null; email: string | null; fields: Record<string, string> } | null> {
@@ -748,6 +750,53 @@ export function registerWebhookRoutes(app: Express) {
           });
           // Update lastContactDate on lead
           await crmDb.updateLead(existingLeads[0].id, { lastContactDate: Date.now() });
+
+          // AI Auto-reply: check if enabled for this lead (only for inbound text messages)
+          if (!fromMe && messageText && messageType === "text") {
+            try {
+              const dbConn = await getDb();
+              if (dbConn) {
+                const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
+                const aiRows = aiResult as any;
+                if (aiRows && aiRows.length > 0 && aiRows[0].enabled) {
+                  // AI auto-reply is enabled - generate and send response asynchronously
+                  const leadForAi = existingLeads[0];
+                  setImmediate(async () => {
+                    try {
+                      const recentMsgs = await crmDb.listMessagesByLead(leadForAi.id, 20);
+                      let vehicleCtx = "";
+                      if (leadForAi.vehicleInterest) {
+                        const search = `%${leadForAi.vehicleInterest}%`;
+                        const vehicles = await dbConn.select().from(inventoryVehicles)
+                          .where(and(eq(inventoryVehicles.status, "available"), or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))))
+                          .limit(5);
+                        if (vehicles.length > 0) {
+                          vehicleCtx = "\nVE\u00cdCULOS DISPON\u00cdVEIS:\n" + vehicles.map(v => `- ${v.brand} ${v.model} ${v.year || ""} | R$ ${v.price?.toLocaleString("pt-BR") || "N/A"} | ${v.km?.toLocaleString("pt-BR") || "0"} km | ${v.color || ""}`).join("\n");
+                        }
+                      }
+                      const chatHist = recentMsgs.slice(-15).map(m => {
+                        const r = m.direction === "inbound" ? "CLIENTE" : "VENDEDOR";
+                        return `${r}: ${m.content || "[M\u00eddia]"}`;
+                      }).join("\n");
+                      const sysPrompt = `Voc\u00ea \u00e9 a IA de vendas da Kafka Multimarcas. Responda o cliente de forma natural, humanizada e profissional. Use portugu\u00eas brasileiro informal mas educado. Seja objetivo e direto (mensagens curtas para WhatsApp). Foque em converter: criar rapport, entender necessidade, apresentar benef\u00edcios, quebrar obje\u00e7\u00f5es, agendar visita. N\u00c3O use markdown/negrito. M\u00e1ximo 1-2 emojis.\n\nLEAD: ${leadForAi.name} | Interesse: ${leadForAi.vehicleInterest || "N\u00e3o especificado"} | Score: ${leadForAi.score}${vehicleCtx}\n\nCONVERSA:\n${chatHist}`;
+                      const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Gere a pr\u00f3xima resposta do vendedor para o cliente. Apenas o texto da mensagem, sem prefixos." }] });
+                      const aiText = ((aiResp.choices?.[0]?.message?.content as string) || "").trim();
+                      if (aiText && phone) {
+                        await zapi.sendText(phone, aiText);
+                        await crmDb.createMessage({ leadId: leadForAi.id, phone, direction: "outbound", messageType: "text", content: aiText, mediaUrl: null, senderName: "IA Kafka", sentBy: null, zapiMessageId: null, timestamp: Date.now() });
+                        console.log(`[AI Auto-Reply] Sent to lead #${leadForAi.id} (${phone}): ${aiText.substring(0, 50)}...`);
+                      }
+                    } catch (aiErr: any) {
+                      console.error(`[AI Auto-Reply] Error for lead #${leadForAi.id}:`, aiErr.message);
+                    }
+                  });
+                }
+              }
+            } catch (aiCheckErr) {
+              // Silently fail AI check - don't block message saving
+            }
+          }
+
           res.json({ success: true, action: "message_saved", leadId: existingLeads[0].id });
           return;
         }
