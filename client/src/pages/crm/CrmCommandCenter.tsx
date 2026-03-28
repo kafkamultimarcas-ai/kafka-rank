@@ -461,8 +461,8 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
                       ? "bg-green-600/90 text-white rounded-br-md"
                       : "bg-card border border-border text-foreground rounded-bl-md"
                   }`}>
-                    {msg.direction === "outbound" && msg.sentBy && (
-                      <p className="text-[9px] font-medium opacity-70 mb-0.5">{sellerMap[msg.sentBy] || "Você"}</p>
+                    {msg.direction === "outbound" && (
+                      <p className="text-[9px] font-medium opacity-70 mb-0.5">{msg.sentBy ? (sellerMap[msg.sentBy] || "Você") : (msg.senderName === "IA Kafka" ? "⚡ IA Kafka" : "Vendedor")}</p>
                     )}
                     {msg.direction === "inbound" && msg.senderName && (
                       <p className="text-[9px] font-medium text-primary mb-0.5">{msg.senderName}</p>

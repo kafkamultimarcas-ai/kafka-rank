@@ -1327,3 +1327,19 @@
 - [x] Mostrar telefone do cliente na lista de leads (abaixo do nome)
 - [x] IA suggestReply e auto-reply no webhook usam modo global (Normal/Feirão)
 - [x] 418 testes passando
+
+## Bugs CRM Chat - Correção Urgente 28/03
+- [x] Chat mostra só mensagens do cliente → ativado enableNotifySentByMe no Z-API para capturar outbound
+- [x] Leads mostram "Sem mensagens" → alterado para "Novo lead" quando sem info
+- [x] Timer "sem resposta" verificado e funciona corretamente
+- [x] Webhook atualizado para processar mensagens outbound via notifySentByMe
+- [x] listMessages retorna todas as mensagens (inbound + outbound) corretamente
+- [x] Integração WhatsApp funcional com status dinâmico nas Configurações
+
+## Bugs CRM - Toast + Outbound Messages 28/03
+- [x] Toast "Configuração salva!" corrigido (duration=3000, closeButton, richColors, z-index 999999)
+- [x] Webhook agora captura mensagens outbound (enableNotifySentByMe ativado)
+- [x] Outbound messages mostram label "Vendedor" ou "⚡ IA Kafka"
+- [x] Z-API webhook processa eventos de mensagem enviada
+- [x] Botões "Reconfigurar Webhook" e "Ativar Captura Outbound" nas Configurações
+- [x] 418 testes passando

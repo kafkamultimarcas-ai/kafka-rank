@@ -243,8 +243,33 @@ export async function setWebhook(webhookUrl: string): Promise<{ success: boolean
       const err = await res.text();
       return { success: false, error: `HTTP ${res.status}: ${err}` };
     }
+    // Also enable notifySentByMe so we capture outbound messages sent from the phone
+    await enableNotifySentByMe();
     return { success: true };
   } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/** Enable receiving outbound messages (sent by the phone) through the webhook */
+export async function enableNotifySentByMe(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${ZAPI_BASE()}/update-notify-sent-by-me`, {
+      method: "PUT",
+      headers: headers(),
+      body: JSON.stringify({
+        notifySentByMe: true,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.log(`[Z-API] enableNotifySentByMe failed: HTTP ${res.status}: ${err}`);
+      return { success: false, error: `HTTP ${res.status}: ${err}` };
+    }
+    console.log(`[Z-API] notifySentByMe enabled successfully`);
+    return { success: true };
+  } catch (err: any) {
+    console.log(`[Z-API] enableNotifySentByMe error: ${err.message}`);
     return { success: false, error: err.message };
   }
 }

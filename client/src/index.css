@@ -158,3 +158,8 @@
     box-shadow: 0 0 20px oklch(0.65 0.25 30 / 0.3), 0 0 40px oklch(0.65 0.25 30 / 0.1);
   }
 }
+
+/* Ensure toast notifications are always visible above all content */
+[data-sonner-toaster] {
+  z-index: 999999 !important;
+}

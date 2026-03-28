@@ -391,7 +391,7 @@ function LeadList({
                       </span>
                     )}
                     {!lead.vehicleInterest && !lead.notes && (
-                      <span className="text-[11px] text-muted-foreground/50 flex-1">Sem mensagens</span>
+                      <span className="text-[11px] text-muted-foreground/50 flex-1">Novo lead</span>
                     )}
                   </div>
 
@@ -768,9 +768,9 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                         ? "bg-green-600/90 text-white rounded-br-md"
                         : "bg-card border border-border text-foreground rounded-bl-md"
                     }`}>
-                      {msg.direction === "outbound" && msg.sentBy && (
+                      {msg.direction === "outbound" && (
                         <p className="text-[9px] font-medium opacity-70 mb-0.5">
-                          {sellerMap[msg.sentBy] || "Você"}
+                          {msg.sentBy ? (sellerMap[msg.sentBy] || "Você") : (msg.senderName === "IA Kafka" ? "⚡ IA Kafka" : "Vendedor")}
                         </p>
                       )}
                       {msg.direction === "inbound" && msg.senderName && (

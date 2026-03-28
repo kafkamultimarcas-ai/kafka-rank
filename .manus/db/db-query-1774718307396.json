@@ -1,0 +1,162 @@
+{
+  "query": "SELECT id, leadId, phone, direction, messageType, LEFT(content, 80) as content_preview, senderName, sentBy, timestamp FROM crm_messages WHERE direction = 'outbound' ORDER BY timestamp DESC LIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, leadId, phone, direction, messageType, LEFT(content, 80) as content_preview, senderName, sentBy, timestamp FROM crm_messages WHERE direction = 'outbound' ORDER BY timestamp DESC LIMIT 15;",
+  "rows": [
+    {
+      "id": "991",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844547"
+    },
+    {
+      "id": "990",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844533"
+    },
+    {
+      "id": "989",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844517"
+    },
+    {
+      "id": "988",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844503"
+    },
+    {
+      "id": "987",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844489"
+    },
+    {
+      "id": "986",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844475"
+    },
+    {
+      "id": "985",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844462"
+    },
+    {
+      "id": "984",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844447"
+    },
+    {
+      "id": "983",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844433"
+    },
+    {
+      "id": "982",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "image",
+      "content_preview": "NULL",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715844414"
+    },
+    {
+      "id": "980",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "text",
+      "content_preview": "Entendi! Pra te ajudar melhor, você tem alguma preferência de ano ou versão espe",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715824632"
+    },
+    {
+      "id": "978",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "text",
+      "content_preview": "Opa, temos sim! Qual ano ou versão você procura? 😉",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715793908"
+    },
+    {
+      "id": "974",
+      "leadId": "481327",
+      "phone": "554797070362",
+      "direction": "outbound",
+      "messageType": "text",
+      "content_preview": "opa",
+      "senderName": "NULL",
+      "sentBy": "NULL",
+      "timestamp": "1774715746445"
+    }
+  ],
+  "messages": [
+    "981\t481327\t554797070362\toutbound\ttext\t🚗 *Nissan Versa*",
+    "📅 Ano: 2022",
+    "🔗 https://www.kafkamultimarcas.com.br/veiculo/niss\tNULL\tNULL\t1774715844400",
+    "681\t481272\t554797270006\toutbound\ttext\t🚗 *Citroën C3*",
+    "📅 Ano: 2015",
+    "💰 Preço: R$ 45.990",
+    "🔧 Câmbio: manual",
+    "⛽ Combustível: Bi\tNULL\tNULL\t1774665610434"
+  ],
+  "stdout": "id\tleadId\tphone\tdirection\tmessageType\tcontent_preview\tsenderName\tsentBy\ttimestamp\n991\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844547\n990\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844533\n989\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844517\n988\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844503\n987\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844489\n986\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844475\n985\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844462\n984\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844447\n983\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844433\n982\t481327\t554797070362\toutbound\timage\tNULL\tNULL\tNULL\t1774715844414\n981\t481327\t554797070362\toutbound\ttext\t🚗 *Nissan Versa*\n📅 Ano: 2022\n\n🔗 https://www.kafkamultimarcas.com.br/veiculo/niss\tNULL\tNULL\t1774715844400\n980\t481327\t554797070362\toutbound\ttext\tEntendi! Pra te ajudar melhor, você tem alguma preferência de ano ou versão espe\tNULL\tNULL\t1774715824632\n978\t481327\t554797070362\toutbound\ttext\tOpa, temos sim! Qual ano ou versão você procura? 😉\tNULL\tNULL\t1774715793908\n974\t481327\t554797070362\toutbound\ttext\topa\tNULL\tNULL\t1774715746445\n681\t481272\t554797270006\toutbound\ttext\t🚗 *Citroën C3*\n📅 Ano: 2015\n💰 Preço: R$ 45.990\n🔧 Câmbio: manual\n⛽ Combustível: Bi\tNULL\tNULL\t1774665610434\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

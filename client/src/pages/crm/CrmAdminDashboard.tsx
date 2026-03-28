@@ -1424,6 +1424,16 @@ function SettingsView() {
     }
   });
 
+  const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
+  const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
+    onSuccess: () => toast.success("Captura de mensagens enviadas ativada!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const configureWebhook = trpc.whatsapp.configureWebhook.useMutation({
+    onSuccess: () => toast.success("Webhook configurado com sucesso!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const createAdmin = trpc.adminAuth.create.useMutation({
     onSuccess: () => {
       refetch(); setShowAdd(false);
@@ -1516,7 +1526,17 @@ function SettingsView() {
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-2">Integrações</h3>
         <div className="space-y-2">
-          <IntegrationItem name="WhatsApp Business API" status="pendente" description="Configure para disparos em massa e recepção automática de leads" />
+          <IntegrationItem name="WhatsApp Business API" status={zapiStatus?.connected ? "ativo" : "desconectado"} description="Envio/recepção de mensagens e disparos em massa" />
+          {zapiStatus?.connected && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => configureWebhook.mutate()} disabled={configureWebhook.isPending}>
+                {configureWebhook.isPending ? "Configurando..." : "Reconfigurar Webhook"}
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => enableSentByMe.mutate()} disabled={enableSentByMe.isPending}>
+                {enableSentByMe.isPending ? "Ativando..." : "Ativar Captura Outbound"}
+              </Button>
+            </div>
+          )}
           <IntegrationItem name="SIG Web" status="pendente" description="Integre com seu sistema de gestão para sincronizar vendas" />
           <IntegrationItem name="OLX / Webmotors" status="pendente" description="Receba leads automaticamente das plataformas de anúncio" />
         </div>

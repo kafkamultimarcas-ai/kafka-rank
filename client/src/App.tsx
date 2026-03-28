@@ -137,7 +137,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster />
+          <Toaster position="top-right" duration={3000} closeButton richColors toastOptions={{ style: { zIndex: 99999 } }} />
           <AccessGate>
             <LiveAlerts />
             <Router />

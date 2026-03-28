@@ -1,0 +1,210 @@
+{
+  "query": "SELECT id, leadId, phone, direction, messageType, LEFT(content, 50) as content_preview, senderName, timestamp FROM crm_messages ORDER BY timestamp DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, leadId, phone, direction, messageType, LEFT(content, 50) as content_preview, senderName, timestamp FROM crm_messages ORDER BY timestamp DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "1022",
+      "leadId": "481174",
+      "phone": "554789285391",
+      "direction": "inbound",
+      "messageType": "document",
+      "content_preview": "NULL",
+      "senderName": "Letícia Lopes",
+      "timestamp": "1774718287000"
+    },
+    {
+      "id": "1021",
+      "leadId": "481333",
+      "phone": "554796438788",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Olá! Tenho interesse e queria mais informações, po",
+      "senderName": "Adriana",
+      "timestamp": "1774717972000"
+    },
+    {
+      "id": "1020",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Já vi o ano",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717797000"
+    },
+    {
+      "id": "1019",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Km dele",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717795000"
+    },
+    {
+      "id": "1018",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "E ano",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717732000"
+    },
+    {
+      "id": "1017",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Valor ?",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717728000"
+    },
+    {
+      "id": "1016",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Asx",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717726000"
+    },
+    {
+      "id": "1015",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Sax preta",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717723000"
+    },
+    {
+      "id": "1014",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Vou deixar pra ir só amanhã mesmo de manhã blz",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774717624000"
+    },
+    {
+      "id": "1013",
+      "leadId": "481323",
+      "phone": "165128792178732",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "NULL",
+      "senderName": "Miguel",
+      "timestamp": "1774717424000"
+    },
+    {
+      "id": "1012",
+      "leadId": "481323",
+      "phone": "165128792178732",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "NULL",
+      "senderName": "Miguel",
+      "timestamp": "1774717402000"
+    },
+    {
+      "id": "1011",
+      "leadId": "481322",
+      "phone": "554796822094",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Jaraguá do sul",
+      "senderName": "Miguel",
+      "timestamp": "1774717395000"
+    },
+    {
+      "id": "1010",
+      "leadId": "481182",
+      "phone": "554799127383",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Sim",
+      "senderName": "Leo",
+      "timestamp": "1774717313000"
+    },
+    {
+      "id": "1009",
+      "leadId": "481174",
+      "phone": "554789285391",
+      "direction": "inbound",
+      "messageType": "document",
+      "content_preview": "NULL",
+      "senderName": "Letícia Lopes",
+      "timestamp": "1774717205000"
+    },
+    {
+      "id": "1008",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Branco",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717029000"
+    },
+    {
+      "id": "1007",
+      "leadId": "481168",
+      "phone": "554788108684",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Km do cruze 2012 ?",
+      "senderName": "Wesley Consultor De Vendas",
+      "timestamp": "1774717028000"
+    },
+    {
+      "id": "1006",
+      "leadId": "481182",
+      "phone": "554799127383",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Q tava na rua",
+      "senderName": "Leo",
+      "timestamp": "1774716726000"
+    },
+    {
+      "id": "1005",
+      "leadId": "481182",
+      "phone": "554799127383",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Uma velha",
+      "senderName": "Leo",
+      "timestamp": "1774716723000"
+    },
+    {
+      "id": "1004",
+      "leadId": "481316",
+      "phone": "555199426014",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Robson",
+      "senderName": "A Maior saudade",
+      "timestamp": "1774716467000"
+    },
+    {
+      "id": "1003",
+      "leadId": "481316",
+      "phone": "555199426014",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Opaa",
+      "senderName": "A Maior saudade",
+      "timestamp": "1774716465000"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tleadId\tphone\tdirection\tmessageType\tcontent_preview\tsenderName\ttimestamp\n1022\t481174\t554789285391\tinbound\tdocument\tNULL\tLetícia Lopes\t1774718287000\n1021\t481333\t554796438788\tinbound\ttext\tOlá! Tenho interesse e queria mais informações, po\tAdriana\t1774717972000\n1020\t481168\t554788108684\tinbound\ttext\tJá vi o ano\tWesley Consultor De Vendas\t1774717797000\n1019\t481168\t554788108684\tinbound\ttext\tKm dele\tWesley Consultor De Vendas\t1774717795000\n1018\t481168\t554788108684\tinbound\ttext\tE ano\tWesley Consultor De Vendas\t1774717732000\n1017\t481168\t554788108684\tinbound\ttext\tValor ?\tWesley Consultor De Vendas\t1774717728000\n1016\t481168\t554788108684\tinbound\ttext\tAsx\tWesley Consultor De Vendas\t1774717726000\n1015\t481168\t554788108684\tinbound\ttext\tSax preta\tWesley Consultor De Vendas\t1774717723000\n1014\t481293\t554791543903\tinbound\ttext\tVou deixar pra ir só amanhã mesmo de manhã blz\t😎 Breno Furtado 🫡\t1774717624000\n1013\t481323\t165128792178732\tinbound\ttext\tNULL\tMiguel\t1774717424000\n1012\t481323\t165128792178732\tinbound\ttext\tNULL\tMiguel\t1774717402000\n1011\t481322\t554796822094\tinbound\ttext\tJaraguá do sul\tMiguel\t1774717395000\n1010\t481182\t554799127383\tinbound\ttext\tSim\tLeo\t1774717313000\n1009\t481174\t554789285391\tinbound\tdocument\tNULL\tLetícia Lopes\t1774717205000\n1008\t481168\t554788108684\tinbound\ttext\tBranco\tWesley Consultor De Vendas\t1774717029000\n1007\t481168\t554788108684\tinbound\ttext\tKm do cruze 2012 ?\tWesley Consultor De Vendas\t1774717028000\n1006\t481182\t554799127383\tinbound\ttext\tQ tava na rua\tLeo\t1774716726000\n1005\t481182\t554799127383\tinbound\ttext\tUma velha\tLeo\t1774716723000\n1004\t481316\t555199426014\tinbound\ttext\tRobson\tA Maior saudade\t1774716467000\n1003\t481316\t555199426014\tinbound\ttext\tOpaa\tA Maior saudade\t1774716465000\n",
+  "stderr": "",
+  "execution_time_ms": 136
+}

@@ -1,0 +1,80 @@
+{
+  "query": "SELECT id, leadId, phone, direction, messageType, LEFT(content, 80) as content_preview, senderName, timestamp FROM crm_messages WHERE leadId = 481293 ORDER BY timestamp ASC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, leadId, phone, direction, messageType, LEFT(content, 80) as content_preview, senderName, timestamp FROM crm_messages WHERE leadId = 481293 ORDER BY timestamp ASC;",
+  "rows": [
+    {
+      "id": "714",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Bom dia",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774698538000"
+    },
+    {
+      "id": "716",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "O feirao de vcs acontece na loja mesmo ?",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774698568000"
+    },
+    {
+      "id": "717",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Blz",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774698595000"
+    },
+    {
+      "id": "718",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Acho q vai dá pra mim ir hj",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774698662000"
+    },
+    {
+      "id": "719",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Depois do almoço ali",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774698666000"
+    },
+    {
+      "id": "723",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Ok",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774698695000"
+    },
+    {
+      "id": "1014",
+      "leadId": "481293",
+      "phone": "554791543903",
+      "direction": "inbound",
+      "messageType": "text",
+      "content_preview": "Vou deixar pra ir só amanhã mesmo de manhã blz",
+      "senderName": "😎 Breno Furtado 🫡",
+      "timestamp": "1774717624000"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tleadId\tphone\tdirection\tmessageType\tcontent_preview\tsenderName\ttimestamp\n714\t481293\t554791543903\tinbound\ttext\tBom dia\t😎 Breno Furtado 🫡\t1774698538000\n716\t481293\t554791543903\tinbound\ttext\tO feirao de vcs acontece na loja mesmo ?\t😎 Breno Furtado 🫡\t1774698568000\n717\t481293\t554791543903\tinbound\ttext\tBlz\t😎 Breno Furtado 🫡\t1774698595000\n718\t481293\t554791543903\tinbound\ttext\tAcho q vai dá pra mim ir hj\t😎 Breno Furtado 🫡\t1774698662000\n719\t481293\t554791543903\tinbound\ttext\tDepois do almoço ali\t😎 Breno Furtado 🫡\t1774698666000\n723\t481293\t554791543903\tinbound\ttext\tOk\t😎 Breno Furtado 🫡\t1774698695000\n1014\t481293\t554791543903\tinbound\ttext\tVou deixar pra ir só amanhã mesmo de manhã blz\t😎 Breno Furtado 🫡\t1774717624000\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

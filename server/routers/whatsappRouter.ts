@@ -77,7 +77,15 @@ export const whatsappRouter = router({
     .mutation(async ({ input }) => {
       // Default to our production webhook URL
       const url = input?.webhookUrl || "https://kafkarank.com/api/webhooks/whatsapp";
-      return zapi.setWebhook(url);
+      const result = await zapi.setWebhook(url);
+      // Also enable notifySentByMe to capture outbound messages from the phone
+      await zapi.enableNotifySentByMe();
+      return result;
+    }),
+  // Enable receiving outbound messages (sent by the phone) through the webhook
+  enableSentByMe: adminProcedure
+    .mutation(async () => {
+      return zapi.enableNotifySentByMe();
     }),
 
   // Send a link
