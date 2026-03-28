@@ -31,6 +31,12 @@ import {
   Edit2,
   Save,
   X,
+  Download,
+  Send,
+  ArrowRightLeft,
+  Zap,
+  Printer,
+  Bot,
 } from "lucide-react";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
@@ -129,7 +135,11 @@ export default function MeusAgendamentos() {
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: appointments, isLoading } = trpc.sdr.myAppointments.useQuery({ sellerId }, { enabled: sellerId > 0, refetchInterval: 10000 });
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
+  const { data: allSellers } = trpc.sellers.list.useQuery();
   const utils = trpc.useUtils();
+  const [transferId, setTransferId] = useState<number | null>(null);
+  const [transferSellerId, setTransferSellerId] = useState<number>(0);
+  const [rescueSendingId, setRescueSendingId] = useState<number | null>(null);
 
   const createAppointment = trpc.sdr.createAppointment.useMutation({
     onSuccess: (data) => {
@@ -186,6 +196,27 @@ export default function MeusAgendamentos() {
     onError: (e) => toast.error(e.message),
   });
 
+  const transferAppointment = trpc.sdr.transferAppointment.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      utils.sdr.myAppointments.invalidate();
+      setTransferId(null);
+      setTransferSellerId(0);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const aiRescue = trpc.sdr.aiRescueWhatsApp.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setRescueSendingId(null);
+    },
+    onError: (e) => {
+      toast.error(e.message);
+      setRescueSendingId(null);
+    },
+  });
+
   const startEditing = (apt: any) => {
     setEditingId(apt.id);
     setEditData({
@@ -216,6 +247,60 @@ export default function MeusAgendamentos() {
   const preVendasComp = useMemo(() => {
     return competitions?.find(c => c.category === "pre_vendas" && c.status === "active");
   }, [competitions]);
+
+  const handleTransfer = (aptId: number) => {
+    if (!transferSellerId || transferSellerId === sellerId) {
+      toast.error('Selecione um vendedor diferente');
+      return;
+    }
+    transferAppointment.mutate({ id: aptId, sellerId, newSellerId: transferSellerId });
+  };
+
+  const handleAiRescue = (apt: any) => {
+    if (!apt.customerPhone) {
+      toast.error('Cliente sem telefone cadastrado');
+      return;
+    }
+    setRescueSendingId(apt.id);
+    aiRescue.mutate({ id: apt.id, sellerId });
+  };
+
+  const handleExportPdf = () => {
+    const rescueList = categorized.noShow;
+    const activeList = categorized.active;
+    const allList = [...rescueList, ...activeList];
+    if (allList.length === 0) {
+      toast.error('Nenhum agendamento para exportar');
+      return;
+    }
+    const sellerName = seller?.name || 'Vendedor';
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+    let html = `<html><head><meta charset="utf-8"><title>Agendamentos - ${sellerName}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#333}h1{font-size:18px;border-bottom:2px solid #e74c3c;padding-bottom:8px}h2{font-size:14px;margin-top:20px;color:#e74c3c}table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th{background:#2c3e50;color:white;padding:8px;text-align:left}td{padding:6px 8px;border-bottom:1px solid #ddd}.rescue{background:#fff3cd}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold}.rescue-badge{background:#e74c3c;color:white}.active-badge{background:#27ae60;color:white}.feirao-badge{background:#f39c12;color:white}@media print{body{padding:0}}</style></head><body>`;
+    html += `<h1>Agendamentos - ${sellerName} (${dateStr})</h1>`;
+    if (rescueList.length > 0) {
+      html += `<h2>RESGATAR CLIENTES (${rescueList.length})</h2>`;
+      html += '<table><tr><th>#</th><th>Cliente</th><th>Telefone</th><th>Interesse</th><th>Agendado</th><th>Obs</th></tr>';
+      rescueList.forEach((a: any) => {
+        html += `<tr class="rescue"><td>${a.ticketNumber || '-'}</td><td>${a.customerName || '-'}</td><td>${a.customerPhone || '-'}</td><td>${a.vehicleInterest || '-'}</td><td>${a.scheduledDate ? new Date(Number(a.scheduledDate)).toLocaleString('pt-BR') : '-'}</td><td>${a.notes || ''}</td></tr>`;
+      });
+      html += '</table>';
+    }
+    if (activeList.length > 0) {
+      html += `<h2>AGENDAMENTOS ATIVOS (${activeList.length})</h2>`;
+      html += '<table><tr><th>#</th><th>Cliente</th><th>Telefone</th><th>Interesse</th><th>Agendado</th><th>Obs</th></tr>';
+      activeList.forEach((a: any) => {
+        html += `<tr><td>${a.ticketNumber || '-'}</td><td>${a.customerName || '-'}</td><td>${a.customerPhone || '-'}</td><td>${a.vehicleInterest || '-'}</td><td>${a.scheduledDate ? new Date(Number(a.scheduledDate)).toLocaleString('pt-BR') : '-'}</td><td>${a.notes || ''}</td></tr>`;
+      });
+      html += '</table>';
+    }
+    html += '</body></html>';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => { printWindow.print(); };
+    }
+  };
 
   const resetForm = () => {
     setCustomerName("");
@@ -614,6 +699,47 @@ export default function MeusAgendamentos() {
                   Reagendar
                 </Button>
               </div>
+              {/* AI Rescue + Transfer */}
+              <div className="flex gap-2">
+                {apt.customerPhone && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAiRescue(apt)}
+                    disabled={rescueSendingId === apt.id}
+                    className="flex-1 gap-1.5 border-purple-500 text-purple-400 hover:bg-purple-500/20 text-xs"
+                  >
+                    <Bot className="h-3.5 w-3.5" />
+                    {rescueSendingId === apt.id ? 'Enviando...' : 'IA Resgate'}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTransferId(transferId === apt.id ? null : apt.id)}
+                  className="flex-1 gap-1.5 border-cyan-500 text-cyan-400 hover:bg-cyan-500/20 text-xs"
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  Transferir
+                </Button>
+              </div>
+              {transferId === apt.id && (
+                <div className="flex gap-2 items-center p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                  <select
+                    value={transferSellerId}
+                    onChange={e => setTransferSellerId(Number(e.target.value))}
+                    className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs text-foreground"
+                  >
+                    <option value={0}>Selecione vendedor...</option>
+                    {(allSellers || []).filter((s: any) => s.id !== sellerId && s.active).map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={() => handleTransfer(apt.id)} disabled={transferAppointment.isPending} className="text-xs h-7">
+                    {transferAppointment.isPending ? '...' : 'OK'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -675,6 +801,47 @@ export default function MeusAgendamentos() {
                   Reagendar
                 </Button>
               </div>
+              {/* AI Rescue + Transfer for no_show */}
+              <div className="flex gap-2">
+                {apt.customerPhone && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAiRescue(apt)}
+                    disabled={rescueSendingId === apt.id}
+                    className="flex-1 gap-1.5 border-purple-500 text-purple-400 hover:bg-purple-500/20 text-xs"
+                  >
+                    <Bot className="h-3.5 w-3.5" />
+                    {rescueSendingId === apt.id ? 'Enviando...' : 'IA Resgate'}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTransferId(transferId === apt.id ? null : apt.id)}
+                  className="flex-1 gap-1.5 border-cyan-500 text-cyan-400 hover:bg-cyan-500/20 text-xs"
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  Transferir
+                </Button>
+              </div>
+              {transferId === apt.id && (
+                <div className="flex gap-2 items-center p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+                  <select
+                    value={transferSellerId}
+                    onChange={e => setTransferSellerId(Number(e.target.value))}
+                    className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs text-foreground"
+                  >
+                    <option value={0}>Selecione vendedor...</option>
+                    {(allSellers || []).filter((s: any) => s.id !== sellerId && s.active).map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={() => handleTransfer(apt.id)} disabled={transferAppointment.isPending} className="text-xs h-7">
+                    {transferAppointment.isPending ? '...' : 'OK'}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -765,10 +932,16 @@ export default function MeusAgendamentos() {
             <img src={LOGO_URL} alt="Kafka Rank" className="h-7 w-7 rounded" />
             <span className="font-heading font-bold text-sm text-foreground">AGENDAMENTOS</span>
           </div>
-          <Button size="sm" onClick={() => setShowForm(!showForm)} className="gap-1.5 bg-primary hover:bg-primary/90">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Novo</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-orange-500 text-orange-400 hover:bg-orange-500/20">
+              <Printer className="h-4 w-4" />
+              <span className="hidden sm:inline">Imprimir</span>
+            </Button>
+            <Button size="sm" onClick={() => setShowForm(!showForm)} className="gap-1.5 bg-primary hover:bg-primary/90">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Novo</span>
+            </Button>
+          </div>
         </div>
       </header>
 

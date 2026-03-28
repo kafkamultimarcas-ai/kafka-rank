@@ -23,6 +23,7 @@ import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
 import { inventoryRouter } from "./routers/inventoryRouter";
 import { whatsappRouter } from "./routers/whatsappRouter";
+import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -1451,6 +1452,107 @@ export const appRouter = router({
       sellerId: z.number(),
     })).query(async ({ input }) => {
       return db.listSalesLinkedToSdr(input.sellerId);
+    }),
+
+    // ===== TRANSFERIR AGENDAMENTO PARA OUTRO VENDEDOR =====
+    transferAppointment: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(), // vendedor atual
+      newSellerId: z.number(), // novo vendedor
+    })).mutation(async ({ input }) => {
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento não encontrado ou não pertence a este vendedor');
+      // Update sellerId directly in DB
+      const database = await db.getDb();
+      if (!database) throw new Error('DB not available');
+      const { sdrRecords } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      await database.update(sdrRecords).set({ sellerId: input.newSellerId }).where(eq(sdrRecords.id, input.id));
+      const newSeller = await db.getSellerById(input.newSellerId);
+      return { success: true, message: `Agendamento transferido para ${newSeller?.name || 'vendedor'}!` };
+    }),
+
+    // ===== RESGATE AUTOMÁTICO VIA IA NO WHATSAPP =====
+    aiRescueWhatsApp: publicProcedure.input(z.object({
+      id: z.number(),
+      sellerId: z.number(),
+    })).mutation(async ({ input }) => {
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const record = records.find((r: any) => r.id === input.id);
+      if (!record) throw new Error('Agendamento não encontrado');
+      if (!record.customerPhone) throw new Error('Cliente não tem telefone cadastrado');
+      const seller = await db.getSellerById(input.sellerId);
+      const sellerName = seller?.name || 'nosso consultor';
+      const vehicleInfo = record.vehicleInterest ? ` sobre o ${record.vehicleInterest}` : '';
+      const scheduledInfo = record.scheduledDate ? ` para ${new Date(Number(record.scheduledDate)).toLocaleDateString('pt-BR')}` : '';
+      // Use AI to generate a personalized rescue message
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um assistente de vendas de uma loja de veículos chamada Kafka. Gere uma mensagem curta e amigável de resgate para um cliente que tinha um agendamento mas não compareceu. A mensagem deve:
+- Ser informal e acolhedora (usar emoji com moderação)
+- Mencionar o nome do cliente
+- Perguntar se está tudo bem e se ainda tem interesse
+- Oferecer reagendar
+- Ser curta (máximo 3 linhas)
+- NÃO incluir saudação formal, NÃO incluir assinatura
+- Responder APENAS com o texto da mensagem, nada mais`
+          },
+          {
+            role: 'user',
+            content: `Cliente: ${record.customerName}\nVendedor: ${sellerName}\nInteresse: ${record.vehicleInterest || 'veículo'}\nAgendamento original: ${scheduledInfo || 'não definido'}\nObservações: ${record.notes || 'nenhuma'}`
+          }
+        ],
+      });
+      const rawMsg = response.choices?.[0]?.message?.content;
+      const aiMessage = (typeof rawMsg === 'string' ? rawMsg : `Olá ${record.customerName}! Tudo bem? Notamos que não conseguimos nos encontrar${scheduledInfo}. Ainda tem interesse${vehicleInfo}? Podemos reagendar! 😊`);
+      // Send via WhatsApp
+      const result = await zapi.sendText(record.customerPhone, aiMessage);
+      if (!result.success) throw new Error(`Erro ao enviar WhatsApp: ${result.error}`);
+      return { success: true, message: 'Mensagem de resgate enviada pelo WhatsApp!', sentMessage: aiMessage };
+    }),
+
+    // ===== EXPORTAR PDF DE AGENDAMENTOS =====
+    exportPdfData: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      filter: z.enum(['all', 'rescue', 'active', 'completed']).optional(),
+    })).query(async ({ input }) => {
+      const records = await db.listSdrRecords(undefined, input.sellerId);
+      const agendamentos = records.filter((r: any) => r.type === 'agendamento');
+      const seller = await db.getSellerById(input.sellerId);
+      const sellerName = seller?.name || 'Vendedor';
+      const now = Date.now();
+      const categorized = agendamentos.map((apt: any) => {
+        const scheduled = apt.scheduledDate ? Number(apt.scheduledDate) : null;
+        const diff = scheduled ? scheduled - now : null;
+        let category = 'active';
+        if (apt.attendanceStatus === 'approved') category = 'completed';
+        else if (apt.attendanceStatus === 'no_show') category = 'rescue';
+        else if (diff !== null && diff < -3600000) category = 'rescue'; // overdue > 1h
+        return { ...apt, category };
+      });
+      let filtered = categorized;
+      if (input.filter && input.filter !== 'all') {
+        filtered = categorized.filter((a: any) => a.category === input.filter);
+      }
+      return {
+        sellerName,
+        generatedAt: Date.now(),
+        appointments: filtered.map((a: any) => ({
+          ticketNumber: a.ticketNumber || '-',
+          customerName: a.customerName || '-',
+          customerPhone: a.customerPhone || '-',
+          vehicleInterest: a.vehicleInterest || '-',
+          scheduledDate: a.scheduledDate ? new Date(Number(a.scheduledDate)).toLocaleString('pt-BR') : '-',
+          status: a.status,
+          attendanceStatus: a.attendanceStatus || 'pending',
+          category: a.category,
+          notes: a.notes || '',
+          isFeirão: a.isFeirão || false,
+        })),
+      };
     }),
   }),
 

@@ -1343,3 +1343,10 @@
 - [x] Z-API webhook processa eventos de mensagem enviada
 - [x] Botões "Reconfigurar Webhook" e "Ativar Captura Outbound" nas Configurações
 - [x] 418 testes passando
+
+## Funcionalidades Agendamentos - 28/03
+- [x] Exportar PDF: botão Imprimir no header gera HTML com lista de resgates e ativos para impressão
+- [x] Transferir agendamento para outro vendedor (botão Transferir + dropdown de vendedores)
+- [x] Resgate automático via IA no WhatsApp (botão IA Resgate gera msg personalizada e envia pelo Z-API)
+- [x] Follow-up automático 20min: alert-checker verifica agendamentos 20min+ atrasados e envia msg IA no WhatsApp
+- [x] 425 testes passando
