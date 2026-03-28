@@ -153,6 +153,7 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   payoffValue: int("payoffValue"), // valor de quitação em centavos (quando financiado)
   costValue: int("costValue"), // valor de custo que o consignado deixou (centavos)
   notes: text("notes"), // observações adicionais
+  rejectionReason: text("rejectionReason"), // motivo da rejeição (quando rejeitado)
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

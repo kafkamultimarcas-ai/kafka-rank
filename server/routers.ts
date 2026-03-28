@@ -989,26 +989,53 @@ export const appRouter = router({
       }
       return { success: true, isValid: result.isValid };
     }),
-    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    reject: adminProcedure.input(z.object({ 
+      id: z.number(),
+      reason: z.string().optional(),
+    })).mutation(async ({ input }) => {
       // Buscar registro antes de rejeitar
       const records = await db.listConsignmentRecords();
       const record = records.find((r: any) => r.id === input.id);
-      await db.rejectConsignmentRecord(input.id);
+      await db.rejectConsignmentRecord(input.id, input.reason);
       if (record) {
+        const reasonMsg = input.reason ? ` Motivo: ${input.reason}` : '';
         await db.createNotification({
           sellerId: record.sellerId,
           type: 'consignment_rejected',
           title: 'Consignação rejeitada',
-          message: `Sua consignação de ${record.vehicleModel} foi rejeitada.`,
+          message: `Sua consignação de ${record.vehicleModel} foi rejeitada.${reasonMsg}`,
         });
         sendPushToSeller(record.sellerId, {
           title: '\u274c Consignação Rejeitada',
-          body: `Sua consignação de ${record.vehicleModel} foi rejeitada.`,
+          body: `Sua consignação de ${record.vehicleModel} foi rejeitada.${reasonMsg}`,
           tag: `consignment-rejected-${input.id}`,
           data: { type: 'consignment_rejected', url: `/minha-area/${record.sellerId}` },
         }).catch(console.error);
       }
       return { success: true };
+    }),
+    // Excluir consignação (admin)
+    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const deleted = await db.deleteConsignmentRecord(input.id);
+      return { success: true, deleted };
+    }),
+    // Editar consignação (admin)
+    update: adminProcedure.input(z.object({
+      id: z.number(),
+      vehiclePlate: z.string().optional(),
+      vehicleModel: z.string().optional(),
+      ownerName: z.string().optional(),
+      ownerPhone: z.string().optional(),
+      entryDate: z.number().optional(),
+      hasAuction: z.boolean().optional(),
+      vehicleStatus: z.string().optional(),
+      payoffValue: z.number().optional(),
+      costValue: z.number().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      const updated = await db.updateConsignmentRecord(id, data);
+      return { success: true, record: updated };
     }),
     // Registrar saída do carro do pátio
     updateExit: adminProcedure.input(z.object({

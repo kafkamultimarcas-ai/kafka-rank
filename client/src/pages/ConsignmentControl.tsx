@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus } from "lucide-react";
+import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2 } from "lucide-react";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type Tab = "patio" | "completed" | "history";
 
@@ -54,6 +55,13 @@ export default function ConsignmentControl() {
   };
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: false });
 
+  // Edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editRecord, setEditRecord] = useState<any>(null);
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteRecordId, setDeleteRecordId] = useState<number | null>(null);
+
   const updateExit = trpc.consignment.updateExit.useMutation({
     onSuccess: () => {
       toast.success("Saída registrada com sucesso!");
@@ -66,6 +74,54 @@ export default function ConsignmentControl() {
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const updateConsignment = trpc.consignment.update.useMutation({
+    onSuccess: () => {
+      toast.success("Consignação atualizada!");
+      refetchYard(); refetchCompleted(); refetchExited();
+      setEditDialogOpen(false);
+      setEditRecord(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const deleteConsignment = trpc.consignment.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Consignação excluída!");
+      refetchYard(); refetchCompleted(); refetchExited();
+      setDeleteDialogOpen(false);
+      setDeleteRecordId(null);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const isAdmin = user?.role === 'admin';
+
+  const openEdit = (v: any) => {
+    setEditRecord({ ...v });
+    setEditDialogOpen(true);
+  };
+
+  const openDelete = (id: number) => {
+    setDeleteRecordId(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editRecord) return;
+    updateConsignment.mutate({
+      id: editRecord.id,
+      vehiclePlate: editRecord.vehiclePlate || undefined,
+      vehicleModel: editRecord.vehicleModel || undefined,
+      ownerName: editRecord.ownerName || undefined,
+      ownerPhone: editRecord.ownerPhone || undefined,
+      entryDate: editRecord.entryDate || undefined,
+      hasAuction: editRecord.hasAuction,
+      vehicleStatus: editRecord.vehicleStatus || undefined,
+      costValue: editRecord.costValue || undefined,
+      notes: editRecord.notes || undefined,
+    });
+  };
 
   const getSellerName = (sellerId: number) => {
     const seller = sellers?.find(s => s.id === sellerId);
@@ -216,7 +272,29 @@ export default function ConsignmentControl() {
                           Faltam {7 - days} dia(s) para completar 7 dias
                         </div>
                       )}
-                      <div className="mt-2 flex justify-end">
+                      <div className="mt-2 flex justify-end gap-2">
+                        {isAdmin && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                              onClick={() => openEdit(v)}
+                            >
+                              <Pencil className="w-3 h-3 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                              onClick={() => openDelete(v.id)}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Excluir
+                            </Button>
+                          </>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -372,6 +450,94 @@ export default function ConsignmentControl() {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {updateExit.isPending ? "Registrando..." : "Confirmar Saída"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Editar Consignação (Admin) */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="bg-card border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Editar Consignação</DialogTitle>
+            <DialogDescription>Corrija os dados da consignação lançada incorretamente.</DialogDescription>
+          </DialogHeader>
+          {editRecord && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Placa</Label>
+                  <Input value={editRecord.vehiclePlate || ''} onChange={e => setEditRecord({...editRecord, vehiclePlate: e.target.value.toUpperCase()})} className="bg-muted border-border text-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Modelo</Label>
+                  <Input value={editRecord.vehicleModel || ''} onChange={e => setEditRecord({...editRecord, vehicleModel: e.target.value})} className="bg-muted border-border text-foreground" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Dono</Label>
+                  <Input value={editRecord.ownerName || ''} onChange={e => setEditRecord({...editRecord, ownerName: e.target.value})} className="bg-muted border-border text-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Telefone</Label>
+                  <Input value={editRecord.ownerPhone || ''} onChange={e => setEditRecord({...editRecord, ownerPhone: e.target.value})} className="bg-muted border-border text-foreground" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Data de Entrada</Label>
+                  <Input type="date" value={editRecord.entryDate ? new Date(editRecord.entryDate).toISOString().split('T')[0] : ''} onChange={e => setEditRecord({...editRecord, entryDate: new Date(e.target.value).getTime()})} className="bg-muted border-border text-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Valor Custo (R$)</Label>
+                  <Input type="number" step="0.01" value={editRecord.costValue ? (editRecord.costValue / 100).toFixed(2) : ''} onChange={e => setEditRecord({...editRecord, costValue: Math.round(parseFloat(e.target.value || '0') * 100)})} className="bg-muted border-border text-foreground" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Status</Label>
+                  <select value={editRecord.vehicleStatus || 'quitado'} onChange={e => setEditRecord({...editRecord, vehicleStatus: e.target.value})} className="w-full h-9 rounded-md border border-border bg-muted text-foreground text-sm px-3">
+                    <option value="quitado">Quitado</option>
+                    <option value="financiado">Financiado</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-foreground text-xs">Leilão?</Label>
+                  <select value={editRecord.hasAuction ? 'sim' : 'nao'} onChange={e => setEditRecord({...editRecord, hasAuction: e.target.value === 'sim'})} className="w-full h-9 rounded-md border border-border bg-muted text-foreground text-sm px-3">
+                    <option value="nao">Sem Leilão</option>
+                    <option value="sim">Com Leilão</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-foreground text-xs">Observações</Label>
+                <Textarea value={editRecord.notes || ''} onChange={e => setEditRecord({...editRecord, notes: e.target.value})} className="bg-muted border-border text-foreground min-h-[60px]" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={updateConsignment.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {updateConsignment.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Excluir Consignação (Admin) */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground text-red-400">Excluir Consignação</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir esta consignação? Se já estava aprovada e válida, os pontos serão revertidos. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={() => deleteRecordId && deleteConsignment.mutate({ id: deleteRecordId })} disabled={deleteConsignment.isPending} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleteConsignment.isPending ? "Excluindo..." : "Excluir Definitivamente"}
             </Button>
           </DialogFooter>
         </DialogContent>

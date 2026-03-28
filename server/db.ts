@@ -1004,10 +1004,42 @@ export async function approveConsignmentRecord(id: number) {
   return { ...record, isValid };
 }
 
-export async function rejectConsignmentRecord(id: number) {
+export async function rejectConsignmentRecord(id: number, rejectionReason?: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(consignmentRecords).set({ status: 'rejected' }).where(eq(consignmentRecords.id, id));
+  await db.update(consignmentRecords).set({ status: 'rejected', rejectionReason: rejectionReason || null }).where(eq(consignmentRecords.id, id));
+}
+
+export async function deleteConsignmentRecord(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const record = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  if (!record[0]) throw new Error("Registro n\u00e3o encontrado");
+  // Se estava aprovado e v\u00e1lido, reverter pontos
+  if (record[0].status === 'approved' && record[0].isValid) {
+    await updateSaleTotals(record[0].sellerId, record[0].competitionId, -record[0].points, false);
+  }
+  await db.delete(consignmentRecords).where(eq(consignmentRecords.id, id));
+  return record[0];
+}
+
+export async function updateConsignmentRecord(id: number, data: Partial<{
+  vehiclePlate: string;
+  vehicleModel: string;
+  ownerName: string;
+  ownerPhone: string;
+  entryDate: number;
+  hasAuction: boolean;
+  vehicleStatus: string;
+  payoffValue: number;
+  costValue: number;
+  notes: string;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(consignmentRecords).set(data).where(eq(consignmentRecords.id, id));
+  const updated = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  return updated[0];
 }
 
 export async function updateConsignmentExitDate(id: number, exitDate: number) {

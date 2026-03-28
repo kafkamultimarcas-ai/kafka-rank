@@ -4,8 +4,17 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck } from "lucide-react";
+import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck, Ban } from "lucide-react";
 import { useLocation } from "wouter";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 type Tab = "vendas" | "fei" | "consignacao" | "despachante" | "sdr" | "comparecimento";
 
@@ -73,12 +82,51 @@ export default function AdminApprovals() {
     }
   };
 
+  // State for consignment rejection dialog
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectRecordId, setRejectRecordId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectObs, setRejectObs] = useState("");
+
+  const REJECT_REASONS = [
+    "Veículo fora de parâmetro da loja",
+    "Documentação irregular",
+    "Veículo com restrição",
+    "Veículo com leilão",
+    "Valor fora da realidade",
+    "Outro",
+  ];
+
+  const openRejectConsignment = (id: number) => {
+    setRejectRecordId(id);
+    setRejectReason("Veículo fora de parâmetro da loja");
+    setRejectObs("");
+    setRejectDialogOpen(true);
+  };
+
+  const confirmRejectConsignment = async () => {
+    if (!rejectRecordId) return;
+    const fullReason = rejectObs ? `${rejectReason} - ${rejectObs}` : rejectReason;
+    try {
+      await rejectConsignment.mutateAsync({ id: rejectRecordId, reason: fullReason });
+      refetchConsignment();
+      toast.info("Consignação rejeitada.");
+      setRejectDialogOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao rejeitar");
+    }
+  };
+
   const handleReject = async (type: Tab, id: number) => {
+    // For consignment, open the rejection dialog instead of rejecting directly
+    if (type === "consignacao") {
+      openRejectConsignment(id);
+      return;
+    }
     try {
       switch (type) {
         case "vendas": await rejectSale.mutateAsync({ id }); refetchSales(); break;
         case "fei": await rejectFei.mutateAsync({ id }); refetchFei(); break;
-        case "consignacao": await rejectConsignment.mutateAsync({ id }); refetchConsignment(); break;
         case "despachante": await rejectDispatch.mutateAsync({ id }); refetchDispatch(); break;
         case "sdr": await rejectSdr.mutateAsync({ id }); refetchSdr(); break;
         case "comparecimento": await rejectAttendance.mutateAsync({ id }); refetchAttendance(); break;
@@ -306,7 +354,7 @@ export default function AdminApprovals() {
                 <Check className="w-4 h-4 mr-1" /> Aprovar
               </Button>
               <Button size="sm" variant="outline" onClick={() => handleReject("consignacao", record.id)} disabled={rejectConsignment.isPending} className="border-red-500/50 text-red-400 hover:bg-red-500/10 font-bold px-4">
-                <X className="w-4 h-4 mr-1" /> Rejeitar
+                <Ban className="w-4 h-4 mr-1" /> Não Aceito
               </Button>
             </div>
           </div>
@@ -504,6 +552,59 @@ export default function AdminApprovals() {
           renderCurrentTab()
         )}
       </div>
+      {/* Dialog de Rejeição de Consignação */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Ban className="w-5 h-5 text-red-400" />
+              Veículo Não Aceito
+            </DialogTitle>
+            <DialogDescription>
+              Selecione o motivo da rejeição. O vendedor será notificado com o motivo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Motivo</label>
+              <div className="grid gap-2">
+                {REJECT_REASONS.map(reason => (
+                  <button
+                    key={reason}
+                    onClick={() => setRejectReason(reason)}
+                    className={`text-left px-3 py-2 rounded-lg border text-sm transition-all ${
+                      rejectReason === reason
+                        ? 'border-red-500 bg-red-500/10 text-red-400 font-semibold'
+                        : 'border-border text-muted-foreground hover:border-muted-foreground/50'
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground">Observação (opcional)</label>
+              <Textarea
+                placeholder="Descreva detalhes adicionais sobre o motivo da rejeição..."
+                value={rejectObs}
+                onChange={e => setRejectObs(e.target.value)}
+                className="bg-muted border-border text-foreground min-h-[80px]"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={confirmRejectConsignment}
+              disabled={!rejectReason || rejectConsignment.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {rejectConsignment.isPending ? "Rejeitando..." : "Confirmar Rejeição"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

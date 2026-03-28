@@ -1233,3 +1233,10 @@
 - [x] System prompt especializado em vendas automotivas, conversão, agendamento, quebra de objeções
 - [x] IA com contexto: nome do lead, interesse, score, histórico de conversa, estoque disponível
 - [x] Funciona tanto no painel admin (CrmCommandCenter) quanto na tela SDR (CrmChat)
+
+## Melhorias Consignação - 27/03/2026
+- [x] Admin: botão editar consignação (corrigir dados lançados errado)
+- [x] Admin: botão excluir consignação (com confirmação)
+- [x] Tela Aprovar: rejeição com motivo "Veículo não aceito - Fora de parâmetro da loja"
+- [x] Tela Aprovar: campo de observação ao rejeitar para explicar o motivo
+- [x] Consignação: exibir motivo da rejeição para o setor de consignação
