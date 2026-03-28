@@ -70,6 +70,7 @@ export default function AdminFei() {
     financedValue: "",
     vehiclePlate: "",
     customerCpf: "",
+    customerName: "",
     status: "",
     notes: "",
     paymentDate: "",
@@ -105,6 +106,7 @@ export default function AdminFei() {
       financedValue: financedValueCents,
       vehiclePlate: editForm.vehiclePlate || undefined,
       customerCpf: editForm.customerCpf || undefined,
+      customerName: editForm.customerName || undefined,
       notes: editForm.notes || undefined,
       paymentDate: editForm.paymentDate ? Number(editForm.paymentDate) : undefined,
     });
@@ -143,6 +145,7 @@ export default function AdminFei() {
       financedValue: record.financedValue ? String(record.financedValue / 100) : "",
       vehiclePlate: record.vehiclePlate || "",
       customerCpf: record.customerCpf || "",
+      customerName: record.customerName || "",
       status: record.status || "pending",
       notes: record.notes || "",
       paymentDate: record.paymentDate ? String(record.paymentDate) : "",
@@ -299,6 +302,9 @@ export default function AdminFei() {
                         {record.vehiclePlate && (
                           <span className="text-muted-foreground">Placa: <span className="text-foreground">{record.vehiclePlate}</span></span>
                         )}
+                        {record.customerName && (
+                          <span className="text-muted-foreground">Cliente: <span className="text-foreground font-medium">{record.customerName}</span></span>
+                        )}
                         {record.customerCpf && (
                           <span className="text-muted-foreground">CPF: <span className="text-foreground">{record.customerCpf}</span></span>
                         )}
@@ -436,6 +442,15 @@ export default function AdminFei() {
                 className="h-9"
                 type="text"
                 inputMode="decimal"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Nome do Cliente</Label>
+              <Input
+                value={editForm.customerName}
+                onChange={(e) => setEditForm(f => ({ ...f, customerName: e.target.value }))}
+                placeholder="Nome completo do cliente"
+                className="h-9"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">

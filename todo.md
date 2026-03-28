@@ -1308,3 +1308,11 @@
 - [x] Admin deve ter acesso à tela do Financeiro (ver tudo que o financeiro vê)
 - [x] Verificar se tela do financeiro está acessível e funcional
 - [x] Garantir que lançamento por áudio funciona na tela principal do financeiro
+
+## Melhorias F&I - 28/03
+- [x] F&I (financeiro) poder editar registros que lançou errado (não só admin)
+- [x] Adicionar campo nome do cliente (além do CPF)
+- [x] Busca automática por placa - puxar modelo/marca FIPE
+- [x] CEP automático - preencher endereço ao digitar CEP
+- [x] Ficha cadastral completa para financiamento (nome, CPF, RG, nascimento, estado civil, mãe, email, telefone, CEP, endereço, profissão, renda, local trabalho, foto CNH/RG)
+- [x] Simplificar aba de cadastro inicial (mais básica)

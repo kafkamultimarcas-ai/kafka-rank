@@ -833,6 +833,7 @@ export async function deleteFeiRecord(id: number) {
 
 export async function updateFeiRecord(id: number, data: {
   customerCpf?: string;
+  customerName?: string;
   vehiclePlate?: string;
   bankName?: string;
   financedValue?: number;
@@ -846,6 +847,7 @@ export async function updateFeiRecord(id: number, data: {
   if (!result[0]) throw new Error("Registro F&I não encontrado");
   const updateData: any = {};
   if (data.customerCpf !== undefined) updateData.customerCpf = data.customerCpf;
+  if (data.customerName !== undefined) updateData.customerName = data.customerName;
   if (data.vehiclePlate !== undefined) updateData.vehiclePlate = data.vehiclePlate;
   if (data.bankName !== undefined) updateData.bankName = data.bankName;
   if (data.financedValue !== undefined) updateData.financedValue = data.financedValue;

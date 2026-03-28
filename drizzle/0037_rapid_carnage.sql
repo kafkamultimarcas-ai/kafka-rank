@@ -1,0 +1,1 @@
+ALTER TABLE `fei_records` ADD `customerName` varchar(255);

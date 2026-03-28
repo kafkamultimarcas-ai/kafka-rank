@@ -794,6 +794,7 @@ export const appRouter = router({
       sellerId: z.number(),
       competitionId: z.number().optional(),
       customerCpf: z.string().optional(),
+      customerName: z.string().optional(),
       vehiclePlate: z.string().optional(),
       bankName: z.string().min(1),
       financedValue: z.number().optional(),
@@ -872,9 +873,10 @@ export const appRouter = router({
       await db.deleteFeiRecord(input.id);
       return { success: true };
     }),
-    update: adminProcedure.input(z.object({
+    update: publicProcedure.input(z.object({
       id: z.number(),
       customerCpf: z.string().optional(),
+      customerName: z.string().optional(),
       vehiclePlate: z.string().optional(),
       bankName: z.string().optional(),
       financedValue: z.number().optional(),
@@ -885,6 +887,41 @@ export const appRouter = router({
       const { id, ...data } = input;
       const updated = await db.updateFeiRecord(id, data);
       return updated;
+    }),
+    // Busca veículo por placa no inventário
+    lookupPlate: publicProcedure.input(z.object({
+      plate: z.string().min(6).max(8),
+    })).query(async ({ input }) => {
+      const { inventoryVehicles } = await import("../drizzle/schema");
+      const { getDb } = await import("./db");
+      const { eq, like } = await import("drizzle-orm");
+      const dbConn = await getDb();
+      if (!dbConn) return { found: false, brand: null, model: null, year: null, fipePrice: null, version: null };
+      const plate = input.plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      // Try exact match first
+      const rows = await dbConn.select().from(inventoryVehicles).where(like(inventoryVehicles.plate, `%${plate}%`));
+      const found = rows.find((v: any) => {
+        const vPlate = (v.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        return vPlate === plate;
+      });
+      if (found) {
+        return { found: true, brand: found.brand, model: found.model, year: found.year, fipePrice: found.fipePrice, version: found.version };
+      }
+      return { found: false, brand: null, model: null, year: null, fipePrice: null, version: null };
+    }),
+    // Busca CEP via ViaCEP
+    lookupCep: publicProcedure.input(z.object({
+      cep: z.string().min(8).max(9),
+    })).query(async ({ input }) => {
+      const cep = input.cep.replace(/\D/g, '');
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await res.json();
+        if (data.erro) return { found: false, logradouro: null, bairro: null, localidade: null, uf: null };
+        return { found: true, logradouro: data.logradouro, bairro: data.bairro, localidade: data.localidade, uf: data.uf };
+      } catch {
+        return { found: false, logradouro: null, bairro: null, localidade: null, uf: null };
+      }
     }),
   }),
 

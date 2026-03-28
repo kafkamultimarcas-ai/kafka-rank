@@ -121,6 +121,7 @@ export const feiRecords = mysqlTable("fei_records", {
   sellerId: int("sellerId").notNull(),
   competitionId: int("competitionId"),
   customerCpf: varchar("customerCpf", { length: 14 }),
+  customerName: varchar("customerName", { length: 255 }),
   vehiclePlate: varchar("vehiclePlate", { length: 10 }),
   bankName: varchar("bankName", { length: 255 }),
   financedValue: int("financedValue").default(0), // valor financiado em centavos

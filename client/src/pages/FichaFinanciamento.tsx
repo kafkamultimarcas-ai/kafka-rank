@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,39 @@ export default function FichaFinanciamento() {
   const { data: sellersList } = trpc.sellers.list.useQuery();
   const createFicha = trpc.fichas.create.useMutation();
   const uploadCnh = trpc.fichas.uploadCnh.useMutation();
+
+  // Auto-lookup placa no estoque
+  const cleanPlate = placa.replace(/[^A-Za-z0-9]/g, '');
+  const { data: plateData } = trpc.fei.lookupPlate.useQuery(
+    { plate: cleanPlate },
+    { enabled: cleanPlate.length >= 7 }
+  );
+
+  // Auto-fill vehicle data when plate is found
+  const [plateAutoFilled, setPlateAutoFilled] = useState(false);
+  useEffect(() => {
+    if (plateData?.found && !plateAutoFilled) {
+      const autoVeiculo = [plateData.brand, plateData.model, plateData.version].filter(Boolean).join(' ');
+      if (autoVeiculo) setVeiculo(autoVeiculo);
+      if (plateData.year) setAnoModelo(String(plateData.year));
+      setPlateAutoFilled(true);
+    }
+  }, [plateData, plateAutoFilled]);
+
+  // Auto-lookup CEP via ViaCEP
+  const cleanCep = cep.replace(/\D/g, '');
+  const { data: cepData } = trpc.fei.lookupCep.useQuery(
+    { cep: cleanCep },
+    { enabled: cleanCep.length === 8 }
+  );
+  const [cepAutoFilled, setCepAutoFilled] = useState(false);
+  useEffect(() => {
+    if (cepData?.found && !cepAutoFilled) {
+      const autoEndereco = [cepData.logradouro, cepData.bairro, cepData.localidade, cepData.uf].filter(Boolean).join(', ');
+      if (autoEndereco) setEndereco(autoEndereco);
+      setCepAutoFilled(true);
+    }
+  }, [cepData, cepAutoFilled]);
 
   const vendedores = (sellersList || []).filter((s: any) => s.department === "vendas" && s.active);
 
@@ -210,15 +243,20 @@ export default function FichaFinanciamento() {
         {/* Seções do formulário */}
         <Section id="veiculo" title="DADOS DO VEÍCULO" icon={Car}>
           <div className="space-y-2">
-            <Label className="text-gray-300 text-sm font-semibold">Veículo</Label>
+            <Label className="text-gray-300 text-sm font-semibold">Veículo {plateData?.found && <span className="text-emerald-400 text-xs">(preenchido automaticamente)</span>}</Label>
             <Input value={veiculo} onChange={e => setVeiculo(e.target.value)}
-              placeholder="Ex: Honda Civic 2024" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+              placeholder="Ex: Honda Civic 2024 - digite a placa para preencher automaticamente" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-gray-300 text-sm font-semibold">Placa</Label>
-              <Input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())}
+              <Input value={placa} onChange={e => { setPlaca(e.target.value.toUpperCase()); setPlateAutoFilled(false); }}
                 placeholder="ABC1D23" maxLength={7} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+              {plateData?.found && (
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Veículo encontrado no estoque!
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-gray-300 text-sm font-semibold">Ano/Modelo</Label>
@@ -309,13 +347,18 @@ export default function FichaFinanciamento() {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label className="text-gray-300 text-sm font-semibold">CEP</Label>
-              <Input value={cep} onChange={e => setCep(e.target.value)}
+              <Input value={cep} onChange={e => { setCep(e.target.value); setCepAutoFilled(false); }}
                 placeholder="00000-000" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+              {cepData?.found && (
+                <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Endereço preenchido!
+                </p>
+              )}
             </div>
             <div className="col-span-2 space-y-2">
               <Label className="text-gray-300 text-sm font-semibold">Endereço e Número</Label>
               <Input value={endereco} onChange={e => setEndereco(e.target.value)}
-                placeholder="Rua, nº, bairro" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                placeholder="Rua, nº, bairro - preencha o CEP para autocompletar" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
             </div>
           </div>
         </Section>
