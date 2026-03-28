@@ -885,6 +885,27 @@ export const crmAiRouter = router({
       return `${role}: ${text}`;
     }).join("\n");
 
+    // 4.5 Fetch global AI mode config
+    let feiraoContext = '';
+    try {
+      const { getDb } = await import("../db");
+      const { sql } = await import("drizzle-orm");
+      const dbConn = await getDb();
+      if (dbConn) {
+        const cfgResult = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+        const cfgRows = cfgResult as any;
+        if (cfgRows && cfgRows.length > 0 && cfgRows[0].aiMode === 'feirao' && cfgRows[0].feiraoConfig) {
+          const fc = JSON.parse(cfgRows[0].feiraoConfig);
+          feiraoContext = `\n\n=== MODO FEIRÃO ATIVO ===`;
+          if (fc.beneficios) feiraoContext += `\nBenefícios: ${fc.beneficios}`;
+          if (fc.promocoes) feiraoContext += `\nPromoções: ${fc.promocoes}`;
+          if (fc.objetivo) feiraoContext += `\nObjetivo: ${fc.objetivo}`;
+          if (fc.instrucoes) feiraoContext += `\nInstruções: ${fc.instrucoes}`;
+          feiraoContext += `\nIMPORTANTE: Você DEVE mencionar o feirão e os benefícios. Tente AGENDAR o cliente para visitar a loja. Crie urgência!`;
+        }
+      }
+    } catch { /* ignore */ }
+
     // 5. Call LLM - optimized for short, humanized WhatsApp messages
     const systemPrompt = `Você é vendedor da Kafka Multimarcas. Responda como um vendedor real de loja de carros pelo WhatsApp.
 
@@ -896,7 +917,7 @@ REGRAS OBRIGATÓRIAS:
 - NUNCA invente dados de veículos
 - Foque em UMA coisa por mensagem: ou pergunta, ou resposta, ou convite pra visita
 - Se puder, chame pelo primeiro nome
-- Tente sempre levar pra visita na loja ou test drive
+- Tente sempre levar pra visita na loja ou test drive${feiraoContext}
 
 LEAD: ${lead.name} | Interesse: ${lead.vehicleInterest || "N/A"} | Etapa: ${lead.stage}${vehicleContext}
 
@@ -924,16 +945,15 @@ ${chatHistory || "(Primeira mensagem)"}`;
   })).query(async ({ input }) => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
-    if (!dbConn) return { enabled: false };
-    // Check if crm_ai_settings table exists, use raw query
+    if (!dbConn) return { enabled: false, aiMode: 'normal' as string };
     try {
       const { sql } = await import("drizzle-orm");
-      const result = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${input.leadId} LIMIT 1`);
+      const result = await dbConn.execute(sql`SELECT enabled, aiMode FROM crm_ai_settings WHERE leadId = ${input.leadId} LIMIT 1`);
       const rows = result as any;
-      if (rows && rows.length > 0) return { enabled: !!rows[0].enabled };
-      return { enabled: false };
+      if (rows && rows.length > 0) return { enabled: !!rows[0].enabled, aiMode: rows[0].aiMode || 'normal' };
+      return { enabled: false, aiMode: 'normal' as string };
     } catch {
-      return { enabled: false };
+      return { enabled: false, aiMode: 'normal' as string };
     }
   }),
 
@@ -947,6 +967,52 @@ ${chatHistory || "(Primeira mensagem)"}`;
     const { sql } = await import("drizzle-orm");
     const val = input.enabled ? 1 : 0;
     await dbConn.execute(sql`INSERT INTO crm_ai_settings (leadId, enabled) VALUES (${input.leadId}, ${val}) ON DUPLICATE KEY UPDATE enabled = ${val}`);
+    return { success: true };
+  }),
+
+  // Get global AI mode config
+  getGlobalAiConfig: publicProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { aiMode: 'normal', feiraoConfig: null, normalConfig: null };
+    try {
+      const { sql } = await import("drizzle-orm");
+      const result = await dbConn.execute(sql`SELECT aiMode, feiraoConfig, normalConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const rows = result as any;
+      if (rows && rows.length > 0) {
+        return {
+          aiMode: rows[0].aiMode || 'normal',
+          feiraoConfig: rows[0].feiraoConfig ? JSON.parse(rows[0].feiraoConfig) : null,
+          normalConfig: rows[0].normalConfig ? JSON.parse(rows[0].normalConfig) : null,
+        };
+      }
+      return { aiMode: 'normal', feiraoConfig: null, normalConfig: null };
+    } catch {
+      return { aiMode: 'normal', feiraoConfig: null, normalConfig: null };
+    }
+  }),
+
+  // Set global AI mode config
+  setGlobalAiConfig: protectedProcedure.input(z.object({
+    aiMode: z.enum(['normal', 'feirao', 'custom']),
+    feiraoConfig: z.object({
+      beneficios: z.string().optional(),
+      promocoes: z.string().optional(),
+      objetivo: z.string().optional(),
+      instrucoes: z.string().optional(),
+    }).optional(),
+    normalConfig: z.object({
+      instrucoes: z.string().optional(),
+    }).optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    const feiraoJson = input.feiraoConfig ? JSON.stringify(input.feiraoConfig) : null;
+    const normalJson = input.normalConfig ? JSON.stringify(input.normalConfig) : null;
+    const now = Date.now();
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET aiMode = ${input.aiMode}, feiraoConfig = ${feiraoJson}, normalConfig = ${normalJson}, updatedAt = ${now} WHERE id = 1`);
     return { success: true };
   }),
 });

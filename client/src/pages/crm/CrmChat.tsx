@@ -373,6 +373,12 @@ function LeadList({
                     </span>
                   </div>
 
+                  {lead.phone && (
+                    <span className="text-[10px] text-muted-foreground/70 truncate block">
+                      {lead.phone}
+                    </span>
+                  )}
+
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {lead.vehicleInterest && (
                       <span className="text-[11px] text-muted-foreground truncate flex-1">
@@ -391,7 +397,7 @@ function LeadList({
 
                   <div className="flex items-center gap-1 mt-1">
                     {isAlert && (() => {
-                      const mins = Math.floor((Date.now() - (lead.createdAt || Date.now())) / 60000);
+                      const mins = Math.floor((Date.now() - (lead.lastContactDate || new Date(lead.createdAt).getTime() || Date.now())) / 60000);
                       const threshold = lead.sellerId > 0 ? 10 : 5;
                       const remaining = Math.max(0, threshold - mins);
                       return (

@@ -13,7 +13,7 @@ import {
   Package, DollarSign, Shield, Menu, X, Bell, Wallet, Receipt, Camera,
   AlertTriangle, Clock, Check, ArrowUpRight, ArrowDownRight, FileText,
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
-  CheckCircle, XCircle, Filter, Plus
+  CheckCircle, XCircle, Filter, Plus, Zap
 } from "lucide-react";
 
 const DEPT_LABELS: Record<string, string> = {
@@ -1510,6 +1510,9 @@ function SettingsView() {
         )}
       </div>
 
+      {/* AI Mode Configuration */}
+      <AiModeConfig />
+
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-2">Integrações</h3>
         <div className="space-y-2">
@@ -1518,6 +1521,174 @@ function SettingsView() {
           <IntegrationItem name="OLX / Webmotors" status="pendente" description="Receba leads automaticamente das plataformas de anúncio" />
         </div>
       </div>
+    </div>
+  );
+}
+
+function AiModeConfig() {
+  const { data: config, refetch } = trpc.crmAi.getGlobalAiConfig.useQuery();
+  const setConfig = trpc.crmAi.setGlobalAiConfig.useMutation({
+    onSuccess: () => { toast.success("Configuração de IA salva!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const [mode, setMode] = useState<'normal' | 'feirao'>('normal');
+  const [feiraoForm, setFeiraoForm] = useState({
+    beneficios: '', promocoes: '', objetivo: '', instrucoes: '',
+  });
+  const [normalForm, setNormalForm] = useState({ instrucoes: '' });
+  const [initialized, setInitialized] = useState(false);
+
+  // Load config when data arrives
+  if (config && !initialized) {
+    setMode(config.aiMode as 'normal' | 'feirao');
+    if (config.feiraoConfig) {
+      setFeiraoForm({
+        beneficios: config.feiraoConfig.beneficios || '',
+        promocoes: config.feiraoConfig.promocoes || '',
+        objetivo: config.feiraoConfig.objetivo || '',
+        instrucoes: config.feiraoConfig.instrucoes || '',
+      });
+    }
+    if (config.normalConfig) {
+      setNormalForm({ instrucoes: config.normalConfig.instrucoes || '' });
+    }
+    setInitialized(true);
+  }
+
+  const handleSave = () => {
+    setConfig.mutate({
+      aiMode: mode,
+      feiraoConfig: mode === 'feirao' ? feiraoForm : undefined,
+      normalConfig: mode === 'normal' ? normalForm : undefined,
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+          <Zap className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Modo da IA</h3>
+          <p className="text-[10px] text-muted-foreground">Configure como a IA responde automaticamente</p>
+        </div>
+      </div>
+
+      {/* Mode selector */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setMode('normal')}
+          className={`flex-1 p-3 rounded-xl border-2 transition-all text-left ${
+            mode === 'normal'
+              ? 'border-primary bg-primary/10'
+              : 'border-border bg-accent/30 hover:bg-accent/50'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <MessageCircle className={`w-4 h-4 ${mode === 'normal' ? 'text-primary' : 'text-muted-foreground'}`} />
+            <span className={`text-sm font-bold ${mode === 'normal' ? 'text-primary' : 'text-foreground'}`}>Normal</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Respostas padrão de vendas, foco em agendamento e conversão</p>
+        </button>
+        <button
+          onClick={() => setMode('feirao')}
+          className={`flex-1 p-3 rounded-xl border-2 transition-all text-left ${
+            mode === 'feirao'
+              ? 'border-amber-500 bg-amber-500/10'
+              : 'border-border bg-accent/30 hover:bg-accent/50'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Zap className={`w-4 h-4 ${mode === 'feirao' ? 'text-amber-500' : 'text-muted-foreground'}`} />
+            <span className={`text-sm font-bold ${mode === 'feirao' ? 'text-amber-500' : 'text-foreground'}`}>Feirão</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Modo evento especial com promoções e urgência</p>
+        </button>
+      </div>
+
+      {/* Mode-specific config */}
+      {mode === 'normal' && (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1 block">Instruções extras para a IA (opcional)</label>
+            <textarea
+              value={normalForm.instrucoes}
+              onChange={e => setNormalForm({ instrucoes: e.target.value })}
+              placeholder="Ex: Sempre mencione que temos financiamento facilitado. Foque em agendar visitas presenciais."
+              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+              rows={3}
+            />
+          </div>
+        </div>
+      )}
+
+      {mode === 'feirao' && (
+        <div className="space-y-3">
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <p className="text-xs text-amber-400 font-medium">🔥 Modo Feirão: A IA vai focar em promover o evento, mencionar benefícios e criar urgência para agendar visitas!</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1 block">Benefícios do Feirão *</label>
+            <textarea
+              value={feiraoForm.beneficios}
+              onChange={e => setFeiraoForm({ ...feiraoForm, beneficios: e.target.value })}
+              placeholder="Ex: Entrada facilitada, taxa 0% no primeiro ano, bônus de R$2.000 na troca"
+              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              rows={2}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1 block">Promoções Específicas</label>
+            <textarea
+              value={feiraoForm.promocoes}
+              onChange={e => setFeiraoForm({ ...feiraoForm, promocoes: e.target.value })}
+              placeholder="Ex: HB20 a partir de R$49.900, Onix com IPVA grátis, SUVs com 15% de desconto"
+              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              rows={2}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1 block">Objetivo Principal</label>
+            <textarea
+              value={feiraoForm.objetivo}
+              onChange={e => setFeiraoForm({ ...feiraoForm, objetivo: e.target.value })}
+              placeholder="Ex: Agendar o máximo de visitas para sábado dia 15/03"
+              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              rows={2}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-foreground mb-1 block">Instruções Adicionais</label>
+            <textarea
+              value={feiraoForm.instrucoes}
+              onChange={e => setFeiraoForm({ ...feiraoForm, instrucoes: e.target.value })}
+              placeholder="Ex: Mencionar que as condições são válidas apenas durante o feirão. Criar senso de urgência."
+              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              rows={2}
+            />
+          </div>
+        </div>
+      )}
+
+      <Button
+        onClick={handleSave}
+        disabled={setConfig.isPending}
+        className="w-full mt-4 racing-gradient text-white font-bold"
+      >
+        {setConfig.isPending ? "Salvando..." : `Salvar Modo ${mode === 'feirao' ? 'Feirão' : 'Normal'}`}
+      </Button>
+
+      {/* Current status */}
+      {config && (
+        <div className="mt-3 p-2 rounded-lg bg-accent/30 border border-border">
+          <p className="text-[10px] text-muted-foreground text-center">
+            Modo atual: <span className={`font-bold ${config.aiMode === 'feirao' ? 'text-amber-400' : 'text-primary'}`}>
+              {config.aiMode === 'feirao' ? '🔥 Feirão' : '💬 Normal'}
+            </span>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

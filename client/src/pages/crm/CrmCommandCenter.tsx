@@ -1458,6 +1458,11 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
             <h3 className="text-sm font-bold text-foreground truncate">{lead.name}</h3>
             <ScoreIcon className={`w-3.5 h-3.5 shrink-0 ${scoreCfg.color}`} />
           </div>
+          {lead.phone && (
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+              <Phone className="w-2.5 h-2.5" /> {lead.phone}
+            </p>
+          )}
           {lead.vehicleInterest && (
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
               <Car className="w-3 h-3" /> {lead.vehicleInterest}

@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/mysql2";
-import { eq, and, like, or, desc, asc, sql, gte, lte, isNull, ne } from "drizzle-orm";
+import { eq, and, like, or, desc, asc, sql, gte, lte, gt, isNull, ne } from "drizzle-orm";
 import {
   admins, InsertAdmin,
   crmLeads, InsertCrmLead,
@@ -85,16 +85,15 @@ export async function listLeadsBySeller(sellerId: number, opts?: { department?: 
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
   if (opts?.score) conditions.push(eq(crmLeads.score, opts.score as "hot" | "warm" | "cold"));
-  return db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.updatedAt));
+  return db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.lastContactDate));
 }
-
 export async function listLeadsByDepartment(department: string, opts?: { archived?: boolean; stage?: string }) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(crmLeads.department, department)];
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
-  return db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.updatedAt));
+  return db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.lastContactDate));
 }
 
 export async function listAllLeads(opts?: { archived?: boolean; department?: string; sellerId?: number }) {
@@ -105,7 +104,7 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
   if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
   if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(crmLeads).where(where).orderBy(desc(crmLeads.updatedAt));
+  return db.select().from(crmLeads).where(where).orderBy(desc(crmLeads.lastContactDate));
 }
 
 export async function updateLead(id: number, data: Partial<InsertCrmLead>) {
@@ -440,21 +439,26 @@ export async function getUnrespondedLeads(thresholdMinutes: number, sellerId?: n
   const db = await getDb();
   if (!db) return [];
   const cutoff = Date.now() - thresholdMinutes * 60 * 1000;
-  const conditions = [
+  const conditions: any[] = [
     eq(crmLeads.archived, false),
-    lte(crmLeads.createdAt, new Date(cutoff)),
+    gt(crmLeads.sellerId, 0), // only assigned leads
   ];
   if (sellerId !== undefined) {
     conditions.push(eq(crmLeads.sellerId, sellerId));
   }
   const leads = await db.select().from(crmLeads).where(and(...conditions));
-  // Filter: leads that have NO outbound message after their creation
+  // Filter: leads where the LAST message is inbound and older than threshold
+  // This means the client sent a message and nobody responded yet
   const result = [];
   for (const lead of leads) {
-    const outbound = await db.select({ id: crmMessages.id }).from(crmMessages)
-      .where(and(eq(crmMessages.leadId, lead.id), eq(crmMessages.direction, "outbound")))
-      .limit(1);
-    if (outbound.length === 0) {
+    // Get the last message for this lead
+    const lastMsg = await db.select().from(crmMessages)
+      .where(eq(crmMessages.leadId, lead.id))
+      .orderBy(desc(crmMessages.timestamp)).limit(1);
+    if (lastMsg.length === 0) continue; // no messages at all, skip
+    const last = lastMsg[0];
+    // If last message is inbound (from client) and older than threshold → unresponded
+    if (last.direction === "inbound" && last.timestamp && last.timestamp < cutoff) {
       result.push(lead);
     }
   }

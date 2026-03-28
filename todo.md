@@ -1316,3 +1316,14 @@
 - [x] CEP automático - preencher endereço ao digitar CEP
 - [x] Ficha cadastral completa para financiamento (nome, CPF, RG, nascimento, estado civil, mãe, email, telefone, CEP, endereço, profissão, renda, local trabalho, foto CNH/RG)
 - [x] Simplificar aba de cadastro inicial (mais básica)
+
+## Bugs CRM Chat + IA - 28/03
+- [x] Leads não sobem na lista quando recebem nova mensagem (já ordena por lastContactDate DESC)
+- [x] Tempo "sem resposta" atualiza corretamente (verifica se última msg é inbound sem resposta)
+- [x] Toggle IA Automática funciona (button type=button, z-10, pointer-events-none no knob)
+- [x] Modos de IA configuráveis: Modo Normal vs Modo Feirão (tabela crm_ai_global_config)
+- [x] Modo Feirão: configurar benefícios/promoções e IA responde focada nisso tentando agendar
+- [x] Opção de alternar entre modos na configuração do CRM (SettingsView > AiModeConfig)
+- [x] Mostrar telefone do cliente na lista de leads (abaixo do nome)
+- [x] IA suggestReply e auto-reply no webhook usam modo global (Normal/Feirão)
+- [x] 418 testes passando
