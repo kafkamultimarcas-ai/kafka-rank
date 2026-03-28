@@ -9,7 +9,7 @@ import {
   CalendarClock, Search, Trash2, Edit2, Phone, Mail, Car, Clock,
   CheckCircle2, XCircle, AlertCircle, UserCheck, User,
   AlertTriangle, PhoneCall, Save, X, Bell, CalendarPlus,
-  Timer, Siren, Flame,
+  Timer, Siren, Flame, Printer, Bot, ArrowRightLeft, RotateCcw,
 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
@@ -35,6 +35,9 @@ export default function AdminAgendamentos() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [now, setNow] = useState(Date.now());
+  const [transferId, setTransferId] = useState<number | null>(null);
+  const [transferSellerId, setTransferSellerId] = useState<number>(0);
+  const [rescueSendingId, setRescueSendingId] = useState<number | null>(null);
 
   // Live clock for countdown
   useEffect(() => {
@@ -49,6 +52,14 @@ export default function AdminAgendamentos() {
   const approveAttMut = trpc.sdr.approveAttendance.useMutation({ onSuccess: () => { refetch(); toast.success("Comparecimento aprovado"); } });
   const rejectAttMut = trpc.sdr.rejectAttendance.useMutation({ onSuccess: () => { refetch(); toast.success("Comparecimento rejeitado"); } });
   const markNoShowMut = trpc.sdr.markNoShow.useMutation({ onSuccess: () => { refetch(); toast.success("Marcado como não compareceu"); } });
+  const transferMut = trpc.sdr.transferAppointment.useMutation({
+    onSuccess: () => { refetch(); setTransferId(null); setTransferSellerId(0); toast.success("Agendamento transferido!"); },
+    onError: (e: any) => toast.error(e.message || "Erro ao transferir"),
+  });
+  const aiRescueMut = trpc.sdr.aiRescueWhatsApp.useMutation({
+    onSuccess: (data: any) => { setRescueSendingId(null); toast.success(data?.message || "Mensagem de resgate enviada!"); },
+    onError: (e: any) => { setRescueSendingId(null); toast.error(e.message || "Erro ao enviar resgate"); },
+  });
 
   const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
   const ONE_HOUR = 60 * 60 * 1000;
@@ -181,6 +192,51 @@ function formatDateShort(ts: number | string | Date | null) {
     return 'normal';
   }
 
+  function handleExportPdf() {
+    const rescueAndActive = (allRecords || []).filter(r => {
+      if (r.attendanceStatus === 'no_show') return true;
+      if (r.status === 'approved' && r.attendanceStatus === 'pending') return true;
+      return false;
+    });
+    if (rescueAndActive.length === 0) { toast.info("Nenhum agendamento para imprimir"); return; }
+    let html = `<html><head><meta charset="utf-8"><title>Agendamentos</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#333}h1{font-size:18px;border-bottom:2px solid #e74c3c;padding-bottom:8px}h2{font-size:14px;margin-top:20px;color:#e74c3c}table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th{background:#2c3e50;color:white;padding:8px;text-align:left}td{padding:6px 8px;border-bottom:1px solid #ddd}.rescue{background:#fff3cd}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold}.rescue-badge{background:#e74c3c;color:white}.active-badge{background:#27ae60;color:white}@media print{body{padding:0}}</style></head><body>`;
+    html += `<h1>Agendamentos - ${new Date().toLocaleDateString('pt-BR')}</h1>`;
+    const rescues = rescueAndActive.filter(r => r.attendanceStatus === 'no_show' || (r.scheduledDate && now - r.scheduledDate > FORTY_EIGHT_HOURS));
+    const actives = rescueAndActive.filter(r => !rescues.includes(r));
+    if (rescues.length > 0) {
+      html += `<h2>RESGATES (${rescues.length})</h2><table><tr><th>Ticket</th><th>Cliente</th><th>Telefone</th><th>Ve\u00edculo</th><th>Vendedor</th><th>Agendado</th><th>Obs</th></tr>`;
+      rescues.forEach(r => {
+        html += `<tr class="rescue"><td>${r.ticketNumber || '#' + r.id}</td><td>${r.customerName || '-'}</td><td>${r.customerPhone || '-'}</td><td>${r.vehicleInterest || '-'}</td><td>${sellerMap.get(r.sellerId) || '?'}</td><td>${r.scheduledDate ? formatDate(r.scheduledDate) : '-'}</td><td>${r.notes || '-'}</td></tr>`;
+      });
+      html += '</table>';
+    }
+    if (actives.length > 0) {
+      html += `<h2>ATIVOS (${actives.length})</h2><table><tr><th>Ticket</th><th>Cliente</th><th>Telefone</th><th>Ve\u00edculo</th><th>Vendedor</th><th>Agendado</th><th>Obs</th></tr>`;
+      actives.forEach(r => {
+        html += `<tr><td>${r.ticketNumber || '#' + r.id}</td><td>${r.customerName || '-'}</td><td>${r.customerPhone || '-'}</td><td>${r.vehicleInterest || '-'}</td><td>${sellerMap.get(r.sellerId) || '?'}</td><td>${r.scheduledDate ? formatDate(r.scheduledDate) : '-'}</td><td>${r.notes || '-'}</td></tr>`;
+      });
+      html += '</table>';
+    }
+    html += '</body></html>';
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const printWindow = window.open(url, '_blank');
+    if (printWindow) { printWindow.onload = () => { printWindow.print(); }; }
+  }
+
+  function handleTransfer(recordId: number) {
+    if (!transferSellerId) { toast.error("Selecione um vendedor"); return; }
+    const record = (allRecords || []).find(r => r.id === recordId);
+    if (!record) return;
+    transferMut.mutate({ id: recordId, sellerId: record.sellerId, newSellerId: transferSellerId });
+  }
+
+  function handleAiRescue(record: any) {
+    if (!record.customerPhone) { toast.error("Cliente sem telefone"); return; }
+    setRescueSendingId(record.id);
+    aiRescueMut.mutate({ id: record.id, sellerId: record.sellerId });
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -191,6 +247,10 @@ function formatDateShort(ts: number | string | Date | null) {
             <h1 className="text-2xl font-bold font-heading">Agendamentos</h1>
           </div>
           <div className="flex items-center gap-2 text-sm flex-wrap">
+            <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-orange-500 text-orange-400 hover:bg-orange-500/20">
+              <Printer className="h-4 w-4" />
+              <span className="hidden sm:inline">Imprimir / PDF</span>
+            </Button>
             {rescueRecords.length > 0 && (
               <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 font-bold animate-pulse flex items-center gap-1.5">
                 <Siren className="h-4 w-4" />
@@ -503,7 +563,50 @@ function formatDateShort(ts: number | string | Date | null) {
                               </a>
                             </>
                           )}
+                          {/* AI Rescue button */}
+                          {record.customerPhone && (isRescue || record.attendanceStatus === 'no_show') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAiRescue(record)}
+                              disabled={rescueSendingId === record.id}
+                              className="border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
+                            >
+                              <Bot className="h-3 w-3 mr-1" />
+                              {rescueSendingId === record.id ? 'Enviando...' : 'IA Resgate'}
+                            </Button>
+                          )}
+                          {/* Transfer button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setTransferId(transferId === record.id ? null : record.id)}
+                            className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20"
+                          >
+                            <ArrowRightLeft className="h-3 w-3 mr-1" /> Transferir
+                          </Button>
                         </div>
+                        {/* Transfer dropdown */}
+                        {transferId === record.id && (
+                          <div className="flex gap-2 items-center p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 mt-2">
+                            <select
+                              value={transferSellerId}
+                              onChange={e => setTransferSellerId(Number(e.target.value))}
+                              className="flex-1 bg-background border border-border rounded px-2 py-1 text-xs text-foreground"
+                            >
+                              <option value={0}>Selecione vendedor...</option>
+                              {(sellersList || []).filter(s => s.id !== record.sellerId && s.active).map(s => (
+                                <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                              ))}
+                            </select>
+                            <Button size="sm" onClick={() => handleTransfer(record.id)} disabled={transferMut.isPending} className="text-xs h-7">
+                              {transferMut.isPending ? '...' : 'OK'}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setTransferId(null)} className="text-xs h-7">
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
