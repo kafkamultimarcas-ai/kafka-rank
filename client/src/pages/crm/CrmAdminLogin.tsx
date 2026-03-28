@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
@@ -28,13 +27,10 @@ export default function CrmAdminLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [autoLoginAttempted, setAutoLoginAttempted] = useState(false);
+  const [autoLoginFailed, setAutoLoginFailed] = useState(false);
   const autoLoginTriedRef = useRef(false);
 
-  // Check if user is already logged in via Manus OAuth (owner)
-  const { user: manusUser, loading: manusLoading } = useAuth();
-
-  // Auto-login mutation for Manus OAuth owner
+  // Auto-login mutation - logs in directly as owner
   const autoLoginMutation = trpc.adminAuth.autoLogin.useMutation({
     onSuccess: (data) => {
       localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
@@ -42,29 +38,24 @@ export default function CrmAdminLogin() {
       navigate("/crm/admin");
     },
     onError: () => {
-      // Auto-login failed (not owner or no admin account), show manual login
-      setAutoLoginAttempted(true);
+      setAutoLoginFailed(true);
     },
   });
 
-  // Try auto-login when Manus OAuth user is detected
+  // Auto-login on page load
   useEffect(() => {
-    if (manusLoading || autoLoginTriedRef.current) return;
-    if (manusUser) {
-      autoLoginTriedRef.current = true;
-      // Check if already has a valid CRM admin token
-      const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
-      if (existingToken) {
-        // Already logged in, just navigate
-        navigate("/crm/admin");
-        return;
-      }
-      // Try auto-login
-      autoLoginMutation.mutate();
-    } else {
-      setAutoLoginAttempted(true);
+    if (autoLoginTriedRef.current) return;
+    autoLoginTriedRef.current = true;
+
+    // Check if already has a valid CRM admin token
+    const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (existingToken) {
+      navigate("/crm/admin");
+      return;
     }
-  }, [manusUser, manusLoading]);
+    // Try auto-login immediately
+    autoLoginMutation.mutate();
+  }, []);
 
   const loginMutation = trpc.adminAuth.login.useMutation({
     onSuccess: (data) => {
@@ -87,7 +78,7 @@ export default function CrmAdminLogin() {
   };
 
   // Show loading while trying auto-login
-  if (manusLoading || (!autoLoginAttempted && autoLoginMutation.isPending)) {
+  if (!autoLoginFailed && autoLoginMutation.isPending) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4">

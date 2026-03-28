@@ -1245,3 +1245,6 @@
 - [x] Resetar senha do admin 'kafka' (nova senha: kafka2026)
 - [x] Login automático: owner do Manus entra direto no CRM admin sem digitar senha
 - [x] Limpar contas de teste da tabela admins (78 contas removidas)
+
+## Fix Login Automático - 28/03/2026
+- [x] Auto-login sem depender do Manus OAuth - gerar token direto ao acessar a página de login
