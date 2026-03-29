@@ -1350,3 +1350,22 @@
 - [x] Resgate automático via IA no WhatsApp (botão IA Resgate gera msg personalizada e envia pelo Z-API)
 - [x] Follow-up automático 20min: alert-checker verifica agendamentos 20min+ atrasados e envia msg IA no WhatsApp
 - [x] 425 testes passando
+
+## Bugs Críticos CRM - 29/03
+- [ ] IA respondendo 2x (mensagem duplicada no WhatsApp)
+- [ ] Layout do chat precisa parecer mais com WhatsApp (balões, cores, espaçamento)
+- [ ] Distribuição de leads deve ir APENAS para SDRs, não para vendedores
+- [ ] Botão de distribuição automática precisa ser mais visível
+- [ ] Toggle IA Automática não funciona (não ativa)
+- [ ] Cruzamento venda x agendamento: notificar admin e SDR quando venda é fechada de um agendamento
+- [ ] Área dedicada para SDR (pré-vendas) separada do vendedor
+
+## Bugs CRM - Outbound + Hora Lead - 29/03
+- [x] Conversas do WhatsApp respondidas pelo vendedor agora capturadas (notifySentByMe reativado com sucesso)
+- [x] Mostrar hora/data que o lead chegou na lista ("Chegou: 29/03, 15:30")
+- [x] Timer "sem resposta" funciona corretamente (verifica última msg inbound sem resposta outbound)
+- [x] Z-API notifySentByMe reativado com sucesso (retornou {"value":true})
+- [x] Chat redesenhado estilo WhatsApp (cores #005c4b outbound, #1f2c33 inbound, bg #0b141a)
+- [x] Deduplicação de mensagens no webhook (messageId cache + AI auto-reply check)
+- [x] Distribuição de leads corrigida para ir apenas para SDRs (pre_vendas)
+- [x] 425 testes passando

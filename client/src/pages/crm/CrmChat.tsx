@@ -374,8 +374,18 @@ function LeadList({
                   </div>
 
                   {lead.phone && (
-                    <span className="text-[10px] text-muted-foreground/70 truncate block">
-                      {lead.phone}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground/70 truncate">
+                        {lead.phone}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground/50">
+                        Chegou: {new Date(lead.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  )}
+                  {!lead.phone && (
+                    <span className="text-[9px] text-muted-foreground/50 block">
+                      Chegou: {new Date(lead.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
 
@@ -751,43 +761,48 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
       <div className="flex-1 flex overflow-hidden">
         {/* Messages area */}
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, rgba(16,185,129,0.03), transparent 50%)" }}>
+          <div className="flex-1 overflow-y-auto px-1 py-3 space-y-1" style={{ backgroundColor: "#0b141a", backgroundImage: "url('data:image/svg+xml,%3Csvg width=\'200\' height=\'200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3Cpattern id=\'p\' width=\'40\' height=\'40\' patternUnits=\'userSpaceOnUse\'%3E%3Cpath d=\'M20 5 L20 8 M5 20 L8 20 M32 20 L35 20 M20 32 L20 35\' stroke=\'%23ffffff\' stroke-width=\'0.3\' opacity=\'0.04\'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width=\'200\' height=\'200\' fill=\'url(%23p)\'/%3E%3C/svg%3E')" }}>
             {groupedMessages.map((group, gi) => (
               <div key={gi}>
                 {/* Date separator */}
                 <div className="flex items-center justify-center my-3">
-                  <span className="text-[10px] text-muted-foreground bg-accent/80 px-3 py-1 rounded-full">
+                  <span className="text-[10px] text-gray-400 bg-[#182229] px-3 py-1 rounded-lg shadow-sm">
                     {group.date}
                   </span>
                 </div>
 
                 {group.messages.map((msg) => (
-                  <div key={msg.id} className={`flex mb-1.5 ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                  <div key={msg.id} className={`flex mb-2 px-2 ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
+                    <div className={`relative max-w-[85%] shadow-md px-3 py-2 ${
                       msg.direction === "outbound"
-                        ? "bg-green-600/90 text-white rounded-br-md"
-                        : "bg-card border border-border text-foreground rounded-bl-md"
+                        ? "bg-[#005c4b] text-white rounded-tl-lg rounded-tr-lg rounded-bl-lg rounded-br-sm"
+                        : "bg-[#1f2c33] text-gray-100 rounded-tl-sm rounded-tr-lg rounded-bl-lg rounded-br-lg"
                     }`}>
                       {msg.direction === "outbound" && (
-                        <p className="text-[9px] font-medium opacity-70 mb-0.5">
-                          {msg.sentBy ? (sellerMap[msg.sentBy] || "Você") : (msg.senderName === "IA Kafka" ? "⚡ IA Kafka" : "Vendedor")}
+                        <p className="text-[10px] font-semibold mb-1" style={{color: msg.senderName === "IA Kafka" ? "#a78bfa" : "#34d399"}}>
+                          {msg.sentBy ? (sellerMap[msg.sentBy] || "Voc\u00ea") : (msg.senderName === "IA Kafka" ? "\u26a1 IA Kafka" : "\ud83d\udce4 Vendedor")}
                         </p>
                       )}
-                      {msg.direction === "inbound" && msg.senderName && (
-                        <p className="text-[9px] font-medium text-primary mb-0.5">
-                          {msg.senderName}
+                      {msg.direction === "inbound" && (
+                        <p className="text-[10px] font-semibold text-[#53bdeb] mb-1">
+                          {msg.senderName || "Cliente"}
                         </p>
                       )}
 
                       <ChatMediaRendererFull msg={msg} />
 
                       {msg.content && msg.content !== "NULL" && (
-                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                       )}
 
-                      <p className={`text-[9px] mt-0.5 text-right ${msg.direction === "outbound" ? "opacity-60" : "text-muted-foreground"}`}>
-                        {formatTime(msg.timestamp)}
-                      </p>
+                      <div className="flex items-center justify-end gap-1 mt-1">
+                        <span className="text-[10px] opacity-60">
+                          {formatTime(msg.timestamp)}
+                        </span>
+                        {msg.direction === "outbound" && (
+                          <span className="text-[10px] opacity-60">\u2713\u2713</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

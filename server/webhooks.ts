@@ -86,29 +86,67 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
     const database = await getDb();
     if (!database) return { sellerId: null, sellerName: null };
 
+    // Always use pre_vendas distribution config - leads go to SDRs first
+    const sdrDept = "pre_vendas";
     const [config] = await database.select().from(crmLeadDistribution)
-      .where(eq(crmLeadDistribution.department, department)).limit(1);
-    if (!config || !config.enabled) return { sellerId: null, sellerName: null };
+      .where(eq(crmLeadDistribution.department, sdrDept)).limit(1);
+    
+    // If no SDR distribution config, try the original department
+    if (!config || !config.enabled) {
+      const [fallbackConfig] = await database.select().from(crmLeadDistribution)
+        .where(eq(crmLeadDistribution.department, department)).limit(1);
+      if (!fallbackConfig || !fallbackConfig.enabled) return { sellerId: null, sellerName: null };
+      
+      // Fallback: use original department but only SDR sellers
+      const sdrSellers = await database.select().from(sellers)
+        .where(and(eq(sellers.department, "pre_vendas"), eq(sellers.active, true)))
+        .orderBy(asc(sellers.id));
+      
+      // If no SDRs, fall back to department sellers
+      const targetSellers = sdrSellers.length > 0 ? sdrSellers : 
+        await database.select().from(sellers)
+          .where(and(eq(sellers.department, department), eq(sellers.active, true)))
+          .orderBy(asc(sellers.id));
+      
+      if (targetSellers.length === 0) return { sellerId: null, sellerName: null };
+      
+      let nextSeller;
+      if (fallbackConfig.lastAssignedSellerId) {
+        const idx = targetSellers.findIndex(s => s.id === fallbackConfig.lastAssignedSellerId);
+        nextSeller = targetSellers[(idx + 1) % targetSellers.length];
+      } else {
+        nextSeller = targetSellers[0];
+      }
+      
+      await crmDb.updateLead(leadId, { sellerId: nextSeller.id });
+      await database.update(crmLeadDistribution)
+        .set({ lastAssignedSellerId: nextSeller.id })
+        .where(eq(crmLeadDistribution.department, department));
+      
+      return { sellerId: nextSeller.id, sellerName: nextSeller.name };
+    }
 
-    const deptSellers = await database.select().from(sellers)
-      .where(and(eq(sellers.department, department), eq(sellers.active, true)))
+    // Primary: distribute to SDR sellers only
+    const sdrSellers = await database.select().from(sellers)
+      .where(and(eq(sellers.department, sdrDept), eq(sellers.active, true)))
       .orderBy(asc(sellers.id));
 
-    if (deptSellers.length === 0) return { sellerId: null, sellerName: null };
+    if (sdrSellers.length === 0) return { sellerId: null, sellerName: null };
 
     let nextSeller;
     if (config.lastAssignedSellerId) {
-      const idx = deptSellers.findIndex(s => s.id === config.lastAssignedSellerId);
-      nextSeller = deptSellers[(idx + 1) % deptSellers.length];
+      const idx = sdrSellers.findIndex(s => s.id === config.lastAssignedSellerId);
+      nextSeller = sdrSellers[(idx + 1) % sdrSellers.length];
     } else {
-      nextSeller = deptSellers[0];
+      nextSeller = sdrSellers[0];
     }
 
     await crmDb.updateLead(leadId, { sellerId: nextSeller.id });
     await database.update(crmLeadDistribution)
       .set({ lastAssignedSellerId: nextSeller.id })
-      .where(eq(crmLeadDistribution.department, department));
+      .where(eq(crmLeadDistribution.department, sdrDept));
 
+    console.log(`[Lead Distribution] Lead #${leadId} assigned to SDR ${nextSeller.name} (ID: ${nextSeller.id})`);
     return { sellerId: nextSeller.id, sellerName: nextSeller.name };
   } catch {
     return { sellerId: null, sellerName: null };
@@ -154,6 +192,21 @@ function parseLeadFromEmail(body: string): { name: string | null; phone: string 
   if (vehicleMatch) result.vehicle = vehicleMatch[1].trim().substring(0, 200);
 
   return result;
+}
+
+// Message deduplication cache (messageId -> timestamp)
+const processedMessages = new Map<string, number>();
+const DEDUP_TTL = 5 * 60 * 1000; // 5 minutes
+function isDuplicate(messageId: string | null): boolean {
+  if (!messageId) return false;
+  const now = Date.now();
+  // Clean old entries
+  Array.from(processedMessages.entries()).forEach(([key, ts]) => {
+    if (now - ts > DEDUP_TTL) processedMessages.delete(key);
+  });
+  if (processedMessages.has(messageId)) return true;
+  processedMessages.set(messageId, now);
+  return false;
 }
 
 export function registerWebhookRoutes(app: Express) {
@@ -721,11 +774,19 @@ export function registerWebhookRoutes(app: Express) {
       const mediaUrl = body.image?.imageUrl || body.audio?.audioUrl || body.video?.videoUrl || body.document?.documentUrl || body.sticker?.stickerUrl || null;
       const messageType = body.image ? "image" : body.audio ? (body.audio.ptt ? "ptt" : "audio") : body.video ? "video" : body.document ? "document" : body.sticker ? "sticker" : "text";
 
-      console.log(`WhatsApp webhook: phone=${rawPhone}, msg=${messageText?.substring(0, 50)}, fromMe=${fromMe}, isGroup=${isGroup}, type=${messageType}`);
+      const zapiMsgId = body.messageId || body.ids?.messageId || null;
+      console.log(`WhatsApp webhook: phone=${rawPhone}, msg=${messageText?.substring(0, 50)}, fromMe=${fromMe}, isGroup=${isGroup}, type=${messageType}, msgId=${zapiMsgId}`);
 
       // Skip group messages
       if (isGroup) {
         res.json({ success: true, action: "skipped", reason: "group" });
+        return;
+      }
+
+      // Deduplicate: skip if we already processed this messageId (Z-API can send retries)
+      if (isDuplicate(zapiMsgId)) {
+        console.log(`[WhatsApp] Duplicate message skipped: ${zapiMsgId}`);
+        res.json({ success: true, action: "skipped", reason: "duplicate" });
         return;
       }
 
@@ -735,6 +796,31 @@ export function registerWebhookRoutes(app: Express) {
         if (existingLeads.length > 0) {
           // Determine direction: fromMe = outbound (seller replied via WhatsApp), else inbound
           const direction = fromMe ? "outbound" : "inbound";
+          
+          // Skip outbound messages that were already saved by AI auto-reply
+          // (The AI saves its own message to DB, then Z-API sends it back via webhook)
+          if (fromMe && messageText) {
+            try {
+              const dbCheck = await getDb();
+              if (dbCheck) {
+                const recentAiMsgs = await dbCheck.select().from(crmMessages)
+                  .where(and(
+                    eq(crmMessages.leadId, existingLeads[0].id),
+                    eq(crmMessages.direction, "outbound"),
+                    eq(crmMessages.senderName, "IA Kafka")
+                  ))
+                  .orderBy(desc(crmMessages.timestamp))
+                  .limit(3);
+                const isDupAi = recentAiMsgs.some(m => m.content === messageText && (Date.now() - (m.timestamp || 0)) < 60000);
+                if (isDupAi) {
+                  console.log(`[WhatsApp] Skipping outbound - already saved by AI auto-reply for lead #${existingLeads[0].id}`);
+                  res.json({ success: true, action: "skipped", reason: "ai_already_saved" });
+                  return;
+                }
+              }
+            } catch { /* continue to save */ }
+          }
+
           // Save message to crm_messages
           await crmDb.createMessage({
             leadId: existingLeads[0].id,
@@ -745,7 +831,7 @@ export function registerWebhookRoutes(app: Express) {
             mediaUrl: mediaUrl || null,
             senderName: senderName || null,
             sentBy: null,
-            zapiMessageId: body.messageId || body.ids?.messageId || null,
+            zapiMessageId: zapiMsgId,
             timestamp: typeof timestamp === 'string' ? new Date(timestamp).getTime() : (timestamp > 9999999999 ? timestamp : timestamp * 1000),
           });
           // Update lastContactDate on lead
