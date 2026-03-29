@@ -1,0 +1,94 @@
+{
+  "query": "SELECT id, leadId, direction, senderName, LEFT(content, 80) as content_preview, messageType, timestamp FROM crm_messages WHERE content IS NOT NULL AND content != '' ORDER BY id DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, leadId, direction, senderName, LEFT(content, 80) as content_preview, messageType, timestamp FROM crm_messages WHERE content IS NOT NULL AND content != '' ORDER BY id DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "90115",
+      "leadId": "510040",
+      "direction": "inbound",
+      "senderName": "Diandro Martins",
+      "content_preview": "Compra",
+      "messageType": "text",
+      "timestamp": "1774790025000"
+    },
+    {
+      "id": "90114",
+      "leadId": "481174",
+      "direction": "outbound",
+      "senderName": "KAFKA MULTIMARCAS",
+      "content_preview": "tel:47 9139-4573",
+      "messageType": "text",
+      "timestamp": "1774789969000"
+    },
+    {
+      "id": "90113",
+      "leadId": "481184",
+      "direction": "inbound",
+      "senderName": "José araldo",
+      "content_preview": "Não sabe a hora",
+      "messageType": "text",
+      "timestamp": "1774789926000"
+    },
+    {
+      "id": "90111",
+      "leadId": "481184",
+      "direction": "inbound",
+      "senderName": "José araldo",
+      "content_preview": "Ainda vai",
+      "messageType": "text",
+      "timestamp": "1774789910000"
+    },
+    {
+      "id": "90109",
+      "leadId": "481293",
+      "direction": "inbound",
+      "senderName": "😎 Breno Furtado 🫡",
+      "content_preview": "Cheguei",
+      "messageType": "text",
+      "timestamp": "1774789895000"
+    },
+    {
+      "id": "90108",
+      "leadId": "510023",
+      "direction": "outbound",
+      "senderName": "KAFKA MULTIMARCAS",
+      "content_preview": "Bomm diaa !",
+      "messageType": "text",
+      "timestamp": "1774789885000"
+    },
+    {
+      "id": "90107",
+      "leadId": "481327",
+      "direction": "outbound",
+      "senderName": "KAFKA MULTIMARCAS",
+      "content_preview": "😔",
+      "messageType": "text",
+      "timestamp": "1774789854000"
+    },
+    {
+      "id": "90105",
+      "leadId": "481327",
+      "direction": "inbound",
+      "senderName": "Consultor Gabriel",
+      "content_preview": "ela nao, o bruno sim",
+      "messageType": "text",
+      "timestamp": "1774789678000"
+    },
+    {
+      "id": "90104",
+      "leadId": "481327",
+      "direction": "outbound",
+      "senderName": "KAFKA MULTIMARCAS",
+      "content_preview": "Ela te respondeu:?",
+      "messageType": "text",
+      "timestamp": "1774789652000"
+    }
+  ],
+  "messages": [
+    "90110\t510023\toutbound\tKAFKA MULTIMARCAS\tTudo bem? ",
+    "Estamos lhe aguardando hoje !\ttext\t1774789899000"
+  ],
+  "stdout": "id\tleadId\tdirection\tsenderName\tcontent_preview\tmessageType\ttimestamp\n90115\t510040\tinbound\tDiandro Martins\tCompra\ttext\t1774790025000\n90114\t481174\toutbound\tKAFKA MULTIMARCAS\ttel:47 9139-4573\ttext\t1774789969000\n90113\t481184\tinbound\tJosé araldo\tNão sabe a hora\ttext\t1774789926000\n90111\t481184\tinbound\tJosé araldo\tAinda vai\ttext\t1774789910000\n90110\t510023\toutbound\tKAFKA MULTIMARCAS\tTudo bem? \nEstamos lhe aguardando hoje !\ttext\t1774789899000\n90109\t481293\tinbound\t😎 Breno Furtado 🫡\tCheguei\ttext\t1774789895000\n90108\t510023\toutbound\tKAFKA MULTIMARCAS\tBomm diaa !\ttext\t1774789885000\n90107\t481327\toutbound\tKAFKA MULTIMARCAS\t😔\ttext\t1774789854000\n90105\t481327\tinbound\tConsultor Gabriel\tela nao, o bruno sim\ttext\t1774789678000\n90104\t481327\toutbound\tKAFKA MULTIMARCAS\tEla te respondeu:?\ttext\t1774789652000\n",
+  "stderr": "",
+  "execution_time_ms": 73
+}

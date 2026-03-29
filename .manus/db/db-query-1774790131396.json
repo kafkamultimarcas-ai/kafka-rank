@@ -1,0 +1,45 @@
+{
+  "query": "SELECT messageType, COUNT(*) as cnt, SUM(CASE WHEN content IS NULL OR content = '' THEN 1 ELSE 0 END) as null_content FROM crm_messages GROUP BY messageType ORDER BY cnt DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT messageType, COUNT(*) as cnt, SUM(CASE WHEN content IS NULL OR content = '' THEN 1 ELSE 0 END) as null_content FROM crm_messages GROUP BY messageType ORDER BY cnt DESC;",
+  "rows": [
+    {
+      "messageType": "text",
+      "cnt": "1462",
+      "null_content": "85"
+    },
+    {
+      "messageType": "image",
+      "cnt": "84",
+      "null_content": "81"
+    },
+    {
+      "messageType": "ptt",
+      "cnt": "83",
+      "null_content": "83"
+    },
+    {
+      "messageType": "audio",
+      "cnt": "60",
+      "null_content": "60"
+    },
+    {
+      "messageType": "document",
+      "cnt": "8",
+      "null_content": "8"
+    },
+    {
+      "messageType": "video",
+      "cnt": "7",
+      "null_content": "7"
+    },
+    {
+      "messageType": "sticker",
+      "cnt": "7",
+      "null_content": "7"
+    }
+  ],
+  "messages": [],
+  "stdout": "messageType\tcnt\tnull_content\ntext\t1462\t85\nimage\t84\t81\nptt\t83\t83\naudio\t60\t60\ndocument\t8\t8\nvideo\t7\t7\nsticker\t7\t7\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

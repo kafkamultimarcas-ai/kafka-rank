@@ -1,0 +1,60 @@
+{
+  "query": "SELECT id, leadId, direction, senderName, content, messageType, mediaUrl, zapiMessageId FROM crm_messages WHERE senderName LIKE '%WILSON%' ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, leadId, direction, senderName, content, messageType, mediaUrl, zapiMessageId FROM crm_messages WHERE senderName LIKE '%WILSON%' ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "90088",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "zapiMessageId": "ACA75F5369FB663A57D93EF81A71A6D6"
+    },
+    {
+      "id": "90087",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "zapiMessageId": "ACD46B5CE6CD7CF00A2167AA56A7C388"
+    },
+    {
+      "id": "90086",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "zapiMessageId": "AC514B384EAE2E10FE520C7EA87C3D37"
+    },
+    {
+      "id": "90085",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "zapiMessageId": "ACE139EDA79E486DF4CA2CBCFB8F99FB"
+    },
+    {
+      "id": "90084",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "zapiMessageId": "ACBC46EFFB845A2E384CC48E2749BFE8"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tleadId\tdirection\tsenderName\tcontent\tmessageType\tmediaUrl\tzapiMessageId\n90088\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\tACA75F5369FB663A57D93EF81A71A6D6\n90087\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\tACD46B5CE6CD7CF00A2167AA56A7C388\n90086\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\tAC514B384EAE2E10FE520C7EA87C3D37\n90085\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\tACE139EDA79E486DF4CA2CBCFB8F99FB\n90084\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\tACBC46EFFB845A2E384CC48E2749BFE8\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

@@ -1,0 +1,210 @@
+{
+  "query": "SELECT id, leadId, direction, senderName, content, messageType, mediaUrl, timestamp FROM crm_messages WHERE senderName LIKE '%WILSON%' ORDER BY timestamp DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, leadId, direction, senderName, content, messageType, mediaUrl, timestamp FROM crm_messages WHERE senderName LIKE '%WILSON%' ORDER BY timestamp DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "90076",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788416119"
+    },
+    {
+      "id": "90075",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788414990"
+    },
+    {
+      "id": "90074",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788413948"
+    },
+    {
+      "id": "90073",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788412903"
+    },
+    {
+      "id": "90070",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788411816"
+    },
+    {
+      "id": "90072",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788410785"
+    },
+    {
+      "id": "90068",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788409647"
+    },
+    {
+      "id": "90071",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788408525"
+    },
+    {
+      "id": "90069",
+      "leadId": "481231",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788408524"
+    },
+    {
+      "id": "90088",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788407000"
+    },
+    {
+      "id": "90087",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788407000"
+    },
+    {
+      "id": "90085",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788407000"
+    },
+    {
+      "id": "90086",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788406000"
+    },
+    {
+      "id": "90084",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788406000"
+    },
+    {
+      "id": "90083",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788406000"
+    },
+    {
+      "id": "90082",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788406000"
+    },
+    {
+      "id": "90081",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788406000"
+    },
+    {
+      "id": "90080",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788406000"
+    },
+    {
+      "id": "90079",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788405000"
+    },
+    {
+      "id": "90078",
+      "leadId": "481232",
+      "direction": "inbound",
+      "senderName": "WILSON ZANDONA",
+      "content": "NULL",
+      "messageType": "text",
+      "mediaUrl": "NULL",
+      "timestamp": "1774788405000"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tleadId\tdirection\tsenderName\tcontent\tmessageType\tmediaUrl\ttimestamp\n90076\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788416119\n90075\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788414990\n90074\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788413948\n90073\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788412903\n90070\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788411816\n90072\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788410785\n90068\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788409647\n90071\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788408525\n90069\t481231\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788408524\n90088\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788407000\n90087\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788407000\n90085\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788407000\n90086\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788406000\n90084\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788406000\n90083\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788406000\n90082\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788406000\n90081\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788406000\n90080\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788406000\n90079\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788405000\n90078\t481232\tinbound\tWILSON ZANDONA\tNULL\ttext\tNULL\t1774788405000\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}

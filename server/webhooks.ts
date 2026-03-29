@@ -766,20 +766,126 @@ export function registerWebhookRoutes(app: Express) {
 
       // Normalize Z-API format vs generic format
       const rawPhone = body.phone || body.from || "";
-      const messageText = body.text?.message || body.message || body.image?.caption || body.video?.caption || "";
       const timestamp = body.momment || body.timestamp || Math.floor(Date.now() / 1000);
       const fromMe = body.fromMe === true;
       const isGroup = body.isGroup === true;
-      const senderName = body.senderName || body.contact?.displayName || "";
-      const mediaUrl = body.image?.imageUrl || body.audio?.audioUrl || body.video?.videoUrl || body.document?.documentUrl || body.sticker?.stickerUrl || null;
-      const messageType = body.image ? "image" : body.audio ? (body.audio.ptt ? "ptt" : "audio") : body.video ? "video" : body.document ? "document" : body.sticker ? "sticker" : "text";
+      const isNewsletter = body.isNewsletter === true;
+      const isStatusReply = body.isStatusReply === true;
+      const senderName = body.senderName || body.chatName || "";
+
+      // Comprehensive message type detection (order matters - check specific types first)
+      let messageType = "text";
+      let messageText = "";
+      let mediaUrl: string | null = null;
+
+      if (body.reaction) {
+        messageType = "reaction";
+        messageText = body.reaction.value || "";
+      } else if (body.image) {
+        messageType = "image";
+        messageText = body.image.caption || "";
+        mediaUrl = body.image.imageUrl || null;
+      } else if (body.audio) {
+        messageType = body.audio.ptt ? "ptt" : "audio";
+        messageText = "";
+        mediaUrl = body.audio.audioUrl || null;
+      } else if (body.video) {
+        messageType = "video";
+        messageText = body.video.caption || "";
+        mediaUrl = body.video.videoUrl || null;
+      } else if (body.document) {
+        messageType = "document";
+        messageText = body.document.fileName || body.document.title || "";
+        mediaUrl = body.document.documentUrl || null;
+      } else if (body.sticker) {
+        messageType = "sticker";
+        messageText = "";
+        mediaUrl = body.sticker.stickerUrl || null;
+      } else if (body.location) {
+        messageType = "location";
+        messageText = body.location.name || body.location.address || `Localização: ${body.location.latitude}, ${body.location.longitude}`;
+      } else if (body.contact && body.contact.displayName) {
+        messageType = "contact";
+        messageText = `Contato: ${body.contact.displayName}`;
+      } else if (body.buttonsResponseMessage) {
+        messageType = "text";
+        messageText = body.buttonsResponseMessage.message || "";
+      } else if (body.listResponseMessage) {
+        messageType = "text";
+        messageText = body.listResponseMessage.message || body.listResponseMessage.title || "";
+      } else if (body.hydratedTemplate) {
+        messageType = "text";
+        messageText = body.hydratedTemplate.message || body.hydratedTemplate.title || "";
+        // Check for media in template header
+        if (body.hydratedTemplate.header?.image?.imageUrl) {
+          messageType = "image";
+          mediaUrl = body.hydratedTemplate.header.image.imageUrl;
+        } else if (body.hydratedTemplate.header?.video?.videoUrl) {
+          messageType = "video";
+          mediaUrl = body.hydratedTemplate.header.video.videoUrl;
+        } else if (body.hydratedTemplate.header?.document?.documentUrl) {
+          messageType = "document";
+          mediaUrl = body.hydratedTemplate.header.document.documentUrl;
+        }
+      } else if (body.buttonsMessage) {
+        messageType = "text";
+        messageText = body.buttonsMessage.message || "";
+      } else if (body.poll) {
+        messageType = "poll";
+        messageText = `Enquete: ${body.poll.question || ""}`;
+      } else if (body.pollVote) {
+        messageType = "poll_vote";
+        messageText = body.pollVote.options?.map((o: any) => o.name).join(", ") || "";
+      } else if (body.carouselMessage) {
+        messageType = "text";
+        messageText = body.carouselMessage.text || "";
+      } else if (body.product) {
+        messageType = "product";
+        messageText = body.product.title || "";
+      } else if (body.order) {
+        messageType = "order";
+        messageText = body.order.message || `Pedido #${body.order.orderId || ""}`;
+      } else if (body.pinMessage) {
+        messageType = "notification";
+        messageText = body.pinMessage.action === "pin" ? "Mensagem fixada" : "Mensagem desafixada";
+      } else if (body.notification) {
+        messageType = "notification";
+        messageText = "";
+      } else if (body.waitingMessage === true) {
+        messageType = "notification";
+        messageText = "";
+      } else if (body.text) {
+        messageType = "text";
+        messageText = body.text.message || "";
+      } else if (body.message && typeof body.message === "string") {
+        // Generic/fallback format
+        messageType = "text";
+        messageText = body.message;
+      }
 
       const zapiMsgId = body.messageId || body.ids?.messageId || null;
-      console.log(`WhatsApp webhook: phone=${rawPhone}, msg=${messageText?.substring(0, 50)}, fromMe=${fromMe}, isGroup=${isGroup}, type=${messageType}, msgId=${zapiMsgId}`);
 
-      // Skip group messages
+      // Log for debugging
+      const payloadPreview = JSON.stringify(body).substring(0, 500);
+      console.log(`[WhatsApp Webhook] phone=${rawPhone}, type=${messageType}, msg="${messageText?.substring(0, 80)}", fromMe=${fromMe}, isGroup=${isGroup}, msgId=${zapiMsgId}`);
+      if (!messageText && messageType === "text") {
+        console.log(`[WhatsApp Webhook] WARNING: Empty text message. Payload: ${payloadPreview}`);
+      }
+
+      // Skip group messages, newsletters, status replies, and system notifications
       if (isGroup) {
         res.json({ success: true, action: "skipped", reason: "group" });
+        return;
+      }
+      if (isNewsletter) {
+        res.json({ success: true, action: "skipped", reason: "newsletter" });
+        return;
+      }
+      if (messageType === "notification" || messageType === "reaction" || messageType === "poll_vote") {
+        // Skip system notifications (pin, payment, etc.), reactions, and poll votes
+        // These don't need to be stored as chat messages
+        console.log(`[WhatsApp Webhook] Skipping ${messageType}: ${messageText || 'no content'}`);
+        res.json({ success: true, action: "skipped", reason: messageType });
         return;
       }
 
@@ -797,24 +903,30 @@ export function registerWebhookRoutes(app: Express) {
           // Determine direction: fromMe = outbound (seller replied via WhatsApp), else inbound
           const direction = fromMe ? "outbound" : "inbound";
           
-          // Skip outbound messages that were already saved by AI auto-reply
-          // (The AI saves its own message to DB, then Z-API sends it back via webhook)
-          if (fromMe && messageText) {
+          // Skip outbound messages that were already saved by AI auto-reply or CRM send
+          // (The AI/CRM saves its own message to DB, then Z-API sends it back via webhook)
+          if (fromMe) {
             try {
               const dbCheck = await getDb();
               if (dbCheck) {
-                const recentAiMsgs = await dbCheck.select().from(crmMessages)
+                // Check for any recent outbound message with same content (AI or CRM-sent)
+                const recentOutbound = await dbCheck.select().from(crmMessages)
                   .where(and(
                     eq(crmMessages.leadId, existingLeads[0].id),
-                    eq(crmMessages.direction, "outbound"),
-                    eq(crmMessages.senderName, "IA Kafka")
+                    eq(crmMessages.direction, "outbound")
                   ))
                   .orderBy(desc(crmMessages.timestamp))
-                  .limit(3);
-                const isDupAi = recentAiMsgs.some(m => m.content === messageText && (Date.now() - (m.timestamp || 0)) < 60000);
-                if (isDupAi) {
-                  console.log(`[WhatsApp] Skipping outbound - already saved by AI auto-reply for lead #${existingLeads[0].id}`);
-                  res.json({ success: true, action: "skipped", reason: "ai_already_saved" });
+                  .limit(5);
+                const isDup = recentOutbound.some(m => {
+                  const timeDiff = Date.now() - (m.timestamp || 0);
+                  // Match by content within 2 minutes, or by zapiMessageId
+                  if (zapiMsgId && m.zapiMessageId === zapiMsgId) return true;
+                  if (messageText && m.content === messageText && timeDiff < 120000) return true;
+                  return false;
+                });
+                if (isDup) {
+                  console.log(`[WhatsApp] Skipping outbound duplicate for lead #${existingLeads[0].id}`);
+                  res.json({ success: true, action: "skipped", reason: "already_saved" });
                   return;
                 }
               }

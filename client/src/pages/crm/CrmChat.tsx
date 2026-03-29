@@ -713,7 +713,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
       {/* Chat header */}
       <div className="border-b border-border bg-card px-3 py-2.5">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="md:hidden p-1 hover:bg-accent rounded-lg">
+          <button onClick={onBack} className="p-1 hover:bg-accent rounded-lg">
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
 
@@ -791,9 +791,23 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
 
                       <ChatMediaRendererFull msg={msg} />
 
-                      {msg.content && msg.content !== "NULL" && (
+                      {msg.content && msg.content !== "NULL" && msg.content.trim() !== "" ? (
                         <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                      )}
+                      ) : !msg.mediaUrl && msg.messageType !== "text" ? (
+                        <p className="text-[12px] italic opacity-60">
+                          {msg.messageType === "ptt" || msg.messageType === "audio" ? "🎤 Mensagem de voz" :
+                           msg.messageType === "sticker" ? "Figurinha" :
+                           msg.messageType === "location" ? "📍 Localização" :
+                           msg.messageType === "contact" ? "👤 Contato compartilhado" :
+                           msg.messageType === "poll" ? "📊 Enquete" :
+                           msg.messageType === "product" ? "🛒 Produto" :
+                           msg.messageType === "order" ? "📦 Pedido" :
+                           msg.messageType === "document" ? "📄 Documento" :
+                           msg.messageType === "image" ? "📷 Imagem" :
+                           msg.messageType === "video" ? "🎥 Vídeo" :
+                           null}
+                        </p>
+                      ) : null}
 
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <span className="text-[10px] opacity-60">

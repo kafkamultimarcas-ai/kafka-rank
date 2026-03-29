@@ -1369,3 +1369,18 @@
 - [x] Deduplicação de mensagens no webhook (messageId cache + AI auto-reply check)
 - [x] Distribuição de leads corrigida para ir apenas para SDRs (pre_vendas)
 - [x] 425 testes passando
+
+## Bugs CRM Críticos - 29/03 (Rodada 2)
+- [ ] Mensagens no chat mostram apenas nome do remetente sem conteúdo (WILSON ZANDONA sem texto)
+- [ ] Conversas do WhatsApp real não aparecem no CRM (ex: conversa Pedro Honda City)
+- [ ] IA enviando mensagens follow-up repetidas (mesma msg várias vezes)
+- [ ] Adicionar botão de voltar no chat mobile
+
+## Correção: Mensagens do WhatsApp não aparecem no CRM
+- [x] Webhook: extração completa de conteúdo para TODOS os tipos de mensagem Z-API (texto, imagem, áudio, vídeo, documento, sticker, localização, contato, botões, templates, enquetes, carrossel, produto, pedido)
+- [x] Webhook: detecção correta de messageType para cada formato de payload
+- [x] Webhook: skip automático de notificações do sistema, reações, votos de enquete e newsletters
+- [x] Webhook: deduplicação melhorada de mensagens outbound (AI + CRM) com janela de 2 min e match por zapiMessageId
+- [x] Chat: exibição de placeholder para mensagens de mídia sem texto (áudio, sticker, localização, contato, enquete, etc.)
+- [x] Chat: aplicado tanto no CrmChat quanto no CrmCommandCenter
+- [x] Botão de voltar sempre visível no chat (não apenas no mobile)

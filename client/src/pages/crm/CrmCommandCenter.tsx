@@ -470,7 +470,23 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
                       <p className="text-[10px] font-semibold text-[#53bdeb] mb-1">{msg.senderName || "Cliente"}</p>
                     )}
                     <ChatMediaRenderer msg={msg} />
-                    {msg.content && msg.content !== "NULL" && <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
+                     {msg.content && msg.content !== "NULL" && msg.content.trim() !== "" ? (
+                       <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                     ) : !msg.mediaUrl && msg.messageType !== "text" ? (
+                       <p className="text-[12px] italic opacity-60">
+                         {msg.messageType === "ptt" || msg.messageType === "audio" ? "🎤 Mensagem de voz" :
+                          msg.messageType === "sticker" ? "Figurinha" :
+                          msg.messageType === "location" ? "📍 Localização" :
+                          msg.messageType === "contact" ? "👤 Contato compartilhado" :
+                          msg.messageType === "poll" ? "📊 Enquete" :
+                          msg.messageType === "product" ? "🛒 Produto" :
+                          msg.messageType === "order" ? "📦 Pedido" :
+                          msg.messageType === "document" ? "📄 Documento" :
+                          msg.messageType === "image" ? "📷 Imagem" :
+                          msg.messageType === "video" ? "🎥 Vídeo" :
+                          null}
+                       </p>
+                     ) : null}
                     <div className="flex items-center justify-end gap-1 mt-1">
                       <span className="text-[10px] opacity-60">{formatChatTime(msg.timestamp)}</span>
                       {msg.direction === "outbound" && <span className="text-[10px] opacity-60">\u2713\u2713</span>}
