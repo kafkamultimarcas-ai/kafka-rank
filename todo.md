@@ -1418,3 +1418,6 @@
 - [x] Promover gerente atual no banco de dados
 - [x] Gerente ter acesso a aprovar vendas, consignação, fichas, editar registros
 - [x] Auditoria: toda alteração pelo gerente registra "Alterado por [nome]"
+
+## IA Toggle Visual no Chat
+- [x] Botão de IA no chat do lead com visual claro de ativado/desativado (cor verde/cinza, texto indicativo)
