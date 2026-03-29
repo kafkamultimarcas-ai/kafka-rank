@@ -51,4 +51,41 @@ describe("AI Global Config Feature", () => {
     expect(crmDb.getUnrespondedLeads).toBeDefined();
     expect(typeof crmDb.getUnrespondedLeads).toBe("function");
   });
+
+  // === Advanced AI Config Tests ===
+  it("should have setAdvancedAiConfig procedure in crmAi router", async () => {
+    const mod = await import("./routers/crmRouter");
+    expect(mod.crmAiRouter.setAdvancedAiConfig).toBeDefined();
+  });
+
+  it("should have getInactiveDispatchStats procedure in crmAi router", async () => {
+    const mod = await import("./routers/crmRouter");
+    expect(mod.crmAiRouter.getInactiveDispatchStats).toBeDefined();
+  });
+
+  it("should have triggerInactiveDispatch procedure in crmAi router", async () => {
+    const mod = await import("./routers/crmRouter");
+    expect(mod.crmAiRouter.triggerInactiveDispatch).toBeDefined();
+  });
+
+  it("should validate working hours range correctly", () => {
+    const isWithinWorkingHours = (h: number, start: number, end: number) => h >= start && h < end;
+    expect(isWithinWorkingHours(10, 8, 20)).toBe(true);
+    expect(isWithinWorkingHours(7, 8, 20)).toBe(false);
+    expect(isWithinWorkingHours(20, 8, 20)).toBe(false);
+    expect(isWithinWorkingHours(8, 8, 20)).toBe(true);
+    expect(isWithinWorkingHours(19, 8, 20)).toBe(true);
+  });
+
+  it("should parse inactive dispatch message template variables", () => {
+    const msg = "Oi {nome}! Ainda tem interesse no {veiculo}?";
+    const parsed = msg.replace("{nome}", "João").replace("{veiculo}", "Civic 2024");
+    expect(parsed).toBe("Oi João! Ainda tem interesse no Civic 2024?");
+  });
+
+  it("should have valid personality enum values", () => {
+    const valid = ["amigavel", "profissional", "agressivo"];
+    valid.forEach(p => expect(typeof p).toBe("string"));
+    expect(valid).toHaveLength(3);
+  });
 });

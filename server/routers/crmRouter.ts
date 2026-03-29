@@ -970,25 +970,44 @@ ${chatHistory || "(Primeira mensagem)"}`;
     return { success: true };
   }),
 
-  // Get global AI mode config
+  // Get global AI mode config (with advanced settings)
   getGlobalAiConfig: publicProcedure.query(async () => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
-    if (!dbConn) return { aiMode: 'normal', feiraoConfig: null, normalConfig: null };
+    const defaults = {
+      aiMode: 'normal' as string, feiraoConfig: null as any, normalConfig: null as any,
+      autoReplyEnabled: false, workingHoursEnabled: false, workingHoursStart: 8, workingHoursEnd: 20,
+      maxMessagesEnabled: false, maxMessagesPerLead: 10, personality: 'amigavel' as string,
+      inactiveDispatchEnabled: false, inactiveDispatchHours: 1, inactiveDispatchMessage: '' as string,
+      inactiveDispatchMaxPerDay: 1,
+    };
+    if (!dbConn) return defaults;
     try {
       const { sql } = await import("drizzle-orm");
-      const result = await dbConn.execute(sql`SELECT aiMode, feiraoConfig, normalConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
       const rows = result as any;
       if (rows && rows.length > 0) {
+        const r = rows[0];
         return {
-          aiMode: rows[0].aiMode || 'normal',
-          feiraoConfig: rows[0].feiraoConfig ? JSON.parse(rows[0].feiraoConfig) : null,
-          normalConfig: rows[0].normalConfig ? JSON.parse(rows[0].normalConfig) : null,
+          aiMode: r.aiMode || 'normal',
+          feiraoConfig: r.feiraoConfig ? JSON.parse(r.feiraoConfig) : null,
+          normalConfig: r.normalConfig ? JSON.parse(r.normalConfig) : null,
+          autoReplyEnabled: !!r.autoReplyEnabled,
+          workingHoursEnabled: !!r.workingHoursEnabled,
+          workingHoursStart: r.workingHoursStart ?? 8,
+          workingHoursEnd: r.workingHoursEnd ?? 20,
+          maxMessagesEnabled: !!r.maxMessagesEnabled,
+          maxMessagesPerLead: r.maxMessagesPerLead ?? 10,
+          personality: r.personality || 'amigavel',
+          inactiveDispatchEnabled: !!r.inactiveDispatchEnabled,
+          inactiveDispatchHours: r.inactiveDispatchHours ?? 1,
+          inactiveDispatchMessage: r.inactiveDispatchMessage || '',
+          inactiveDispatchMaxPerDay: r.inactiveDispatchMaxPerDay ?? 1,
         };
       }
-      return { aiMode: 'normal', feiraoConfig: null, normalConfig: null };
+      return defaults;
     } catch {
-      return { aiMode: 'normal', feiraoConfig: null, normalConfig: null };
+      return defaults;
     }
   }),
 
@@ -1014,6 +1033,73 @@ ${chatHistory || "(Primeira mensagem)"}`;
     const now = Date.now();
     await dbConn.execute(sql`UPDATE crm_ai_global_config SET aiMode = ${input.aiMode}, feiraoConfig = ${feiraoJson}, normalConfig = ${normalJson}, updatedAt = ${now} WHERE id = 1`);
     return { success: true };
+  }),
+
+  // Set advanced AI settings
+  setAdvancedAiConfig: protectedProcedure.input(z.object({
+    autoReplyEnabled: z.boolean().optional(),
+    workingHoursEnabled: z.boolean().optional(),
+    workingHoursStart: z.number().min(0).max(23).optional(),
+    workingHoursEnd: z.number().min(0).max(23).optional(),
+    maxMessagesEnabled: z.boolean().optional(),
+    maxMessagesPerLead: z.number().min(1).max(100).optional(),
+    personality: z.enum(['amigavel', 'profissional', 'agressivo']).optional(),
+    inactiveDispatchEnabled: z.boolean().optional(),
+    inactiveDispatchHours: z.number().min(1).max(72).optional(),
+    inactiveDispatchMessage: z.string().optional(),
+    inactiveDispatchMaxPerDay: z.number().min(1).max(5).optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    const now = Date.now();
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
+      autoReplyEnabled = ${input.autoReplyEnabled !== undefined ? (input.autoReplyEnabled ? 1 : 0) : sql`autoReplyEnabled`},
+      workingHoursEnabled = ${input.workingHoursEnabled !== undefined ? (input.workingHoursEnabled ? 1 : 0) : sql`workingHoursEnabled`},
+      workingHoursStart = ${input.workingHoursStart !== undefined ? input.workingHoursStart : sql`workingHoursStart`},
+      workingHoursEnd = ${input.workingHoursEnd !== undefined ? input.workingHoursEnd : sql`workingHoursEnd`},
+      maxMessagesEnabled = ${input.maxMessagesEnabled !== undefined ? (input.maxMessagesEnabled ? 1 : 0) : sql`maxMessagesEnabled`},
+      maxMessagesPerLead = ${input.maxMessagesPerLead !== undefined ? input.maxMessagesPerLead : sql`maxMessagesPerLead`},
+      personality = ${input.personality !== undefined ? input.personality : sql`personality`},
+      inactiveDispatchEnabled = ${input.inactiveDispatchEnabled !== undefined ? (input.inactiveDispatchEnabled ? 1 : 0) : sql`inactiveDispatchEnabled`},
+      inactiveDispatchHours = ${input.inactiveDispatchHours !== undefined ? input.inactiveDispatchHours : sql`inactiveDispatchHours`},
+      inactiveDispatchMessage = ${input.inactiveDispatchMessage !== undefined ? input.inactiveDispatchMessage : sql`inactiveDispatchMessage`},
+      inactiveDispatchMaxPerDay = ${input.inactiveDispatchMaxPerDay !== undefined ? input.inactiveDispatchMaxPerDay : sql`inactiveDispatchMaxPerDay`},
+      updatedAt = ${now}
+    WHERE id = 1`);
+    return { success: true };
+  }),
+
+  // Get inactive dispatch stats
+  getInactiveDispatchStats: publicProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { todayCount: 0, totalCount: 0, lastRun: null as number | null };
+    try {
+      const { sql } = await import("drizzle-orm");
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const todayResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log WHERE sentAt >= ${todayStart.getTime()}`);
+      const totalResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log`);
+      const configResult = await dbConn.execute(sql`SELECT inactiveDispatchLastRun FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const todayRows = todayResult as any;
+      const totalRows = totalResult as any;
+      const cfgRows = configResult as any;
+      return {
+        todayCount: Number(todayRows?.[0]?.cnt || 0),
+        totalCount: Number(totalRows?.[0]?.cnt || 0),
+        lastRun: cfgRows?.[0]?.inactiveDispatchLastRun ? Number(cfgRows[0].inactiveDispatchLastRun) : null,
+      };
+    } catch {
+      return { todayCount: 0, totalCount: 0, lastRun: null as number | null };
+    }
+  }),
+
+  // Manual trigger inactive dispatch
+  triggerInactiveDispatch: protectedProcedure.mutation(async () => {
+    const { runInactiveDispatch } = await import("../inactive-dispatch");
+    const result = await runInactiveDispatch();
+    return result;
   }),
 });
 

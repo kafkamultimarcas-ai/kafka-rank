@@ -978,68 +978,100 @@ export function registerWebhookRoutes(app: Express) {
 
           // AI Auto-reply: check if enabled for this lead (only for inbound text messages)
           if (!fromMe && messageText && messageType === "text") {
-            try {
-              const dbConn = await getDb();
-              if (dbConn) {
+            (async () => {
+              try {
+                const dbConn = await getDb();
+                if (!dbConn) return;
+
+                // Check global AI toggle
+                const globalCheck = await dbConn.execute(sql`SELECT autoReplyEnabled, workingHoursEnabled, workingHoursStart, workingHoursEnd, maxMessagesEnabled, maxMessagesPerLead, personality FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+                const globalRows = globalCheck as any;
+                const globalCfg = globalRows?.[0];
+                if (!globalCfg || !globalCfg.autoReplyEnabled) return; // Global AI disabled
+
+                // Check working hours
+                if (globalCfg.workingHoursEnabled) {
+                  const currentHour = new Date().getHours();
+                  if (currentHour < (globalCfg.workingHoursStart ?? 8) || currentHour >= (globalCfg.workingHoursEnd ?? 20)) {
+                    console.log(`[AI Auto-Reply] Outside working hours (${globalCfg.workingHoursStart}-${globalCfg.workingHoursEnd}), skipping`);
+                    return;
+                  }
+                }
+
+                // Check per-lead AI setting
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
                 const aiRows = aiResult as any;
-                if (aiRows && aiRows.length > 0 && aiRows[0].enabled) {
-                  // AI auto-reply is enabled - generate and send response asynchronously
-                  const leadForAi = existingLeads[0];
-                  setImmediate(async () => {
-                    try {
-                      // Fetch global AI mode config
-                      let globalAiMode = 'normal';
-                      let feiraoCtx = '';
-                      try {
-                        const globalCfg = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-                        const cfgRows = globalCfg as any;
-                        if (cfgRows && cfgRows.length > 0) {
-                          globalAiMode = cfgRows[0].aiMode || 'normal';
-                          if (globalAiMode === 'feirao' && cfgRows[0].feiraoConfig) {
-                            const fc = JSON.parse(cfgRows[0].feiraoConfig);
-                            feiraoCtx = `\n\n=== MODO FEIR\u00c3O ATIVO ===\n`;
-                            if (fc.beneficios) feiraoCtx += `Benef\u00edcios: ${fc.beneficios}\n`;
-                            if (fc.promocoes) feiraoCtx += `Promo\u00e7\u00f5es: ${fc.promocoes}\n`;
-                            if (fc.objetivo) feiraoCtx += `Objetivo: ${fc.objetivo}\n`;
-                            if (fc.instrucoes) feiraoCtx += `Instru\u00e7\u00f5es: ${fc.instrucoes}\n`;
-                            feiraoCtx += `IMPORTANTE: Voc\u00ea DEVE mencionar o feir\u00e3o e os benef\u00edcios. Tente AGENDAR o cliente para visitar a loja. Crie urg\u00eancia!`;
-                          }
-                        }
-                      } catch { /* ignore */ }
+                if (!aiRows || aiRows.length === 0 || !aiRows[0].enabled) return;
 
-                      const recentMsgs = await crmDb.listMessagesByLead(leadForAi.id, 20);
-                      let vehicleCtx = "";
-                      if (leadForAi.vehicleInterest) {
-                        const search = `%${leadForAi.vehicleInterest}%`;
-                        const vehicles = await dbConn.select().from(inventoryVehicles)
-                          .where(and(eq(inventoryVehicles.status, "available"), or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))))
-                          .limit(5);
-                        if (vehicles.length > 0) {
-                          vehicleCtx = "\nVE\u00cdCULOS DISPON\u00cdVEIS:\n" + vehicles.map(v => `- ${v.brand} ${v.model} ${v.year || ""} | R$ ${v.price?.toLocaleString("pt-BR") || "N/A"} | ${v.km?.toLocaleString("pt-BR") || "0"} km | ${v.color || ""}`).join("\n");
-                        }
-                      }
-                      const chatHist = recentMsgs.slice(-15).map(m => {
-                        const r = m.direction === "inbound" ? "CLIENTE" : "VENDEDOR";
-                        return `${r}: ${m.content || "[M\u00eddia]"}`;
-                      }).join("\n");
-                      const sysPrompt = `Voc\u00ea \u00e9 vendedor da Kafka Multimarcas respondendo pelo WhatsApp.\n\nREGRAS:\n- M\u00c1XIMO 2-3 linhas (como mensagem real de WhatsApp)\n- Linguagem natural e informal, como amigo\n- SEM formata\u00e7\u00e3o (sem negrito, asteriscos, markdown)\n- M\u00e1ximo 1 emoji (ou nenhum)\n- NUNCA invente dados de ve\u00edculos\n- Foque em UMA coisa: ou pergunta, ou resposta, ou convite pra visita\n- Chame pelo primeiro nome quando poss\u00edvel${feiraoCtx}\n\nLEAD: ${leadForAi.name} | Interesse: ${leadForAi.vehicleInterest || "N/A"} | Score: ${leadForAi.score}${vehicleCtx}\n\nCONVERSA:\n${chatHist}`;
-                      const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Gere a pr\u00f3xima mensagem do vendedor. M\u00e1ximo 2-3 linhas curtas. Apenas o texto, sem prefixos." }] });
-                      const aiText = ((aiResp.choices?.[0]?.message?.content as string) || "").trim();
-                      if (aiText && phone) {
-                        await zapi.sendText(phone, aiText);
-                        await crmDb.createMessage({ leadId: leadForAi.id, phone, direction: "outbound", messageType: "text", content: aiText, mediaUrl: null, senderName: "IA Kafka", sentBy: null, zapiMessageId: null, timestamp: Date.now() });
-                        console.log(`[AI Auto-Reply] Sent to lead #${leadForAi.id} (${phone}): ${aiText.substring(0, 50)}...`);
-                      }
-                    } catch (aiErr: any) {
-                      console.error(`[AI Auto-Reply] Error for lead #${leadForAi.id}:`, aiErr.message);
-                    }
-                  });
+                // Check message limit per lead
+                if (globalCfg.maxMessagesEnabled && globalCfg.maxMessagesPerLead) {
+                  const countResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_messages WHERE leadId = ${existingLeads[0].id} AND direction = 'outbound' AND senderName = 'IA Kafka'`);
+                  const countRows = countResult as any;
+                  if (Number(countRows?.[0]?.cnt || 0) >= globalCfg.maxMessagesPerLead) {
+                    console.log(`[AI Auto-Reply] Lead #${existingLeads[0].id} hit message limit (${globalCfg.maxMessagesPerLead}), skipping`);
+                    return;
+                  }
                 }
+
+                // All checks passed - generate and send AI reply
+                const leadForAi = existingLeads[0];
+                const aiPersonality = globalCfg.personality || 'amigavel';
+
+                // Fetch AI mode config
+                let globalAiMode = 'normal';
+                let feiraoCtx = '';
+                try {
+                  const modeCfg = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+                  const modeRows = modeCfg as any;
+                  if (modeRows && modeRows.length > 0) {
+                    globalAiMode = modeRows[0].aiMode || 'normal';
+                    if (globalAiMode === 'feirao' && modeRows[0].feiraoConfig) {
+                      const fc = JSON.parse(modeRows[0].feiraoConfig);
+                      feiraoCtx = `\n\n=== MODO FEIR\u00c3O ATIVO ===\n`;
+                      if (fc.beneficios) feiraoCtx += `Benef\u00edcios: ${fc.beneficios}\n`;
+                      if (fc.promocoes) feiraoCtx += `Promo\u00e7\u00f5es: ${fc.promocoes}\n`;
+                      if (fc.objetivo) feiraoCtx += `Objetivo: ${fc.objetivo}\n`;
+                      if (fc.instrucoes) feiraoCtx += `Instru\u00e7\u00f5es: ${fc.instrucoes}\n`;
+                      feiraoCtx += `IMPORTANTE: Voc\u00ea DEVE mencionar o feir\u00e3o e os benef\u00edcios. Tente AGENDAR o cliente para visitar a loja. Crie urg\u00eancia!`;
+                    }
+                  }
+                } catch { /* ignore */ }
+
+                // Personality instructions
+                const personalityMap: Record<string, string> = {
+                  amigavel: 'Linguagem natural e informal, como amigo',
+                  profissional: 'Linguagem profissional e educada, direta ao ponto',
+                  agressivo: 'Linguagem persuasiva com urgência, foque em escassez e oportunidade',
+                };
+                const personalityInstr = personalityMap[aiPersonality] || personalityMap.amigavel;
+
+                const recentMsgs = await crmDb.listMessagesByLead(leadForAi.id, 20);
+                let vehicleCtx = "";
+                if (leadForAi.vehicleInterest) {
+                  const search = `%${leadForAi.vehicleInterest}%`;
+                  const vehicles = await dbConn.select().from(inventoryVehicles)
+                    .where(and(eq(inventoryVehicles.status, "available"), or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))))
+                    .limit(5);
+                  if (vehicles.length > 0) {
+                    vehicleCtx = "\nVE\u00cdCULOS DISPON\u00cdVEIS:\n" + vehicles.map(v => `- ${v.brand} ${v.model} ${v.year || ""} | R$ ${v.price?.toLocaleString("pt-BR") || "N/A"} | ${v.km?.toLocaleString("pt-BR") || "0"} km | ${v.color || ""}`).join("\n");
+                  }
+                }
+                const chatHist = recentMsgs.slice(-15).map(m => {
+                  const r = m.direction === "inbound" ? "CLIENTE" : "VENDEDOR";
+                  return `${r}: ${m.content || "[M\u00eddia]"}`;
+                }).join("\n");
+                const sysPrompt = `Voc\u00ea \u00e9 vendedor da Kafka Multimarcas respondendo pelo WhatsApp.\n\nREGRAS:\n- M\u00c1XIMO 2-3 linhas (como mensagem real de WhatsApp)\n- ${personalityInstr}\n- SEM formata\u00e7\u00e3o (sem negrito, asteriscos, markdown)\n- M\u00e1ximo 1 emoji (ou nenhum)\n- NUNCA invente dados de ve\u00edculos\n- Foque em UMA coisa: ou pergunta, ou resposta, ou convite pra visita\n- Chame pelo primeiro nome quando poss\u00edvel${feiraoCtx}\n\nLEAD: ${leadForAi.name} | Interesse: ${leadForAi.vehicleInterest || "N/A"} | Score: ${leadForAi.score}${vehicleCtx}\n\nCONVERSA:\n${chatHist}`;
+                const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Gere a pr\u00f3xima mensagem do vendedor. M\u00e1ximo 2-3 linhas curtas. Apenas o texto, sem prefixos." }] });
+                const aiText = ((aiResp.choices?.[0]?.message?.content as string) || "").trim();
+                if (aiText && phone) {
+                  await zapi.sendText(phone, aiText);
+                  await crmDb.createMessage({ leadId: leadForAi.id, phone, direction: "outbound", messageType: "text", content: aiText, mediaUrl: null, senderName: "IA Kafka", sentBy: null, zapiMessageId: null, timestamp: Date.now() });
+                  console.log(`[AI Auto-Reply] Sent to lead #${leadForAi.id} (${phone}): ${aiText.substring(0, 50)}...`);
+                }
+              } catch (aiErr: any) {
+                console.error(`[AI Auto-Reply] Error:`, aiErr.message);
               }
-            } catch (aiCheckErr) {
-              // Silently fail AI check - don't block message saving
-            }
+            })();
           }
 
           res.json({ success: true, action: "message_saved", leadId: existingLeads[0].id });

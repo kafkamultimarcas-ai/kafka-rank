@@ -13,7 +13,7 @@ import {
   Package, DollarSign, Shield, Menu, X, Bell, Wallet, Receipt, Camera,
   AlertTriangle, Clock, Check, ArrowUpRight, ArrowDownRight, FileText,
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
-  CheckCircle, XCircle, Filter, Plus, Zap
+  CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2
 } from "lucide-react";
 
 const DEPT_LABELS: Record<string, string> = {
@@ -1523,6 +1523,9 @@ function SettingsView() {
       {/* AI Mode Configuration */}
       <AiModeConfig />
 
+      {/* Advanced AI Configuration */}
+      <AdvancedAiConfig />
+
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-2">Integrações</h3>
         <div className="space-y-2">
@@ -1723,6 +1726,269 @@ function IntegrationItem({ name, status, description }: { name: string; status: 
       <span className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${status === "ativo" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
         {status}
       </span>
+    </div>
+  );
+}
+
+// ===== ADVANCED AI CONFIGURATION =====
+function AdvancedAiConfig() {
+  const { data: config, refetch } = trpc.crmAi.getGlobalAiConfig.useQuery();
+  const { data: stats, refetch: refetchStats } = trpc.crmAi.getInactiveDispatchStats.useQuery();
+  const setAdvanced = trpc.crmAi.setAdvancedAiConfig.useMutation({
+    onSuccess: () => { toast.success("Configuração avançada salva!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const triggerDispatch = trpc.crmAi.triggerInactiveDispatch.useMutation({
+    onSuccess: (data) => { toast.success(`Disparo concluído: ${data.sent} enviados, ${data.skipped} ignorados`); refetchStats(); },
+    onError: (e: any) => toast.error("Erro no disparo: " + e.message),
+  });
+
+  const [autoReply, setAutoReply] = useState(false);
+  const [workingHoursEnabled, setWorkingHoursEnabled] = useState(false);
+  const [workingHoursStart, setWorkingHoursStart] = useState(8);
+  const [workingHoursEnd, setWorkingHoursEnd] = useState(20);
+  const [maxMsgEnabled, setMaxMsgEnabled] = useState(false);
+  const [maxMsgPerLead, setMaxMsgPerLead] = useState(10);
+  const [personality, setPersonality] = useState('amigavel');
+  const [inactiveEnabled, setInactiveEnabled] = useState(false);
+  const [inactiveHours, setInactiveHours] = useState(1);
+  const [inactiveMsg, setInactiveMsg] = useState('');
+  const [inactiveMaxPerDay, setInactiveMaxPerDay] = useState(1);
+  const [initialized, setInitialized] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  if (config && !initialized) {
+    setAutoReply(config.autoReplyEnabled);
+    setWorkingHoursEnabled(config.workingHoursEnabled);
+    setWorkingHoursStart(config.workingHoursStart);
+    setWorkingHoursEnd(config.workingHoursEnd);
+    setMaxMsgEnabled(config.maxMessagesEnabled);
+    setMaxMsgPerLead(config.maxMessagesPerLead);
+    setPersonality(config.personality);
+    setInactiveEnabled(config.inactiveDispatchEnabled);
+    setInactiveHours(config.inactiveDispatchHours);
+    setInactiveMsg(config.inactiveDispatchMessage);
+    setInactiveMaxPerDay(config.inactiveDispatchMaxPerDay);
+    setInitialized(true);
+  }
+
+  const handleSave = () => {
+    setAdvanced.mutate({
+      autoReplyEnabled: autoReply,
+      workingHoursEnabled,
+      workingHoursStart,
+      workingHoursEnd,
+      maxMessagesEnabled: maxMsgEnabled,
+      maxMessagesPerLead: maxMsgPerLead,
+      personality: personality as 'amigavel' | 'profissional' | 'agressivo',
+      inactiveDispatchEnabled: inactiveEnabled,
+      inactiveDispatchHours: inactiveHours,
+      inactiveDispatchMessage: inactiveMsg,
+      inactiveDispatchMaxPerDay: inactiveMaxPerDay,
+    });
+  };
+
+  const Toggle = ({ checked, onChange, label, desc }: { checked: boolean; onChange: (v: boolean) => void; label: string; desc?: string }) => (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border">
+      <div className="flex-1 mr-3">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {desc && <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${checked ? 'bg-green-500' : 'bg-muted'}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+          <Bot className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-foreground">Controle da IA</h3>
+          <p className="text-[10px] text-muted-foreground">Ative/desative e configure o comportamento</p>
+        </div>
+        <button onClick={() => setShowAdvanced(!showAdvanced)} className="text-xs text-primary underline">
+          {showAdvanced ? 'Menos' : 'Avançado'}
+        </button>
+      </div>
+
+      {/* Main toggle - always visible */}
+      <div className="space-y-2">
+        <Toggle
+          checked={autoReply}
+          onChange={setAutoReply}
+          label="IA Responder Sozinha"
+          desc="Quando LIGADO, a IA responde automaticamente os leads que tiverem IA ativada individualmente"
+        />
+
+        {/* Status indicator */}
+        <div className={`p-2 rounded-lg border text-center text-xs font-bold ${autoReply ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+          {autoReply ? <><Power className="w-3 h-3 inline mr-1" /> IA ATIVA - respondendo leads automaticamente</> : <><Power className="w-3 h-3 inline mr-1" /> IA DESATIVADA - nenhuma resposta automática</>}
+        </div>
+      </div>
+
+      {showAdvanced && (
+        <div className="mt-4 space-y-3 border-t border-border pt-4">
+          {/* Personality */}
+          <div>
+            <label className="text-xs font-medium text-foreground mb-2 block">Personalidade da IA</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { key: 'amigavel', label: 'Amigável', icon: '😊', desc: 'Informal e simpática' },
+                { key: 'profissional', label: 'Profissional', icon: '👔', desc: 'Educada e direta' },
+                { key: 'agressivo', label: 'Agressivo', icon: '🔥', desc: 'Persuasiva e urgente' },
+              ].map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setPersonality(p.key)}
+                  className={`p-2 rounded-lg border-2 text-center transition-all ${
+                    personality === p.key
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-accent/30 hover:bg-accent/50'
+                  }`}
+                >
+                  <span className="text-lg">{p.icon}</span>
+                  <p className={`text-[11px] font-bold mt-1 ${personality === p.key ? 'text-primary' : 'text-foreground'}`}>{p.label}</p>
+                  <p className="text-[9px] text-muted-foreground">{p.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Working Hours */}
+          <Toggle
+            checked={workingHoursEnabled}
+            onChange={setWorkingHoursEnabled}
+            label="Horário de Funcionamento"
+            desc="IA só responde dentro do horário definido"
+          />
+          {workingHoursEnabled && (
+            <div className="flex items-center gap-2 px-3">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <select value={workingHoursStart} onChange={e => setWorkingHoursStart(Number(e.target.value))} className="bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground">
+                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}
+              </select>
+              <span className="text-xs text-muted-foreground">até</span>
+              <select value={workingHoursEnd} onChange={e => setWorkingHoursEnd(Number(e.target.value))} className="bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground">
+                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Message Limit */}
+          <Toggle
+            checked={maxMsgEnabled}
+            onChange={setMaxMsgEnabled}
+            label="Limite de Mensagens por Lead"
+            desc="Limita quantas mensagens a IA pode enviar para cada lead"
+          />
+          {maxMsgEnabled && (
+            <div className="flex items-center gap-2 px-3">
+              <MessageCircle className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Máximo:</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={maxMsgPerLead}
+                onChange={e => setMaxMsgPerLead(Number(e.target.value))}
+                className="w-16 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center"
+              />
+              <span className="text-xs text-muted-foreground">mensagens</span>
+            </div>
+          )}
+
+          {/* Inactive Dispatch */}
+          <div className="border-t border-border pt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Send className="w-4 h-4 text-amber-400" />
+              <h4 className="text-xs font-bold text-foreground">Disparo para Inativos</h4>
+            </div>
+            <Toggle
+              checked={inactiveEnabled}
+              onChange={setInactiveEnabled}
+              label="Reativar Clientes Inativos"
+              desc="Envia mensagem para leads que não responderam há X horas"
+            />
+            {inactiveEnabled && (
+              <div className="mt-2 space-y-2 px-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Após</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={72}
+                    value={inactiveHours}
+                    onChange={e => setInactiveHours(Number(e.target.value))}
+                    className="w-14 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">horas sem resposta</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Máx.</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={inactiveMaxPerDay}
+                    onChange={e => setInactiveMaxPerDay(Number(e.target.value))}
+                    className="w-14 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">disparo(s) por dia/lead</span>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-1 block">Mensagem personalizada (opcional - se vazio, IA gera automaticamente)</label>
+                  <textarea
+                    value={inactiveMsg}
+                    onChange={e => setInactiveMsg(e.target.value)}
+                    placeholder="Oi {nome}! Ainda tem interesse no {veiculo}? Posso te ajudar com algo?"
+                    className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    rows={2}
+                  />
+                  <p className="text-[9px] text-muted-foreground mt-1">Use {'{nome}'}, {'{veiculo}'}, {'{nome_completo}'} como variáveis</p>
+                </div>
+                {stats && (
+                  <div className="p-2 rounded-lg bg-accent/30 border border-border">
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Enviados hoje: <strong className="text-foreground">{stats.todayCount}</strong></span>
+                      <span>Total: <strong className="text-foreground">{stats.totalCount}</strong></span>
+                    </div>
+                    {stats.lastRun && (
+                      <p className="text-[9px] text-muted-foreground mt-1">Último disparo: {new Date(stats.lastRun).toLocaleString('pt-BR')}</p>
+                    )}
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs gap-1"
+                  onClick={() => triggerDispatch.mutate()}
+                  disabled={triggerDispatch.isPending}
+                >
+                  <Send className="w-3 h-3" />
+                  {triggerDispatch.isPending ? 'Disparando...' : 'Disparar Agora (Manual)'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <Button
+        onClick={handleSave}
+        disabled={setAdvanced.isPending}
+        className="w-full mt-4 racing-gradient text-white font-bold"
+      >
+        {setAdvanced.isPending ? 'Salvando...' : 'Salvar Configurações da IA'}
+      </Button>
     </div>
   );
 }

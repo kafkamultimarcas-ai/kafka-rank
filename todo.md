@@ -1384,3 +1384,13 @@
 - [x] Chat: exibição de placeholder para mensagens de mídia sem texto (áudio, sticker, localização, contato, enquete, etc.)
 - [x] Chat: aplicado tanto no CrmChat quanto no CrmCommandCenter
 - [x] Botão de voltar sempre visível no chat (não apenas no mobile)
+
+## Configuração Avançada da IA
+- [x] Toggle global: IA responder sozinha (ligar/desligar auto-resposta)
+- [x] Disparo automático para clientes inativos (configurável: X horas sem resposta)
+- [x] Controle para não duplicar mensagem de disparo (1 disparo por lead por ciclo)
+- [x] Horário de funcionamento da IA (ex: 8h-20h)
+- [x] Limite de mensagens da IA por lead (ex: máx 5 mensagens automáticas)
+- [x] Tom/personalidade da IA (amigável, profissional, agressivo vendas)
+- [x] Mensagem customizada para disparo de inativos
+- [x] Painel visual avançado na página de Configurações
