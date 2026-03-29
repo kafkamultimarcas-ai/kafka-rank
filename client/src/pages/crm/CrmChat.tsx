@@ -865,6 +865,31 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
             </div>
           )}
 
+          {/* AI Auto-reply toggle - above input */}
+          <div className="border-t border-border bg-card/95 flex items-center justify-between px-3 py-1.5">
+            <div className="flex items-center gap-2">
+              <Zap className={`w-3.5 h-3.5 ${autoReplyData?.enabled ? 'text-green-400' : 'text-gray-500'}`} />
+              <span className={`text-xs font-medium ${autoReplyData?.enabled ? 'text-green-400' : 'text-gray-500'}`}>
+                {autoReplyData?.enabled ? '⚡ IA Ativada' : 'IA Desativada'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setAutoReplyMut.mutate({ leadId, enabled: !autoReplyData?.enabled }); }}
+              className={`relative w-11 h-6 rounded-full transition-all duration-300 cursor-pointer border-2 shrink-0 ${
+                autoReplyData?.enabled 
+                  ? 'bg-green-500 border-green-400 shadow-[0_0_8px_rgba(34,197,94,0.4)]' 
+                  : 'bg-gray-700 border-gray-600'
+              }`}
+            >
+              <div className={`absolute top-0.5 w-5 h-5 rounded-full shadow-md transition-transform duration-300 pointer-events-none ${
+                autoReplyData?.enabled 
+                  ? 'translate-x-5 bg-white' 
+                  : 'translate-x-0.5 bg-gray-400'
+              }`} />
+            </button>
+          </div>
+
           {/* Message input */}
           <div className="border-t border-border bg-card p-3">
             {uploading && (
@@ -929,7 +954,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                       <Zap className="w-5 h-5 text-white" />
                     )}
                   </button>
-                  <div className="flex-1 relative">
+                  <div className="flex-1 relative min-w-0">
                     <textarea
                       value={message}
                       onChange={e => setMessage(e.target.value)}
@@ -959,30 +984,6 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                   )}
                 </>
               )}
-            </div>
-            {/* AI Auto-reply toggle */}
-            <div className="flex items-center justify-between px-4 py-2 border-t border-border/50">
-              <div className="flex items-center gap-2">
-                <Zap className={`w-4 h-4 ${autoReplyData?.enabled ? 'text-green-400' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${autoReplyData?.enabled ? 'text-green-400' : 'text-gray-500'}`}>
-                  {autoReplyData?.enabled ? '⚡ IA Ativada' : 'IA Desativada'}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAutoReplyMut.mutate({ leadId, enabled: !autoReplyData?.enabled }); }}
-                className={`relative w-11 h-6 rounded-full transition-all duration-300 cursor-pointer z-10 border-2 ${
-                  autoReplyData?.enabled 
-                    ? 'bg-green-500 border-green-400 shadow-[0_0_8px_rgba(34,197,94,0.4)]' 
-                    : 'bg-gray-700 border-gray-600'
-                }`}
-              >
-                <div className={`absolute top-0.5 w-5 h-5 rounded-full shadow-md transition-transform duration-300 pointer-events-none ${
-                  autoReplyData?.enabled 
-                    ? 'translate-x-5 bg-white' 
-                    : 'translate-x-0.5 bg-gray-400'
-                }`} />
-              </button>
             </div>
           </div>
         </div>

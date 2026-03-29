@@ -985,12 +985,14 @@ export function registerWebhookRoutes(app: Express) {
 
                 // Check per-lead AI setting FIRST (individual toggle)
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
-                const aiRows = aiResult as any;
+                const aiRaw = aiResult as any;
+                const aiRows = Array.isArray(aiRaw?.[0]) ? aiRaw[0] : aiRaw;
                 if (!aiRows || aiRows.length === 0 || !aiRows[0].enabled) return;
 
                 // Load global config for working hours, limits, personality (but NOT as master switch)
                 const globalCheck = await dbConn.execute(sql`SELECT autoReplyEnabled, workingHoursEnabled, workingHoursStart, workingHoursEnd, maxMessagesEnabled, maxMessagesPerLead, personality FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-                const globalRows = globalCheck as any;
+                const globalRaw = globalCheck as any;
+                const globalRows = Array.isArray(globalRaw?.[0]) ? globalRaw[0] : globalRaw;
                 const globalCfg = globalRows?.[0] || {};
 
                 // Check working hours (only if enabled)
@@ -1005,7 +1007,8 @@ export function registerWebhookRoutes(app: Express) {
                 // Check message limit per lead
                 if (globalCfg.maxMessagesEnabled && globalCfg.maxMessagesPerLead) {
                   const countResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_messages WHERE leadId = ${existingLeads[0].id} AND direction = 'outbound' AND senderName = 'IA Kafka'`);
-                  const countRows = countResult as any;
+                  const countRaw = countResult as any;
+                  const countRows = Array.isArray(countRaw?.[0]) ? countRaw[0] : countRaw;
                   if (Number(countRows?.[0]?.cnt || 0) >= globalCfg.maxMessagesPerLead) {
                     console.log(`[AI Auto-Reply] Lead #${existingLeads[0].id} hit message limit (${globalCfg.maxMessagesPerLead}), skipping`);
                     return;
@@ -1021,7 +1024,8 @@ export function registerWebhookRoutes(app: Express) {
                 let feiraoCtx = '';
                 try {
                   const modeCfg = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-                  const modeRows = modeCfg as any;
+                  const modeRaw = modeCfg as any;
+                  const modeRows = Array.isArray(modeRaw?.[0]) ? modeRaw[0] : modeRaw;
                   if (modeRows && modeRows.length > 0) {
                     globalAiMode = modeRows[0].aiMode || 'normal';
                     if (globalAiMode === 'feirao' && modeRows[0].feiraoConfig) {

@@ -893,7 +893,8 @@ export const crmAiRouter = router({
       const dbConn = await getDb();
       if (dbConn) {
         const cfgResult = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-        const cfgRows = cfgResult as any;
+        const cfgRaw = cfgResult as any;
+        const cfgRows = Array.isArray(cfgRaw?.[0]) ? cfgRaw[0] : cfgRaw;
         if (cfgRows && cfgRows.length > 0 && cfgRows[0].aiMode === 'feirao' && cfgRows[0].feiraoConfig) {
           const fc = JSON.parse(cfgRows[0].feiraoConfig);
           feiraoContext = `\n\n=== MODO FEIRÃO ATIVO ===`;
@@ -949,7 +950,9 @@ ${chatHistory || "(Primeira mensagem)"}`;
     try {
       const { sql } = await import("drizzle-orm");
       const result = await dbConn.execute(sql`SELECT enabled, aiMode FROM crm_ai_settings WHERE leadId = ${input.leadId} LIMIT 1`);
-      const rows = result as any;
+      const rawRows = result as any;
+      // Drizzle execute() returns [rows, fields] for MySQL - need to unwrap
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       if (rows && rows.length > 0) return { enabled: !!rows[0].enabled, aiMode: rows[0].aiMode || 'normal' };
       return { enabled: false, aiMode: 'normal' as string };
     } catch {
@@ -985,7 +988,8 @@ ${chatHistory || "(Primeira mensagem)"}`;
     try {
       const { sql } = await import("drizzle-orm");
       const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-      const rows = result as any;
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       if (rows && rows.length > 0) {
         const r = rows[0];
         return {
@@ -1090,9 +1094,12 @@ ${chatHistory || "(Primeira mensagem)"}`;
       const todayResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log WHERE sentAt >= ${todayStart.getTime()}`);
       const totalResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log`);
       const configResult = await dbConn.execute(sql`SELECT inactiveDispatchLastRun FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-      const todayRows = todayResult as any;
-      const totalRows = totalResult as any;
-      const cfgRows = configResult as any;
+      const todayRaw = todayResult as any;
+      const totalRaw = totalResult as any;
+      const cfgRaw = configResult as any;
+      const todayRows = Array.isArray(todayRaw?.[0]) ? todayRaw[0] : todayRaw;
+      const totalRows = Array.isArray(totalRaw?.[0]) ? totalRaw[0] : totalRaw;
+      const cfgRows = Array.isArray(cfgRaw?.[0]) ? cfgRaw[0] : cfgRaw;
       return {
         todayCount: Number(todayRows?.[0]?.cnt || 0),
         totalCount: Number(totalRows?.[0]?.cnt || 0),

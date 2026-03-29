@@ -1424,3 +1424,10 @@
 
 ## Bug: Botão IA no Chat não funciona
 - [x] Botão de toggle da IA no chat do WhatsApp não está funcionando ao clicar
+
+## Bug: Toggle IA não persiste estado (getAutoReply retorna false)
+- [x] Corrigir parsing do resultado de dbConn.execute() - Drizzle retorna [rows, fields] para MySQL
+- [x] Aplicar fix em server/routers/crmRouter.ts (4 locais)
+- [x] Aplicar fix em server/webhooks.ts (4 locais)
+- [x] Aplicar fix em server/inactive-dispatch.ts (4 locais)
+- [x] Testar toggle ON/OFF e verificar persistência via API

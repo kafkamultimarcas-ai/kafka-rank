@@ -26,7 +26,8 @@ export async function runInactiveDispatch(): Promise<{ sent: number; skipped: nu
 
     // 1. Get config
     const cfgResult = await database.execute(sql`SELECT * FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
-    const cfgRows = cfgResult as any;
+    const cfgRaw = cfgResult as any;
+    const cfgRows = Array.isArray(cfgRaw?.[0]) ? cfgRaw[0] : cfgRaw;
     if (!cfgRows || cfgRows.length === 0) return result;
     const cfg = cfgRows[0];
 
@@ -62,7 +63,8 @@ export async function runInactiveDispatch(): Promise<{ sent: number; skipped: nu
         AND lastContactDate < ${cutoffTime}
         AND lastContactDate > ${cutoffTime - 72 * 60 * 60 * 1000}
     `);
-    const leads = leadsResult as any[];
+    const leadsRaw = leadsResult as any;
+    const leads = Array.isArray(leadsRaw?.[0]) ? leadsRaw[0] : leadsRaw;
     if (!leads || leads.length === 0) {
       console.log("[Inactive Dispatch] No inactive leads found.");
       await database.execute(sql`UPDATE crm_ai_global_config SET inactiveDispatchLastRun = ${Date.now()} WHERE id = 1`);
@@ -93,7 +95,8 @@ export async function runInactiveDispatch(): Promise<{ sent: number; skipped: nu
           SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log 
           WHERE leadId = ${lead.id} AND sentAt >= ${todayStart.getTime()}
         `);
-        const logRows = logResult as any;
+        const logRaw = logResult as any;
+        const logRows = Array.isArray(logRaw?.[0]) ? logRaw[0] : logRaw;
         const todayCount = Number(logRows?.[0]?.cnt || 0);
         if (todayCount >= maxPerDay) {
           result.skipped++;
@@ -105,7 +108,8 @@ export async function runInactiveDispatch(): Promise<{ sent: number; skipped: nu
           SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log 
           WHERE leadId = ${lead.id} AND sentAt >= ${cutoffTime}
         `);
-        const recentRows = recentLogResult as any;
+        const recentRaw = recentLogResult as any;
+        const recentRows = Array.isArray(recentRaw?.[0]) ? recentRaw[0] : recentRaw;
         if (Number(recentRows?.[0]?.cnt || 0) > 0) {
           result.skipped++;
           continue;
