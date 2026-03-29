@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, managerOrAdminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 
@@ -416,12 +416,12 @@ export const appRouter = router({
         linkedSdr: sdrRecordId ? { sdrRecordId, sdrSellerName } : null,
       };
     }),
-    // Listar vendas pendentes (admin)
-    listPending: adminProcedure.query(async () => {
+    // Listar vendas pendentes (admin/gerente)
+    listPending: managerOrAdminProcedure.query(async () => {
       return db.listPendingSales();
     }),
-    // Aprovar venda (admin)
-    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Aprovar venda (admin/gerente)
+    approve: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const sale = await db.approveSale(input.id);
       const seller = await db.getSellerById(sale.sellerId);
       // Auto-incrementar meta da loja
@@ -469,8 +469,8 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    // Rejeitar venda (admin)
-    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Rejeitar venda (admin/gerente)
+    reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar venda antes de rejeitar para ter os dados
       const sales = await db.listSales(undefined, undefined);
       const sale = sales.find((s: any) => s.id === input.id);
@@ -494,19 +494,24 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    // Editar venda (admin) - ajusta pontos automaticamente
-    edit: adminProcedure.input(z.object({
+    // Editar venda (admin/gerente) - ajusta pontos automaticamente
+    edit: managerOrAdminProcedure.input(z.object({
       id: z.number(),
       vehicleModel: z.string().optional(),
       value: z.number().optional(),
       sellerId: z.number().optional(),
       status: z.enum(['pending', 'approved', 'rejected']).optional(),
       leadSource: z.string().optional(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
       const oldSalesList = await db.listSales(undefined, undefined);
       const oldSale = oldSalesList.find((s: any) => s.id === id);
       const result = await db.editSale(id, data);
+      // Audit trail - registrar quem editou
+      const editorName = (ctx as any).editorName || 'Admin';
+      try {
+        await db.rawQuery(`UPDATE sales SET lastEditedBy = ?, lastEditedAt = NOW() WHERE id = ?`, [editorName, id]);
+      } catch (e) { console.error('Erro ao registrar auditoria:', e); }
       // Atualizar meta se status mudou
       if (oldSale && data.status && data.status !== oldSale.status) {
         const saleDate = new Date(oldSale.createdAt);
@@ -520,8 +525,8 @@ export const appRouter = router({
       }
       return { success: true, sale: result };
     }),
-    // Excluir venda (admin) - reverte pontos e meta se aprovada
-    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Excluir venda (admin/gerente) - reverte pontos e meta se aprovada
+    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar venda antes de deletar para decrementar meta
       const salesList = await db.listSales(undefined, undefined);
       const sale = salesList.find((s: any) => s.id === input.id);
@@ -839,10 +844,10 @@ export const appRouter = router({
       sendPushPendingRecord(seller.name, 'F&I', `Banco ${input.bankName} | ${input.returnType}`).catch(console.error);
       return { id, message: "F&I registrado! Aguardando aprovação." };
     }),
-    listPending: adminProcedure.query(async () => {
+    listPending: managerOrAdminProcedure.query(async () => {
       return db.listPendingFeiRecords();
     }),
-    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    approve: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const record = await db.approveFeiRecord(input.id);
       const seller = await db.getSellerById(record.sellerId);
       if (seller) {
@@ -862,7 +867,7 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar registro antes de rejeitar para ter os dados
       const records = await db.listFeiRecords();
       const record = records.find((r: any) => r.id === input.id);
@@ -886,7 +891,7 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteFeiRecord(input.id);
       return { success: true };
     }),
@@ -1016,10 +1021,10 @@ export const appRouter = router({
       sendPushPendingRecord(seller.name, 'Consignação', `${input.vehicleModel} | Dono: ${input.ownerName}`).catch(console.error);
       return { id, message: `Consignação registrada! Aguardando aprovação. O carro precisa ficar 7 dias no pátio para contar pontos.${warningMsg}` };
     }),
-    listPending: adminProcedure.query(async () => {
+    listPending: managerOrAdminProcedure.query(async () => {
       return db.listPendingConsignmentRecords();
     }),
-    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    approve: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
       const result = await db.approveConsignmentRecord(input.id);
       const seller = await db.getSellerById(result.sellerId);
       if (seller) {
@@ -1043,7 +1048,7 @@ export const appRouter = router({
       }
       return { success: true, isValid: result.isValid };
     }),
-    reject: adminProcedure.input(z.object({ 
+    reject: managerOrAdminProcedure.input(z.object({ 
       id: z.number(),
       reason: z.string().optional(),
     })).mutation(async ({ input }) => {
@@ -1068,13 +1073,13 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    // Excluir consignação (admin)
-    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Excluir consignação (admin/gerente)
+    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const deleted = await db.deleteConsignmentRecord(input.id);
       return { success: true, deleted };
     }),
-    // Editar consignação (admin)
-    update: adminProcedure.input(z.object({
+    // Editar consignação (admin/gerente)
+    update: managerOrAdminProcedure.input(z.object({
       id: z.number(),
       vehiclePlate: z.string().optional(),
       vehicleModel: z.string().optional(),
@@ -1092,7 +1097,7 @@ export const appRouter = router({
       return { success: true, record: updated };
     }),
     // Registrar saída do carro do pátio
-    updateExit: adminProcedure.input(z.object({
+    updateExit: managerOrAdminProcedure.input(z.object({
       id: z.number(),
       exitDate: z.number(),
     })).mutation(async ({ input }) => {
@@ -1140,10 +1145,10 @@ export const appRouter = router({
       sendPushPendingRecord(seller.name, 'Despachante', `${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`).catch(console.error);
       return { id, message: "Registro de despachante enviado! Aguardando aprovação." };
     }),
-    listPending: adminProcedure.query(async () => {
+    listPending: managerOrAdminProcedure.query(async () => {
       return db.listPendingDispatchRecords();
     }),
-    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    approve: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const record = await db.approveDispatchRecord(input.id);
       const seller = await db.getSellerById(record.sellerId);
       if (seller) {
@@ -1164,7 +1169,7 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const records = await db.listDispatchRecords();
       const record = records.find((r: any) => r.id === input.id);
       await db.rejectDispatchRecord(input.id);
@@ -1184,7 +1189,7 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteDispatchRecord(input.id);
       return { success: true };
     }),
@@ -1285,18 +1290,18 @@ export const appRouter = router({
     }).optional()).query(async ({ input }) => {
       return db.listSdrRecords(input?.competitionId, input?.sellerId);
     }),
-    pending: adminProcedure.query(async () => {
+    pending: managerOrAdminProcedure.query(async () => {
       return db.listPendingSdrRecords();
     }),
-    approve: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    approve: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const record = await db.approveSdrRecord(input.id);
       return { success: true, record };
     }),
-    reject: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.rejectSdrRecord(input.id);
       return { success: true };
     }),
-    delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteSdrRecord(input.id);
       return { success: true };
     }),
@@ -1306,11 +1311,11 @@ export const appRouter = router({
       return { success: true, record };
     }),
     // Listar agendamentos pendentes de aprovação de comparecimento
-    pendingAttendance: adminProcedure.query(async () => {
+    pendingAttendance: managerOrAdminProcedure.query(async () => {
       return db.listPendingAttendance();
     }),
     // Gerente aprova comparecimento
-    approveAttendance: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    approveAttendance: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const record = await db.approveAttendance(input.id);
       // Push para vendedor que comparecimento foi aprovado
       if (record && record.sellerId) {
@@ -1319,12 +1324,12 @@ export const appRouter = router({
       return { success: true, record };
     }),
     // Gerente reprova comparecimento
-    rejectAttendance: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    rejectAttendance: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.rejectAttendance(input.id);
       return { success: true };
     }),
     // Gerente marca como não compareceu
-    markNoShow: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    markNoShow: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.markNoShow(input.id);
       return { success: true };
     }),

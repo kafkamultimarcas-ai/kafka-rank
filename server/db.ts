@@ -40,6 +40,16 @@ export async function getDb() {
   return _db;
 }
 
+// Raw SQL query helper for audit trail and ad-hoc updates
+export async function rawQuery(query: string, params: any[] = []) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  return db.execute(sql.raw(query.replace(/\?/g, () => {
+    const val = params.shift();
+    return typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : String(val);
+  })));
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();

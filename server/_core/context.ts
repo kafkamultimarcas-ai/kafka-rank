@@ -10,13 +10,13 @@ import { parse as parseCookieHeader } from "cookie";
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: (User & { sellerRole?: string }) | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: (User & { sellerRole?: string }) | null = null;
 
   // 1) Try OAuth session first (owner/admin)
   try {
@@ -91,7 +91,7 @@ export async function createContext(
         const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
         const seller = await getSellerById(payload.sellerId);
         if (seller && seller.active) {
-          // Create a virtual user object with "seller" role
+          // Create a virtual user object - gerente gets special flag
           user = {
             id: -(1000000 + seller.id), // large negative offset to distinguish from managers
             openId: `seller_${seller.id}`,
@@ -102,7 +102,8 @@ export async function createContext(
             createdAt: seller.createdAt,
             updatedAt: seller.updatedAt,
             lastSignedIn: new Date(),
-          } as User;
+            sellerRole: seller.sellerRole || 'vendedor', // Pass sellerRole to context
+          } as User & { sellerRole?: string };
         }
       }
     } catch (error) {

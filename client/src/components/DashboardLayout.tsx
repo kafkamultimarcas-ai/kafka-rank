@@ -76,27 +76,39 @@ export default function DashboardLayout({
   });
   const { loading, user } = useAuth();
   const managerQuery = trpc.managers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const sellerQuery = trpc.sellers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const isManagerLoading = managerQuery.isLoading;
+  const isSellerLoading = sellerQuery.isLoading;
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading || isManagerLoading) {
+  if (loading || isManagerLoading || isSellerLoading) {
     return <DashboardLayoutSkeleton />
   }
 
   // Owner logged in via OAuth
   const isOwner = user && user.role === "admin" && (user.id > 0);
-  // Manager logged in via password
+  // Manager logged in via password (managers table)
   const isManager = managerQuery.data && managerQuery.data.role === "manager";
+  // Seller-gerente logged in via seller login
+  const isSellerGerente = sellerQuery.data && sellerQuery.data.sellerRole === 'gerente';
 
-  if (!isOwner && !isManager) {
+  if (!isOwner && !isManager && !isSellerGerente) {
     return <ManagerLoginScreen />;
   }
 
-  const displayName = isOwner ? (user?.name || "Admin") : (managerQuery.data?.name || "Gerente");
-  const displayEmail = isOwner ? (user?.email || "") : "Gerente";
+  const displayName = isOwner 
+    ? (user?.name || "Admin") 
+    : isManager 
+      ? (managerQuery.data?.name || "Gerente") 
+      : (sellerQuery.data?.nickname || sellerQuery.data?.name || "Gerente");
+  const displayEmail = isOwner 
+    ? (user?.email || "") 
+    : isManager 
+      ? "Gerente" 
+      : "Gerente";
   const showOwnerItems = !!isOwner;
 
   return (
@@ -108,7 +120,8 @@ export default function DashboardLayout({
         displayName={displayName}
         displayEmail={displayEmail}
         showOwnerItems={showOwnerItems}
-        isManager={!!isManager}
+        isManager={!!isManager || !!isSellerGerente}
+        isSellerGerente={!!isSellerGerente}
       >
         {children}
       </DashboardLayoutContent>
@@ -222,11 +235,13 @@ type DashboardLayoutContentProps = {
   displayEmail: string;
   showOwnerItems: boolean;
   isManager: boolean;
+  isSellerGerente?: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager }: DashboardLayoutContentProps) {
+function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager, isSellerGerente }: DashboardLayoutContentProps) {
   const { logout: oauthLogout } = useAuth();
   const managerLogout = trpc.managers.logout.useMutation();
+  const sellerLogout = trpc.sellers.logout.useMutation();
   const utils = trpc.useUtils();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
@@ -264,7 +279,12 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
   }, [isResizing, setSidebarWidth]);
 
   const handleLogout = async () => {
-    if (isManager) {
+    if (isSellerGerente) {
+      await sellerLogout.mutateAsync();
+      await utils.sellers.me.invalidate();
+      toast.success("Logout realizado!");
+      window.location.href = "/";
+    } else if (isManager) {
       await managerLogout.mutateAsync();
       await utils.managers.me.invalidate();
       await utils.auth.me.invalidate();

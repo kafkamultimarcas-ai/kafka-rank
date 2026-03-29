@@ -1402,3 +1402,19 @@
 - [x] Card do veículo clicável para expandir e mostrar todas as informações detalhadas
 - [x] Cruzar placa da venda com consignação: ao registrar venda, dar saída automática e marcar como "Vendido"
 - [x] Indicador visual "Vendido" no histórico da consignação com dados do vendedor e valor
+
+## Papel de Gerente
+- [x] Adicionar role "manager" ao sistema (entre vendedor e admin)
+- [x] Gerente pode aprovar/rejeitar vendas pendentes
+- [x] Gerente pode aprovar/rejeitar consignações e fichas
+- [x] Gerente pode editar vendas e consignações lançadas errado
+- [x] Registro de auditoria: toda alteração mostra "Alterado por [nome] em [data]"
+- [x] Gerente NÃO tem acesso a configurações do sistema, IA, integrações
+- [x] Interface do gerente com botões de aprovação e edição
+
+## Gerente - Correção de Cadastro e Acesso
+- [x] Adicionar opção de "Gerente" no cadastro de vendedor (Admin → Equipe)
+- [x] DashboardLayout aceitar seller-gerente e mostrar sidebar admin
+- [x] Promover gerente atual no banco de dados
+- [x] Gerente ter acesso a aprovar vendas, consignação, fichas, editar registros
+- [x] Auditoria: toda alteração pelo gerente registra "Alterado por [nome]"
