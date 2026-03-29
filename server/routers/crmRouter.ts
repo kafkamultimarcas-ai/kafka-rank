@@ -1068,6 +1068,14 @@ ${chatHistory || "(Primeira mensagem)"}`;
       inactiveDispatchMaxPerDay = ${input.inactiveDispatchMaxPerDay !== undefined ? input.inactiveDispatchMaxPerDay : sql`inactiveDispatchMaxPerDay`},
       updatedAt = ${now}
     WHERE id = 1`);
+
+    // When global toggle changes, mass-update all leads
+    if (input.autoReplyEnabled !== undefined) {
+      const val = input.autoReplyEnabled ? 1 : 0;
+      await dbConn.execute(sql`UPDATE crm_ai_settings SET enabled = ${val}`);
+      console.log(`[AI Config] Global toggle ${input.autoReplyEnabled ? 'ON' : 'OFF'} - updated all leads`);
+    }
+
     return { success: true };
   }),
 

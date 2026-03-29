@@ -1421,3 +1421,6 @@
 
 ## IA Toggle Visual no Chat
 - [x] Botão de IA no chat do lead com visual claro de ativado/desativado (cor verde/cinza, texto indicativo)
+
+## Bug: Botão IA no Chat não funciona
+- [x] Botão de toggle da IA no chat do WhatsApp não está funcionando ao clicar

@@ -1,0 +1,30 @@
+{
+  "query": "SELECT * FROM crm_ai_global_config WHERE id = 1",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT * FROM crm_ai_global_config WHERE id = 1",
+  "rows": [
+    {
+      "id": "1",
+      "aiMode": "normal",
+      "feiraoConfig": "NULL",
+      "normalConfig": "NULL",
+      "customModes": "NULL",
+      "updatedAt": "1774716757000",
+      "autoReplyEnabled": "0",
+      "workingHoursStart": "8",
+      "workingHoursEnd": "20",
+      "workingHoursEnabled": "0",
+      "maxMessagesPerLead": "10",
+      "maxMessagesEnabled": "0",
+      "personality": "amigavel",
+      "inactiveDispatchEnabled": "0",
+      "inactiveDispatchHours": "1",
+      "inactiveDispatchMessage": "NULL",
+      "inactiveDispatchMaxPerDay": "1",
+      "inactiveDispatchLastRun": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\taiMode\tfeiraoConfig\tnormalConfig\tcustomModes\tupdatedAt\tautoReplyEnabled\tworkingHoursStart\tworkingHoursEnd\tworkingHoursEnabled\tmaxMessagesPerLead\tmaxMessagesEnabled\tpersonality\tinactiveDispatchEnabled\tinactiveDispatchHours\tinactiveDispatchMessage\tinactiveDispatchMaxPerDay\tinactiveDispatchLastRun\n1\tnormal\tNULL\tNULL\tNULL\t1774716757000\t0\t8\t20\t0\t10\t0\tamigavel\t0\t1\tNULL\t1\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 115
+}

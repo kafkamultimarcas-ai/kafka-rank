@@ -983,13 +983,17 @@ export function registerWebhookRoutes(app: Express) {
                 const dbConn = await getDb();
                 if (!dbConn) return;
 
-                // Check global AI toggle
+                // Check per-lead AI setting FIRST (individual toggle)
+                const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
+                const aiRows = aiResult as any;
+                if (!aiRows || aiRows.length === 0 || !aiRows[0].enabled) return;
+
+                // Load global config for working hours, limits, personality (but NOT as master switch)
                 const globalCheck = await dbConn.execute(sql`SELECT autoReplyEnabled, workingHoursEnabled, workingHoursStart, workingHoursEnd, maxMessagesEnabled, maxMessagesPerLead, personality FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
                 const globalRows = globalCheck as any;
-                const globalCfg = globalRows?.[0];
-                if (!globalCfg || !globalCfg.autoReplyEnabled) return; // Global AI disabled
+                const globalCfg = globalRows?.[0] || {};
 
-                // Check working hours
+                // Check working hours (only if enabled)
                 if (globalCfg.workingHoursEnabled) {
                   const currentHour = new Date().getHours();
                   if (currentHour < (globalCfg.workingHoursStart ?? 8) || currentHour >= (globalCfg.workingHoursEnd ?? 20)) {
@@ -997,11 +1001,6 @@ export function registerWebhookRoutes(app: Express) {
                     return;
                   }
                 }
-
-                // Check per-lead AI setting
-                const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
-                const aiRows = aiResult as any;
-                if (!aiRows || aiRows.length === 0 || !aiRows[0].enabled) return;
 
                 // Check message limit per lead
                 if (globalCfg.maxMessagesEnabled && globalCfg.maxMessagesPerLead) {
