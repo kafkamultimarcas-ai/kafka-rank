@@ -1,0 +1,37 @@
+{
+  "query": "SELECT id, vehicleModel, description, customerPhone FROM sales ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, vehicleModel, description, customerPhone FROM sales ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "540004",
+      "vehicleModel": "Gol vermelho",
+      "description": "NULL",
+      "customerPhone": "47999876544"
+    },
+    {
+      "id": "540003",
+      "vehicleModel": "Prisma 2009",
+      "description": "NULL",
+      "customerPhone": "47997058789"
+    },
+    {
+      "id": "510001",
+      "vehicleModel": "Duster 23",
+      "description": "Lead Letícia agendado e vendido",
+      "customerPhone": "47 9978-6240"
+    },
+    {
+      "id": "480003",
+      "vehicleModel": "Hb20 2020",
+      "description": "NULL",
+      "customerPhone": "NULL"
+    }
+  ],
+  "messages": [
+    "510002\tPrisma 2019\tCliente comprou no Feirão ",
+    "Estou a 2 meses em conversa!\t47999332850"
+  ],
+  "stdout": "id\tvehicleModel\tdescription\tcustomerPhone\n540004\tGol vermelho\tNULL\t47999876544\n540003\tPrisma 2009\tNULL\t47997058789\n510002\tPrisma 2019\tCliente comprou no Feirão \nEstou a 2 meses em conversa!\t47999332850\n510001\tDuster 23\tLead Letícia agendado e vendido\t47 9978-6240\n480003\tHb20 2020\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

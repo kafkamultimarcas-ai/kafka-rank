@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Phone, DollarSign, FileText, ShieldCheck, Tag } from "lucide-react";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
@@ -31,6 +31,7 @@ export default function ConsignmentControl() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // Dados
   const { data: yardVehicles, refetch: refetchYard } = trpc.consignment.yard.useQuery();
@@ -144,6 +145,92 @@ export default function ConsignmentControl() {
     updateExit.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime() });
   };
 
+  const toggleExpand = (id: number) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  const formatCurrency = (cents: number | null | undefined) => {
+    if (!cents) return "—";
+    return `R$ ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  };
+
+  // Detail panel component
+  const VehicleDetails = ({ v }: { v: any }) => (
+    <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+        <div className="flex items-center gap-1.5">
+          <Car className="w-3 h-3 text-blue-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Modelo:</span>
+          <span className="text-foreground font-medium truncate">{v.vehicleModel || '—'}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Tag className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Placa:</span>
+          <span className="text-foreground font-mono font-medium">{v.vehiclePlate || '—'}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Phone className="w-3 h-3 text-green-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Tel Dono:</span>
+          <span className="text-foreground">{v.ownerPhone || '—'}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <DollarSign className="w-3 h-3 text-yellow-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Custo:</span>
+          <span className="text-foreground font-medium">{formatCurrency(v.costValue)}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck className="w-3 h-3 text-purple-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Status:</span>
+          <span className={`font-medium ${v.vehicleStatus === 'financiado' ? 'text-orange-400' : 'text-emerald-400'}`}>
+            {v.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
+          </span>
+        </div>
+        {v.vehicleStatus === 'financiado' && v.payoffValue && (
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="w-3 h-3 text-orange-400 flex-shrink-0" />
+            <span className="text-muted-foreground">Quitação:</span>
+            <span className="text-orange-400 font-medium">{formatCurrency(v.payoffValue)}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Leilão:</span>
+          <span className={v.hasAuction ? 'text-red-400 font-semibold' : 'text-emerald-400'}>
+            {v.hasAuction ? 'SIM' : 'Não'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Calendar className="w-3 h-3 text-blue-400 flex-shrink-0" />
+          <span className="text-muted-foreground">Entrada:</span>
+          <span className="text-foreground">{new Date(v.entryDate).toLocaleDateString('pt-BR')}</span>
+        </div>
+        {v.exitDate && (
+          <div className="flex items-center gap-1.5">
+            <LogOut className="w-3 h-3 text-red-400 flex-shrink-0" />
+            <span className="text-muted-foreground">Saída:</span>
+            <span className="text-foreground">{new Date(v.exitDate).toLocaleDateString('pt-BR')}</span>
+          </div>
+        )}
+      </div>
+      {v.notes && (
+        <div className="flex items-start gap-1.5 text-xs">
+          <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+          <span className="text-muted-foreground">Obs:</span>
+          <span className="text-foreground">{v.notes}</span>
+        </div>
+      )}
+      {v.soldVia && (
+        <div className="flex items-center gap-1.5 text-xs bg-green-500/10 rounded px-2 py-1.5 border border-green-500/20">
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+          <span className="text-green-400 font-semibold">VENDIDO</span>
+          {v.soldAt && (
+            <span className="text-green-400/70 text-[10px]">em {new Date(v.soldAt).toLocaleDateString('pt-BR')}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const tabs: { key: Tab; label: string; icon: any; count?: number }[] = [
     { key: "patio", label: "No Pátio", icon: Car, count: yardVehicles?.length || 0 },
     { key: "completed", label: "7 Dias ✓", icon: CheckCircle2, count: completed7Days?.length || 0 },
@@ -229,18 +316,25 @@ export default function ConsignmentControl() {
                   const days = getDaysInYard(v.entryDate);
                   const isNear7 = days >= 5 && days < 7;
                   const isOver7 = days >= 7;
+                  const isExpanded = expandedId === v.id;
                   return (
-                    <div key={v.id} className={`racing-card p-3 ${
+                    <div key={v.id} className={`racing-card p-3 cursor-pointer transition-all ${
                       isOver7 ? 'border-emerald-500/30 bg-emerald-500/5' :
                       isNear7 ? 'border-yellow-500/30 bg-yellow-500/5' : ''
-                    }`}>
-                      <div className="flex items-start justify-between gap-2">
+                    } ${isExpanded ? 'ring-1 ring-blue-500/40' : ''}`}>
+                      <div className="flex items-start justify-between gap-2" onClick={() => toggleExpand(v.id)}>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-sm text-foreground bg-muted/50 px-2 py-0.5 rounded">
                               {v.vehiclePlate || '---'}
                             </span>
                             <span className="text-xs text-muted-foreground">{v.vehicleModel}</span>
+                            {v.soldVia && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold">VENDIDO</span>
+                            )}
+                            {v.hasAuction && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold">LEILÃO</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                             <span>Dono: <strong className="text-foreground">{v.ownerName}</strong></span>
@@ -251,13 +345,18 @@ export default function ConsignmentControl() {
                             <span>Vendedor: {getSellerName(v.sellerId)}</span>
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
+                        <div className="text-right flex-shrink-0 flex flex-col items-end">
                           <div className={`text-lg font-bold font-heading ${
                             isOver7 ? 'text-emerald-400' : isNear7 ? 'text-yellow-400' : 'text-foreground'
                           }`}>
                             {days}d
                           </div>
                           <div className="text-[10px] text-muted-foreground">no pátio</div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-blue-400 mt-1" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground mt-1" />
+                          )}
                         </div>
                       </div>
                       {isOver7 && (
@@ -272,6 +371,8 @@ export default function ConsignmentControl() {
                           Faltam {7 - days} dia(s) para completar 7 dias
                         </div>
                       )}
+                      {/* Expanded details */}
+                      {isExpanded && <VehicleDetails v={v} />}
                       <div className="mt-2 flex justify-end gap-2">
                         {isAdmin && (
                           <>
@@ -279,7 +380,7 @@ export default function ConsignmentControl() {
                               size="sm"
                               variant="outline"
                               className="text-xs h-7 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                              onClick={() => openEdit(v)}
+                              onClick={(e) => { e.stopPropagation(); openEdit(v); }}
                             >
                               <Pencil className="w-3 h-3 mr-1" />
                               Editar
@@ -288,7 +389,7 @@ export default function ConsignmentControl() {
                               size="sm"
                               variant="outline"
                               className="text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                              onClick={() => openDelete(v.id)}
+                              onClick={(e) => { e.stopPropagation(); openDelete(v.id); }}
                             >
                               <Trash2 className="w-3 h-3 mr-1" />
                               Excluir
@@ -299,7 +400,7 @@ export default function ConsignmentControl() {
                           size="sm"
                           variant="outline"
                           className="text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                          onClick={() => handleExitClick(v.id)}
+                          onClick={(e) => { e.stopPropagation(); handleExitClick(v.id); }}
                         >
                           <LogOut className="w-3 h-3 mr-1" />
                           Dar Saída
@@ -339,15 +440,20 @@ export default function ConsignmentControl() {
               <div className="space-y-2">
                 {filterVehicles(completed7Days).map((v: any) => {
                   const days = getDaysInYard(v.entryDate, v.exitDate);
+                  const isExpanded = expandedId === v.id;
                   return (
-                    <div key={v.id} className="racing-card p-3 border-emerald-500/20">
+                    <div key={v.id} className={`racing-card p-3 border-emerald-500/20 cursor-pointer transition-all ${isExpanded ? 'ring-1 ring-blue-500/40' : ''}`}
+                      onClick={() => toggleExpand(v.id)}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-sm text-foreground bg-muted/50 px-2 py-0.5 rounded">
                               {v.vehiclePlate || '---'}
                             </span>
                             <span className="text-xs text-muted-foreground">{v.vehicleModel}</span>
+                            {v.soldVia && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold">VENDIDO</span>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             Dono: {v.ownerName} | Vendedor: {getSellerName(v.sellerId)}
@@ -357,11 +463,17 @@ export default function ConsignmentControl() {
                             {v.exitDate && ` → Saída: ${new Date(v.exitDate).toLocaleDateString('pt-BR')}`}
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
+                        <div className="text-right flex-shrink-0 flex flex-col items-end">
                           <div className="text-lg font-bold text-emerald-400">{days}d</div>
                           <div className="text-[10px] text-emerald-400/60">✓ válido</div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-blue-400 mt-1" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground mt-1" />
+                          )}
                         </div>
                       </div>
+                      {isExpanded && <VehicleDetails v={v} />}
                     </div>
                   );
                 })}
@@ -387,11 +499,13 @@ export default function ConsignmentControl() {
               <div className="space-y-2">
                 {filterVehicles(exitedVehicles).map((v: any) => {
                   const days = getDaysInYard(v.entryDate, v.exitDate);
+                  const isExpanded = expandedId === v.id;
                   return (
-                    <div key={v.id} className={`racing-card p-3 ${v.isValid ? 'border-emerald-500/20' : 'border-red-500/20'}`}>
+                    <div key={v.id} className={`racing-card p-3 cursor-pointer transition-all ${v.isValid ? 'border-emerald-500/20' : 'border-red-500/20'} ${isExpanded ? 'ring-1 ring-blue-500/40' : ''}`}
+                      onClick={() => toggleExpand(v.id)}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-sm text-foreground bg-muted/50 px-2 py-0.5 rounded">
                               {v.vehiclePlate || '---'}
                             </span>
@@ -401,6 +515,9 @@ export default function ConsignmentControl() {
                             ) : (
                               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">&lt;7d</span>
                             )}
+                            {v.soldVia && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold">VENDIDO</span>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             Dono: {v.ownerName} | Vendedor: {getSellerName(v.sellerId)}
@@ -409,10 +526,16 @@ export default function ConsignmentControl() {
                             {new Date(v.entryDate).toLocaleDateString('pt-BR')} → {v.exitDate ? new Date(v.exitDate).toLocaleDateString('pt-BR') : '—'}
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
+                        <div className="text-right flex-shrink-0 flex flex-col items-end">
                           <div className={`text-lg font-bold ${v.isValid ? 'text-emerald-400' : 'text-red-400'}`}>{days}d</div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-blue-400 mt-1" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground mt-1" />
+                          )}
                         </div>
                       </div>
+                      {isExpanded && <VehicleDetails v={v} />}
                     </div>
                   );
                 })}

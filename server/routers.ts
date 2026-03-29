@@ -321,6 +321,7 @@ export const appRouter = router({
       competitionId: z.number().optional(),
       description: z.string().optional(),
       vehicleModel: z.string().optional(),
+      vehiclePlate: z.string().optional(),
       value: z.number().optional(),
       points: z.number().default(1),
     })).mutation(async ({ input }) => {
@@ -330,20 +331,26 @@ export const appRouter = router({
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const saleCategory = comp?.category || 'vendas';
       await db.autoUpdateStoreGoal(saleCategory, now.getMonth() + 1, now.getFullYear(), 1);
+      // Cruzar placa com consignação
+      let consignmentMatch = null;
+      if (input.vehiclePlate) {
+        consignmentMatch = await db.crossReferenceConsignmentWithSale(id, input.vehiclePlate);
+      }
       const seller = await db.getSellerById(input.sellerId);
       if (seller && input.value && input.value >= 50000) {
         await notifyOwner({
           title: `Venda importante registrada!`,
-          content: `${seller.name} registrou uma venda de R$ ${(input.value).toLocaleString("pt-BR")} - ${input.vehicleModel || "Veículo"}`,
+          content: `${seller.name} registrou uma venda de R$ ${(input.value).toLocaleString("pt-BR")} - ${input.vehicleModel || "Ve\u00edculo"}`,
         });
       }
-      return { id };
+      return { id, consignmentMatch };
     }),
     // Vendedor registra venda (fica pendente de aprovação)
     registerBySeller: publicProcedure.input(z.object({
       sellerId: z.number(),
       competitionId: z.number().optional(),
       vehicleModel: z.string().min(1),
+      vehiclePlate: z.string().optional(),
       value: z.number().optional(),
       description: z.string().optional(),
       leadSource: z.enum(['lead_loja', 'lead_vendedor']),
@@ -451,6 +458,15 @@ export const appRouter = router({
           });
         }
       } catch (e) { console.error('Erro ao criar sale_document:', e); }
+      // Cruzar placa com consignação ao aprovar
+      if (sale.vehiclePlate) {
+        try {
+          const consignmentMatch = await db.crossReferenceConsignmentWithSale(input.id, sale.vehiclePlate);
+          if (consignmentMatch) {
+            console.log(`[Sale Approved] Consignação #${consignmentMatch.consignmentId} marcada como vendida (placa ${consignmentMatch.vehiclePlate})`);
+          }
+        } catch (e) { console.error('Erro ao cruzar consignação:', e); }
+      }
       return { success: true };
     }),
     // Rejeitar venda (admin)

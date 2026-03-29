@@ -1394,3 +1394,11 @@
 - [x] Tom/personalidade da IA (amigável, profissional, agressivo vendas)
 - [x] Mensagem customizada para disparo de inativos
 - [x] Painel visual avançado na página de Configurações
+
+## Consignação - Card Clicável
+- [x] Card do veículo clicável para expandir e mostrar todas as informações detalhadas
+
+## Consignação - Melhorias
+- [x] Card do veículo clicável para expandir e mostrar todas as informações detalhadas
+- [x] Cruzar placa da venda com consignação: ao registrar venda, dar saída automática e marcar como "Vendido"
+- [x] Indicador visual "Vendido" no histórico da consignação com dados do vendedor e valor

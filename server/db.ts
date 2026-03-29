@@ -1061,6 +1061,36 @@ export async function updateConsignmentExitDate(id: number, exitDate: number) {
   return { ...record, exitDate, isValid };
 }
 
+// Cross-reference: when a sale is approved, check if the plate matches a consignment vehicle
+export async function crossReferenceConsignmentWithSale(saleId: number, plate: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const normalizedPlate = plate.replace(/[-\s]/g, '').toUpperCase();
+  if (!normalizedPlate || normalizedPlate.length < 5) return null;
+  // Find active consignment with matching plate (in yard, approved, not yet sold)
+  const matches = await db.select().from(consignmentRecords).where(and(
+    sql`UPPER(REPLACE(${consignmentRecords.vehiclePlate}, '-', '')) = ${normalizedPlate}`,
+    eq(consignmentRecords.status, 'approved'),
+    sql`${consignmentRecords.soldVia} IS NULL`,
+  )).limit(1);
+  if (matches.length === 0) return null;
+  const record = matches[0];
+  const now = Date.now();
+  // Mark as sold and auto-exit if still in yard
+  await db.update(consignmentRecords).set({
+    soldVia: 'sale',
+    saleId: saleId,
+    soldAt: now,
+    exitDate: record.exitDate || now, // auto-exit if not yet exited
+    isValid: true, // sold = valid regardless of days
+  }).where(eq(consignmentRecords.id, record.id));
+  // Update totals if not already valid
+  if (!record.isValid && record.status === 'approved') {
+    await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
+  }
+  return { consignmentId: record.id, vehiclePlate: record.vehiclePlate, vehicleModel: record.vehicleModel };
+}
+
 export async function validateConsignmentDays() {
   // Valida consignações aprovadas que completaram os 7 dias
   const db = await getDb();

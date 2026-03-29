@@ -320,6 +320,7 @@ export default function RegisterSale() {
           if (!saleLeadSource) { toast.error("Selecione a origem do lead!"); return; }
           result = await registerSale.mutateAsync({
             sellerId: sid, competitionId: cid, vehicleModel,
+            vehiclePlate: vehiclePlate || undefined,
             value: value ? parseInt(value.replace(/\D/g, "")) : undefined,
             description: description || undefined,
             leadSource: saleLeadSource as 'lead_loja' | 'lead_vendedor',
@@ -673,11 +674,19 @@ export default function RegisterSale() {
                     placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   <p className="text-[10px] text-gray-500">Se preencher, o sistema cruza automaticamente com agendamentos (SDR ganha comissão)</p>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 font-semibold">Valor (R$)</Label>
-                  <Input value={value} onChange={e => setValue(e.target.value)}
-                    placeholder="Ex: 85000" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold">Valor (R$)</Label>
+                    <Input value={value} onChange={e => setValue(e.target.value)}
+                      placeholder="Ex: 85000" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold">Placa do veículo</Label>
+                    <Input value={vehiclePlate} onChange={e => setVehiclePlate(e.target.value.toUpperCase())}
+                      placeholder="ABC1D23" maxLength={7} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
                 </div>
+                <p className="text-[10px] text-gray-500 -mt-1">Se preencher a placa, o sistema cruza automaticamente com a consignação</p>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Observação</Label>
                   <Textarea value={description} onChange={e => setDescription(e.target.value)}

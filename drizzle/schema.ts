@@ -103,6 +103,7 @@ export const sales = mysqlTable("sales", {
   competitionId: int("competitionId"),
   description: varchar("description", { length: 500 }),
   vehicleModel: varchar("vehicleModel", { length: 255 }),
+  vehiclePlate: varchar("vehiclePlate", { length: 10 }), // placa do veículo vendido para cruzar com consignação
   value: int("value").default(0),
   leadSource: varchar("leadSource", { length: 50 }), // 'lead_loja' ou 'lead_vendedor'
   customerPhone: varchar("customerPhone", { length: 20 }), // telefone do comprador para cruzar com agendamento
@@ -155,6 +156,9 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   costValue: int("costValue"), // valor de custo que o consignado deixou (centavos)
   notes: text("notes"), // observações adicionais
   rejectionReason: text("rejectionReason"), // motivo da rejeição (quando rejeitado)
+  soldVia: varchar("soldVia", { length: 20 }), // null=not sold, 'sale'=sold via sale registration
+  saleId: int("saleId"), // FK to sales table if sold
+  soldAt: bigint("soldAt", { mode: "number" }), // timestamp when marked as sold
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
