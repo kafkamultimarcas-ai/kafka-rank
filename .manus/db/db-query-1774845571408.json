@@ -1,0 +1,15 @@
+{
+  "query": "SELECT id, username, passwordHash FROM sellers WHERE id = 240001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, username, passwordHash FROM sellers WHERE id = 240001;",
+  "rows": [
+    {
+      "id": "240001",
+      "username": "Nathan",
+      "passwordHash": "$2b$10$9v/w/9RjMriC3q8m.lZmlubeFkJT51TnDtqcihrR4C9NuIYk.q4Mq"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tusername\tpasswordHash\n240001\tNathan\t$2b$10$9v/w/9RjMriC3q8m.lZmlubeFkJT51TnDtqcihrR4C9NuIYk.q4Mq\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

@@ -23,6 +23,7 @@ import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
 import { inventoryRouter } from "./routers/inventoryRouter";
 import { whatsappRouter } from "./routers/whatsappRouter";
+import { managerMentorRouter } from "./routers/managerMentorRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
@@ -2196,6 +2197,8 @@ Adapte o formato conforme o assunto, mas sempre inclua:
 
   // ===== WHATSAPP (Z-API) =====
   whatsapp: whatsappRouter,
+
+  managerMentor: managerMentorRouter,
 
   managerPerms: router({
     // Listar módulos disponíveis

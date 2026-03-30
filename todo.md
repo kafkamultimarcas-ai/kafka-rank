@@ -1438,3 +1438,20 @@
 - [x] Redistribuir os leads do Nathan entre os vendedores ativos
 - [x] Adicionar verificação no webhook WhatsApp: se lead está com gerente, reatribuir automaticamente
 - [x] Testar que novos leads não são mais distribuídos para gerentes
+
+## Dashboard de Performance do Gerente (Mentor IA)
+- [x] Schema: tabela manager_tasks (tarefas automáticas do mentor para o gerente)
+- [x] Schema: tabela manager_alerts (alertas inteligentes em tempo real)
+- [x] Schema: tabela manager_mentor_messages (mensagens de mentoria IA para o gerente)
+- [x] Backend: rota analytics do gerente (visão geral equipe, métricas por vendedor, vendas, leads, tempo resposta, conversão)
+- [x] Backend: ranking de vendedores com métricas detalhadas e tendências
+- [x] Backend: geração de tarefas automáticas via IA (ex: "Falar com Wesley que caiu 30%", "Parabenizar Leonardo por 5 vendas")
+- [x] Backend: alertas inteligentes (vendedor parado, queda performance, lead quente sem resposta, meta em risco)
+- [x] Backend: mensagens motivacionais/direcionais via IA para o gerente (mentor)
+- [x] Frontend: página PerformanceGerente com visão completa
+- [x] Frontend: painel de Tarefas do Dia (geradas pela IA mentor)
+- [x] Frontend: painel de Alertas Críticos com ações rápidas
+- [x] Frontend: cards por vendedor com métricas e mini-gráficos
+- [x] Frontend: mensagem do Mentor IA (dica do dia, direcionamento estratégico)
+- [x] Frontend: filtros por período (hoje, semana, mês)
+- [x] Acesso exclusivo para sellers com sellerRole="gerente"

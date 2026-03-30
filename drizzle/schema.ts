@@ -951,3 +951,60 @@ export const fuelRecords = mysqlTable("fuel_records", {
 });
 export type FuelRecord = typeof fuelRecords.$inferSelect;
 export type InsertFuelRecord = typeof fuelRecords.$inferInsert;
+
+
+// ===== MANAGER MENTOR IA =====
+
+// Tarefas geradas pela IA para o gerente
+export const managerTasks = mysqlTable("manager_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  managerId: int("managerId").notNull(), // seller com role gerente
+  type: varchar("type", { length: 50 }).notNull(), // coaching, alert, recognition, strategy, followup
+  priority: varchar("priority", { length: 20 }).default("medium").notNull(), // critical, high, medium, low
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  targetSellerId: int("targetSellerId"), // vendedor alvo da tarefa (se aplicável)
+  actionType: varchar("actionType", { length: 50 }), // talk, message, review, approve, transfer
+  completed: boolean("completed").default(false).notNull(),
+  completedAt: bigint("completedAt", { mode: "number" }),
+  expiresAt: bigint("expiresAt", { mode: "number" }), // quando a tarefa expira
+  metadata: text("metadata"), // JSON com dados extras (ex: % queda, lead ID)
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ManagerTask = typeof managerTasks.$inferSelect;
+export type InsertManagerTask = typeof managerTasks.$inferInsert;
+
+// Alertas inteligentes em tempo real para o gerente
+export const managerAlerts = mysqlTable("manager_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  managerId: int("managerId").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // idle_seller, hot_lead_no_response, goal_at_risk, performance_drop, new_record
+  severity: varchar("severity", { length: 20 }).default("warning").notNull(), // critical, warning, info, success
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  targetSellerId: int("targetSellerId"),
+  relatedEntityId: int("relatedEntityId"), // leadId, saleId, etc
+  relatedEntityType: varchar("relatedEntityType", { length: 50 }), // lead, sale, appointment
+  dismissed: boolean("dismissed").default(false).notNull(),
+  dismissedAt: bigint("dismissedAt", { mode: "number" }),
+  metadata: text("metadata"), // JSON
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ManagerAlert = typeof managerAlerts.$inferSelect;
+export type InsertManagerAlert = typeof managerAlerts.$inferInsert;
+
+// Mensagens de mentoria IA (dica do dia, direcionamento estratégico)
+export const managerMentorMessages = mysqlTable("manager_mentor_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  managerId: int("managerId").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // daily_tip, strategy, motivation, warning, celebration
+  title: varchar("title", { length: 500 }).notNull(),
+  content: text("content").notNull(),
+  icon: varchar("icon", { length: 50 }), // emoji ou ícone
+  read: boolean("read").default(false).notNull(),
+  generatedFor: varchar("generatedFor", { length: 20 }), // date string YYYY-MM-DD
+  metadata: text("metadata"), // JSON com contexto usado para gerar
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ManagerMentorMessage = typeof managerMentorMessages.$inferSelect;
+export type InsertManagerMentorMessage = typeof managerMentorMessages.$inferInsert;

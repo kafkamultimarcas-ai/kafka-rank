@@ -267,6 +267,13 @@
       "when": 1774715129005,
       "tag": "0037_rapid_carnage",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "5",
+      "when": 1774844985461,
+      "tag": "0038_uneven_machine_man",
+      "breakpoints": true
     }
   ]
 }
