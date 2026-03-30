@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, name, department FROM crm_leads WHERE sellerId = 240001 AND archived = 0;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, department FROM crm_leads WHERE sellerId = 240001 AND archived = 0;",
+  "rows": [
+    {
+      "id": "481169",
+      "name": "Paulo Justino",
+      "department": "vendas"
+    },
+    {
+      "id": "481192",
+      "name": "Everaldo",
+      "department": "vendas"
+    },
+    {
+      "id": "481287",
+      "name": "Dfelipetatuador",
+      "department": "vendas"
+    },
+    {
+      "id": "481308",
+      "name": "José Lino",
+      "department": "vendas"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tdepartment\n481169\tPaulo Justino\tvendas\n481192\tEveraldo\tvendas\n481287\tDfelipetatuador\tvendas\n481308\tJosé Lino\tvendas\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

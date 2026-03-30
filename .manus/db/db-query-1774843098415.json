@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "rows": [
+    {
+      "id": "481217",
+      "name": "nanybiblio somer"
+    },
+    {
+      "id": "481224",
+      "name": "Edgar"
+    },
+    {
+      "id": "481236",
+      "name": "WhatsApp 551131361712"
+    },
+    {
+      "id": "481245",
+      "name": "Jose"
+    },
+    {
+      "id": "481246",
+      "name": "Jose"
+    },
+    {
+      "id": "481254",
+      "name": "Emanoel Guilherme"
+    },
+    {
+      "id": "481263",
+      "name": "Jesiel"
+    },
+    {
+      "id": "481267",
+      "name": "A Maior saudade"
+    },
+    {
+      "id": "481274",
+      "name": "Willian"
+    },
+    {
+      "id": "481287",
+      "name": "Dfelipetatuador"
+    },
+    {
+      "id": "481288",
+      "name": "gmsfrancisco@hotmail.com"
+    },
+    {
+      "id": "481294",
+      "name": "Rafael Santos"
+    },
+    {
+      "id": "481298",
+      "name": "Renato Silvio Cunha"
+    },
+    {
+      "id": "481304",
+      "name": "Fábia Rocha"
+    },
+    {
+      "id": "481317",
+      "name": "alexandramarluce6"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n481217\tnanybiblio somer\n481224\tEdgar\n481236\tWhatsApp 551131361712\n481245\tJose\n481246\tJose\n481254\tEmanoel Guilherme\n481263\tJesiel\n481267\tA Maior saudade\n481274\tWillian\n481287\tDfelipetatuador\n481288\tgmsfrancisco@hotmail.com\n481294\tRafael Santos\n481298\tRenato Silvio Cunha\n481304\tFábia Rocha\n481317\talexandramarluce6\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

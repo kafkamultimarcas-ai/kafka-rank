@@ -1,0 +1,58 @@
+{
+  "query": "SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "rows": [
+    {
+      "id": "481157",
+      "name": "Pr. Sandro Lima IMCVN"
+    },
+    {
+      "id": "481203",
+      "name": "Elaine Enfermeira Obstetra"
+    },
+    {
+      "id": "481222",
+      "name": "adri"
+    },
+    {
+      "id": "481240",
+      "name": "Jana"
+    },
+    {
+      "id": "481257",
+      "name": "Everton"
+    },
+    {
+      "id": "481274",
+      "name": "Willian"
+    },
+    {
+      "id": "481276",
+      "name": "Garage 77"
+    },
+    {
+      "id": "481290",
+      "name": "Nardo"
+    },
+    {
+      "id": "481307",
+      "name": "Zé Carlos😜"
+    },
+    {
+      "id": "481308",
+      "name": "José Lino"
+    },
+    {
+      "id": "481312",
+      "name": "Gabriel Gustavo"
+    },
+    {
+      "id": "481315",
+      "name": "João Carlos Franchin"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n481157\tPr. Sandro Lima IMCVN\n481203\tElaine Enfermeira Obstetra\n481222\tadri\n481240\tJana\n481257\tEverton\n481274\tWillian\n481276\tGarage 77\n481290\tNardo\n481307\tZé Carlos😜\n481308\tJosé Lino\n481312\tGabriel Gustavo\n481315\tJoão Carlos Franchin\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

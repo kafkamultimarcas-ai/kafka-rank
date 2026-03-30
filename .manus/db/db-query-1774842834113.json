@@ -1,0 +1,85 @@
+{
+  "query": "SELECT id, name, createdAt FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id DESC LIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, createdAt FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id DESC LIMIT 15;",
+  "rows": [
+    {
+      "id": "481328",
+      "name": "Consultor Gabriel",
+      "createdAt": "2026-03-28 16:36:17"
+    },
+    {
+      "id": "481319",
+      "name": "Mateus",
+      "createdAt": "2026-03-28 15:16:46"
+    },
+    {
+      "id": "481315",
+      "name": "João Carlos Franchin",
+      "createdAt": "2026-03-28 14:42:04"
+    },
+    {
+      "id": "481312",
+      "name": "Gabriel Gustavo",
+      "createdAt": "2026-03-28 14:09:13"
+    },
+    {
+      "id": "481307",
+      "name": "Zé Carlos😜",
+      "createdAt": "2026-03-28 13:13:10"
+    },
+    {
+      "id": "481290",
+      "name": "Nardo",
+      "createdAt": "2026-03-28 04:58:16"
+    },
+    {
+      "id": "481276",
+      "name": "Garage 77",
+      "createdAt": "2026-03-28 02:20:18"
+    },
+    {
+      "id": "481264",
+      "name": "Everton",
+      "createdAt": "2026-03-27 23:18:02"
+    },
+    {
+      "id": "481257",
+      "name": "Everton",
+      "createdAt": "2026-03-27 22:37:22"
+    },
+    {
+      "id": "481240",
+      "name": "Jana",
+      "createdAt": "2026-03-27 20:06:12"
+    },
+    {
+      "id": "481235",
+      "name": "André Alex 🙏🏼💪🏼🥋🚵🏻‍♀️⚽🏐",
+      "createdAt": "2026-03-27 19:26:48"
+    },
+    {
+      "id": "481231",
+      "name": "WILSON ZANDONA",
+      "createdAt": "2026-03-27 19:06:06"
+    },
+    {
+      "id": "481222",
+      "name": "adri",
+      "createdAt": "2026-03-27 18:19:43"
+    },
+    {
+      "id": "481217",
+      "name": "nanybiblio somer",
+      "createdAt": "2026-03-27 18:10:02"
+    },
+    {
+      "id": "481210",
+      "name": "Valdeci",
+      "createdAt": "2026-03-27 17:18:55"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tcreatedAt\n481328\tConsultor Gabriel\t2026-03-28 16:36:17\n481319\tMateus\t2026-03-28 15:16:46\n481315\tJoão Carlos Franchin\t2026-03-28 14:42:04\n481312\tGabriel Gustavo\t2026-03-28 14:09:13\n481307\tZé Carlos😜\t2026-03-28 13:13:10\n481290\tNardo\t2026-03-28 04:58:16\n481276\tGarage 77\t2026-03-28 02:20:18\n481264\tEverton\t2026-03-27 23:18:02\n481257\tEverton\t2026-03-27 22:37:22\n481240\tJana\t2026-03-27 20:06:12\n481235\tAndré Alex 🙏🏼💪🏼🥋🚵🏻‍♀️⚽🏐\t2026-03-27 19:26:48\n481231\tWILSON ZANDONA\t2026-03-27 19:06:06\n481222\tadri\t2026-03-27 18:19:43\n481217\tnanybiblio somer\t2026-03-27 18:10:02\n481210\tValdeci\t2026-03-27 17:18:55\n",
+  "stderr": "",
+  "execution_time_ms": 69
+}

@@ -11,7 +11,7 @@ import {
   sellers,
   admins,
 } from "../../drizzle/schema";
-import { eq, and, desc, asc, lte, sql, or, like } from "drizzle-orm";
+import { eq, and, desc, asc, lte, sql, or, like, ne } from "drizzle-orm";
 
 // ===== MESSAGE TEMPLATES =====
 export const crmTemplatesRouter = router({
@@ -194,9 +194,9 @@ export const crmDistributionRouter = router({
     const [config] = await database.select().from(crmLeadDistribution).where(eq(crmLeadDistribution.department, input.department)).limit(1);
     if (!config || !config.enabled) return { assigned: false, reason: "Distribution not enabled" };
 
-    // Get active sellers in department
+    // Get active sellers in department (exclude gerentes)
     const deptSellers = await database.select().from(sellers).where(
-      and(eq(sellers.department, input.department), eq(sellers.active, true))
+      and(eq(sellers.department, input.department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente"))
     ).orderBy(asc(sellers.id));
 
     if (deptSellers.length === 0) return { assigned: false, reason: "No sellers in department" };

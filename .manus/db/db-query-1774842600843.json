@@ -1,0 +1,129 @@
+{
+  "query": "SELECT id, name, department, sellerRole, active FROM sellers WHERE active = 1 ORDER BY name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, department, sellerRole, active FROM sellers WHERE active = 1 ORDER BY name;",
+  "rows": [
+    {
+      "id": "60001",
+      "name": "Andréia Vieegas",
+      "department": "fei",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "210001",
+      "name": "Beatriz Eduarda",
+      "department": "marketing",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "60002",
+      "name": "Jordana claudino",
+      "department": "consignacao",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "30001",
+      "name": "Letícia ",
+      "department": "pre_vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "90001",
+      "name": "LOJA ",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "240001",
+      "name": "Nathan Felipe ",
+      "department": "vendas",
+      "sellerRole": "gerente",
+      "active": "1"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "60003",
+      "name": "Rafaela Simões ",
+      "department": "despachante",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "240002",
+      "name": "Rafaelaa",
+      "department": "financeiro",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "180001",
+      "name": "Tissiane dos santos ",
+      "department": "pre_vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "120001",
+      "name": "Vinicius albuini",
+      "department": "pos_venda",
+      "sellerRole": "vendedor",
+      "active": "1"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "department": "vendas",
+      "sellerRole": "vendedor",
+      "active": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tdepartment\tsellerRole\tactive\n60001\tAndréia Vieegas\tfei\tvendedor\t1\n210001\tBeatriz Eduarda\tmarketing\tvendedor\t1\n7\tEmanuel\tvendas\tvendedor\t1\n2\tGabriel\tvendas\tvendedor\t1\n60002\tJordana claudino\tconsignacao\tvendedor\t1\n1\tLeonardo\tvendas\tvendedor\t1\n30001\tLetícia \tpre_vendas\tvendedor\t1\n90001\tLOJA \tvendas\tvendedor\t1\n6\tLucas\tvendas\tvendedor\t1\n3\tMatheus\tvendas\tvendedor\t1\n240001\tNathan Felipe \tvendas\tgerente\t1\n5\tPetherson\tvendas\tvendedor\t1\n60003\tRafaela Simões \tdespachante\tvendedor\t1\n240002\tRafaelaa\tfinanceiro\tvendedor\t1\n180001\tTissiane dos santos \tpre_vendas\tvendedor\t1\n120001\tVinicius albuini\tpos_venda\tvendedor\t1\n4\tWesley\tvendas\tvendedor\t1\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

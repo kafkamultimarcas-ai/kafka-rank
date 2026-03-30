@@ -3,7 +3,7 @@ import crypto from "crypto";
 import * as crmDb from "./crmDb";
 import { getDb } from "./db";
 import { sellers, crmLeadDistribution, inventoryVehicles, crmMessages } from "../drizzle/schema";
-import { eq, and, asc, like, or, sql, desc } from "drizzle-orm";
+import { eq, and, asc, like, or, sql, desc, ne } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import * as zapi from "./zapi-service";
 
@@ -97,15 +97,15 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
         .where(eq(crmLeadDistribution.department, department)).limit(1);
       if (!fallbackConfig || !fallbackConfig.enabled) return { sellerId: null, sellerName: null };
       
-      // Fallback: use original department but only SDR sellers
+      // Fallback: use original department but only SDR sellers (exclude gerentes)
       const sdrSellers = await database.select().from(sellers)
-        .where(and(eq(sellers.department, "pre_vendas"), eq(sellers.active, true)))
+        .where(and(eq(sellers.department, "pre_vendas"), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
         .orderBy(asc(sellers.id));
       
-      // If no SDRs, fall back to department sellers
+      // If no SDRs, fall back to department sellers (exclude gerentes)
       const targetSellers = sdrSellers.length > 0 ? sdrSellers : 
         await database.select().from(sellers)
-          .where(and(eq(sellers.department, department), eq(sellers.active, true)))
+          .where(and(eq(sellers.department, department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
           .orderBy(asc(sellers.id));
       
       if (targetSellers.length === 0) return { sellerId: null, sellerName: null };
@@ -126,9 +126,9 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
       return { sellerId: nextSeller.id, sellerName: nextSeller.name };
     }
 
-    // Primary: distribute to SDR sellers only
+    // Primary: distribute to SDR sellers only (exclude gerentes)
     const sdrSellers = await database.select().from(sellers)
-      .where(and(eq(sellers.department, sdrDept), eq(sellers.active, true)))
+      .where(and(eq(sellers.department, sdrDept), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
       .orderBy(asc(sellers.id));
 
     if (sdrSellers.length === 0) return { sellerId: null, sellerName: null };
@@ -948,6 +948,24 @@ export function registerWebhookRoutes(app: Express) {
           });
           // Update lastContactDate on lead
           await crmDb.updateLead(existingLeads[0].id, { lastContactDate: Date.now() });
+
+          // If the lead's current seller is a gerente, auto-reassign to a vendedor
+          if (!fromMe && existingLeads[0].sellerId > 0) {
+            try {
+              const dbConn2 = await getDb();
+              if (dbConn2) {
+                const [currentSeller] = await dbConn2.select().from(sellers).where(eq(sellers.id, existingLeads[0].sellerId)).limit(1);
+                if (currentSeller && currentSeller.sellerRole === "gerente") {
+                  const reassignResult = await crmDb.autoReassignLead(existingLeads[0].id);
+                  if (reassignResult) {
+                    console.log(`[WhatsApp] Lead #${existingLeads[0].id} was assigned to gerente ${currentSeller.name}, reassigned to ${reassignResult.newSellerName} (ID: ${reassignResult.newSellerId})`);
+                  }
+                }
+              }
+            } catch (reassignErr) {
+              // Silently fail gerente check
+            }
+          }
 
           // Auto-classify lead temperature based on inbound message engagement
           if (!fromMe) {

@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE crm_leads SET sellerId = 5 WHERE id = 481169 AND sellerId = 240001;\nUPDATE crm_leads SET sellerId = 5 WHERE id = 481192 AND sellerId = 240001;\nUPDATE crm_leads SET sellerId = 5 WHERE id = 481287 AND sellerId = 240001;\nUPDATE crm_leads SET sellerId = 5 WHERE id = 481308 AND sellerId = 240001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute UPDATE crm_leads SET sellerId = 5 WHERE id = 481169 AND sellerId = 240001;\nUPDATE crm_leads SET sellerId = 5 WHERE id = 481192 AND sellerId = 240001;\nUPDATE crm_leads SET sellerId = 5 WHERE id = 481287 AND sellerId = 240001;\nUPDATE crm_leads SET sellerId = 5 WHERE id = 481308 AND sellerId = 240001;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 102
+}

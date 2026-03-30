@@ -1,0 +1,55 @@
+{
+  "query": "SELECT id, name, archived FROM crm_leads WHERE sellerId = 240001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name, archived FROM crm_leads WHERE sellerId = 240001;",
+  "rows": [
+    {
+      "id": "481154",
+      "name": "Weiber",
+      "archived": "0"
+    },
+    {
+      "id": "481156",
+      "name": "Denise 🥰",
+      "archived": "0"
+    },
+    {
+      "id": "481158",
+      "name": "Lothar Gode",
+      "archived": "0"
+    },
+    {
+      "id": "481215",
+      "name": "Max",
+      "archived": "0"
+    },
+    {
+      "id": "481229",
+      "name": "Renan Luiz",
+      "archived": "0"
+    },
+    {
+      "id": "481259",
+      "name": "Kety💕",
+      "archived": "0"
+    },
+    {
+      "id": "481262",
+      "name": "Elíseo Hobold",
+      "archived": "0"
+    },
+    {
+      "id": "481318",
+      "name": "Elcio Da Vani ❤️",
+      "archived": "0"
+    },
+    {
+      "id": "481326",
+      "name": "Natan Ramalho",
+      "archived": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tarchived\n481154\tWeiber\t0\n481156\tDenise 🥰\t0\n481158\tLothar Gode\t0\n481215\tMax\t0\n481229\tRenan Luiz\t0\n481259\tKety💕\t0\n481262\tElíseo Hobold\t0\n481318\tElcio Da Vani ❤️\t0\n481326\tNatan Ramalho\t0\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}

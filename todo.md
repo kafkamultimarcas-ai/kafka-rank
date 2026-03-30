@@ -1431,3 +1431,10 @@
 - [x] Aplicar fix em server/webhooks.ts (4 locais)
 - [x] Aplicar fix em server/inactive-dispatch.ts (4 locais)
 - [x] Testar toggle ON/OFF e verificar persistência via API
+
+## Nathan Felipe: Vendedor → Gerente + Redistribuição de Leads
+- [x] Alterar Nathan Felipe de "Vendedor" para "Gerente" no banco de dados
+- [x] Excluir gerentes da distribuição round-robin de leads em webhooks.ts, alert-checker.ts, crmEnhanced.ts, crmDb.ts
+- [x] Redistribuir os leads do Nathan entre os vendedores ativos
+- [x] Adicionar verificação no webhook WhatsApp: se lead está com gerente, reatribuir automaticamente
+- [x] Testar que novos leads não são mais distribuídos para gerentes

@@ -1,0 +1,45 @@
+{
+  "query": "SELECT s.id, s.name, COUNT(l.id) as leadCount FROM sellers s LEFT JOIN crm_leads l ON l.sellerId = s.id AND l.archived = 0 WHERE s.department = 'vendas' AND s.active = 1 AND s.sellerRole = 'vendedor' AND s.id != 90001 GROUP BY s.id, s.name ORDER BY leadCount ASC, s.id ASC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, COUNT(l.id) as leadCount FROM sellers s LEFT JOIN crm_leads l ON l.sellerId = s.id AND l.archived = 0 WHERE s.department = 'vendas' AND s.active = 1 AND s.sellerRole = 'vendedor' AND s.id != 90001 GROUP BY s.id, s.name ORDER BY leadCount ASC, s.id ASC;",
+  "rows": [
+    {
+      "id": "5",
+      "name": "Petherson",
+      "leadCount": "15"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "leadCount": "16"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "leadCount": "16"
+    },
+    {
+      "id": "3",
+      "name": "Matheus",
+      "leadCount": "17"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "leadCount": "17"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "leadCount": "19"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "leadCount": "19"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tleadCount\n5\tPetherson\t15\n1\tLeonardo\t16\n7\tEmanuel\t16\n3\tMatheus\t17\n6\tLucas\t17\n2\tGabriel\t19\n4\tWesley\t19\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

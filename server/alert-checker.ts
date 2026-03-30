@@ -1,7 +1,7 @@
 import * as crmDb from "./crmDb";
 import { getDb } from "./db";
 import { crmLeadDistribution, sellers } from "../drizzle/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, ne } from "drizzle-orm";
 
 const SDR_THRESHOLD_MINUTES = 5;
 const SELLER_THRESHOLD_MINUTES = 10;
@@ -17,7 +17,7 @@ async function autoAssignToSDR(leadId: number, department: string): Promise<bool
     if (!config || !config.enabled) return false;
 
     const deptSellers = await database.select().from(sellers)
-      .where(and(eq(sellers.department, department), eq(sellers.active, true)))
+      .where(and(eq(sellers.department, department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
       .orderBy(asc(sellers.id));
 
     if (deptSellers.length === 0) return false;

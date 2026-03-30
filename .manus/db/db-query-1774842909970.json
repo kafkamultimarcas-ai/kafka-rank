@@ -1,0 +1,54 @@
+{
+  "query": "SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "rows": [
+    {
+      "id": "481167",
+      "name": "🙏❤️"
+    },
+    {
+      "id": "481169",
+      "name": "Paulo Justino"
+    },
+    {
+      "id": "481195",
+      "name": "Mimos da Nayi"
+    },
+    {
+      "id": "481198",
+      "name": "Anderson Savariz"
+    },
+    {
+      "id": "481211",
+      "name": "Ailton"
+    },
+    {
+      "id": "481215",
+      "name": "Max"
+    },
+    {
+      "id": "481234",
+      "name": "sandracristinaanacleto"
+    },
+    {
+      "id": "481236",
+      "name": "WhatsApp 551131361712"
+    },
+    {
+      "id": "481254",
+      "name": "Emanoel Guilherme"
+    },
+    {
+      "id": "481313",
+      "name": "Wesley Consultor De Vendas"
+    },
+    {
+      "id": "481328",
+      "name": "Consultor Gabriel"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n481167\t🙏❤️\n481169\tPaulo Justino\n481195\tMimos da Nayi\n481198\tAnderson Savariz\n481211\tAilton\n481215\tMax\n481234\tsandracristinaanacleto\n481236\tWhatsApp 551131361712\n481254\tEmanoel Guilherme\n481313\tWesley Consultor De Vendas\n481328\tConsultor Gabriel\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

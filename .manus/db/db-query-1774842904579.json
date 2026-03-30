@@ -1,0 +1,64 @@
+{
+  "query": "SELECT s.id, s.name, s.sellerRole, COUNT(l.id) as leadCount FROM sellers s LEFT JOIN crm_leads l ON l.sellerId = s.id AND l.archived = 0 WHERE s.department = 'vendas' AND s.active = 1 GROUP BY s.id, s.name, s.sellerRole ORDER BY leadCount DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT s.id, s.name, s.sellerRole, COUNT(l.id) as leadCount FROM sellers s LEFT JOIN crm_leads l ON l.sellerId = s.id AND l.archived = 0 WHERE s.department = 'vendas' AND s.active = 1 GROUP BY s.id, s.name, s.sellerRole ORDER BY leadCount DESC;",
+  "rows": [
+    {
+      "id": "3",
+      "name": "Matheus",
+      "sellerRole": "vendedor",
+      "leadCount": "23"
+    },
+    {
+      "id": "1",
+      "name": "Leonardo",
+      "sellerRole": "vendedor",
+      "leadCount": "21"
+    },
+    {
+      "id": "7",
+      "name": "Emanuel",
+      "sellerRole": "vendedor",
+      "leadCount": "17"
+    },
+    {
+      "id": "6",
+      "name": "Lucas",
+      "sellerRole": "vendedor",
+      "leadCount": "17"
+    },
+    {
+      "id": "5",
+      "name": "Petherson",
+      "sellerRole": "vendedor",
+      "leadCount": "16"
+    },
+    {
+      "id": "2",
+      "name": "Gabriel",
+      "sellerRole": "vendedor",
+      "leadCount": "16"
+    },
+    {
+      "id": "90001",
+      "name": "LOJA ",
+      "sellerRole": "vendedor",
+      "leadCount": "15"
+    },
+    {
+      "id": "4",
+      "name": "Wesley",
+      "sellerRole": "vendedor",
+      "leadCount": "15"
+    },
+    {
+      "id": "240001",
+      "name": "Nathan Felipe ",
+      "sellerRole": "gerente",
+      "leadCount": "9"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\tsellerRole\tleadCount\n3\tMatheus\tvendedor\t23\n1\tLeonardo\tvendedor\t21\n7\tEmanuel\tvendedor\t17\n6\tLucas\tvendedor\t17\n5\tPetherson\tvendedor\t16\n2\tGabriel\tvendedor\t16\n90001\tLOJA \tvendedor\t15\n4\tWesley\tvendedor\t15\n240001\tNathan Felipe \tgerente\t9\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}

@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, name FROM crm_leads WHERE sellerId = 240001 AND archived = 0 ORDER BY id;",
+  "rows": [
+    {
+      "id": "481173",
+      "name": "Thaila"
+    },
+    {
+      "id": "481187",
+      "name": "Edino"
+    },
+    {
+      "id": "481188",
+      "name": "Roni"
+    },
+    {
+      "id": "481200",
+      "name": "Adriano"
+    },
+    {
+      "id": "481204",
+      "name": "Pastor João"
+    },
+    {
+      "id": "481230",
+      "name": "Vitor"
+    },
+    {
+      "id": "481244",
+      "name": "Elizete Fagundes"
+    },
+    {
+      "id": "481246",
+      "name": "Jose"
+    },
+    {
+      "id": "481247",
+      "name": "Nico"
+    },
+    {
+      "id": "481253",
+      "name": "Renato Silvio Cunha"
+    },
+    {
+      "id": "481267",
+      "name": "A Maior saudade"
+    },
+    {
+      "id": "481298",
+      "name": "Renato Silvio Cunha"
+    },
+    {
+      "id": "481305",
+      "name": "✨"
+    },
+    {
+      "id": "481306",
+      "name": "Angela"
+    },
+    {
+      "id": "481331",
+      "name": "Cliente Teste CRM"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\n481173\tThaila\n481187\tEdino\n481188\tRoni\n481200\tAdriano\n481204\tPastor João\n481230\tVitor\n481244\tElizete Fagundes\n481246\tJose\n481247\tNico\n481253\tRenato Silvio Cunha\n481267\tA Maior saudade\n481298\tRenato Silvio Cunha\n481305\t✨\n481306\tAngela\n481331\tCliente Teste CRM\n",
+  "stderr": "",
+  "execution_time_ms": 65
+}

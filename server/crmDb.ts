@@ -512,12 +512,13 @@ export async function autoReassignLead(leadId: number) {
   const lead = await getLeadById(leadId);
   if (!lead || lead.sellerId === 0) return null;
   
-  // Get all active sellers in same department, excluding current
+  // Get all active sellers in same department, excluding current and gerentes
   const allSellers = await db.select().from(sellers)
     .where(and(
       eq(sellers.department, lead.department),
       eq(sellers.active, true),
-      ne(sellers.id, lead.sellerId)
+      ne(sellers.id, lead.sellerId),
+      ne(sellers.sellerRole, "gerente")
     ));
   if (allSellers.length === 0) return null;
   
