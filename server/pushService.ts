@@ -249,3 +249,33 @@ export async function sendPushNewPvChamado(vendedorName: string, clienteNome: st
     data: { type: "pv_chamado", url: "/admin/pos-venda" },
   });
 }
+
+// ===== VENDEDOR: NOVO LEAD RECEBIDO =====
+export async function sendPushNewLead(sellerId: number, leadName: string, leadPhone: string | null, source: string | null, vehicleInterest: string | null) {
+  const sourceLabel = source ? ` (${source})` : "";
+  const vehicleLabel = vehicleInterest ? `\nInteresse: ${vehicleInterest}` : "";
+  const phoneLabel = leadPhone ? `\nTel: ${leadPhone}` : "";
+  
+  await sendPushToSeller(sellerId, {
+    title: "🚨 NOVO LEAD RECEBIDO!",
+    body: `${leadName}${sourceLabel}${phoneLabel}${vehicleLabel}\n\nResponda RÁPIDO para não perder essa venda!`,
+    tag: `new-lead-${sellerId}-${Date.now()}`,
+    data: { type: "new_lead", url: "/login-vendedor" },
+    requireInteraction: true,
+    vibrate: [500, 200, 500, 200, 500, 200, 500],
+  });
+}
+
+// ===== VENDEDOR: LEAD TRANSFERIDO PARA ELE =====
+export async function sendPushLeadTransferred(sellerId: number, leadName: string, fromSellerName: string | null) {
+  const fromLabel = fromSellerName ? ` de ${fromSellerName}` : "";
+  
+  await sendPushToSeller(sellerId, {
+    title: "📲 LEAD TRANSFERIDO PRA VOCÊ!",
+    body: `${leadName} foi transferido${fromLabel} para você.\nAbra o app e responda agora!`,
+    tag: `lead-transferred-${sellerId}-${Date.now()}`,
+    data: { type: "lead_transferred", url: "/login-vendedor" },
+    requireInteraction: true,
+    vibrate: [500, 200, 500, 200, 500],
+  });
+}

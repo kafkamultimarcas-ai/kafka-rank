@@ -1455,3 +1455,42 @@
 - [x] Frontend: mensagem do Mentor IA (dica do dia, direcionamento estratégico)
 - [x] Frontend: filtros por período (hoje, semana, mês)
 - [x] Acesso exclusivo para sellers com sellerRole="gerente"
+
+## Notificação de Novo Lead para Vendedor
+- [ ] Backend: sendPushNewLead + sendPushLeadTransferred no pushService
+- [ ] Backend: disparar push + notificação no banco em autoAssignLead e todos pontos de atribuição
+- [ ] Backend: rota para buscar leads recentes não vistos pelo vendedor (polling)
+- [ ] Frontend: banner gigante vermelho pulsando na Home quando chega novo lead
+- [ ] Frontend: som de alerta ao receber novo lead
+- [ ] Frontend: polling a cada 15s para detectar novos leads na tela do vendedor
+- [ ] Frontend: botão no banner para ir direto ao CRM/lead
+
+## CRM Overhaul: Acesso Unificado + Em Negociação + Lead Já Vendido
+- [ ] Backend: campo "negotiating" (boolean + timestamp) no lead para travar auto-transfer
+- [ ] Backend: auto-transfer (alert-checker, crmDb) deve ignorar leads em negociação
+- [ ] Backend: cross-check telefone/placa do lead com vendas para detectar "Lead Já Vendido"
+- [ ] Backend: telefone obrigatório no registro de venda + auto-fill dados do lead
+- [ ] Frontend: botão "Estou Atendendo" no card do lead que trava transferência
+- [ ] Frontend: badge "EM NEGOCIAÇÃO" visível no card do lead
+- [ ] Frontend: aviso "LEAD JÁ VENDIDO por [vendedor]" quando lead já foi fechado
+- [ ] Frontend: acesso unificado - vendedor loga e vê CRM + notificações + alertas numa tela central
+- [ ] Análise UX completa do CRM com recomendações de melhorias
+
+## PLANO MELHORIA GERAL (do relatório)
+
+### Bugs Críticos
+- [x] Bug: IA respondendo 2x (mensagem duplicada no WhatsApp) - lock por lead + check DB 30s
+- [x] Bug: SDR não vê leads não atribuídos no CRM - enabled condition corrigida, listForSDR já retorna todos os leads
+- [x] Bug: Financeiro bloqueado (não consegue lançar contas) - rotas financeiras mudadas de protectedProcedure para publicProcedure
+- [x] Bug: Filtro de leads por temperatura não funciona (todos Morno) - auto-classify agora só faz upgrade, nunca downgrade
+- [x] Bug: IA automática mensagens muito longas e pouco humanizadas - prompt reduzido para 1-2 linhas, mais natural
+
+### Bugs Médios
+- [x] Bug: Fotos enviadas do veículo não aparecem no chat do remetente - delay refetch 2s+5s para fotos serem salvas
+- [x] Bug: Envio de veículo simplificado (mostra dados demais) - mensagem já simplificada (nome+ano+link)
+- [x] Bug: Documentos de venda cards não clicáveis - links para CNH/Comprovante com ícone Eye
+- [x] Bug: Botão voltar faltando em algumas abas - todas as páginas já têm back button ou sidebar
+
+### Features Novas
+- [x] Feature: Controle de leads "Em Negociação" com alerta de inatividade - card no dashboard + alerta 3d+ parado
+- [x] Feature: Alerta "Lead Já Vendido" quando lead com mesma placa/telefone já tem venda aprovada - badge vermelho no LeadCard + checkAlreadySold endpoint

@@ -1,0 +1,80 @@
+{
+  "query": "SELECT * FROM crm_pipeline_stages WHERE department = 'vendas' ORDER BY displayOrder;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT * FROM crm_pipeline_stages WHERE department = 'vendas' ORDER BY displayOrder;",
+  "rows": [
+    {
+      "id": "1",
+      "department": "vendas",
+      "name": "Novo Lead",
+      "displayOrder": "1",
+      "color": "#6366F1",
+      "isDefault": "1",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "2",
+      "department": "vendas",
+      "name": "Contato Feito",
+      "displayOrder": "2",
+      "color": "#8B5CF6",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "3",
+      "department": "vendas",
+      "name": "Visita Agendada",
+      "displayOrder": "3",
+      "color": "#F59E0B",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "4",
+      "department": "vendas",
+      "name": "Em Negociacao",
+      "displayOrder": "4",
+      "color": "#F97316",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "5",
+      "department": "vendas",
+      "name": "Proposta Enviada",
+      "displayOrder": "5",
+      "color": "#EF4444",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "6",
+      "department": "vendas",
+      "name": "Venda Fechada",
+      "displayOrder": "6",
+      "color": "#22C55E",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "7",
+      "department": "vendas",
+      "name": "Perdido",
+      "displayOrder": "7",
+      "color": "#6B7280",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tdepartment\tname\tdisplayOrder\tcolor\tisDefault\tisFinal\tcreatedAt\n1\tvendas\tNovo Lead\t1\t#6366F1\t1\t0\t2026-03-20 04:53:25\n2\tvendas\tContato Feito\t2\t#8B5CF6\t0\t0\t2026-03-20 04:53:25\n3\tvendas\tVisita Agendada\t3\t#F59E0B\t0\t0\t2026-03-20 04:53:25\n4\tvendas\tEm Negociacao\t4\t#F97316\t0\t0\t2026-03-20 04:53:25\n5\tvendas\tProposta Enviada\t5\t#EF4444\t0\t0\t2026-03-20 04:53:25\n6\tvendas\tVenda Fechada\t6\t#22C55E\t0\t1\t2026-03-20 04:53:25\n7\tvendas\tPerdido\t7\t#6B7280\t0\t1\t2026-03-20 04:53:25\n",
+  "stderr": "",
+  "execution_time_ms": 57
+}

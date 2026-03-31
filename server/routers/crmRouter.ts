@@ -8,6 +8,7 @@ import * as crmDb from "../crmDb";
 import * as db from "../db";
 import { storagePut } from "../storage";
 import { transcribeAudio } from "../_core/voiceTranscription";
+import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 
 // ===== ADMIN AUTH (Login próprio) =====
 export const adminAuthRouter = router({
@@ -128,6 +129,42 @@ export const crmLeadsRouter = router({
     return crmDb.getLeadById(input.id);
   }),
 
+  // Check if lead's phone or plate already has an approved sale
+  checkAlreadySold: publicProcedure.input(z.object({ leadId: z.number() })).query(async ({ input }) => {
+    const lead = await crmDb.getLeadById(input.leadId);
+    if (!lead) return { alreadySold: false };
+    const { getDb } = await import("../db");
+    const { sales } = await import("../../drizzle/schema");
+    const { eq, or, and } = await import("drizzle-orm");
+    const dbConn = await getDb();
+    if (!dbConn) return { alreadySold: false };
+    const conditions = [];
+    if (lead.phone) {
+      const cleanPhone = lead.phone.replace(/\D/g, "");
+      conditions.push(eq(sales.customerPhone, lead.phone));
+      if (cleanPhone !== lead.phone) conditions.push(eq(sales.customerPhone, cleanPhone));
+    }
+    if (lead.vehiclePlate) {
+      conditions.push(eq(sales.vehiclePlate, lead.vehiclePlate));
+    }
+    if (conditions.length === 0) return { alreadySold: false };
+    const matches = await dbConn.select().from(sales).where(
+      and(eq(sales.status, "approved"), or(...conditions))
+    ).limit(5);
+    if (matches.length === 0) return { alreadySold: false };
+    return {
+      alreadySold: true,
+      sales: matches.map(s => ({
+        id: s.id,
+        vehicleModel: s.vehicleModel,
+        vehiclePlate: s.vehiclePlate,
+        customerPhone: s.customerPhone,
+        createdAt: s.createdAt,
+        sellerId: s.sellerId,
+      })),
+    };
+  }),
+
   listBySeller: publicProcedure.input(z.object({
     sellerId: z.number(),
     department: z.string().optional(),
@@ -239,6 +276,15 @@ export const crmLeadsRouter = router({
       type: "transferencia",
       description: `Lead transferido para vendedor #${input.newSellerId}${input.notes ? ` - ${input.notes}` : ""}`,
     });
+    // Notify the new seller
+    sendPushLeadTransferred(input.newSellerId, lead.name || 'Lead', null).catch(console.error);
+    db.createNotification({
+      title: '\ud83d\udcf2 LEAD TRANSFERIDO!',
+      message: `${lead.name || 'Lead'} foi transferido para voc\u00ea. Responda agora!`,
+      type: 'urgent',
+      sellerId: input.newSellerId,
+      targetType: 'seller',
+    }).catch(console.error);
     return { success: true };
   }),
 
@@ -260,6 +306,17 @@ export const crmLeadsRouter = router({
         });
         assigned++;
       } catch {}
+    }
+    // Notify seller about bulk assignment
+    if (assigned > 0) {
+      sendPushNewLead(input.newSellerId, `${assigned} leads`, null, 'distribui\u00e7\u00e3o', null).catch(console.error);
+      db.createNotification({
+        title: '\ud83d\udea8 NOVOS LEADS!',
+        message: `Voc\u00ea recebeu ${assigned} leads novos. Confira no CRM!`,
+        type: 'urgent',
+        sellerId: input.newSellerId,
+        targetType: 'seller',
+      }).catch(console.error);
     }
     return { assigned, total: input.leadIds.length };
   }),
@@ -908,26 +965,26 @@ export const crmAiRouter = router({
     } catch { /* ignore */ }
 
     // 5. Call LLM - optimized for short, humanized WhatsApp messages
-    const systemPrompt = `Você é vendedor da Kafka Multimarcas. Responda como um vendedor real de loja de carros pelo WhatsApp.
+    const firstName = (lead.name || '').split(' ')[0] || 'amigo';
+    const systemPrompt = `Vendedor Kafka Multimarcas no WhatsApp. Responda como pessoa real.
 
-REGRAS OBRIGATÓRIAS:
-- MÁXIMO 2-3 linhas por mensagem (como uma pessoa real digitaria no WhatsApp)
-- Linguagem natural, informal, como se estivesse conversando com um amigo
-- SEM formatação (sem negrito, sem markdown, sem asteriscos)
-- Máximo 1 emoji por mensagem (ou nenhum)
-- NUNCA invente dados de veículos
-- Foque em UMA coisa por mensagem: ou pergunta, ou resposta, ou convite pra visita
-- Se puder, chame pelo primeiro nome
-- Tente sempre levar pra visita na loja ou test drive${feiraoContext}
+REGRAS:
+- MAX 1-2 linhas curtas (como WhatsApp real)
+- Linguagem natural e informal
+- Sem formatação, sem asteriscos, sem markdown
+- Max 1 emoji
+- Nunca invente dados de veículos
+- Foque em 1 coisa só
+- Chame de ${firstName}
+- Tente levar pra visita/test drive${feiraoContext}
 
-LEAD: ${lead.name} | Interesse: ${lead.vehicleInterest || "N/A"} | Etapa: ${lead.stage}${vehicleContext}
+Cliente: ${firstName} | Interesse: ${lead.vehicleInterest || 'veículo'} | Etapa: ${lead.stage}${vehicleContext}
 
-CONVERSA:
-${chatHistory || "(Primeira mensagem)"}`;
+${chatHistory || '(Primeira mensagem)'}`;
 
     const userMessage = input.customPrompt
-      ? `${input.customPrompt}. Responda em no máximo 2-3 linhas curtas.`
-      : "Gere a próxima mensagem do vendedor. Máximo 2-3 linhas curtas, como uma mensagem real de WhatsApp. Apenas o texto, sem prefixos.";
+      ? `${input.customPrompt}. Max 1-2 linhas.`
+      : "Responda o cliente em 1-2 linhas. Só o texto, nada mais.";
 
     const response = await invokeLLM({
       messages: [

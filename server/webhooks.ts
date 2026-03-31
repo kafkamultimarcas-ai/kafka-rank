@@ -6,6 +6,8 @@ import { sellers, crmLeadDistribution, inventoryVehicles, crmMessages } from "..
 import { eq, and, asc, like, or, sql, desc, ne } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import * as zapi from "./zapi-service";
+import { sendPushNewLead, sendPushLeadTransferred } from "./pushService";
+import { createNotification } from "./db";
 
 // ===== META GRAPH API HELPER =====
 async function fetchMetaLeadData(leadgenId: string, pageAccessToken: string): Promise<{ name: string; phone: string | null; email: string | null; fields: Record<string, string> } | null> {
@@ -123,6 +125,17 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
         .set({ lastAssignedSellerId: nextSeller.id })
         .where(eq(crmLeadDistribution.department, department));
       
+      // Notify seller about new lead
+      const leadData = await crmDb.getLeadById(leadId);
+      sendPushNewLead(nextSeller.id, leadData?.name || 'Novo Lead', leadData?.phone || null, leadData?.source || null, leadData?.vehicleInterest || null).catch(console.error);
+      createNotification({
+        title: '\ud83d\udea8 NOVO LEAD!',
+        message: `Voc\u00ea recebeu o lead ${leadData?.name || 'Novo Lead'}${leadData?.phone ? ' - ' + leadData.phone : ''}. Responda r\u00e1pido!`,
+        type: 'urgent',
+        sellerId: nextSeller.id,
+        targetType: 'seller',
+      }).catch(console.error);
+      
       return { sellerId: nextSeller.id, sellerName: nextSeller.name };
     }
 
@@ -145,6 +158,17 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
     await database.update(crmLeadDistribution)
       .set({ lastAssignedSellerId: nextSeller.id })
       .where(eq(crmLeadDistribution.department, sdrDept));
+
+    // Notify seller about new lead
+    const leadInfo = await crmDb.getLeadById(leadId);
+    sendPushNewLead(nextSeller.id, leadInfo?.name || 'Novo Lead', leadInfo?.phone || null, leadInfo?.source || null, leadInfo?.vehicleInterest || null).catch(console.error);
+    createNotification({
+      title: '\ud83d\udea8 NOVO LEAD!',
+      message: `Voc\u00ea recebeu o lead ${leadInfo?.name || 'Novo Lead'}${leadInfo?.phone ? ' - ' + leadInfo.phone : ''}. Responda r\u00e1pido!`,
+      type: 'urgent',
+      sellerId: nextSeller.id,
+      targetType: 'seller',
+    }).catch(console.error);
 
     console.log(`[Lead Distribution] Lead #${leadId} assigned to SDR ${nextSeller.name} (ID: ${nextSeller.id})`);
     return { sellerId: nextSeller.id, sellerName: nextSeller.name };
@@ -207,6 +231,26 @@ function isDuplicate(messageId: string | null): boolean {
   if (processedMessages.has(messageId)) return true;
   processedMessages.set(messageId, now);
   return false;
+}
+
+// AI Auto-Reply lock per lead to prevent concurrent/duplicate AI replies
+export const aiReplyLocks = new Map<number, number>();
+const AI_LOCK_TTL = 30 * 1000; // 30 seconds lock per lead
+function acquireAiLock(leadId: number): boolean {
+  const now = Date.now();
+  // Clean expired locks
+  Array.from(aiReplyLocks.entries()).forEach(([key, ts]) => {
+    if (now - ts > AI_LOCK_TTL) aiReplyLocks.delete(key);
+  });
+  if (aiReplyLocks.has(leadId)) {
+    console.log(`[AI Auto-Reply] Lock active for lead #${leadId}, skipping duplicate`);
+    return false;
+  }
+  aiReplyLocks.set(leadId, now);
+  return true;
+}
+function releaseAiLock(leadId: number): void {
+  aiReplyLocks.delete(leadId);
 }
 
 export function registerWebhookRoutes(app: Express) {
@@ -968,6 +1012,8 @@ export function registerWebhookRoutes(app: Express) {
           }
 
           // Auto-classify lead temperature based on inbound message engagement
+          // Only UPGRADE temperature (cold->warm->hot), NEVER downgrade
+          // Manual score changes by sellers/admins are preserved
           if (!fromMe) {
             try {
               const dbConn = await getDb();
@@ -980,13 +1026,13 @@ export function registerWebhookRoutes(app: Express) {
                 const inboundCount = Number(countResult?.cnt || 0);
                 const currentScore = existingLeads[0].score;
                 let newScore = currentScore;
-                // Classification rules: 1-3 msgs = cold, 4-8 msgs = warm, 9+ msgs = hot
+                // Only upgrade: 4+ msgs cold->warm, 9+ msgs warm->hot
                 if (inboundCount >= 9 && currentScore !== "hot") newScore = "hot";
-                else if (inboundCount >= 4 && inboundCount < 9 && currentScore === "cold") newScore = "warm";
-                else if (inboundCount < 4 && currentScore !== "cold") newScore = "cold";
+                else if (inboundCount >= 4 && currentScore === "cold") newScore = "warm";
+                // Never downgrade - if seller manually set to hot/warm, keep it
                 if (newScore !== currentScore) {
                   await crmDb.updateLead(existingLeads[0].id, { score: newScore as any });
-                  console.log(`[Lead Score] Lead #${existingLeads[0].id} auto-classified: ${currentScore} -> ${newScore} (${inboundCount} inbound msgs)`);
+                  console.log(`[Lead Score] Lead #${existingLeads[0].id} auto-upgraded: ${currentScore} -> ${newScore} (${inboundCount} inbound msgs)`);
                 }
               }
             } catch (scoreErr) {
@@ -996,10 +1042,16 @@ export function registerWebhookRoutes(app: Express) {
 
           // AI Auto-reply: check if enabled for this lead (only for inbound text messages)
           if (!fromMe && messageText && messageType === "text") {
+            const leadIdForAi = existingLeads[0].id;
+            // Acquire lock to prevent duplicate AI replies for same lead
+            if (!acquireAiLock(leadIdForAi)) {
+              // Lock already held - another AI reply is in progress for this lead
+              console.log(`[AI Auto-Reply] Skipping - lock active for lead #${leadIdForAi}`);
+            } else {
             (async () => {
               try {
                 const dbConn = await getDb();
-                if (!dbConn) return;
+                if (!dbConn) { releaseAiLock(leadIdForAi); return; }
 
                 // Check per-lead AI setting FIRST (individual toggle)
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
@@ -1081,18 +1133,31 @@ export function registerWebhookRoutes(app: Express) {
                   const r = m.direction === "inbound" ? "CLIENTE" : "VENDEDOR";
                   return `${r}: ${m.content || "[M\u00eddia]"}`;
                 }).join("\n");
-                const sysPrompt = `Voc\u00ea \u00e9 vendedor da Kafka Multimarcas respondendo pelo WhatsApp.\n\nREGRAS:\n- M\u00c1XIMO 2-3 linhas (como mensagem real de WhatsApp)\n- ${personalityInstr}\n- SEM formata\u00e7\u00e3o (sem negrito, asteriscos, markdown)\n- M\u00e1ximo 1 emoji (ou nenhum)\n- NUNCA invente dados de ve\u00edculos\n- Foque em UMA coisa: ou pergunta, ou resposta, ou convite pra visita\n- Chame pelo primeiro nome quando poss\u00edvel${feiraoCtx}\n\nLEAD: ${leadForAi.name} | Interesse: ${leadForAi.vehicleInterest || "N/A"} | Score: ${leadForAi.score}${vehicleCtx}\n\nCONVERSA:\n${chatHist}`;
-                const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Gere a pr\u00f3xima mensagem do vendedor. M\u00e1ximo 2-3 linhas curtas. Apenas o texto, sem prefixos." }] });
+                const firstName = (leadForAi.name || '').split(' ')[0] || 'amigo';
+                const sysPrompt = `Vendedor Kafka Multimarcas no WhatsApp. Responda como pessoa real.\n\nREGRAS:\n- MAX 1-2 linhas curtas\n- ${personalityInstr}\n- Sem formatação, sem asteriscos\n- Max 1 emoji\n- Nunca invente dados\n- Foque em 1 coisa só\n- Chame de ${firstName}${feiraoCtx}\n\nCliente: ${firstName} | Interesse: ${leadForAi.vehicleInterest || 'veículo'}${vehicleCtx}\n\n${chatHist}`;
+                const aiResp = await invokeLLM({ messages: [{ role: "system", content: sysPrompt }, { role: "user", content: "Responda o cliente em 1-2 linhas. Só o texto, nada mais." }] });
                 const aiText = ((aiResp.choices?.[0]?.message?.content as string) || "").trim();
                 if (aiText && phone) {
+                  // Check if we already sent an AI reply in the last 30s (extra safety)
+                  const recentAiCheck = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_messages WHERE leadId = ${leadForAi.id} AND direction = 'outbound' AND senderName = 'IA Kafka' AND timestamp > ${Date.now() - 30000}`);
+                  const recentAiRaw = recentAiCheck as any;
+                  const recentAiRows = Array.isArray(recentAiRaw?.[0]) ? recentAiRaw[0] : recentAiRaw;
+                  if (Number(recentAiRows?.[0]?.cnt || 0) > 0) {
+                    console.log(`[AI Auto-Reply] Already sent AI reply to lead #${leadForAi.id} in last 30s, skipping duplicate`);
+                    releaseAiLock(leadIdForAi);
+                    return;
+                  }
                   await zapi.sendText(phone, aiText);
                   await crmDb.createMessage({ leadId: leadForAi.id, phone, direction: "outbound", messageType: "text", content: aiText, mediaUrl: null, senderName: "IA Kafka", sentBy: null, zapiMessageId: null, timestamp: Date.now() });
                   console.log(`[AI Auto-Reply] Sent to lead #${leadForAi.id} (${phone}): ${aiText.substring(0, 50)}...`);
                 }
+                releaseAiLock(leadIdForAi);
               } catch (aiErr: any) {
                 console.error(`[AI Auto-Reply] Error:`, aiErr.message);
+                releaseAiLock(leadIdForAi);
               }
             })();
+            } // end acquireAiLock else
           }
 
           res.json({ success: true, action: "message_saved", leadId: existingLeads[0].id });

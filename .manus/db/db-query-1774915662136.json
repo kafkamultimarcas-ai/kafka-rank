@@ -1,0 +1,250 @@
+{
+  "query": "SELECT * FROM crm_pipeline_stages ORDER BY department, displayOrder;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT * FROM crm_pipeline_stages ORDER BY department, displayOrder;",
+  "rows": [
+    {
+      "id": "14",
+      "department": "consignacao",
+      "name": "Veiculo Recebido",
+      "displayOrder": "1",
+      "color": "#6366F1",
+      "isDefault": "1",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "15",
+      "department": "consignacao",
+      "name": "Avaliado",
+      "displayOrder": "2",
+      "color": "#8B5CF6",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "16",
+      "department": "consignacao",
+      "name": "Anunciado",
+      "displayOrder": "3",
+      "color": "#F59E0B",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "17",
+      "department": "consignacao",
+      "name": "Em Negociacao",
+      "displayOrder": "4",
+      "color": "#F97316",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "18",
+      "department": "consignacao",
+      "name": "Vendido",
+      "displayOrder": "5",
+      "color": "#22C55E",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "19",
+      "department": "consignacao",
+      "name": "Devolvido",
+      "displayOrder": "6",
+      "color": "#6B7280",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "20",
+      "department": "fei",
+      "name": "Cliente Recebido",
+      "displayOrder": "1",
+      "color": "#6366F1",
+      "isDefault": "1",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "21",
+      "department": "fei",
+      "name": "Analise de Credito",
+      "displayOrder": "2",
+      "color": "#8B5CF6",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "22",
+      "department": "fei",
+      "name": "Aprovado",
+      "displayOrder": "3",
+      "color": "#22C55E",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "23",
+      "department": "fei",
+      "name": "Contrato Assinado",
+      "displayOrder": "4",
+      "color": "#F59E0B",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "24",
+      "department": "fei",
+      "name": "Reprovado",
+      "displayOrder": "5",
+      "color": "#EF4444",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "8",
+      "department": "pre_vendas",
+      "name": "Lead Recebido",
+      "displayOrder": "1",
+      "color": "#6366F1",
+      "isDefault": "1",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "9",
+      "department": "pre_vendas",
+      "name": "Qualificado",
+      "displayOrder": "2",
+      "color": "#8B5CF6",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "10",
+      "department": "pre_vendas",
+      "name": "Agendamento Marcado",
+      "displayOrder": "3",
+      "color": "#F59E0B",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "11",
+      "department": "pre_vendas",
+      "name": "Compareceu",
+      "displayOrder": "4",
+      "color": "#F97316",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "12",
+      "department": "pre_vendas",
+      "name": "Convertido p/ Vendas",
+      "displayOrder": "5",
+      "color": "#22C55E",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "13",
+      "department": "pre_vendas",
+      "name": "Descartado",
+      "displayOrder": "6",
+      "color": "#6B7280",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "1",
+      "department": "vendas",
+      "name": "Novo Lead",
+      "displayOrder": "1",
+      "color": "#6366F1",
+      "isDefault": "1",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "2",
+      "department": "vendas",
+      "name": "Contato Feito",
+      "displayOrder": "2",
+      "color": "#8B5CF6",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "3",
+      "department": "vendas",
+      "name": "Visita Agendada",
+      "displayOrder": "3",
+      "color": "#F59E0B",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "4",
+      "department": "vendas",
+      "name": "Em Negociacao",
+      "displayOrder": "4",
+      "color": "#F97316",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "5",
+      "department": "vendas",
+      "name": "Proposta Enviada",
+      "displayOrder": "5",
+      "color": "#EF4444",
+      "isDefault": "0",
+      "isFinal": "0",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "6",
+      "department": "vendas",
+      "name": "Venda Fechada",
+      "displayOrder": "6",
+      "color": "#22C55E",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    },
+    {
+      "id": "7",
+      "department": "vendas",
+      "name": "Perdido",
+      "displayOrder": "7",
+      "color": "#6B7280",
+      "isDefault": "0",
+      "isFinal": "1",
+      "createdAt": "2026-03-20 04:53:25"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tdepartment\tname\tdisplayOrder\tcolor\tisDefault\tisFinal\tcreatedAt\n14\tconsignacao\tVeiculo Recebido\t1\t#6366F1\t1\t0\t2026-03-20 04:53:25\n15\tconsignacao\tAvaliado\t2\t#8B5CF6\t0\t0\t2026-03-20 04:53:25\n16\tconsignacao\tAnunciado\t3\t#F59E0B\t0\t0\t2026-03-20 04:53:25\n17\tconsignacao\tEm Negociacao\t4\t#F97316\t0\t0\t2026-03-20 04:53:25\n18\tconsignacao\tVendido\t5\t#22C55E\t0\t1\t2026-03-20 04:53:25\n19\tconsignacao\tDevolvido\t6\t#6B7280\t0\t1\t2026-03-20 04:53:25\n20\tfei\tCliente Recebido\t1\t#6366F1\t1\t0\t2026-03-20 04:53:25\n21\tfei\tAnalise de Credito\t2\t#8B5CF6\t0\t0\t2026-03-20 04:53:25\n22\tfei\tAprovado\t3\t#22C55E\t0\t0\t2026-03-20 04:53:25\n23\tfei\tContrato Assinado\t4\t#F59E0B\t0\t1\t2026-03-20 04:53:25\n24\tfei\tReprovado\t5\t#EF4444\t0\t1\t2026-03-20 04:53:25\n8\tpre_vendas\tLead Recebido\t1\t#6366F1\t1\t0\t2026-03-20 04:53:25\n9\tpre_vendas\tQualificado\t2\t#8B5CF6\t0\t0\t2026-03-20 04:53:25\n10\tpre_vendas\tAgendamento Marcado\t3\t#F59E0B\t0\t0\t2026-03-20 04:53:25\n11\tpre_vendas\tCompareceu\t4\t#F97316\t0\t0\t2026-03-20 04:53:25\n12\tpre_vendas\tConvertido p/ Vendas\t5\t#22C55E\t0\t1\t2026-03-20 04:53:25\n13\tpre_vendas\tDescartado\t6\t#6B7280\t0\t1\t2026-03-20 04:53:25\n1\tvendas\tNovo Lead\t1\t#6366F1\t1\t0\t2026-03-20 04:53:25\n2\tvendas\tContato Feito\t2\t#8B5CF6\t0\t0\t2026-03-20 04:53:25\n3\tvendas\tVisita Agendada\t3\t#F59E0B\t0\t0\t2026-03-20 04:53:25\n4\tvendas\tEm Negociacao\t4\t#F97316\t0\t0\t2026-03-20 04:53:25\n5\tvendas\tProposta Enviada\t5\t#EF4444\t0\t0\t2026-03-20 04:53:25\n6\tvendas\tVenda Fechada\t6\t#22C55E\t0\t1\t2026-03-20 04:53:25\n7\tvendas\tPerdido\t7\t#6B7280\t0\t1\t2026-03-20 04:53:25\n",
+  "stderr": "",
+  "execution_time_ms": 159
+}

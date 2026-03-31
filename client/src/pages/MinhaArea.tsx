@@ -614,8 +614,20 @@ export default function MinhaArea() {
                       </span>
                     </div>
                     <div className="flex gap-2">
-                      <span className="text-[10px] text-emerald-400 flex items-center gap-1"><FileCheck className="w-3 h-3" /> CNH</span>
-                      <span className="text-[10px] text-emerald-400 flex items-center gap-1"><FileCheck className="w-3 h-3" /> Comprovante</span>
+                      {doc.cnhUrl ? (
+                        <a href={doc.cnhUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors">
+                          <FileCheck className="w-3 h-3" /> CNH <Eye className="w-2.5 h-2.5 ml-0.5" />
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-emerald-400 flex items-center gap-1"><FileCheck className="w-3 h-3" /> CNH</span>
+                      )}
+                      {doc.comprovanteUrl ? (
+                        <a href={doc.comprovanteUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-400 flex items-center gap-1 hover:text-emerald-300 transition-colors">
+                          <FileCheck className="w-3 h-3" /> Comprovante <Eye className="w-2.5 h-2.5 ml-0.5" />
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-emerald-400 flex items-center gap-1"><FileCheck className="w-3 h-3" /> Comprovante</span>
+                      )}
                     </div>
                     {doc.dispatchStatus === 'transferido' && doc.documentoEmitidoUrl && (
                       <a

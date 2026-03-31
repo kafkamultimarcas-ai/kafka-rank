@@ -10,7 +10,7 @@ import {
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
-  Volume2, Download, Play, File, Square
+  Volume2, Download, Play, File, Square, Handshake
 } from "lucide-react";
 
 // Detect media type from URL extension as fallback
@@ -259,7 +259,13 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const sendVehicle = trpc.crmChat.sendVehicle.useMutation({
-    onSuccess: (data: any) => { refetchMessages(); setShowVehicles(false); toast.success(`Veículo ${data.vehicleName} enviado!`); },
+    onSuccess: (data: any) => {
+      setShowVehicles(false);
+      toast.success(`Veículo ${data.vehicleName} enviado! ${data.photosSent}/${data.photosTotal} fotos`);
+      // Delay refetch to ensure all photos are saved in DB
+      setTimeout(() => refetchMessages(), 2000);
+      setTimeout(() => refetchMessages(), 5000);
+    },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const uploadMedia = trpc.crmChat.uploadMedia.useMutation();
@@ -749,7 +755,7 @@ export default function CrmCommandCenter() {
     { sellerId, archived: false }, { enabled: sellerId > 0 && !isSDR, refetchInterval: 10000 }
   );
   const { data: sdrLeads, refetch: refetchSDR } = trpc.crmLeads.listForSDR.useQuery(
-    { archived: false }, { enabled: isSDR, refetchInterval: 10000 }
+    { archived: false }, { enabled: isSDR && sellerId > 0, refetchInterval: 10000 }
   );
   const leads = isSDR ? sdrLeads : sellerLeads;
   const refetchLeads = isSDR ? refetchSDR : refetchSellerLeads;
@@ -1008,6 +1014,7 @@ export default function CrmCommandCenter() {
             onWhatsApp={handleWhatsApp}
             onCall={handleCall}
             sellerId={sellerId}
+            leads={leads}
           />
         )
       )}
@@ -1274,7 +1281,17 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
 }
 
 // ===== SELLER DASHBOARD =====
-function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryAlerts, onWhatsApp, onCall, sellerId }: any) {
+function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryAlerts, onWhatsApp, onCall, sellerId, leads }: any) {
+  // Em Negociação tracking
+  const negotiationLeads = useMemo(() => {
+    if (!leads) return [];
+    return leads.filter((l: any) => l.stage === 'Em Negociacao' || l.stage === 'Em Negociação');
+  }, [leads]);
+  const staleNegotiations = useMemo(() => {
+    const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+    return negotiationLeads.filter((l: any) => !l.lastContactDate || l.lastContactDate < threeDaysAgo);
+  }, [negotiationLeads]);
+
   return (
     <div className="px-3 mt-3 space-y-3">
       {/* Performance cards */}
@@ -1289,6 +1306,16 @@ function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryA
             <span className="text-[9px] px-1 py-0.5 rounded bg-red-500/20 text-red-400">{stats?.hot || 0} quentes</span>
             <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400">{stats?.warm || 0} mornos</span>
           </div>
+        </div>
+        <div className="rounded-xl border border-orange-500/40 bg-orange-500/10 p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Handshake className="w-3.5 h-3.5 text-orange-400" />
+            <span className="text-[10px] text-orange-300 uppercase font-bold">Em Negociação</span>
+          </div>
+          <p className="text-xl font-bold text-orange-400">{negotiationLeads.length}</p>
+          {staleNegotiations.length > 0 && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-red-500/20 text-red-400">{staleNegotiations.length} parados 3d+</span>
+          )}
         </div>
         <div className="rounded-xl border border-border bg-card p-3">
           <div className="flex items-center gap-1.5 mb-1">
@@ -1306,15 +1333,34 @@ function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryA
           <p className="text-xl font-bold text-foreground">{dashboard?.pendingFollowUps || 0}</p>
           <p className="text-[9px] text-muted-foreground">pendentes hoje</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Zap className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-[10px] text-muted-foreground uppercase">Tempo Resp.</span>
-          </div>
-          <p className="text-xl font-bold text-foreground">{dashboard?.avgResponseTime || "--"}</p>
-          <p className="text-[9px] text-muted-foreground">média em minutos</p>
-        </div>
       </div>
+
+      {/* ALERTA: Negociações paradas */}
+      {staleNegotiations.length > 0 && (
+        <div className="rounded-xl border-2 border-orange-500/50 bg-orange-500/10 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-orange-400" />
+            <span className="text-xs font-bold text-orange-400">{staleNegotiations.length} negociação(ões) parada(s) há 3+ dias!</span>
+          </div>
+          <p className="text-[10px] text-orange-300/70 mb-1">Leads em negociação sem contato recente. Retome o contato!</p>
+          {staleNegotiations.slice(0, 3).map((lead: any) => (
+            <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-orange-500/20">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium text-foreground truncate block">{lead.name}</span>
+                {lead.vehicleInterest && <span className="text-[10px] text-muted-foreground">{lead.vehicleInterest}</span>}
+              </div>
+              <div className="flex gap-1">
+                <button onClick={() => onWhatsApp(lead)} className="p-1.5 rounded bg-green-500/20 hover:bg-green-500/30 active:scale-95">
+                  <MessageCircle className="w-3.5 h-3.5 text-green-400" />
+                </button>
+                <button onClick={() => onCall(lead)} className="p-1.5 rounded bg-blue-500/20 hover:bg-blue-500/30 active:scale-95">
+                  <Phone className="w-3.5 h-3.5 text-blue-400" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Follow-ups pendentes */}
       {followUps && followUps.length > 0 && (
@@ -1459,6 +1505,10 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
 }) {
   const [showStages, setShowStages] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const { data: soldCheck } = trpc.crmLeads.checkAlreadySold.useQuery(
+    { leadId: lead.id },
+    { enabled: !!lead.id, staleTime: 60000 }
+  );
   const scoreCfg = SCORE_CONFIG[lead.score as keyof typeof SCORE_CONFIG] || SCORE_CONFIG.warm;
   const ScoreIcon = scoreCfg.icon;
   const isUrgent = lead._alertType === "transfer";
@@ -1508,6 +1558,12 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
             {lead.source && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${(SOURCE_LABELS[lead.source]?.bg || 'bg-accent')} ${(SOURCE_LABELS[lead.source]?.color || 'text-muted-foreground')}`}>
                 {SOURCE_LABELS[lead.source]?.label || lead.source}
+              </span>
+            )}
+            {/* JÁ VENDIDO badge */}
+            {soldCheck?.alreadySold && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/30 text-red-400 font-bold border border-red-500/40 flex items-center gap-0.5">
+                <AlertTriangle className="w-2.5 h-2.5" /> JÁ VENDIDO
               </span>
             )}
             {/* SDR: show assignment status */}

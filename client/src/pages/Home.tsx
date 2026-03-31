@@ -8,6 +8,7 @@ import { getLoginUrl } from "@/const";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
 import NotificationCenter from "@/components/NotificationCenter";
+import NewLeadAlert from "@/components/NewLeadAlert";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
@@ -156,6 +157,9 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* New Lead Alert - big visual alert for sellers */}
+      {sellerSession && <NewLeadAlert sellerId={sellerSession.id} />}
 
       {/* Hero Section */}
       <section className="relative overflow-hidden py-12 sm:py-20">

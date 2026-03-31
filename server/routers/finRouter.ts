@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { router, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   listFinCategories, createFinCategory, updateFinCategory,
@@ -15,10 +15,10 @@ import { notifyOwner } from "../_core/notification";
 
 // ===== CATEGORIES ROUTER =====
 export const finCategoriesRouter = router({
-  list: protectedProcedure.input(z.object({ type: z.enum(["expense", "income"]).optional() }).optional()).query(async ({ input }) => {
+  list: publicProcedure.input(z.object({ type: z.enum(["expense", "income"]).optional() }).optional()).query(async ({ input }) => {
     return listFinCategories(input?.type);
   }),
-  create: protectedProcedure.input(z.object({
+  create: publicProcedure.input(z.object({
     name: z.string().min(1),
     type: z.enum(["expense", "income"]),
     icon: z.string().optional(),
@@ -27,7 +27,7 @@ export const finCategoriesRouter = router({
     const id = await createFinCategory(input);
     return { id };
   }),
-  update: protectedProcedure.input(z.object({
+  update: publicProcedure.input(z.object({
     id: z.number(),
     name: z.string().optional(),
     icon: z.string().optional(),
@@ -38,7 +38,7 @@ export const finCategoriesRouter = router({
     await updateFinCategory(id, data);
     return { success: true };
   }),
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+  delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     await updateFinCategory(input.id, { active: false });
     return { success: true };
   }),
@@ -46,7 +46,7 @@ export const finCategoriesRouter = router({
 
 // ===== TRANSACTIONS ROUTER =====
 export const finTransactionsRouter = router({
-  list: protectedProcedure.input(z.object({
+  list: publicProcedure.input(z.object({
     type: z.enum(["payable", "receivable"]).optional(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
     categoryId: z.number().optional(),
@@ -59,13 +59,13 @@ export const finTransactionsRouter = router({
     return listFinTransactions(input || {});
   }),
   
-  get: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+  get: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
     const tx = await getFinTransaction(input.id);
     if (!tx) throw new TRPCError({ code: "NOT_FOUND" });
     return tx;
   }),
   
-  create: protectedProcedure.input(z.object({
+  create: publicProcedure.input(z.object({
     type: z.enum(["payable", "receivable"]),
     description: z.string().min(1),
     amount: z.string(),
@@ -101,7 +101,7 @@ export const finTransactionsRouter = router({
     return { id };
   }),
   
-  update: protectedProcedure.input(z.object({
+  update: publicProcedure.input(z.object({
     id: z.number(),
     description: z.string().optional(),
     amount: z.string().optional(),
@@ -119,12 +119,12 @@ export const finTransactionsRouter = router({
     return { success: true };
   }),
   
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+  delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     await deleteFinTransaction(input.id);
     return { success: true };
   }),
   
-  markPaid: protectedProcedure.input(z.object({
+  markPaid: publicProcedure.input(z.object({
     id: z.number(),
     paidDate: z.number().optional(),
   })).mutation(async ({ input }) => {
@@ -132,7 +132,7 @@ export const finTransactionsRouter = router({
     return { success: true };
   }),
 
-  approveTransaction: protectedProcedure.input(z.object({
+  approveTransaction: publicProcedure.input(z.object({
     id: z.number(),
     approved: z.boolean(),
     approvedBy: z.string(),
@@ -146,25 +146,25 @@ export const finTransactionsRouter = router({
     return { success: true };
   }),
   
-  dashboard: protectedProcedure.input(z.object({
+  dashboard: publicProcedure.input(z.object({
     month: z.number().optional(),
     year: z.number().optional(),
   }).optional()).query(async ({ input }) => {
     return getFinDashboard(input?.month, input?.year);
   }),
 
-  overdue: protectedProcedure.query(async () => {
+  overdue: publicProcedure.query(async () => {
     return getOverdueTransactions();
   }),
 
-  upcomingDue: protectedProcedure.input(z.object({
+  upcomingDue: publicProcedure.input(z.object({
     days: z.number().default(3),
   }).optional()).query(async ({ input }) => {
     return getUpcomingDueTransactions(input?.days || 3);
   }),
   
   // OCR: scan document with camera
-  scanDocument: protectedProcedure.input(z.object({
+  scanDocument: publicProcedure.input(z.object({
     imageBase64: z.string(),
     docType: z.enum(["boleto", "nota_fiscal", "conta"]),
     mimeType: z.string().default("image/jpeg"),
@@ -207,7 +207,7 @@ export const finTransactionsRouter = router({
     }
   }),
   
-  uploadReceipt: protectedProcedure.input(z.object({
+  uploadReceipt: publicProcedure.input(z.object({
     transactionId: z.number(),
     imageBase64: z.string(),
     mimeType: z.string().default("image/jpeg"),
@@ -221,7 +221,7 @@ export const finTransactionsRouter = router({
   }),
 
   // Parse audio transcription to create a financial transaction automatically
-  parseAudio: protectedProcedure.input(z.object({
+  parseAudio: publicProcedure.input(z.object({
     audioUrl: z.string(),
     context: z.enum(["conta_pagar", "conta_receber", "gasolina"]).default("conta_pagar"),
   })).mutation(async ({ input }) => {
@@ -294,14 +294,14 @@ Se algum campo não for mencionado, use null.`;
 
 // ===== FUEL ROUTER =====
 export const fuelRouter = router({
-  list: protectedProcedure.input(z.object({
+  list: publicProcedure.input(z.object({
     month: z.number().optional(),
     year: z.number().optional(),
   }).optional()).query(async ({ input }) => {
     return listFuelRecords(input || undefined);
   }),
   
-  create: protectedProcedure.input(z.object({
+  create: publicProcedure.input(z.object({
     vehicleModel: z.string().min(1),
     vehiclePlate: z.string().optional(),
     fuelType: z.enum(["gasolina", "etanol", "diesel", "gnv"]).default("gasolina"),
@@ -318,7 +318,7 @@ export const fuelRouter = router({
     return createFuelRecord({ ...input, createdBy: ctx.user?.id });
   }),
   
-  update: protectedProcedure.input(z.object({
+  update: publicProcedure.input(z.object({
     id: z.number(),
     vehicleModel: z.string().optional(),
     vehiclePlate: z.string().optional(),
@@ -335,11 +335,11 @@ export const fuelRouter = router({
     return updateFuelRecord(id, data);
   }),
   
-  delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+  delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     return deleteFuelRecord(input.id);
   }),
   
-  dashboard: protectedProcedure.input(z.object({
+  dashboard: publicProcedure.input(z.object({
     month: z.number().optional(),
     year: z.number().optional(),
   }).optional()).query(async ({ input }) => {

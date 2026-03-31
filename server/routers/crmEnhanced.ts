@@ -12,6 +12,8 @@ import {
   admins,
 } from "../../drizzle/schema";
 import { eq, and, desc, asc, lte, sql, or, like, ne } from "drizzle-orm";
+import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
+import { createNotification } from "../db";
 
 // ===== MESSAGE TEMPLATES =====
 export const crmTemplatesRouter = router({
@@ -216,6 +218,17 @@ export const crmDistributionRouter = router({
     // Update last assigned
     await database.update(crmLeadDistribution).set({ lastAssignedSellerId: nextSeller.id }).where(eq(crmLeadDistribution.department, input.department));
 
+    // Notify seller about new lead
+    const leadInfo = await crmDb.getLeadById(input.leadId);
+    sendPushNewLead(nextSeller.id, leadInfo?.name || 'Novo Lead', leadInfo?.phone || null, leadInfo?.source || null, leadInfo?.vehicleInterest || null).catch(console.error);
+    createNotification({
+      title: '\ud83d\udea8 NOVO LEAD!',
+      message: `Voc\u00ea recebeu o lead ${leadInfo?.name || 'Novo Lead'}${leadInfo?.phone ? ' - ' + leadInfo.phone : ''}. Responda r\u00e1pido!`,
+      type: 'urgent',
+      sellerId: nextSeller.id,
+      targetType: 'seller',
+    }).catch(console.error);
+
     return { assigned: true, sellerId: nextSeller.id, sellerName: nextSeller.name };
   }),
 });
@@ -285,6 +298,17 @@ export const crmTimeAlertsRouter = router({
       type: "transferencia",
       description: `Lead transferido automaticamente (sem resposta em 20min)`,
     });
+
+    // Notify new seller about transferred lead
+    const transferredLead = await crmDb.getLeadById(input.leadId);
+    sendPushLeadTransferred(newSeller.id, transferredLead?.name || 'Lead', null).catch(console.error);
+    createNotification({
+      title: '\ud83d\udcf2 LEAD TRANSFERIDO!',
+      message: `${transferredLead?.name || 'Lead'} foi transferido para voc\u00ea. Responda agora!`,
+      type: 'urgent',
+      sellerId: newSeller.id,
+      targetType: 'seller',
+    }).catch(console.error);
 
     return { transferred: true, newSellerId: newSeller.id, newSellerName: newSeller.name };
   }),
