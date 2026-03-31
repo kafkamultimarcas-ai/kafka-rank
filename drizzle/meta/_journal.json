@@ -274,6 +274,13 @@
       "when": 1774844985461,
       "tag": "0038_uneven_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "5",
+      "when": 1774973613768,
+      "tag": "0039_magenta_shiver_man",
+      "breakpoints": true
     }
   ]
 }

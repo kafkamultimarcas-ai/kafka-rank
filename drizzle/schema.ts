@@ -1008,3 +1008,26 @@ export const managerMentorMessages = mysqlTable("manager_mentor_messages", {
 });
 export type ManagerMentorMessage = typeof managerMentorMessages.$inferSelect;
 export type InsertManagerMentorMessage = typeof managerMentorMessages.$inferInsert;
+
+// ===== MATA-MATA (BRACKET MATCHES) =====
+// Confrontos diretos dentro de competições tipo equipe/mata-mata
+export const bracketMatches = mysqlTable("bracket_matches", {
+  id: int("id").autoincrement().primaryKey(),
+  competitionId: int("competitionId").notNull(),
+  round: int("round").notNull(), // 1 = quartas, 2 = semi, 3 = final (ou conforme nº de participantes)
+  matchOrder: int("matchOrder").notNull(), // ordem do confronto dentro da rodada (1, 2, 3...)
+  teamAId: int("teamAId"), // equipe/dupla A (null se bye)
+  teamBId: int("teamBId"), // equipe/dupla B (null se bye)
+  sellerAId: int("sellerAId"), // vendedor A (para individual 1v1)
+  sellerBId: int("sellerBId"), // vendedor B (para individual 1v1)
+  scoreA: int("scoreA").default(0).notNull(), // placar do lado A (vendas)
+  scoreB: int("scoreB").default(0).notNull(), // placar do lado B (vendas)
+  winnerId: int("winnerId"), // teamId ou sellerId do vencedor
+  winnerType: varchar("winnerType", { length: 10 }), // "team" ou "seller"
+  status: mysqlEnum("bracket_status", ["pending", "active", "finished"]).default("pending").notNull(),
+  startedAt: bigint("startedAt", { mode: "number" }),
+  finishedAt: bigint("finishedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type BracketMatch = typeof bracketMatches.$inferSelect;
+export type InsertBracketMatch = typeof bracketMatches.$inferInsert;

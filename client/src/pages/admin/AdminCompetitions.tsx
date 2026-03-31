@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Trash2, Play, Square, Users, UserPlus, X, Pencil, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import BracketPanel from "@/components/BracketPanel";
 
 const CATEGORY_LABELS: Record<string, string> = {
   vendas: "Vendas", fei: "F&I", consignacao: "Consignação",
@@ -327,6 +328,13 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdi
           </Button>
         )}
       </div>
+
+      {/* BRACKET PANEL - Mata-Mata */}
+      <BracketPanel
+        competitionId={comp.id}
+        competitionType={comp.type}
+        competitionStatus={comp.status}
+      />
 
       {/* Participant Dialog */}
       <Dialog open={participantDialogOpen} onOpenChange={(open: boolean) => { if (!open) onCloseParticipants(); }}>

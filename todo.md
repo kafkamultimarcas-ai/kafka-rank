@@ -1534,3 +1534,24 @@
 
 ### Bug: Teclado sumindo ao digitar no formulário Nova Competição (mobile)
 - [x] Bug: Input perde foco ao digitar no formulário Nova Competição no celular - CompetitionForm movido para fora do componente pai
+
+### Feature: Painel Mata-Mata 2v2 Visual (Torneio)
+- [x] Backend: Criar tabela de confrontos (bracket_matches) com dupla A vs dupla B, placar, fase, vencedor
+- [x] Backend: Endpoint sortear chaves automaticamente (embaralha equipes/participantes)
+- [x] Backend: Endpoint criar confronto manual (gerente escolhe quem contra quem)
+- [x] Backend: Endpoint atualizar placar manualmente (+/- pontos)
+- [x] Backend: Endpoint definir vencedor e encerrar confronto
+- [x] Backend: Endpoint limpar todos os confrontos de uma competição
+- [x] Backend: Endpoint alertas motivacionais (meusAlertas) - detecta quando vendedor está perdendo
+- [x] Backend: Placar automático - cada venda aprovada incrementa placar do mata-mata (sales.approve + sales.create)
+- [x] Frontend: BracketPanel - painel visual estilo torneio/copa com chaves por rodada
+- [x] Frontend: Placar ao vivo estilo jogo (ex: 2 x 0) com botões +/- para cada lado
+- [x] Frontend: Botão "Sortear Chaves" para sorteio automático + opção manual
+- [x] Frontend: Botão "Limpar" para resetar chaves com confirmação
+- [x] Frontend: Separado do ranking de meta - painel próprio dentro de cada CompetitionCard
+- [x] Frontend: BracketMotivationalAlert - alerta visual na Home quando vendedor está perdendo
+- [x] Frontend: Mensagem motivacional "Corre que dá tempo! Cada venda é um gol!"
+- [x] Frontend: Coroa dourada no vencedor do confronto encerrado
+- [x] Frontend: Suporte a BYE (quando número ímpar de participantes)
+- [x] Testes: 8 testes do bracket (CRUD, incremento placar, listagem ordenada, lógica motivacional)
+- [x] Total: 482 testes passando, 0 erros TypeScript

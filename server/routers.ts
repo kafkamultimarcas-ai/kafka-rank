@@ -305,6 +305,197 @@ export const appRouter = router({
     }),
   }),
 
+  // ===== BRACKET (MATA-MATA) =====
+  bracket: router({
+    list: publicProcedure.input(z.object({ competitionId: z.number() })).query(async ({ input }) => {
+      const matches = await db.listBracketMatches(input.competitionId);
+      const sellersList = await db.listSellers();
+      const teamsList = await db.listTeamsByCompetition(input.competitionId);
+      const sellersMap = new Map(sellersList.map(s => [s.id, s]));
+      const teamsMap = new Map(teamsList.map(t => [t.id, t]));
+      return matches.map(m => ({
+        ...m,
+        teamA: m.teamAId ? teamsMap.get(m.teamAId) : null,
+        teamB: m.teamBId ? teamsMap.get(m.teamBId) : null,
+        sellerA: m.sellerAId ? sellersMap.get(m.sellerAId) : null,
+        sellerB: m.sellerBId ? sellersMap.get(m.sellerBId) : null,
+      }));
+    }),
+    // Sortear chaves automaticamente (embaralha equipes/participantes e cria confrontos)
+    sortear: adminProcedure.input(z.object({
+      competitionId: z.number(),
+    })).mutation(async ({ input }) => {
+      const comp = await db.getCompetitionById(input.competitionId);
+      if (!comp) throw new Error("Competição não encontrada");
+      // Limpar confrontos antigos
+      await db.deleteBracketMatchesByCompetition(input.competitionId);
+      const isTeamType = comp.type === "team" || comp.type === "group";
+      if (isTeamType) {
+        // Sortear por equipes
+        const teamsList = await db.listTeamsByCompetition(input.competitionId);
+        if (teamsList.length < 2) throw new Error("Precisa de pelo menos 2 equipes");
+        // Embaralhar
+        const shuffled = [...teamsList].sort(() => Math.random() - 0.5);
+        const round = 1;
+        const matches = [];
+        for (let i = 0; i < shuffled.length; i += 2) {
+          const teamA = shuffled[i];
+          const teamB = shuffled[i + 1] || null; // bye se ímpar
+          const matchId = await db.createBracketMatch({
+            competitionId: input.competitionId,
+            round,
+            matchOrder: Math.floor(i / 2) + 1,
+            teamAId: teamA.id,
+            teamBId: teamB?.id || null,
+            status: teamB ? "active" : "finished",
+            winnerId: teamB ? null : teamA.id,
+            winnerType: teamB ? null : "team",
+            startedAt: Date.now(),
+          });
+          matches.push(matchId);
+        }
+        return { matches: matches.length, type: "team" };
+      } else {
+        // Sortear por vendedores individuais
+        const participants = await db.listParticipants(input.competitionId);
+        if (participants.length < 2) throw new Error("Precisa de pelo menos 2 participantes");
+        const shuffled = [...participants].sort(() => Math.random() - 0.5);
+        const round = 1;
+        const matches = [];
+        for (let i = 0; i < shuffled.length; i += 2) {
+          const sellerA = shuffled[i];
+          const sellerB = shuffled[i + 1] || null;
+          const matchId = await db.createBracketMatch({
+            competitionId: input.competitionId,
+            round,
+            matchOrder: Math.floor(i / 2) + 1,
+            sellerAId: sellerA.sellerId,
+            sellerBId: sellerB?.sellerId || null,
+            status: sellerB ? "active" : "finished",
+            winnerId: sellerB ? null : sellerA.sellerId,
+            winnerType: sellerB ? null : "seller",
+            startedAt: Date.now(),
+          });
+          matches.push(matchId);
+        }
+        return { matches: matches.length, type: "individual" };
+      }
+    }),
+    // Montar confronto manual
+    criarConfronto: adminProcedure.input(z.object({
+      competitionId: z.number(),
+      round: z.number().default(1),
+      matchOrder: z.number().default(1),
+      teamAId: z.number().optional(),
+      teamBId: z.number().optional(),
+      sellerAId: z.number().optional(),
+      sellerBId: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      const id = await db.createBracketMatch({
+        ...input,
+        status: "active",
+        startedAt: Date.now(),
+      });
+      return { id };
+    }),
+    // Atualizar placar manualmente
+    atualizarPlacar: adminProcedure.input(z.object({
+      matchId: z.number(),
+      scoreA: z.number(),
+      scoreB: z.number(),
+    })).mutation(async ({ input }) => {
+      await db.updateBracketMatch(input.matchId, {
+        scoreA: input.scoreA,
+        scoreB: input.scoreB,
+      });
+      return { success: true };
+    }),
+    // Definir vencedor e encerrar confronto
+    definirVencedor: adminProcedure.input(z.object({
+      matchId: z.number(),
+      winnerId: z.number(),
+      winnerType: z.enum(["team", "seller"]),
+    })).mutation(async ({ input }) => {
+      await db.updateBracketMatch(input.matchId, {
+        winnerId: input.winnerId,
+        winnerType: input.winnerType,
+        status: "finished",
+        finishedAt: Date.now(),
+      });
+      return { success: true };
+    }),
+    // Limpar todos os confrontos de uma competição
+    limpar: adminProcedure.input(z.object({
+      competitionId: z.number(),
+    })).mutation(async ({ input }) => {
+      await db.deleteBracketMatchesByCompetition(input.competitionId);
+      return { success: true };
+    }),
+    // Alertas motivacionais para vendedor que está perdendo no mata-mata
+    meusAlertas: publicProcedure.input(z.object({
+      sellerId: z.number(),
+    })).query(async ({ input }) => {
+      // Buscar todas as competições ativas
+      const activeComps = await db.listCompetitions("active");
+      const alerts: Array<{
+        competitionName: string;
+        opponentName: string;
+        myScore: number;
+        opponentScore: number;
+        matchId: number;
+      }> = [];
+      for (const comp of activeComps) {
+        const matches = await db.listBracketMatches(comp.id);
+        for (const match of matches) {
+          if (match.status !== "active") continue;
+          const isTeamType = comp.type === "team" || comp.type === "group";
+          let mySide: "A" | "B" | null = null;
+          if (isTeamType) {
+            // Check if seller is in teamA or teamB
+            if (match.teamAId || match.teamBId) {
+              const participants = await db.listParticipants(comp.id);
+              const myParticipant = participants.find(p => p.sellerId === input.sellerId);
+              if (myParticipant?.teamId === match.teamAId) mySide = "A";
+              else if (myParticipant?.teamId === match.teamBId) mySide = "B";
+            }
+          } else {
+            if (match.sellerAId === input.sellerId) mySide = "A";
+            else if (match.sellerBId === input.sellerId) mySide = "B";
+          }
+          if (!mySide) continue;
+          const myScore = mySide === "A" ? match.scoreA : match.scoreB;
+          const opponentScore = mySide === "A" ? match.scoreB : match.scoreA;
+          if (opponentScore > myScore) {
+            // Resolve opponent name
+            let opponentName = "Adversário";
+            if (isTeamType) {
+              const oppTeamId = mySide === "A" ? match.teamBId : match.teamAId;
+              if (oppTeamId) {
+                const teams = await db.listTeamsByCompetition(comp.id);
+                const oppTeam = teams.find(t => t.id === oppTeamId);
+                opponentName = oppTeam?.name || "Adversário";
+              }
+            } else {
+              const oppSellerId = mySide === "A" ? match.sellerBId : match.sellerAId;
+              if (oppSellerId) {
+                const oppSeller = await db.getSellerById(oppSellerId);
+                opponentName = oppSeller?.name || "Adversário";
+              }
+            }
+            alerts.push({
+              competitionName: comp.name,
+              opponentName,
+              myScore,
+              opponentScore,
+              matchId: match.id,
+            });
+          }
+        }
+      }
+      return alerts;
+    }),
+  }),
+
   // ===== SALES =====
   sales: router({
     list: publicProcedure.input(z.object({
@@ -343,6 +534,31 @@ export const appRouter = router({
           title: `Venda importante registrada!`,
           content: `${seller.name} registrou uma venda de R$ ${(input.value).toLocaleString("pt-BR")} - ${input.vehicleModel || "Ve\u00edculo"}`,
         });
+      }
+      // AUTO-UPDATE BRACKET SCORE: incrementar placar do mata-mata (venda criada pelo admin já aprovada)
+      if (input.competitionId) {
+        try {
+          const bracketMatches = await db.listBracketMatches(input.competitionId);
+          const isTeamComp = comp && (comp.type === 'team' || comp.type === 'group');
+          for (const match of bracketMatches) {
+            if (match.status !== 'active') continue;
+            if (isTeamComp) {
+              const participants = await db.listParticipants(input.competitionId);
+              const sellerParticipant = participants.find(p => p.sellerId === input.sellerId);
+              if (sellerParticipant?.teamId === match.teamAId) {
+                await db.incrementBracketScore(match.id, 'A');
+              } else if (sellerParticipant?.teamId === match.teamBId) {
+                await db.incrementBracketScore(match.id, 'B');
+              }
+            } else {
+              if (match.sellerAId === input.sellerId) {
+                await db.incrementBracketScore(match.id, 'A');
+              } else if (match.sellerBId === input.sellerId) {
+                await db.incrementBracketScore(match.id, 'B');
+              }
+            }
+          }
+        } catch (e) { console.error('[Bracket] Erro ao atualizar placar (admin create):', e); }
       }
       return { id, consignmentMatch };
     }),
@@ -459,6 +675,37 @@ export const appRouter = router({
           });
         }
       } catch (e) { console.error('Erro ao criar sale_document:', e); }
+      // AUTO-UPDATE BRACKET SCORE: incrementar placar do mata-mata quando venda é aprovada
+      if (sale.competitionId) {
+        try {
+          const bracketMatches = await db.listBracketMatches(sale.competitionId);
+          const isTeamComp = comp && (comp.type === 'team' || comp.type === 'group');
+          for (const match of bracketMatches) {
+            if (match.status !== 'active') continue;
+            if (isTeamComp) {
+              // Check if seller is in teamA or teamB
+              const participants = await db.listParticipants(sale.competitionId);
+              const sellerParticipant = participants.find(p => p.sellerId === sale.sellerId);
+              if (sellerParticipant?.teamId === match.teamAId) {
+                await db.incrementBracketScore(match.id, 'A');
+                console.log(`[Bracket] +1 para Time A (match ${match.id}) - venda de ${seller?.name}`);
+              } else if (sellerParticipant?.teamId === match.teamBId) {
+                await db.incrementBracketScore(match.id, 'B');
+                console.log(`[Bracket] +1 para Time B (match ${match.id}) - venda de ${seller?.name}`);
+              }
+            } else {
+              // Individual match
+              if (match.sellerAId === sale.sellerId) {
+                await db.incrementBracketScore(match.id, 'A');
+                console.log(`[Bracket] +1 para Lado A (match ${match.id}) - venda de ${seller?.name}`);
+              } else if (match.sellerBId === sale.sellerId) {
+                await db.incrementBracketScore(match.id, 'B');
+                console.log(`[Bracket] +1 para Lado B (match ${match.id}) - venda de ${seller?.name}`);
+              }
+            }
+          }
+        } catch (e) { console.error('[Bracket] Erro ao atualizar placar:', e); }
+      }
       // Cruzar placa com consignação ao aprovar
       if (sale.vehiclePlate) {
         try {

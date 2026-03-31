@@ -23,6 +23,7 @@ import {
   mktTasks, InsertMktTask,
   saleDocuments, InsertSaleDocument,
   fichasFinanciamento, InsertFichaFinanciamento, fichaBancos, InsertFichaBanco, BANCOS_FINANCIAMENTO,
+  bracketMatches, InsertBracketMatch,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -792,6 +793,54 @@ export async function getTeamRanking(competitionId: number) {
       })),
     };
   }).sort((a, b) => b.totalPoints - a.totalPoints);
+}
+
+// ===== BRACKET MATCHES (MATA-MATA) =====
+export async function listBracketMatches(competitionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(bracketMatches)
+    .where(eq(bracketMatches.competitionId, competitionId))
+    .orderBy(bracketMatches.round, bracketMatches.matchOrder);
+}
+
+export async function createBracketMatch(data: InsertBracketMatch) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(bracketMatches).values(data);
+  return result[0].insertId;
+}
+
+export async function updateBracketMatch(id: number, data: Partial<InsertBracketMatch>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(bracketMatches).set(data).where(eq(bracketMatches.id, id));
+}
+
+export async function deleteBracketMatchesByCompetition(competitionId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.delete(bracketMatches).where(eq(bracketMatches.competitionId, competitionId));
+}
+
+export async function getBracketMatch(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(bracketMatches).where(eq(bracketMatches.id, id));
+  return rows[0] || null;
+}
+
+/** Incrementa o placar de um lado do confronto */
+export async function incrementBracketScore(matchId: number, side: 'A' | 'B') {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const match = await getBracketMatch(matchId);
+  if (!match) throw new Error("Match not found");
+  if (side === 'A') {
+    await db.update(bracketMatches).set({ scoreA: match.scoreA + 1 }).where(eq(bracketMatches.id, matchId));
+  } else {
+    await db.update(bracketMatches).set({ scoreB: match.scoreB + 1 }).where(eq(bracketMatches.id, matchId));
+  }
 }
 
 // ===== F&I RECORDS =====
