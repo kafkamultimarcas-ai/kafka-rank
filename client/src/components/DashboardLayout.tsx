@@ -30,7 +30,7 @@ import { Button } from "./ui/button";
 import { toast } from "sonner";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Painel Geral", path: "/admin" },
+  { icon: LayoutDashboard, label: "Visão Geral", path: "/admin" },
   { icon: CheckCircle, label: "Aprovar Vendas", path: "/admin/aprovacoes" },
   { icon: Users, label: "Equipe", path: "/admin/vendedores" },
   { icon: Trophy, label: "Competições", path: "/admin/competicoes" },
@@ -41,16 +41,16 @@ const menuItems = [
   { icon: Target, label: "Metas", path: "/admin/metas" },
   { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
   { icon: Gift, label: "Sorteio Feirão", path: "/admin/sorteio" },
-  { icon: Settings, label: "Configurações", path: "/admin/configuracoes" },
-  { icon: LayoutGrid, label: "CRM Admin", path: "/crm/admin" },
+  { icon: Settings, label: "Ajustes", path: "/admin/configuracoes" },
+  { icon: LayoutGrid, label: "CRM Gerente", path: "/crm/admin" },
   { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
   { icon: Wrench, label: "Pós-Venda", path: "/admin/pos-venda" },
-  { icon: DollarSign, label: "Gastos PV", path: "/admin/pv-financeiro" },
+  { icon: DollarSign, label: "Gastos Pós-Venda", path: "/admin/pv-financeiro" },
   { icon: Flag, label: "Marketing", path: "/admin/marketing" },
   { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
-  { icon: DollarSign, label: "Financeiro Op.", path: "/financeiro" },
+  { icon: DollarSign, label: "Caixa da Loja", path: "/financeiro" },
   { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
-  { icon: Bot, label: "Configurar IAM", path: "/admin/iam" },
+  { icon: Bot, label: "Ajustar IA", path: "/admin/iam" },
   { icon: FileText, label: "Documentos", path: "/admin/documentos" },
   { icon: Car, label: "Estoque", path: "/admin/estoque" },
 ];
@@ -323,11 +323,11 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => setLocation("/")}
-                  tooltip="Dashboard Público"
+                  tooltip="Tela Inicial"
                   className="h-10 transition-all font-normal"
                 >
                   <Home className="h-4 w-4" />
-                  <span>Dashboard Público</span>
+                  <span>Tela Inicial</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <div className="my-2 border-t border-border" />

@@ -189,11 +189,11 @@ export default function Home() {
               </Button>
               {activeComps.length > 0 && (
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/corrida/${activeComps[0].id}`)} className="gap-2">
-                  <Trophy className="h-4 w-4" /> Ver Pista
+                  <Trophy className="h-4 w-4" /> Ranking
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={() => setLocation("/tv")} className="gap-2">
-                <Tv className="h-4 w-4" /> Modo TV
+                <Tv className="h-4 w-4" /> Tela TV
               </Button>
               <Button variant="outline" size="sm" onClick={() => setLocation("/pos-venda")} className="gap-2 border-orange-600 text-orange-400 hover:bg-orange-600/10">
                 <Wrench className="h-4 w-4" /> Pós-Venda
@@ -206,23 +206,23 @@ export default function Home() {
               </Button>
               {sellerSession ? (
                 <Button variant="outline" size="sm" onClick={() => setLocation("/crm")} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
-                  <LayoutGrid className="h-4 w-4" /> Meus Leads
+                  <LayoutGrid className="h-4 w-4" /> Meus Clientes
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
-                  <LayoutGrid className="h-4 w-4" /> Meus Leads
+                  <LayoutGrid className="h-4 w-4" /> Meus Clientes
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={() => setLocation("/ficha-financiamento")} className="gap-2 border-blue-600 text-blue-400 hover:bg-blue-600/10">
-                <DollarSign className="h-4 w-4" /> Ficha Financiamento
+                <DollarSign className="h-4 w-4" /> Financiamento
               </Button>
               {sellerSession ? (
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
-                  <FileText className="h-4 w-4" /> Meus Documentos
+                  <FileText className="h-4 w-4" /> Meus Docs
                 </Button>
               ) : (
                 <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
-                  <FileText className="h-4 w-4" /> Meus Documentos
+                  <FileText className="h-4 w-4" /> Meus Docs
                 </Button>
               )}
             </div>

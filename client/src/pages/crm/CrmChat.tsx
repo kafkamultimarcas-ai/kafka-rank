@@ -838,7 +838,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
           {showVehicles && (
             <div className="border-t border-border bg-card/95 backdrop-blur max-h-[300px] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                <span className="text-xs font-bold text-foreground">🚗 Enviar Veículo do Estoque</span>
+                <span className="text-xs font-bold text-foreground">🚗 Mandar Carro do Estoque</span>
                 <button onClick={() => setShowVehicles(false)} className="p-1 hover:bg-accent rounded"><X className="w-4 h-4" /></button>
               </div>
               <div className="px-3 py-2">
@@ -1095,7 +1095,7 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
       <div className="p-4 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground">Detalhes do Lead</h3>
+          <h3 className="text-sm font-bold text-foreground">Info do Cliente</h3>
           <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
 

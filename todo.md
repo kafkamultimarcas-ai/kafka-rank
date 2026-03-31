@@ -1511,3 +1511,9 @@
 - [x] Audit: Verificar como nova loja teria acesso zerado - nova instância recomendada
 - [x] Audit: Identificar o que falta melhorar em cada painel - relatório completo gerado
 - [x] Feature: Terminar sistema de distribuição SDR (auto + manual) - UI completa com toggle + round-robin
+
+### Simplificação de Nomes e Textos (UX)
+- [x] Simplificar labels do painel SDR (distribuição, atribuição, round-robin → linguagem direta)
+- [x] Simplificar labels do CRM vendedor (dashboard, stats, pipeline → linguagem do vendedor)
+- [x] Simplificar labels do Admin e Home (termos técnicos → linguagem simples)
+- [x] Revisar todos os botões, títulos e mensagens para serem diretos e lógicos

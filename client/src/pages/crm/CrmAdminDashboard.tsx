@@ -64,16 +64,16 @@ export default function CrmAdminDashboard() {
   }
 
   const menuItems = [
-    { key: "chat" as const, icon: MessageCircle, label: "Chat / Leads" },
-    { key: "performance" as const, icon: TrendingUp, label: "Performance" },
-    { key: "dashboard" as const, icon: LayoutDashboard, label: "Painel Geral" },
-    { key: "leads" as const, icon: Users, label: "Todos os Leads" },
-    { key: "pipeline" as const, icon: SlidersHorizontal, label: "Pipeline" },
+    { key: "chat" as const, icon: MessageCircle, label: "Conversas" },
+    { key: "performance" as const, icon: TrendingUp, label: "Resultados" },
+    { key: "dashboard" as const, icon: LayoutDashboard, label: "Visão Geral" },
+    { key: "leads" as const, icon: Users, label: "Todos os Clientes" },
+    { key: "pipeline" as const, icon: SlidersHorizontal, label: "Etapas de Venda" },
     { key: "inventory" as const, icon: Car, label: "Estoque" },
     { key: "financial" as const, icon: Wallet, label: "Financeiro" },
     { key: "campaigns" as const, icon: Megaphone, label: "Campanhas" },
     { key: "marketing" as const, icon: BarChart3, label: "Marketing" },
-    { key: "settings" as const, icon: Settings, label: "Configurações" },
+    { key: "settings" as const, icon: Settings, label: "Ajustes" },
   ];
 
   // When clicking a department card, navigate to leads filtered by that dept

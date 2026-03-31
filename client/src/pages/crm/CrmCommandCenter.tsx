@@ -516,7 +516,7 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
         {showVehicles && (
           <div className="border-t border-border bg-card/95 backdrop-blur max-h-[250px] overflow-hidden flex flex-col shrink-0">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-xs font-bold text-foreground">🚗 Enviar Veículo do Estoque</span>
+              <span className="text-xs font-bold text-foreground">🚗 Mandar Carro do Estoque</span>
               <button onClick={() => setShowVehicles(false)} className="p-1 hover:bg-accent rounded"><X className="w-4 h-4" /></button>
             </div>
             <div className="px-3 py-2">
@@ -898,7 +898,7 @@ export default function CrmCommandCenter() {
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div>
-              <h1 className="text-sm font-bold text-foreground">{isSDR ? 'Pré-Vendas / SDR' : 'Meu CRM'}</h1>
+              <h1 className="text-sm font-bold text-foreground">{isSDR ? 'Meus Leads' : 'Meus Clientes'}</h1>
               <p className="text-[10px] text-muted-foreground">{sellerSession.nickname || sellerSession.name}</p>
             </div>
           </div>
@@ -920,9 +920,9 @@ export default function CrmCommandCenter() {
         {/* Tab navigation */}
         <div className="flex border-b border-border">
           {[
-            { key: "dashboard" as TabView, label: "Painel", icon: BarChart3 },
-            { key: "leads" as TabView, label: "Leads", icon: User },
-            { key: "pipeline" as TabView, label: "Pipeline", icon: Target },
+            { key: "dashboard" as TabView, label: "Resumo", icon: BarChart3 },
+            { key: "leads" as TabView, label: "Clientes", icon: User },
+            { key: "pipeline" as TabView, label: "Etapas", icon: Target },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-all border-b-2 ${activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
@@ -1221,7 +1221,7 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
         <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <CheckCircle className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-[10px] text-muted-foreground uppercase">Atribuídos</span>
+            <span className="text-[10px] text-muted-foreground uppercase">Com Vendedor</span>
           </div>
           <p className="text-xl font-bold text-cyan-400">{assignmentStats.assigned}</p>
         </div>
@@ -1231,7 +1231,7 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-            <Shuffle className="w-3.5 h-3.5 text-primary" /> Distribuição de Leads
+            <Shuffle className="w-3.5 h-3.5 text-primary" /> Enviar Leads p/ Vendedores
           </h3>
           <button
             onClick={() => updateConfigMut.mutate({ department: department || "vendas", enabled: !isAutoEnabled })}
@@ -1243,13 +1243,13 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
             }`}
           >
             <Power className="w-3 h-3" />
-            {isAutoEnabled ? "AUTO LIGADO" : "AUTO DESLIGADO"}
+            {isAutoEnabled ? "AUTOMÁTICO" : "MANUAL"}
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground mb-2">
           {isAutoEnabled
-            ? "Novos leads serão distribuídos automaticamente entre os vendedores."
-            : "Distribuição manual ativa. Use o botão abaixo ou atribua individualmente."}
+            ? "Quando chegar lead novo, o sistema já manda direto pra um vendedor."
+            : "Você escolhe pra qual vendedor mandar cada lead."}
         </p>
         {unassignedLeads.length > 0 && (
           <button
@@ -1258,7 +1258,7 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold transition-all active:scale-95"
           >
             <Shuffle className="w-3.5 h-3.5" />
-            {autoDistributeMut.isPending ? "Distribuindo..." : `Distribuir ${unassignedLeads.length} leads agora (Round-Robin)`}
+            {autoDistributeMut.isPending ? "Enviando..." : `Enviar ${unassignedLeads.length} leads para vendedores agora`}
           </button>
         )}
       </div>
@@ -1268,7 +1268,7 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
         <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/5 p-3">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400">{unassignedLeads.length} leads aguardando atribuição</span>
+            <span className="text-xs font-bold text-amber-400">{unassignedLeads.length} leads sem vendedor</span>
           </div>
           {unassignedLeads.slice(0, 5).map((lead: any) => (
             <div key={lead.id} className="flex items-center justify-between py-2 border-t border-amber-500/15">
@@ -1282,7 +1282,7 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
                   onChange={e => { const v = parseInt(e.target.value); if (v) onAssign(lead.id, v); }}
                   className="h-7 px-2 text-[10px] rounded-lg border border-border bg-background text-foreground min-w-[100px]"
                 >
-                  <option value="">Atribuir →</option>
+                  <option value="">Enviar p/ →</option>
                   {vendorSellers.map((s: any) => (
                     <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
                   ))}
@@ -1300,7 +1300,7 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
       {vendorSellers.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-3">
           <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
-            <BarChart3 className="w-3.5 h-3.5 text-primary" /> Leads por Vendedor
+            <BarChart3 className="w-3.5 h-3.5 text-primary" /> Quantos leads cada vendedor tem
           </h3>
           <div className="space-y-1.5">
             {vendorSellers.map((s: any) => {
@@ -1324,14 +1324,14 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
       {recentLeads.length > 0 && (
         <div className="rounded-xl border border-border bg-card p-3">
           <h3 className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-muted-foreground" /> Atividade Recente
+            <Clock className="w-3.5 h-3.5 text-muted-foreground" /> Últimos Leads
           </h3>
           {recentLeads.map((lead: any) => (
             <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-border/50">
               <div className="flex-1 min-w-0">
                 <span className="text-[11px] font-medium text-foreground truncate block">{lead.name}</span>
                 <span className="text-[10px] text-muted-foreground">
-                  {lead.sellerId > 0 ? sellerMap[lead.sellerId] || `#${lead.sellerId}` : "Sem vendedor"} • {timeAgo(lead.lastContactDate || (typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt).getTime()))}
+                  {lead.sellerId > 0 ? sellerMap[lead.sellerId] || `#${lead.sellerId}` : "Sem vendedor ainda"} • {timeAgo(lead.lastContactDate || (typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt).getTime()))}
                 </span>
               </div>
             </div>
@@ -1390,7 +1390,7 @@ function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryA
         <div className="rounded-xl border border-border bg-card p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[10px] text-muted-foreground uppercase">Follow-ups</span>
+            <span className="text-[10px] text-muted-foreground uppercase">Retornos</span>
           </div>
           <p className="text-xl font-bold text-foreground">{dashboard?.pendingFollowUps || 0}</p>
           <p className="text-[9px] text-muted-foreground">pendentes hoje</p>
@@ -1402,9 +1402,9 @@ function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryA
         <div className="rounded-xl border-2 border-orange-500/50 bg-orange-500/10 p-3">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-orange-400" />
-            <span className="text-xs font-bold text-orange-400">{staleNegotiations.length} negociação(ões) parada(s) há 3+ dias!</span>
+            <span className="text-xs font-bold text-orange-400">{staleNegotiations.length} negociação parada há 3+ dias!</span>
           </div>
-          <p className="text-[10px] text-orange-300/70 mb-1">Leads em negociação sem contato recente. Retome o contato!</p>
+          <p className="text-[10px] text-orange-300/70 mb-1">Esses clientes estão esperando! Manda mensagem agora.</p>
           {staleNegotiations.slice(0, 3).map((lead: any) => (
             <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-orange-500/20">
               <div className="flex-1 min-w-0">
@@ -1429,7 +1429,7 @@ function SellerDashboard({ dashboard, stats, followUps, overdueTasks, inventoryA
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400">{followUps.length} leads sem contato há 48h+</span>
+            <span className="text-xs font-bold text-amber-400">{followUps.length} clientes esperando retorno (48h+)</span>
           </div>
           {followUps.slice(0, 4).map((lead: any) => (
             <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-amber-500/15">
@@ -1583,13 +1583,13 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
       {isUrgent && (
         <div className="flex items-center gap-1 mb-2 px-2 py-1 rounded-lg bg-red-500/20">
           <Timer className="w-3 h-3 text-red-400" />
-          <span className="text-[10px] font-bold text-red-400">URGENTE - {minutesSinceCreation(lead.createdAt)}min sem resposta!</span>
+          <span className="text-[10px] font-bold text-red-400">URGENTE - {minutesSinceCreation(lead.createdAt)}min sem responder!</span>
         </div>
       )}
       {isWarning && (
         <div className="flex items-center gap-1 mb-2 px-2 py-1 rounded-lg bg-amber-500/20">
           <Zap className="w-3 h-3 text-amber-400" />
-          <span className="text-[10px] font-bold text-amber-400">PRIORIDADE - {minutesSinceCreation(lead.createdAt)}min aguardando</span>
+          <span className="text-[10px] font-bold text-amber-400">ATENÇÃO - {minutesSinceCreation(lead.createdAt)}min esperando resposta</span>
         </div>
       )}
 
@@ -1684,7 +1684,7 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
       {isSDR && showAssign && vendorSellers && vendorSellers.length > 0 && (
         <div className="mt-2 p-2 rounded-lg bg-card border border-cyan-500/20 space-y-1">
           <p className="text-[10px] text-cyan-400 font-medium mb-1 flex items-center gap-1">
-            <ArrowRightLeft className="w-3 h-3" /> Atribuir a vendedor:
+            <ArrowRightLeft className="w-3 h-3" /> Enviar para vendedor:
           </p>
           <div className="grid grid-cols-2 gap-1">
             {vendorSellers.map((s: any) => (
@@ -1705,7 +1705,7 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
       {/* Templates dropdown */}
       {showTemplates && templates.length > 0 && (
         <div className="mt-2 p-2 rounded-lg bg-card border border-border space-y-1">
-          <p className="text-[10px] text-muted-foreground font-medium mb-1">Enviar template:</p>
+          <p className="text-[10px] text-muted-foreground font-medium mb-1">Mensagem pronta:</p>
           {templates.map((t: any) => (
             <button key={t.id} onClick={() => onTemplateSelect(t.id)}
               className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent text-xs text-foreground flex items-center gap-2 transition-colors">
@@ -1743,7 +1743,7 @@ function NewLeadModal({ sellerId, department, onClose, onCreated }: {
   const [isRecording, setIsRecording] = useState(false);
 
   const createLead = trpc.crmLeads.create.useMutation({
-    onSuccess: () => { toast.success("Lead cadastrado!"); onCreated(); },
+    onSuccess: () => { toast.success("Cliente cadastrado!"); onCreated(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -1782,7 +1782,7 @@ function NewLeadModal({ sellerId, department, onClose, onCreated }: {
     <div className="fixed inset-0 z-[100] bg-black/60 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="bg-background w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl border border-border max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b border-border flex items-center justify-between">
-          <h2 className="text-base font-bold text-foreground">Novo Lead</h2>
+          <h2 className="text-base font-bold text-foreground">Novo Cliente</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-lg">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
@@ -1795,11 +1795,11 @@ function NewLeadModal({ sellerId, department, onClose, onCreated }: {
             <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(47) 99999-9999" className="h-10" type="tel" />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Veículo de Interesse</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Carro que quer</label>
             <Input value={vehicleInterest} onChange={e => setVehicleInterest(e.target.value)} placeholder="Ex: HB20, Hilux, Civic..." className="h-10" />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Origem</label>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">De onde veio</label>
             <select value={source} onChange={e => setSource(e.target.value)}
               className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground text-sm">
               <option value="manual">Manual</option>
@@ -1832,7 +1832,7 @@ function NewLeadModal({ sellerId, department, onClose, onCreated }: {
               className="w-full h-20 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm resize-none" />
           </div>
           <Button type="submit" disabled={createLead.isPending} className="w-full racing-gradient text-white font-bold h-11">
-            {createLead.isPending ? "Salvando..." : "Cadastrar Lead"}
+            {createLead.isPending ? "Salvando..." : "Cadastrar Cliente"}
           </Button>
         </form>
       </div>

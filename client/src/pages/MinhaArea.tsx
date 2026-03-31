@@ -519,7 +519,7 @@ export default function MinhaArea() {
         {dept === "vendas" && showDocTab && (
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <FileText className="w-4 h-4" /> Documentos das Vendas
+              <FileText className="w-4 h-4" /> Docs das Vendas
             </h2>
 
             {/* Hidden file inputs */}
