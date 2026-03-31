@@ -99,10 +99,10 @@ export default function CrmAdminLogin() {
             </div>
             <img src={LOGO_URL} alt="Kafka Rank" className="h-10 w-auto mb-2" />
             <h1 className="text-lg font-black text-white tracking-wider uppercase">
-              CRM Admin
+              CRM Gerente
             </h1>
             <p className="text-xs text-gray-400 mt-1 text-center">
-              Acesso administrativo ao CRM Kafka
+              Acesso do gerente ao CRM Kafka
             </p>
           </div>
 

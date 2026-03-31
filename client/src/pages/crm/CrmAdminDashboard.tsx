@@ -45,6 +45,12 @@ export default function CrmAdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate("/crm/admin/login");
+    }
+  }, [isLoading, isAuthenticated, navigate]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -52,12 +58,6 @@ export default function CrmAdminDashboard() {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate("/crm/admin/login");
-    }
-  }, [isLoading, isAuthenticated, navigate]);
 
   if (!isAuthenticated) {
     return null;
@@ -90,7 +90,7 @@ export default function CrmAdminDashboard() {
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary" />
             <div>
-              <h1 className="text-sm font-bold text-foreground">CRM Admin</h1>
+              <h1 className="text-sm font-bold text-foreground">CRM Gerente</h1>
               <p className="text-[10px] text-muted-foreground">{admin?.name}</p>
             </div>
           </div>
@@ -119,7 +119,7 @@ export default function CrmAdminDashboard() {
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Shield className="w-5 h-5 text-primary" />
-                <span className="text-sm font-bold text-foreground">CRM Admin</span>
+                <span className="text-sm font-bold text-foreground">CRM Gerente</span>
               </div>
               <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
             </div>

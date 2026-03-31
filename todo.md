@@ -1517,3 +1517,17 @@
 - [x] Simplificar labels do CRM vendedor (dashboard, stats, pipeline → linguagem do vendedor)
 - [x] Simplificar labels do Admin e Home (termos técnicos → linguagem simples)
 - [x] Revisar todos os botões, títulos e mensagens para serem diretos e lógicos
+
+### Bug Crítico - CRM Gerente Crash
+- [x] Bug: CRM Gerente (CrmAdminDashboard) crashando com "An unexpected error occurred" na produção - useEffect movido antes dos early returns (regra de hooks)
+
+### Auditoria Técnica Completa - Correção Total
+- [x] Audit: Verificar TODOS os erros de console do browser - 0 erros novos
+- [x] Audit: Verificar TODOS os erros de rede (HTTP 4xx/5xx) - 0 erros
+- [x] Audit: Verificar TODOS os erros de TypeScript/LSP - 0 erros TS
+- [x] Audit: Verificar TODOS os hooks React (ordem, dependências, early returns) - 51 componentes auditados, 0 violações
+- [x] Audit: Verificar TODOS os componentes com setState durante render - 0 violações
+- [x] Audit: Verificar TODOS os routers backend por erros - 344 procedures verificadas
+- [x] Audit: Verificar webhooks e jobs background - alert-checker e inactive-dispatch OK
+- [x] Audit: Melhorias de UX, performance e robustez - checkAlreadySold otimizado, DB retry, NotFound traduzido, Admin→Gerente
+- [x] Audit: Corrigir TUDO encontrado - todos os bugs corrigidos, 474 testes passando

@@ -747,10 +747,10 @@ export default function AdminFinanceiro() {
                   {/* Approval buttons */}
                   {(tx as any).approvalStatus === "pending_approval" && (
                     <div className="flex gap-2 pt-2 border-t border-purple-500/20">
-                      <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => approveTx.mutate({ id: tx.id, approved: true, approvedBy: "Admin" })} disabled={approveTx.isPending}>
+                      <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => approveTx.mutate({ id: tx.id, approved: true, approvedBy: "Gerente" })} disabled={approveTx.isPending}>
                         Autorizar Pagamento
                       </Button>
-                      <Button variant="destructive" className="flex-1" onClick={() => approveTx.mutate({ id: tx.id, approved: false, approvedBy: "Admin" })} disabled={approveTx.isPending}>
+                      <Button variant="destructive" className="flex-1" onClick={() => approveTx.mutate({ id: tx.id, approved: false, approvedBy: "Gerente" })} disabled={approveTx.isPending}>
                         Rejeitar
                       </Button>
                     </div>

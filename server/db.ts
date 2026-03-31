@@ -28,6 +28,10 @@ import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+export function resetDbConnection() {
+  _db = null;
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -38,6 +42,20 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+/** Wrapper that retries once on ECONNRESET */
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: any) {
+    if (err?.cause?.code === 'ECONNRESET' || err?.message?.includes('ECONNRESET')) {
+      console.warn('[Database] ECONNRESET - reconnecting and retrying...');
+      resetDbConnection();
+      return await fn();
+    }
+    throw err;
+  }
 }
 
 // Raw SQL query helper for audit trail and ad-hoc updates

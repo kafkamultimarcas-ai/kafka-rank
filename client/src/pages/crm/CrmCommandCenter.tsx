@@ -1569,7 +1569,7 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
   const [showAssign, setShowAssign] = useState(false);
   const { data: soldCheck } = trpc.crmLeads.checkAlreadySold.useQuery(
     { leadId: lead.id },
-    { enabled: !!lead.id, staleTime: 60000 }
+    { enabled: !!lead.id, staleTime: 300000, refetchOnWindowFocus: false, refetchOnMount: false }
   );
   const scoreCfg = SCORE_CONFIG[lead.score as keyof typeof SCORE_CONFIG] || SCORE_CONFIG.warm;
   const ScoreIcon = scoreCfg.icon;

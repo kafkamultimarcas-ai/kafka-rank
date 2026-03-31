@@ -100,7 +100,7 @@ export default function DashboardLayout({
   }
 
   const displayName = isOwner 
-    ? (user?.name || "Admin") 
+    ? (user?.name || "Gerente") 
     : isManager 
       ? (managerQuery.data?.name || "Gerente") 
       : (sellerQuery.data?.nickname || sellerQuery.data?.name || "Gerente");

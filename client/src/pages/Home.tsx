@@ -147,7 +147,7 @@ export default function Home() {
             {user?.role === "admin" ? (
               <Button size="sm" onClick={() => setLocation("/admin")} className="gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
                 <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">Admin</span>
+                <span className="hidden sm:inline">Gerência</span>
               </Button>
             ) : !user && !authLoading ? (
               <Button variant="ghost" size="sm" onClick={() => window.location.href = getLoginUrl()} className="gap-1.5 text-muted-foreground hover:text-foreground">

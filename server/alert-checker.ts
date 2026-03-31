@@ -1,5 +1,5 @@
 import * as crmDb from "./crmDb";
-import { getDb } from "./db";
+import { getDb, withRetry } from "./db";
 import { crmLeadDistribution, sellers } from "../drizzle/schema";
 import { eq, and, asc, ne } from "drizzle-orm";
 
@@ -56,6 +56,14 @@ async function autoAssignToSDR(leadId: number, department: string): Promise<bool
  *  Inactive client dispatch will be handled by the new configurable system with DB-backed tracking.
  */
 async function checkAlerts() {
+  try {
+    await withRetry(async () => { await _checkAlertsInner(); });
+  } catch (err) {
+    console.error("[Alert Checker] Error:", err);
+  }
+}
+
+async function _checkAlertsInner() {
   try {
     // 1. Check SDR alerts (leads with sellerId=0 unresponded for 5+ min) - try to auto-assign
     const sdrAlerts = await crmDb.getUnrespondedLeads(SDR_THRESHOLD_MINUTES);
