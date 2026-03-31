@@ -1,0 +1,22 @@
+{
+  "query": "SELECT \n  (SELECT COUNT(*) FROM sellers) as sellers_count,\n  (SELECT COUNT(*) FROM crm_leads) as leads_count,\n  (SELECT COUNT(*) FROM crm_messages) as messages_count,\n  (SELECT COUNT(*) FROM inventory_vehicles) as vehicles_count,\n  (SELECT COUNT(*) FROM sales) as sales_count,\n  (SELECT COUNT(*) FROM fin_transactions) as fin_count,\n  (SELECT COUNT(*) FROM pv_chamados) as pv_count,\n  (SELECT COUNT(*) FROM fichas_financiamento) as fichas_count,\n  (SELECT COUNT(*) FROM notifications) as notifications_count,\n  (SELECT COUNT(*) FROM crm_activities) as activities_count;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT \n  (SELECT COUNT(*) FROM sellers) as sellers_count,\n  (SELECT COUNT(*) FROM crm_leads) as leads_count,\n  (SELECT COUNT(*) FROM crm_messages) as messages_count,\n  (SELECT COUNT(*) FROM inventory_vehicles) as vehicles_count,\n  (SELECT COUNT(*) FROM sales) as sales_count,\n  (SELECT COUNT(*) FROM fin_transactions) as fin_count,\n  (SELECT COUNT(*) FROM pv_chamados) as pv_count,\n  (SELECT COUNT(*) FROM fichas_financiamento) as fichas_count,\n  (SELECT COUNT(*) FROM notifications) as notifications_count,\n  (SELECT COUNT(*) FROM crm_activities) as activities_count;",
+  "rows": [
+    {
+      "sellers_count": "18",
+      "leads_count": "342",
+      "messages_count": "3302",
+      "vehicles_count": "149",
+      "sales_count": "46",
+      "fin_count": "7",
+      "pv_count": "11",
+      "fichas_count": "0",
+      "notifications_count": "238",
+      "activities_count": "319531"
+    }
+  ],
+  "messages": [],
+  "stdout": "sellers_count\tleads_count\tmessages_count\tvehicles_count\tsales_count\tfin_count\tpv_count\tfichas_count\tnotifications_count\tactivities_count\n18\t342\t3302\t149\t46\t7\t11\t0\t238\t319531\n",
+  "stderr": "",
+  "execution_time_ms": 334
+}

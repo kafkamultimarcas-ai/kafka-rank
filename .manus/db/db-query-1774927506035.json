@@ -1,0 +1,100 @@
+{
+  "query": "SELECT \n  table_name, \n  ROUND(data_length/1024/1024, 2) as data_mb, \n  ROUND(index_length/1024/1024, 2) as index_mb,\n  table_rows\nFROM information_schema.tables \nWHERE table_schema = DATABASE() \nORDER BY data_length DESC \nLIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT \n  table_name, \n  ROUND(data_length/1024/1024, 2) as data_mb, \n  ROUND(index_length/1024/1024, 2) as index_mb,\n  table_rows\nFROM information_schema.tables \nWHERE table_schema = DATABASE() \nORDER BY data_length DESC \nLIMIT 15;",
+  "rows": [
+    {
+      "table_name": "crm_activities",
+      "data_mb": "9.73",
+      "index_mb": "0.00",
+      "table_rows": "318900"
+    },
+    {
+      "table_name": "crm_messages",
+      "data_mb": "0.34",
+      "index_mb": "0.08",
+      "table_rows": "3287"
+    },
+    {
+      "table_name": "inventory_sync_logs",
+      "data_mb": "0.05",
+      "index_mb": "0.00",
+      "table_rows": "787"
+    },
+    {
+      "table_name": "crm_leads",
+      "data_mb": "0.03",
+      "index_mb": "0.00",
+      "table_rows": "341"
+    },
+    {
+      "table_name": "inventory_vehicles",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "table_rows": "149"
+    },
+    {
+      "table_name": "mkt_strategies",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "table_rows": "212"
+    },
+    {
+      "table_name": "mkt_tasks",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "table_rows": "212"
+    },
+    {
+      "table_name": "motivational_quotes",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "table_rows": "368"
+    },
+    {
+      "table_name": "sdr_records",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "table_rows": "107"
+    },
+    {
+      "table_name": "notifications",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "table_rows": "238"
+    },
+    {
+      "table_name": "crm_integrations",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "table_rows": "118"
+    },
+    {
+      "table_name": "crm_inventory",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "table_rows": "62"
+    },
+    {
+      "table_name": "sales",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "table_rows": "46"
+    },
+    {
+      "table_name": "fei_records",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "table_rows": "34"
+    },
+    {
+      "table_name": "consignment_records",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "table_rows": "19"
+    }
+  ],
+  "messages": [],
+  "stdout": "table_name\tdata_mb\tindex_mb\ttable_rows\ncrm_activities\t9.73\t0.00\t318900\ncrm_messages\t0.34\t0.08\t3287\ninventory_sync_logs\t0.05\t0.00\t787\ncrm_leads\t0.03\t0.00\t341\ninventory_vehicles\t0.01\t0.00\t149\nmkt_strategies\t0.01\t0.00\t212\nmkt_tasks\t0.01\t0.00\t212\nmotivational_quotes\t0.01\t0.00\t368\nsdr_records\t0.01\t0.00\t107\nnotifications\t0.01\t0.00\t238\ncrm_integrations\t0.00\t0.00\t118\ncrm_inventory\t0.00\t0.00\t62\nsales\t0.00\t0.00\t46\nfei_records\t0.00\t0.00\t34\nconsignment_records\t0.00\t0.00\t19\n",
+  "stderr": "",
+  "execution_time_ms": 80
+}

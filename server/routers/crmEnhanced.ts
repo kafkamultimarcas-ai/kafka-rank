@@ -161,15 +161,15 @@ export const crmFollowUpRouter = router({
 
 // ===== LEAD DISTRIBUTION (Round Robin) =====
 export const crmDistributionRouter = router({
-  // Get distribution config
-  getConfig: adminProcedure.query(async () => {
+  // Get distribution config (accessible by SDR and admin)
+  getConfig: publicProcedure.query(async () => {
     const database = await getDb();
     if (!database) return [];
     return database.select().from(crmLeadDistribution).orderBy(asc(crmLeadDistribution.department));
   }),
 
-  // Update distribution config
-  updateConfig: adminProcedure.input(z.object({
+  // Update distribution config (accessible by SDR and admin)
+  updateConfig: publicProcedure.input(z.object({
     department: z.string(),
     enabled: z.boolean(),
   })).mutation(async ({ input }) => {
@@ -182,6 +182,74 @@ export const crmDistributionRouter = router({
       await database.insert(crmLeadDistribution).values(input);
     }
     return { success: true };
+  }),
+
+  // SDR: Auto-distribute all unassigned leads to vendedores via round-robin
+  autoDistributeToSellers: publicProcedure.input(z.object({
+    department: z.string().default("vendas"),
+    sdrSellerId: z.number(),
+  })).mutation(async ({ input }) => {
+    const database = await getDb();
+    if (!database) throw new Error("DB not available");
+
+    // Get unassigned leads
+    const unassigned = await crmDb.listAllLeads({ sellerId: 0, department: input.department });
+    if (unassigned.length === 0) return { distributed: 0, total: 0, assignments: [] };
+
+    // Get active vendedores (not gerente, not SDR)
+    const vendedores = await database.select().from(sellers).where(
+      and(eq(sellers.department, input.department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente"))
+    ).orderBy(asc(sellers.id));
+
+    if (vendedores.length === 0) return { distributed: 0, total: unassigned.length, assignments: [] };
+
+    // Get last assigned index
+    const [config] = await database.select().from(crmLeadDistribution).where(eq(crmLeadDistribution.department, input.department)).limit(1);
+    let startIdx = 0;
+    if (config?.lastAssignedSellerId) {
+      const idx = vendedores.findIndex(s => s.id === config.lastAssignedSellerId);
+      startIdx = (idx + 1) % vendedores.length;
+    }
+
+    // Distribute round-robin
+    const assignments: { leadId: number; leadName: string; sellerId: number; sellerName: string }[] = [];
+    for (let i = 0; i < unassigned.length; i++) {
+      const lead = unassigned[i];
+      const seller = vendedores[(startIdx + i) % vendedores.length];
+      await crmDb.updateLead(lead.id, { sellerId: seller.id });
+      await crmDb.createActivity({
+        leadId: lead.id,
+        sellerId: input.sdrSellerId,
+        type: "transferencia",
+        description: `Lead distribuído automaticamente para ${seller.name} (round-robin pelo SDR)`,
+      });
+      assignments.push({ leadId: lead.id, leadName: lead.name || 'Lead', sellerId: seller.id, sellerName: seller.name || '' });
+    }
+
+    // Update last assigned
+    const lastSeller = vendedores[(startIdx + unassigned.length - 1) % vendedores.length];
+    if (config) {
+      await database.update(crmLeadDistribution).set({ lastAssignedSellerId: lastSeller.id }).where(eq(crmLeadDistribution.department, input.department));
+    }
+
+    // Notify each seller about their new leads
+    const sellerCounts: Record<number, { name: string; count: number }> = {};
+    for (const a of assignments) {
+      if (!sellerCounts[a.sellerId]) sellerCounts[a.sellerId] = { name: a.sellerName, count: 0 };
+      sellerCounts[a.sellerId].count++;
+    }
+    for (const [sid, info] of Object.entries(sellerCounts)) {
+      sendPushNewLead(Number(sid), `${info.count} leads`, null, 'distribuição SDR', null).catch(console.error);
+      createNotification({
+        title: '\ud83d\udea8 NOVOS LEADS!',
+        message: `Você recebeu ${info.count} lead(s) novo(s) do SDR. Responda rápido!`,
+        type: 'urgent',
+        sellerId: Number(sid),
+        targetType: 'seller',
+      }).catch(console.error);
+    }
+
+    return { distributed: assignments.length, total: unassigned.length, assignments };
   }),
 
   // Assign lead to next seller (round robin)

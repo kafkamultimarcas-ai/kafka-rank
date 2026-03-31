@@ -10,7 +10,7 @@ import {
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
-  Volume2, Download, Play, File, Square, Handshake
+  Volume2, Download, Play, File, Square, Handshake, Power, Shuffle
 } from "lucide-react";
 
 // Detect media type from URL extension as fallback
@@ -1003,6 +1003,8 @@ export default function CrmCommandCenter() {
             onAssign={handleAssign}
             onWhatsApp={handleWhatsApp}
             onCall={handleCall}
+            sellerId={sellerId}
+            department={dept}
           />
         ) : (
           <SellerDashboard
@@ -1151,8 +1153,32 @@ export default function CrmCommandCenter() {
 }
 
 // ===== SDR DASHBOARD =====
-function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers, onAssign, onWhatsApp, onCall }: any) {
+function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers, onAssign, onWhatsApp, onCall, sellerId, department }: any) {
   const unassignedLeads = useMemo(() => leads.filter((l: any) => l.sellerId === 0), [leads]);
+
+  // Distribution config
+  const { data: distConfig, refetch: refetchConfig } = trpc.crmDistribution.getConfig.useQuery();
+  const updateConfigMut = trpc.crmDistribution.updateConfig.useMutation({
+    onSuccess: () => { refetchConfig(); toast.success("Configuração atualizada!"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const autoDistributeMut = trpc.crmDistribution.autoDistributeToSellers.useMutation({
+    onSuccess: (data) => {
+      if (data.distributed > 0) {
+        toast.success(`${data.distributed} leads distribuídos automaticamente!`);
+      } else {
+        toast.info("Nenhum lead para distribuir.");
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const currentDeptConfig = useMemo(() => {
+    if (!distConfig) return null;
+    return distConfig.find((c: any) => c.department === (department || "vendas"));
+  }, [distConfig, department]);
+
+  const isAutoEnabled = currentDeptConfig?.enabled ?? false;
   const recentLeads = useMemo(() => {
     return [...leads]
       .sort((a: any, b: any) => {
@@ -1199,6 +1225,42 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
           </div>
           <p className="text-xl font-bold text-cyan-400">{assignmentStats.assigned}</p>
         </div>
+      </div>
+
+      {/* Distribution Controls */}
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+            <Shuffle className="w-3.5 h-3.5 text-primary" /> Distribuição de Leads
+          </h3>
+          <button
+            onClick={() => updateConfigMut.mutate({ department: department || "vendas", enabled: !isAutoEnabled })}
+            disabled={updateConfigMut.isPending}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all ${
+              isAutoEnabled
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+            }`}
+          >
+            <Power className="w-3 h-3" />
+            {isAutoEnabled ? "AUTO LIGADO" : "AUTO DESLIGADO"}
+          </button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mb-2">
+          {isAutoEnabled
+            ? "Novos leads serão distribuídos automaticamente entre os vendedores."
+            : "Distribuição manual ativa. Use o botão abaixo ou atribua individualmente."}
+        </p>
+        {unassignedLeads.length > 0 && (
+          <button
+            onClick={() => autoDistributeMut.mutate({ department: department || "vendas", sdrSellerId: sellerId })}
+            disabled={autoDistributeMut.isPending}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold transition-all active:scale-95"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            {autoDistributeMut.isPending ? "Distribuindo..." : `Distribuir ${unassignedLeads.length} leads agora (Round-Robin)`}
+          </button>
+        )}
       </div>
 
       {/* Unassigned leads needing attention */}

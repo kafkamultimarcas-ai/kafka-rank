@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,13 @@ export default function CrmAdminDashboard() {
     );
   }
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate("/crm/admin/login");
+    }
+  }, [isLoading, isAuthenticated, navigate]);
+
   if (!isAuthenticated) {
-    navigate("/crm/admin/login");
     return null;
   }
 

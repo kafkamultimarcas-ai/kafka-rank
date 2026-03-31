@@ -1494,3 +1494,20 @@
 ### Features Novas
 - [x] Feature: Controle de leads "Em Negociação" com alerta de inatividade - card no dashboard + alerta 3d+ parado
 - [x] Feature: Alerta "Lead Já Vendido" quando lead com mesma placa/telefone já tem venda aprovada - badge vermelho no LeadCard + checkAlreadySold endpoint
+
+### SDR Distribution System
+- [x] Feature: Distribuição automática de leads entre SDRs (round-robin) - autoDistributeToSellers endpoint
+- [x] Feature: Distribuição manual de leads (SDR escolhe vendedor) - select dropdown por lead no painel SDR
+- [x] Feature: Toggle para ativar/desativar distribuição automática - Power toggle AUTO LIGADO/DESLIGADO
+- [x] Feature: Painel de distribuição SDR no CRM - card com toggle + botão distribuir todos
+
+### Auditoria Final de Bugs
+- [x] Audit: Varredura completa do sistema para bugs restantes - setState render fix + índices
+- [x] Audit: Ajustes finais e correções encontradas - 8 índices criados, navigate fix
+
+### Auditoria Completa + Multi-Loja
+- [x] Audit: Análise completa de todos os painéis e funcionalidades - 21 painéis verificados
+- [x] Audit: Verificar capacidade do servidor para 2+ lojas - banco 11MB, TiDB aguenta TB
+- [x] Audit: Verificar como nova loja teria acesso zerado - nova instância recomendada
+- [x] Audit: Identificar o que falta melhorar em cada painel - relatório completo gerado
+- [x] Feature: Terminar sistema de distribuição SDR (auto + manual) - UI completa com toggle + round-robin
