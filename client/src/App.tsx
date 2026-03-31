@@ -52,6 +52,7 @@ const RankingFeirao = lazy(() => import("./pages/RankingFeirao"));
 const FichaFinanciamento = lazy(() => import("./pages/FichaFinanciamento"));
 const MesaCredito = lazy(() => import("./pages/MesaCredito"));
 const GerentePanel = lazy(() => import("./pages/GerentePanel"));
+const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
 
@@ -125,6 +126,7 @@ function Router() {
         <Route path="/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/gerente" component={GerentePanel} />
+        <Route path="/super-admin" component={SuperAdmin} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

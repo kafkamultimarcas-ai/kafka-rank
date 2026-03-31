@@ -1562,3 +1562,40 @@
 - [x] Frontend: exibir opção no formulário de criar/editar competição
 - [x] Bracket: funcionar corretamente com competições 1x1 (tratado como individual no sorteio e placar)
 - [x] 482 testes passando, 0 erros TypeScript
+
+## Sistema Multi-Tenant (Multi-Loja) - Portal de Revenda SaaS
+
+### Schema e Banco de Dados
+- [x] Criar tabela tenants (lojas): id, nome, slug, logo, telefone, endereço, plano, status, branding, módulos
+- [x] Criar tabela super_admins: acesso ao portal master com roles (owner/support)
+- [x] Adicionar coluna tenant_id em TODAS as 53 tabelas existentes com índice
+- [x] Migrar dados existentes da Kafka para tenant_id=1
+- [x] Atualizar schema Drizzle com tenantId em todas as definições de tabela
+
+### Backend - Super Admin Router
+- [x] Login super admin com JWT separado (secret diferente)
+- [x] Dashboard: total lojas, ativas, vendedores, vendas/mês por loja
+- [x] Criar loja: admin inicial + pipeline padrão + categorias financeiras
+- [x] Listar lojas com métricas (vendedores, vendas, leads)
+- [x] Detalhe da loja com contagens e info
+- [x] Atualizar loja (nome, status, plano, limites, branding)
+- [x] Deletar loja (soft delete)
+- [x] Listar admins da loja + reset de senha
+
+### Portal Super Admin (Frontend)
+- [x] Tela de login premium (escura, gradiente, ícone Shield)
+- [x] Dashboard com 4 cards de métricas (lojas, ativas, vendedores, vendas/mês)
+- [x] Lista de lojas com busca, StatusBadge, PlanBadge, métricas
+- [x] Modal criar nova loja (dados + plano + admin inicial)
+- [x] Modal detalhe: edição, admins, reset senha, cor principal
+- [x] Rota /super-admin no App.tsx (lazy loaded)
+- [x] Bypass AccessGate para /super-admin
+
+### Testes
+- [x] 20 testes: slug, auth JWT, bcrypt, isolamento, planos, módulos, dados padrão
+- [x] Total: 502 testes passando, 0 erros TypeScript
+
+### Pendente (próximas iterações)
+- [ ] Middleware de tenant: filtrar automaticamente TODAS as queries por tenant_id
+- [ ] Branding por loja: logo, cores, white-label na tela TV
+- [ ] Seletor de loja na tela de login do vendedor

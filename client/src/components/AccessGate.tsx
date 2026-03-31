@@ -12,6 +12,7 @@ const BYPASS_ROUTES = [
   "/crm/admin", "/crm", "/crm/integracoes",
   "/tv",
   "/admin",
+  "/super-admin",
 ];
 
 const DEPARTMENT_OPTIONS = [
