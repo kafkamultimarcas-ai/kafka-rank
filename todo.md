@@ -1531,3 +1531,6 @@
 - [x] Audit: Verificar webhooks e jobs background - alert-checker e inactive-dispatch OK
 - [x] Audit: Melhorias de UX, performance e robustez - checkAlreadySold otimizado, DB retry, NotFound traduzido, Admin→Gerente
 - [x] Audit: Corrigir TUDO encontrado - todos os bugs corrigidos, 474 testes passando
+
+### Bug: Teclado sumindo ao digitar no formulário Nova Competição (mobile)
+- [x] Bug: Input perde foco ao digitar no formulário Nova Competição no celular - CompetitionForm movido para fora do componente pai

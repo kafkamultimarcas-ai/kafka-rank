@@ -109,74 +109,6 @@ export default function AdminCompetitions() {
     });
   }
 
-  function CompetitionForm({ f, setF, onSubmit, submitLabel, isPending }: {
-    f: FormState; setF: (v: FormState) => void; onSubmit: (e: React.FormEvent) => void;
-    submitLabel: string; isPending: boolean;
-  }) {
-    return (
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <Label className="text-foreground">Nome *</Label>
-          <Input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="Ex: Grande Prêmio de Março" className="bg-input border-border text-foreground" />
-        </div>
-        <div>
-          <Label className="text-foreground">Descrição</Label>
-          <Input value={f.description} onChange={e => setF({ ...f, description: e.target.value })} placeholder="Descrição da competição" className="bg-input border-border text-foreground" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-foreground">Categoria</Label>
-            <Select value={f.category} onValueChange={(v) => setF({ ...f, category: v })}>
-              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="vendas">Vendas</SelectItem>
-                <SelectItem value="fei">F&I</SelectItem>
-                <SelectItem value="consignacao">Consignação</SelectItem>
-                <SelectItem value="despachante">Despachante</SelectItem>
-                <SelectItem value="feirao">Feirão</SelectItem>
-                <SelectItem value="pre_vendas">Pré-Vendas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-foreground">Meta (opcional)</Label>
-            <Input type="number" min={1} value={f.goalTarget} onChange={e => setF({ ...f, goalTarget: e.target.value })} placeholder="Ex: 10" className="bg-input border-border text-foreground" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-foreground">Tipo</Label>
-            <Select value={f.type} onValueChange={(v: any) => setF({ ...f, type: v })}>
-              <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="team">Equipes (2v2)</SelectItem>
-                <SelectItem value="group">Grupos</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-foreground">Pontos/Registro</Label>
-            <Input type="number" min={1} value={f.pointsPerSale} onChange={e => setF({ ...f, pointsPerSale: parseInt(e.target.value) || 1 })} className="bg-input border-border text-foreground" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-foreground">Data Início *</Label>
-            <Input type="date" value={f.startDate} onChange={e => setF({ ...f, startDate: e.target.value })} className="bg-input border-border text-foreground" />
-          </div>
-          <div>
-            <Label className="text-foreground">Data Fim *</Label>
-            <Input type="date" value={f.endDate} onChange={e => setF({ ...f, endDate: e.target.value })} className="bg-input border-border text-foreground" />
-          </div>
-        </div>
-        <Button type="submit" className="w-full racing-gradient text-white" disabled={isPending}>
-          {isPending ? "Salvando..." : submitLabel}
-        </Button>
-      </form>
-    );
-  }
-
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -246,6 +178,74 @@ export default function AdminCompetitions() {
         </Dialog>
       </div>
     </DashboardLayout>
+  );
+}
+
+function CompetitionForm({ f, setF, onSubmit, submitLabel, isPending }: {
+  f: FormState; setF: (v: FormState) => void; onSubmit: (e: React.FormEvent) => void;
+  submitLabel: string; isPending: boolean;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <Label className="text-foreground">Nome *</Label>
+        <Input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="Ex: Grande Prêmio de Março" className="bg-input border-border text-foreground" />
+      </div>
+      <div>
+        <Label className="text-foreground">Descrição</Label>
+        <Input value={f.description} onChange={e => setF({ ...f, description: e.target.value })} placeholder="Descrição da competição" className="bg-input border-border text-foreground" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-foreground">Categoria</Label>
+          <Select value={f.category} onValueChange={(v) => setF({ ...f, category: v })}>
+            <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="vendas">Vendas</SelectItem>
+              <SelectItem value="fei">F&I</SelectItem>
+              <SelectItem value="consignacao">Consignação</SelectItem>
+              <SelectItem value="despachante">Despachante</SelectItem>
+              <SelectItem value="feirao">Feirão</SelectItem>
+              <SelectItem value="pre_vendas">Pré-Vendas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-foreground">Meta (opcional)</Label>
+          <Input type="number" min={1} value={f.goalTarget} onChange={e => setF({ ...f, goalTarget: e.target.value })} placeholder="Ex: 10" className="bg-input border-border text-foreground" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-foreground">Tipo</Label>
+          <Select value={f.type} onValueChange={(v: any) => setF({ ...f, type: v })}>
+            <SelectTrigger className="bg-input border-border text-foreground"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="team">Equipes (2v2)</SelectItem>
+              <SelectItem value="group">Grupos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-foreground">Pontos/Registro</Label>
+          <Input type="number" min={1} value={f.pointsPerSale} onChange={e => setF({ ...f, pointsPerSale: parseInt(e.target.value) || 1 })} className="bg-input border-border text-foreground" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-foreground">Data Início *</Label>
+          <Input type="date" value={f.startDate} onChange={e => setF({ ...f, startDate: e.target.value })} className="bg-input border-border text-foreground" />
+        </div>
+        <div>
+          <Label className="text-foreground">Data Fim *</Label>
+          <Input type="date" value={f.endDate} onChange={e => setF({ ...f, endDate: e.target.value })} className="bg-input border-border text-foreground" />
+        </div>
+      </div>
+      <Button type="submit" className="w-full racing-gradient text-white" disabled={isPending}>
+        {isPending ? "Salvando..." : submitLabel}
+      </Button>
+    </form>
   );
 }
 
