@@ -58,7 +58,7 @@ export const competitions = mysqlTable("competitions", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   category: varchar("category", { length: 50 }).default("vendas").notNull(), // vendas, pre_vendas, fei, consignacao, despachante, feirao
-  type: mysqlEnum("type", ["individual", "team", "group"]).default("individual").notNull(),
+  type: mysqlEnum("type", ["individual", "team", "group", "1v1"]).default("individual").notNull(),
   status: mysqlEnum("status", ["draft", "active", "finished"]).default("draft").notNull(),
   pointsPerSale: int("pointsPerSale").default(1).notNull(),
   goalTarget: int("goalTarget"), // meta (ex: X carros consignados, X transferências)

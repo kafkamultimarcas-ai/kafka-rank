@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 type BracketPanelProps = {
   competitionId: number;
-  competitionType: string; // "individual" | "team" | "group"
+  competitionType: string; // "individual" | "team" | "group" | "1v1"
   competitionStatus: string; // "draft" | "active" | "finished"
 };
 

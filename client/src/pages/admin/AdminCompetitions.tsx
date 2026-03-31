@@ -22,7 +22,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 type FormState = {
   name: string; description: string; category: string;
-  type: "individual" | "team" | "group";
+  type: "individual" | "team" | "group" | "1v1";
   pointsPerSale: number; goalTarget: string; startDate: string; endDate: string;
 };
 
@@ -225,6 +225,7 @@ function CompetitionForm({ f, setF, onSubmit, submitLabel, isPending }: {
               <SelectItem value="individual">Individual</SelectItem>
               <SelectItem value="team">Equipes (2v2)</SelectItem>
               <SelectItem value="group">Grupos</SelectItem>
+              <SelectItem value="1v1">1x1 (Mata-Mata)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -271,7 +272,7 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdi
               {comp.status === "active" ? "Ativa" : comp.status === "finished" ? "Encerrada" : "Rascunho"}
             </span>
             <span className="text-xs text-muted-foreground">
-              {comp.type === "individual" ? "Individual" : comp.type === "team" ? "Equipes" : "Grupos"}
+              {comp.type === "individual" ? "Individual" : comp.type === "team" ? "Equipes" : comp.type === "1v1" ? "1x1" : "Grupos"}
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[comp.category] || CATEGORY_COLORS.vendas}`}>
               {CATEGORY_LABELS[comp.category] || "Vendas"}

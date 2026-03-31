@@ -1,0 +1,1 @@
+ALTER TABLE `competitions` MODIFY COLUMN `type` enum('individual','team','group','1v1') NOT NULL DEFAULT 'individual';

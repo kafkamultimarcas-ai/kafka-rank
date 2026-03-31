@@ -1555,3 +1555,10 @@
 - [x] Frontend: Suporte a BYE (quando número ímpar de participantes)
 - [x] Testes: 8 testes do bracket (CRUD, incremento placar, listagem ordenada, lógica motivacional)
 - [x] Total: 482 testes passando, 0 erros TypeScript
+
+### Feature: Tipo de competição 1x1 (Mata-Mata Individual)
+- [x] Adicionar opção "1x1 (Mata-Mata)" no seletor de tipo de competição
+- [x] Backend: suportar tipo "1v1" no schema e routers (enum + migration aplicada)
+- [x] Frontend: exibir opção no formulário de criar/editar competição
+- [x] Bracket: funcionar corretamente com competições 1x1 (tratado como individual no sorteio e placar)
+- [x] 482 testes passando, 0 erros TypeScript
