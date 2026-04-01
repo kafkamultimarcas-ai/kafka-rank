@@ -2,13 +2,25 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { tenantStorage } from "../tenantDb";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+
+// Tenant middleware - wraps ALL procedures with AsyncLocalStorage tenant context
+// This makes getCurrentTenantId() available in all db functions automatically
+const tenantMiddleware = t.middleware(async (opts) => {
+  const { ctx, next } = opts;
+  const tenantId = ctx.tenantId || 1;
+  // Run the entire procedure within the tenant context
+  return tenantStorage.run({ tenantId }, () => next({ ctx }));
+});
+
+// ALL procedures go through tenant middleware first
+export const publicProcedure = t.procedure.use(tenantMiddleware);
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;

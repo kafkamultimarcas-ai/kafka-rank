@@ -1596,6 +1596,30 @@
 - [x] Total: 502 testes passando, 0 erros TypeScript
 
 ### Pendente (próximas iterações)
-- [ ] Middleware de tenant: filtrar automaticamente TODAS as queries por tenant_id
+- [x] Middleware de tenant: filtrar automaticamente TODAS as queries por tenant_id (171 filtros via getCurrentTenantId + AsyncLocalStorage)
 - [ ] Branding por loja: logo, cores, white-label na tela TV
 - [ ] Seletor de loja na tela de login do vendedor
+
+## Auditoria Multi-Tenant COMPLETA e Correção de Bugs
+- [x] Adicionar tenantId no contexto do usuário (context.ts + resolveTenantId)
+- [x] Criar middleware tRPC com AsyncLocalStorage para tenant (trpc.ts)
+- [x] Injetar getCurrentTenantId() em 171 queries (db.ts + crmDb.ts + finDb.ts)
+- [x] 27 testes de segurança multi-tenant (schema, queries, INSERT, middleware, super admin)
+- [x] Gerar relatório completo de bugs e melhorias
+- [x] Gerar prompt de melhoria para futuras iterações
+- [x] Total: 528 testes passando, 0 erros TypeScript
+
+## Bug: Pista de Corrida Sumiu
+- [x] Investigado: não é bug — pista só aparece com competição ativa (Fase 1 encerrou 30/03)
+- [ ] Melhoria: mostrar mensagem "Sem competição ativa" em vez de esconder a pista
+
+## Feature: Virada de Mês com Histórico
+- [x] Tabela monthly_snapshots (vendedor, vendas, pontos, ranking por mês)
+- [x] Tabela competition_snapshots (competição, campeão, ranking JSON por mês)
+- [x] Função executeMonthTurnover (arquiva + zera contadores)
+- [x] Função getMonthlySnapshots (consultar histórico)
+- [x] Função listAvailableMonths (meses disponíveis)
+- [x] Página AdminMonthTurnover em /admin/virada-mes
+- [x] Link no menu lateral (DashboardLayout)
+- [x] Endpoints tRPC: executar virada, listar snapshots, listar meses
+- [ ] Virada automática via cron job (dia 1 de cada mês)

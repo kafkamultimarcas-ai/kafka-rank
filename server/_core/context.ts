@@ -6,11 +6,13 @@ import { ENV } from "./env";
 import { getManagerById, getSellerById } from "../db";
 import { getAdminById } from "../crmDb";
 import { parse as parseCookieHeader } from "cookie";
+import { resolveTenantId } from "../tenantMiddleware";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: (User & { sellerRole?: string }) | null;
+  tenantId: number;
 };
 
 export async function createContext(
@@ -111,9 +113,13 @@ export async function createContext(
     }
   }
 
+  // Resolve tenantId from authenticated user
+  const tenantId = await resolveTenantId(user);
+
   return {
     req: opts.req,
     res: opts.res,
     user,
+    tenantId,
   };
 }

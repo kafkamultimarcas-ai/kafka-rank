@@ -1143,3 +1143,47 @@ export const superAdmins = mysqlTable("super_admins", {
 });
 export type SuperAdmin = typeof superAdmins.$inferSelect;
 export type InsertSuperAdmin = typeof superAdmins.$inferInsert;
+
+
+// Snapshots mensais - grava o estado de cada vendedor ao final de cada mês
+export const monthlySnapshots = mysqlTable("monthly_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  sellerName: varchar("sellerName", { length: 255 }).notNull(),
+  month: int("month").notNull(), // 1-12
+  year: int("year").notNull(),
+  totalSales: int("totalSales").default(0).notNull(),
+  totalPoints: int("totalPoints").default(0).notNull(),
+  department: varchar("department", { length: 100 }),
+  rank: int("rank").default(0), // posição no ranking daquele mês
+  // Dados extras opcionais
+  totalFei: int("totalFei").default(0),
+  totalConsignacao: int("totalConsignacao").default(0),
+  totalAgendamentos: int("totalAgendamentos").default(0),
+  totalLeads: int("totalLeads").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+export type MonthlySnapshot = typeof monthlySnapshots.$inferSelect;
+export type InsertMonthlySnapshot = typeof monthlySnapshots.$inferInsert;
+
+// Snapshots de competições - grava o resultado final de cada competição
+export const competitionSnapshots = mysqlTable("competition_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  competitionId: int("competitionId").notNull(),
+  competitionName: varchar("competitionName", { length: 255 }).notNull(),
+  competitionType: varchar("competitionType", { length: 20 }),
+  category: varchar("category", { length: 50 }),
+  startDate: bigint("startDate", { mode: "number" }),
+  endDate: bigint("endDate", { mode: "number" }),
+  month: int("month").notNull(),
+  year: int("year").notNull(),
+  // Ranking serializado como JSON
+  rankingJson: text("rankingJson"), // JSON array com posição, nome, pontos, vendas
+  championName: varchar("championName", { length: 255 }),
+  championSellerId: int("championSellerId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+export type CompetitionSnapshot = typeof competitionSnapshots.$inferSelect;
+export type InsertCompetitionSnapshot = typeof competitionSnapshots.$inferInsert;

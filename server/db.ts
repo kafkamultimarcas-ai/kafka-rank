@@ -1,4 +1,4 @@
-import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray, gte, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -24,6 +24,8 @@ import {
   saleDocuments, InsertSaleDocument,
   fichasFinanciamento, InsertFichaFinanciamento, fichaBancos, InsertFichaBanco, BANCOS_FINANCIAMENTO,
   bracketMatches, InsertBracketMatch,
+  monthlySnapshots, InsertMonthlySnapshot,
+  competitionSnapshots, InsertCompetitionSnapshot,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -90,14 +92,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; } else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    await db.insert(users).values({...values, tenantId: getCurrentTenantId()}).onDuplicateKeyUpdate({ set: updateSet });
   } catch (error) { console.error("[Database] Failed to upsert user:", error); throw error; }
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db.select().from(users).where(and(eq(users.tenantId, getCurrentTenantId()), eq(users.openId, openId))).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -125,14 +127,14 @@ const safeSellerColumns = {
 export async function listSellers(activeOnly = false) {
   const db = await getDb();
   if (!db) return [];
-  if (activeOnly) return db.select(safeSellerColumns).from(sellers).where(eq(sellers.active, true)).orderBy(desc(sellers.totalPoints));
-  return db.select(safeSellerColumns).from(sellers).orderBy(desc(sellers.totalPoints));
+  if (activeOnly) return db.select(safeSellerColumns).from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.active, true))).orderBy(desc(sellers.totalPoints));
+  return db.select(safeSellerColumns).from(sellers).where(eq(sellers.tenantId, getCurrentTenantId())).orderBy(desc(sellers.totalPoints));
 }
 
 export async function getSellerById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select(safeSellerColumns).from(sellers).where(eq(sellers.id, id)).limit(1);
+  const result = await db.select(safeSellerColumns).from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, id))).limit(1);
   return result[0];
 }
 
@@ -140,14 +142,14 @@ export async function getSellerById(id: number) {
 export async function getSellerByIdInternal(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(sellers).where(eq(sellers.id, id)).limit(1);
+  const result = await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, id))).limit(1);
   return result[0];
 }
 
 export async function getSellerByUsername(username: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(sellers).where(eq(sellers.username, username)).limit(1);
+  const result = await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.username, username))).limit(1);
   return result[0];
 }
 
@@ -160,102 +162,102 @@ export async function updateSellerLastAccess(id: number) {
 export async function createSeller(data: InsertSeller) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(sellers).values(data);
+  const result = await db.insert(sellers).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateSeller(id: number, data: Partial<InsertSeller>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sellers).set(data).where(eq(sellers.id, id));
+  await db.update(sellers).set(data).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, id)));
 }
 
 export async function deleteSeller(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(sellers).where(eq(sellers.id, id));
+  await db.delete(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, id)));
 }
 
 // ===== COMPETITIONS =====
 export async function listCompetitions(status?: string) {
   const db = await getDb();
   if (!db) return [];
-  if (status) return db.select().from(competitions).where(eq(competitions.status, status as any)).orderBy(desc(competitions.createdAt));
-  return db.select().from(competitions).orderBy(desc(competitions.createdAt));
+  if (status) return db.select().from(competitions).where(and(eq(competitions.tenantId, getCurrentTenantId()), eq(competitions.status, status as any))).orderBy(desc(competitions.createdAt));
+  return db.select().from(competitions).where(eq(competitions.tenantId, getCurrentTenantId())).orderBy(desc(competitions.createdAt));
 }
 
 export async function getCompetitionById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(competitions).where(eq(competitions.id, id)).limit(1);
+  const result = await db.select().from(competitions).where(and(eq(competitions.tenantId, getCurrentTenantId()), eq(competitions.id, id))).limit(1);
   return result[0];
 }
 
 export async function createCompetition(data: InsertCompetition) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(competitions).values(data);
+  const result = await db.insert(competitions).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateCompetition(id: number, data: Partial<InsertCompetition>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(competitions).set(data).where(eq(competitions.id, id));
+  await db.update(competitions).set(data).where(and(eq(competitions.tenantId, getCurrentTenantId()), eq(competitions.id, id)));
 }
 
 export async function deleteCompetition(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(competitionParticipants).where(eq(competitionParticipants.competitionId, id));
-  await db.delete(teams).where(eq(teams.competitionId, id));
-  await db.delete(competitions).where(eq(competitions.id, id));
+  await db.delete(competitionParticipants).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.competitionId, id)));
+  await db.delete(teams).where(and(eq(teams.tenantId, getCurrentTenantId()), eq(teams.competitionId, id)));
+  await db.delete(competitions).where(and(eq(competitions.tenantId, getCurrentTenantId()), eq(competitions.id, id)));
 }
 
 // ===== TEAMS =====
 export async function listTeamsByCompetition(competitionId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(teams).where(eq(teams.competitionId, competitionId));
+  return db.select().from(teams).where(and(eq(teams.tenantId, getCurrentTenantId()), eq(teams.competitionId, competitionId)));
 }
 
 export async function createTeam(data: InsertTeam) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(teams).values(data);
+  const result = await db.insert(teams).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function deleteTeam(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(teams).where(eq(teams.id, id));
+  await db.delete(teams).where(and(eq(teams.tenantId, getCurrentTenantId()), eq(teams.id, id)));
 }
 
 // ===== PARTICIPANTS =====
 export async function listParticipants(competitionId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(competitionParticipants).where(eq(competitionParticipants.competitionId, competitionId)).orderBy(desc(competitionParticipants.points));
+  return db.select().from(competitionParticipants).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.competitionId, competitionId))).orderBy(desc(competitionParticipants.points));
 }
 
 export async function addParticipant(data: InsertCompetitionParticipant) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(competitionParticipants).values(data);
+  const result = await db.insert(competitionParticipants).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function removeParticipant(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(competitionParticipants).where(eq(competitionParticipants.id, id));
+  await db.delete(competitionParticipants).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.id, id)));
 }
 
 export async function updateParticipantPoints(id: number, points: number, salesCount: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(competitionParticipants).set({ points, salesCount }).where(eq(competitionParticipants.id, id));
+  await db.update(competitionParticipants).set({ points, salesCount }).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.id, id)));
 }
 
 // ===== SALES =====
@@ -265,8 +267,8 @@ export async function listSales(competitionId?: number, sellerId?: number) {
   const conditions = [];
   if (competitionId) conditions.push(eq(sales.competitionId, competitionId));
   if (sellerId) conditions.push(eq(sales.sellerId, sellerId));
-  if (conditions.length > 0) return db.select().from(sales).where(and(...conditions)).orderBy(desc(sales.createdAt));
-  return db.select().from(sales).orderBy(desc(sales.createdAt));
+  if (conditions.length > 0) return db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(sales.createdAt));
+  return db.select().from(sales).where(eq(sales.tenantId, getCurrentTenantId())).orderBy(desc(sales.createdAt));
 }
 
 export async function createSale(data: InsertSale) {
@@ -274,7 +276,7 @@ export async function createSale(data: InsertSale) {
   if (!db) throw new Error("DB not available");
   // Vendas criadas pelo admin são aprovadas direto, vendas dos vendedores ficam pendentes
   const saleData = { ...data, status: data.status || 'pending' as const };
-  const result = await db.insert(sales).values(saleData);
+  const result = await db.insert(sales).values({...saleData, tenantId: getCurrentTenantId()});
   // Se aprovada direto (admin), atualiza totais
   if (saleData.status === 'approved') {
     await updateSaleTotals(data.sellerId, data.competitionId, data.points ?? 1);
@@ -293,7 +295,7 @@ async function updateSaleTotals(sellerId: number, competitionId: number | null |
   if (!db) return;
   
   // Verificar departamento do vendedor - só vendedores somam pontos de venda
-  const sellerResult = await db.select({ department: sellers.department }).from(sellers).where(eq(sellers.id, sellerId)).limit(1);
+  const sellerResult = await db.select({ department: sellers.department }).from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, sellerId))).limit(1);
   const sellerDept = sellerResult[0]?.department || 'vendas';
   
   if (incrementSales) {
@@ -325,16 +327,16 @@ async function updateSaleTotals(sellerId: number, competitionId: number | null |
 export async function listPendingSales() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(sales).where(eq(sales.status, 'pending')).orderBy(desc(sales.createdAt));
+  return db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.status, 'pending'))).orderBy(desc(sales.createdAt));
 }
 
 export async function approveSale(saleId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const saleResult = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  const saleResult = await db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId))).limit(1);
   const sale = saleResult[0];
   if (!sale || sale.status !== 'pending') throw new Error("Venda não encontrada ou já processada");
-  await db.update(sales).set({ status: 'approved' }).where(eq(sales.id, saleId));
+  await db.update(sales).set({ status: 'approved' }).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId)));
   await updateSaleTotals(sale.sellerId, sale.competitionId, sale.points);
   return sale;
 }
@@ -342,13 +344,13 @@ export async function approveSale(saleId: number) {
 export async function rejectSale(saleId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sales).set({ status: 'rejected' }).where(eq(sales.id, saleId));
+  await db.update(sales).set({ status: 'rejected' }).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId)));
 }
 
 export async function deleteSale(saleId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const saleResult = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  const saleResult = await db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId))).limit(1);
   const sale = saleResult[0];
   if (!sale) throw new Error("Venda não encontrada");
   // Se a venda estava aprovada, reverter os pontos
@@ -367,14 +369,14 @@ export async function deleteSale(saleId: number) {
       ));
     }
   }
-  await db.delete(sales).where(eq(sales.id, saleId));
+  await db.delete(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId)));
   return sale;
 }
 
 export async function editSale(saleId: number, data: { vehicleModel?: string; value?: number; sellerId?: number; status?: 'pending' | 'approved' | 'rejected'; leadSource?: string }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const saleResult = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  const saleResult = await db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId))).limit(1);
   const oldSale = saleResult[0];
   if (!oldSale) throw new Error("Venda não encontrada");
 
@@ -436,7 +438,7 @@ export async function editSale(saleId: number, data: { vehicleModel?: string; va
   }
 
   if (Object.keys(updates).length > 0) {
-    await db.update(sales).set(updates).where(eq(sales.id, saleId));
+    await db.update(sales).set(updates).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId)));
   }
   return { ...oldSale, ...updates };
 }
@@ -472,67 +474,67 @@ export async function getRecentApprovedSales(sinceTimestamp: number) {
 export async function listTrainings(activeOnly = false) {
   const db = await getDb();
   if (!db) return [];
-  if (activeOnly) return db.select().from(trainings).where(eq(trainings.active, true)).orderBy(desc(trainings.createdAt));
-  return db.select().from(trainings).orderBy(desc(trainings.createdAt));
+  if (activeOnly) return db.select().from(trainings).where(and(eq(trainings.tenantId, getCurrentTenantId()), eq(trainings.active, true))).orderBy(desc(trainings.createdAt));
+  return db.select().from(trainings).where(eq(trainings.tenantId, getCurrentTenantId())).orderBy(desc(trainings.createdAt));
 }
 
 export async function createTraining(data: InsertTraining) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(trainings).values(data);
+  const result = await db.insert(trainings).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateTraining(id: number, data: Partial<InsertTraining>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(trainings).set(data).where(eq(trainings.id, id));
+  await db.update(trainings).set(data).where(and(eq(trainings.tenantId, getCurrentTenantId()), eq(trainings.id, id)));
 }
 
 export async function deleteTraining(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(trainings).where(eq(trainings.id, id));
+  await db.delete(trainings).where(and(eq(trainings.tenantId, getCurrentTenantId()), eq(trainings.id, id)));
 }
 
 // ===== ACTION PLANS =====
 export async function listActionPlans(sellerId?: number) {
   const db = await getDb();
   if (!db) return [];
-  if (sellerId) return db.select().from(actionPlans).where(eq(actionPlans.sellerId, sellerId)).orderBy(desc(actionPlans.createdAt));
-  return db.select().from(actionPlans).orderBy(desc(actionPlans.createdAt));
+  if (sellerId) return db.select().from(actionPlans).where(and(eq(actionPlans.tenantId, getCurrentTenantId()), eq(actionPlans.sellerId, sellerId))).orderBy(desc(actionPlans.createdAt));
+  return db.select().from(actionPlans).where(eq(actionPlans.tenantId, getCurrentTenantId())).orderBy(desc(actionPlans.createdAt));
 }
 
 export async function createActionPlan(data: InsertActionPlan) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(actionPlans).values(data);
+  const result = await db.insert(actionPlans).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateActionPlan(id: number, data: Partial<InsertActionPlan>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(actionPlans).set(data).where(eq(actionPlans.id, id));
+  await db.update(actionPlans).set(data).where(and(eq(actionPlans.tenantId, getCurrentTenantId()), eq(actionPlans.id, id)));
 }
 
 export async function deleteActionPlan(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(actionPlans).where(eq(actionPlans.id, id));
+  await db.delete(actionPlans).where(and(eq(actionPlans.tenantId, getCurrentTenantId()), eq(actionPlans.id, id)));
 }
 
 // ===== MOTIVATIONAL QUOTES =====
 export async function listQuotes() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(motivationalQuotes).where(eq(motivationalQuotes.active, true)).orderBy(desc(motivationalQuotes.generatedAt));
+  return db.select().from(motivationalQuotes).where(and(eq(motivationalQuotes.tenantId, getCurrentTenantId()), eq(motivationalQuotes.active, true))).orderBy(desc(motivationalQuotes.generatedAt));
 }
 
 export async function createQuote(data: InsertMotivationalQuote) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(motivationalQuotes).values(data);
+  const result = await db.insert(motivationalQuotes).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
@@ -571,7 +573,7 @@ export async function listNotifications(sellerId?: number) {
       ))
       .orderBy(desc(notifications.createdAt)).limit(50);
   }
-  return db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(50);
+  return db.select().from(notifications).where(eq(notifications.tenantId, getCurrentTenantId())).orderBy(desc(notifications.createdAt)).limit(50);
 }
 
 export async function listAdminNotifications() {
@@ -613,14 +615,14 @@ export async function countUnreadSellerNotifications(sellerId: number) {
 export async function createNotification(data: InsertNotification) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(notifications).values(data);
+  const result = await db.insert(notifications).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function markNotificationRead(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+  await db.update(notifications).set({ read: true }).where(and(eq(notifications.tenantId, getCurrentTenantId()), eq(notifications.id, id)));
 }
 
 export async function markAllNotificationsRead(targetType: string, sellerId?: number) {
@@ -648,7 +650,7 @@ export async function markAllNotificationsRead(targetType: string, sellerId?: nu
 export async function getPushSubscriptionsBySeller(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.sellerId, sellerId));
+  return db.select().from(pushSubscriptions).where(and(eq(pushSubscriptions.tenantId, getCurrentTenantId()), eq(pushSubscriptions.sellerId, sellerId)));
 }
 
 // ===== PUSH SUBSCRIPTIONS =====
@@ -656,7 +658,7 @@ export async function savePushSubscription(data: { endpoint: string; p256dh: str
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   // Verificar se já existe essa subscription
-  const existing = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, data.endpoint)).limit(1);
+  const existing = await db.select().from(pushSubscriptions).where(and(eq(pushSubscriptions.tenantId, getCurrentTenantId()), eq(pushSubscriptions.endpoint, data.endpoint))).limit(1);
   if (existing.length > 0) {
     // Atualizar
     await db.update(pushSubscriptions).set({
@@ -666,20 +668,20 @@ export async function savePushSubscription(data: { endpoint: string; p256dh: str
     }).where(eq(pushSubscriptions.id, existing[0].id));
     return existing[0].id;
   }
-  const result = await db.insert(pushSubscriptions).values(data);
+  const result = await db.insert(pushSubscriptions).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function getAllPushSubscriptions() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(pushSubscriptions);
+  return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.tenantId, getCurrentTenantId()));
 }
 
 export async function deletePushSubscription(endpoint: string) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.tenantId, getCurrentTenantId()), eq(pushSubscriptions.endpoint, endpoint)));
 }
 
 // ===== GOALS (METAS) =====
@@ -692,27 +694,27 @@ export async function listGoals(filters?: { month?: number; year?: number; type?
   if (filters?.type) conditions.push(eq(goals.type, filters.type as any));
   if (filters?.sellerId) conditions.push(eq(goals.sellerId, filters.sellerId));
   if (filters?.category) conditions.push(eq(goals.category, filters.category));
-  if (conditions.length > 0) return db.select().from(goals).where(and(...conditions)).orderBy(desc(goals.createdAt));
-  return db.select().from(goals).orderBy(desc(goals.createdAt));
+  if (conditions.length > 0) return db.select().from(goals).where(and(eq(goals.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(goals.createdAt));
+  return db.select().from(goals).where(eq(goals.tenantId, getCurrentTenantId())).orderBy(desc(goals.createdAt));
 }
 
 export async function createGoal(data: InsertGoal) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(goals).values(data);
+  const result = await db.insert(goals).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateGoal(id: number, data: Partial<InsertGoal>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(goals).set(data).where(eq(goals.id, id));
+  await db.update(goals).set(data).where(and(eq(goals.tenantId, getCurrentTenantId()), eq(goals.id, id)));
 }
 
 export async function deleteGoal(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(goals).where(eq(goals.id, id));
+  await db.delete(goals).where(and(eq(goals.tenantId, getCurrentTenantId()), eq(goals.id, id)));
 }
 
 export async function incrementGoalProgress(goalId: number, amount: number = 1) {
@@ -722,9 +724,9 @@ export async function incrementGoalProgress(goalId: number, amount: number = 1) 
     currentValue: sql`currentValue + ${amount}`,
   }).where(eq(goals.id, goalId));
   // Check if achieved
-  const [goal] = await db.select().from(goals).where(eq(goals.id, goalId)).limit(1);
+  const [goal] = await db.select().from(goals).where(and(eq(goals.tenantId, getCurrentTenantId()), eq(goals.id, goalId))).limit(1);
   if (goal && goal.currentValue >= goal.targetValue && !goal.achieved) {
-    await db.update(goals).set({ achieved: true }).where(eq(goals.id, goalId));
+    await db.update(goals).set({ achieved: true }).where(and(eq(goals.tenantId, getCurrentTenantId()), eq(goals.id, goalId)));
     return { achieved: true, goal };
   }
   return { achieved: false, goal };
@@ -758,10 +760,10 @@ export async function autoUpdateStoreGoal(saleCategory: string, month: number, y
 export async function getCompetitionRanking(competitionId: number) {
   const db = await getDb();
   if (!db) return [];
-  const participants = await db.select().from(competitionParticipants).where(eq(competitionParticipants.competitionId, competitionId)).orderBy(desc(competitionParticipants.points));
+  const participants = await db.select().from(competitionParticipants).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.competitionId, competitionId))).orderBy(desc(competitionParticipants.points));
   const sellerIds = participants.map(p => p.sellerId);
   if (sellerIds.length === 0) return [];
-  const sellersList = await db.select().from(sellers).where(inArray(sellers.id, sellerIds));
+  const sellersList = await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), inArray(sellers.id, sellerIds)));
   const sellersMap = new Map(sellersList.map(s => [s.id, s]));
   return participants.map((p, idx) => ({
     position: idx + 1,
@@ -773,10 +775,10 @@ export async function getCompetitionRanking(competitionId: number) {
 export async function getTeamRanking(competitionId: number) {
   const db = await getDb();
   if (!db) return [];
-  const teamsList = await db.select().from(teams).where(eq(teams.competitionId, competitionId));
-  const participants = await db.select().from(competitionParticipants).where(eq(competitionParticipants.competitionId, competitionId));
+  const teamsList = await db.select().from(teams).where(and(eq(teams.tenantId, getCurrentTenantId()), eq(teams.competitionId, competitionId)));
+  const participants = await db.select().from(competitionParticipants).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.competitionId, competitionId)));
   const sellerIds = participants.map(p => p.sellerId);
-  const sellersList = sellerIds.length > 0 ? await db.select().from(sellers).where(inArray(sellers.id, sellerIds)) : [];
+  const sellersList = sellerIds.length > 0 ? await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), inArray(sellers.id, sellerIds))) : [];
   const sellersMap = new Map(sellersList.map(s => [s.id, s]));
 
   return teamsList.map(team => {
@@ -807,26 +809,26 @@ export async function listBracketMatches(competitionId: number) {
 export async function createBracketMatch(data: InsertBracketMatch) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(bracketMatches).values(data);
+  const result = await db.insert(bracketMatches).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateBracketMatch(id: number, data: Partial<InsertBracketMatch>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(bracketMatches).set(data).where(eq(bracketMatches.id, id));
+  await db.update(bracketMatches).set(data).where(and(eq(bracketMatches.tenantId, getCurrentTenantId()), eq(bracketMatches.id, id)));
 }
 
 export async function deleteBracketMatchesByCompetition(competitionId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(bracketMatches).where(eq(bracketMatches.competitionId, competitionId));
+  await db.delete(bracketMatches).where(and(eq(bracketMatches.tenantId, getCurrentTenantId()), eq(bracketMatches.competitionId, competitionId)));
 }
 
 export async function getBracketMatch(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(bracketMatches).where(eq(bracketMatches.id, id));
+  const rows = await db.select().from(bracketMatches).where(and(eq(bracketMatches.tenantId, getCurrentTenantId()), eq(bracketMatches.id, id)));
   return rows[0] || null;
 }
 
@@ -837,9 +839,9 @@ export async function incrementBracketScore(matchId: number, side: 'A' | 'B') {
   const match = await getBracketMatch(matchId);
   if (!match) throw new Error("Match not found");
   if (side === 'A') {
-    await db.update(bracketMatches).set({ scoreA: match.scoreA + 1 }).where(eq(bracketMatches.id, matchId));
+    await db.update(bracketMatches).set({ scoreA: match.scoreA + 1 }).where(and(eq(bracketMatches.tenantId, getCurrentTenantId()), eq(bracketMatches.id, matchId)));
   } else {
-    await db.update(bracketMatches).set({ scoreB: match.scoreB + 1 }).where(eq(bracketMatches.id, matchId));
+    await db.update(bracketMatches).set({ scoreB: match.scoreB + 1 }).where(and(eq(bracketMatches.tenantId, getCurrentTenantId()), eq(bracketMatches.id, matchId)));
   }
 }
 
@@ -850,30 +852,30 @@ export async function listFeiRecords(competitionId?: number, sellerId?: number) 
   const conditions = [];
   if (competitionId) conditions.push(eq(feiRecords.competitionId, competitionId));
   if (sellerId) conditions.push(eq(feiRecords.sellerId, sellerId));
-  if (conditions.length > 0) return db.select().from(feiRecords).where(and(...conditions)).orderBy(desc(feiRecords.createdAt));
-  return db.select().from(feiRecords).orderBy(desc(feiRecords.createdAt));
+  if (conditions.length > 0) return db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(feiRecords.createdAt));
+  return db.select().from(feiRecords).where(eq(feiRecords.tenantId, getCurrentTenantId())).orderBy(desc(feiRecords.createdAt));
 }
 
 export async function createFeiRecord(data: InsertFeiRecord) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(feiRecords).values(data);
+  const result = await db.insert(feiRecords).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function listPendingFeiRecords() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(feiRecords).where(eq(feiRecords.status, 'pending')).orderBy(desc(feiRecords.createdAt));
+  return db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.status, 'pending'))).orderBy(desc(feiRecords.createdAt));
 }
 
 export async function approveFeiRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  const result = await db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id))).limit(1);
   const record = result[0];
   if (!record || record.status !== 'pending') throw new Error("Registro F&I não encontrado ou já processado");
-  await db.update(feiRecords).set({ status: 'approved' }).where(eq(feiRecords.id, id));
+  await db.update(feiRecords).set({ status: 'approved' }).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id)));
   // F&I NÃO é venda de veículo - incrementSales=false para não contar no ranking de vendas
   await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
   return record;
@@ -882,13 +884,13 @@ export async function approveFeiRecord(id: number) {
 export async function rejectFeiRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(feiRecords).set({ status: 'rejected' }).where(eq(feiRecords.id, id));
+  await db.update(feiRecords).set({ status: 'rejected' }).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id)));
 }
 
 export async function deleteFeiRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  const result = await db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Registro não encontrado");
   if (record.status === 'approved') {
@@ -905,7 +907,7 @@ export async function deleteFeiRecord(id: number) {
       ));
     }
   }
-  await db.delete(feiRecords).where(eq(feiRecords.id, id));
+  await db.delete(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id)));
 }
 
 export async function updateFeiRecord(id: number, data: {
@@ -920,7 +922,7 @@ export async function updateFeiRecord(id: number, data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  const result = await db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id))).limit(1);
   if (!result[0]) throw new Error("Registro F&I não encontrado");
   const updateData: any = {};
   if (data.customerCpf !== undefined) updateData.customerCpf = data.customerCpf;
@@ -932,9 +934,9 @@ export async function updateFeiRecord(id: number, data: {
   if (data.paymentDate !== undefined) updateData.paymentDate = data.paymentDate;
   if (data.notes !== undefined) updateData.notes = data.notes;
   if (Object.keys(updateData).length > 0) {
-    await db.update(feiRecords).set(updateData).where(eq(feiRecords.id, id));
+    await db.update(feiRecords).set(updateData).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id)));
   }
-  const updated = await db.select().from(feiRecords).where(eq(feiRecords.id, id)).limit(1);
+  const updated = await db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id))).limit(1);
   return updated[0];
 }
 
@@ -945,8 +947,8 @@ export async function listConsignmentRecords(competitionId?: number, sellerId?: 
   const conditions = [];
   if (competitionId) conditions.push(eq(consignmentRecords.competitionId, competitionId));
   if (sellerId) conditions.push(eq(consignmentRecords.sellerId, sellerId));
-  if (conditions.length > 0) return db.select().from(consignmentRecords).where(and(...conditions)).orderBy(desc(consignmentRecords.createdAt));
-  return db.select().from(consignmentRecords).orderBy(desc(consignmentRecords.createdAt));
+  if (conditions.length > 0) return db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(consignmentRecords.createdAt));
+  return db.select().from(consignmentRecords).where(eq(consignmentRecords.tenantId, getCurrentTenantId())).orderBy(desc(consignmentRecords.createdAt));
 }
 
 // Verificar se placa já está no pátio (sem saída) ou foi consignada nos últimos 60 dias
@@ -1056,26 +1058,26 @@ export async function listVehiclesExited(month?: number, year?: number) {
 export async function createConsignmentRecord(data: InsertConsignmentRecord) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(consignmentRecords).values(data);
+  const result = await db.insert(consignmentRecords).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function listPendingConsignmentRecords() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(consignmentRecords).where(eq(consignmentRecords.status, 'pending')).orderBy(desc(consignmentRecords.createdAt));
+  return db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.status, 'pending'))).orderBy(desc(consignmentRecords.createdAt));
 }
 
 export async function approveConsignmentRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  const result = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id))).limit(1);
   const record = result[0];
   if (!record || record.status !== 'pending') throw new Error("Registro de consignação não encontrado ou já processado");
   // Verificar se já passou os dias mínimos
   const daysPassed = Math.floor((Date.now() - record.entryDate) / (1000 * 60 * 60 * 24));
   const isValid = daysPassed >= record.validAfterDays;
-  await db.update(consignmentRecords).set({ status: 'approved', isValid }).where(eq(consignmentRecords.id, id));
+  await db.update(consignmentRecords).set({ status: 'approved', isValid }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
   if (isValid) {
     // Consignação NÃO é venda de veículo - incrementSales=false
     await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
@@ -1086,19 +1088,19 @@ export async function approveConsignmentRecord(id: number) {
 export async function rejectConsignmentRecord(id: number, rejectionReason?: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(consignmentRecords).set({ status: 'rejected', rejectionReason: rejectionReason || null }).where(eq(consignmentRecords.id, id));
+  await db.update(consignmentRecords).set({ status: 'rejected', rejectionReason: rejectionReason || null }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
 }
 
 export async function deleteConsignmentRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const record = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  const record = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id))).limit(1);
   if (!record[0]) throw new Error("Registro n\u00e3o encontrado");
   // Se estava aprovado e v\u00e1lido, reverter pontos
   if (record[0].status === 'approved' && record[0].isValid) {
     await updateSaleTotals(record[0].sellerId, record[0].competitionId, -record[0].points, false);
   }
-  await db.delete(consignmentRecords).where(eq(consignmentRecords.id, id));
+  await db.delete(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
   return record[0];
 }
 
@@ -1116,21 +1118,21 @@ export async function updateConsignmentRecord(id: number, data: Partial<{
 }>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(consignmentRecords).set(data).where(eq(consignmentRecords.id, id));
-  const updated = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  await db.update(consignmentRecords).set(data).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
+  const updated = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id))).limit(1);
   return updated[0];
 }
 
 export async function updateConsignmentExitDate(id: number, exitDate: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(consignmentRecords).where(eq(consignmentRecords.id, id)).limit(1);
+  const result = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Registro n\u00e3o encontrado");
   // Calcular se é válido baseado na diferença entre saída e entrada
   const daysPassed = Math.floor((exitDate - record.entryDate) / (1000 * 60 * 60 * 24));
   const isValid = daysPassed >= record.validAfterDays;
-  await db.update(consignmentRecords).set({ exitDate, isValid }).where(eq(consignmentRecords.id, id));
+  await db.update(consignmentRecords).set({ exitDate, isValid }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
   // Se ficou válido agora e já estava aprovado, atualizar pontos
   if (isValid && record.status === 'approved' && !record.isValid) {
     await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
@@ -1145,11 +1147,11 @@ export async function crossReferenceConsignmentWithSale(saleId: number, plate: s
   const normalizedPlate = plate.replace(/[-\s]/g, '').toUpperCase();
   if (!normalizedPlate || normalizedPlate.length < 5) return null;
   // Find active consignment with matching plate (in yard, approved, not yet sold)
-  const matches = await db.select().from(consignmentRecords).where(and(
+  const matches = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), and(
     sql`UPPER(REPLACE(${consignmentRecords.vehiclePlate}, '-', '')) = ${normalizedPlate}`,
     eq(consignmentRecords.status, 'approved'),
     sql`${consignmentRecords.soldVia} IS NULL`,
-  )).limit(1);
+  ))).limit(1);
   if (matches.length === 0) return null;
   const record = matches[0];
   const now = Date.now();
@@ -1172,14 +1174,14 @@ export async function validateConsignmentDays() {
   // Valida consignações aprovadas que completaram os 7 dias
   const db = await getDb();
   if (!db) return;
-  const records = await db.select().from(consignmentRecords).where(and(
+  const records = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), and(
     eq(consignmentRecords.status, 'approved'),
     eq(consignmentRecords.isValid, false),
-  ));
+  )));
   for (const record of records) {
     const daysPassed = Math.floor((Date.now() - record.entryDate) / (1000 * 60 * 60 * 24));
     if (daysPassed >= record.validAfterDays) {
-      await db.update(consignmentRecords).set({ isValid: true }).where(eq(consignmentRecords.id, record.id));
+      await db.update(consignmentRecords).set({ isValid: true }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, record.id)));
       // Consignação NÃO é venda de veículo - incrementSales=false
       await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);
     }
@@ -1193,30 +1195,30 @@ export async function listDispatchRecords(competitionId?: number, sellerId?: num
   const conditions = [];
   if (competitionId) conditions.push(eq(dispatchRecords.competitionId, competitionId));
   if (sellerId) conditions.push(eq(dispatchRecords.sellerId, sellerId));
-  if (conditions.length > 0) return db.select().from(dispatchRecords).where(and(...conditions)).orderBy(desc(dispatchRecords.createdAt));
-  return db.select().from(dispatchRecords).orderBy(desc(dispatchRecords.createdAt));
+  if (conditions.length > 0) return db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(dispatchRecords.createdAt));
+  return db.select().from(dispatchRecords).where(eq(dispatchRecords.tenantId, getCurrentTenantId())).orderBy(desc(dispatchRecords.createdAt));
 }
 
 export async function createDispatchRecord(data: InsertDispatchRecord) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(dispatchRecords).values(data);
+  const result = await db.insert(dispatchRecords).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function listPendingDispatchRecords() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(dispatchRecords).where(eq(dispatchRecords.status, 'pending')).orderBy(desc(dispatchRecords.createdAt));
+  return db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.status, 'pending'))).orderBy(desc(dispatchRecords.createdAt));
 }
 
 export async function approveDispatchRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(dispatchRecords).where(eq(dispatchRecords.id, id)).limit(1);
+  const result = await db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id))).limit(1);
   const record = result[0];
   if (!record || record.status !== 'pending') throw new Error("Registro de despachante não encontrado ou já processado");
-  await db.update(dispatchRecords).set({ status: 'approved' }).where(eq(dispatchRecords.id, id));
+  await db.update(dispatchRecords).set({ status: 'approved' }).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id)));
   const totalPoints = record.points + record.bonusPoints;
   // Despachante NÃO é venda de veículo - incrementSales=false
   await updateSaleTotals(record.sellerId, record.competitionId, totalPoints, false);
@@ -1226,13 +1228,13 @@ export async function approveDispatchRecord(id: number) {
 export async function rejectDispatchRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(dispatchRecords).set({ status: 'rejected' }).where(eq(dispatchRecords.id, id));
+  await db.update(dispatchRecords).set({ status: 'rejected' }).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id)));
 }
 
 export async function deleteDispatchRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(dispatchRecords).where(eq(dispatchRecords.id, id)).limit(1);
+  const result = await db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Registro não encontrado");
   if (record.status === 'approved') {
@@ -1250,14 +1252,14 @@ export async function deleteDispatchRecord(id: number) {
       ));
     }
   }
-  await db.delete(dispatchRecords).where(eq(dispatchRecords.id, id));
+  await db.delete(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id)));
 }
 
 // Despachante: marcar como transferido com documento emitido
 export async function markDispatchTransferred(id: number, documentUrl: string, documentKey: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(dispatchRecords).where(eq(dispatchRecords.id, id)).limit(1);
+  const result = await db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Registro de despachante n\u00e3o encontrado");
   await db.update(dispatchRecords).set({
@@ -1293,7 +1295,7 @@ export async function listAllTransferredDocuments() {
 export async function getNextTicketNumber() {
   const db = await getDb();
   if (!db) return '#A001';
-  const [result] = await db.select({ count: sql<number>`count(*)` }).from(sdrRecords).where(eq(sdrRecords.type, 'agendamento'));
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.type, 'agendamento')));
   const num = Number(result?.count || 0) + 1;
   return `#A${String(num).padStart(3, '0')}`;
 }
@@ -1305,7 +1307,7 @@ export async function createSdrRecord(data: InsertSdrRecord) {
   if (data.type === 'agendamento' && !data.ticketNumber) {
     data.ticketNumber = await getNextTicketNumber();
   }
-  const result = await db.insert(sdrRecords).values(data);
+  const result = await db.insert(sdrRecords).values({...data, tenantId: getCurrentTenantId()});
   return { id: result[0].insertId, ticketNumber: data.ticketNumber };
 }
 
@@ -1315,23 +1317,23 @@ export async function listSdrRecords(competitionId?: number, sellerId?: number) 
   const conditions = [];
   if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
   if (sellerId) conditions.push(eq(sdrRecords.sellerId, sellerId));
-  if (conditions.length > 0) return db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.createdAt));
-  return db.select().from(sdrRecords).orderBy(desc(sdrRecords.createdAt));
+  if (conditions.length > 0) return db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(sdrRecords.createdAt));
+  return db.select().from(sdrRecords).where(eq(sdrRecords.tenantId, getCurrentTenantId())).orderBy(desc(sdrRecords.createdAt));
 }
 
 export async function listPendingSdrRecords() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(sdrRecords).where(eq(sdrRecords.status, 'pending')).orderBy(desc(sdrRecords.createdAt));
+  return db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.status, 'pending'))).orderBy(desc(sdrRecords.createdAt));
 }
 
 export async function approveSdrRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const result = await db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id))).limit(1);
   const record = result[0];
   if (!record || record.status !== 'pending') throw new Error("Registro SDR não encontrado ou já processado");
-  await db.update(sdrRecords).set({ status: 'approved' }).where(eq(sdrRecords.id, id));
+  await db.update(sdrRecords).set({ status: 'approved' }).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
   // Para agendamentos: NÃO dar pontos aqui. Pontos só são dados quando gerente aprova comparecimento (approveAttendance).
   // Para lead_convertido: dar pontos na aprovação do registro.
   // incrementSales=false pois SDR/pré-vendas NÃO são vendas de veículos
@@ -1344,14 +1346,14 @@ export async function approveSdrRecord(id: number) {
 export async function rejectSdrRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sdrRecords).set({ status: 'rejected' }).where(eq(sdrRecords.id, id));
+  await db.update(sdrRecords).set({ status: 'rejected' }).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
 }
 
 // Vendedor marca que cliente compareceu
 export async function markAttendance(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const result = await db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Agendamento não encontrado");
   await db.update(sdrRecords).set({
@@ -1365,20 +1367,20 @@ export async function markAttendance(id: number) {
 export async function listPendingAttendance() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(sdrRecords).where(
+  return db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()),
     eq(sdrRecords.attendanceStatus, 'attended')
-  ).orderBy(desc(sdrRecords.createdAt));
+  )).orderBy(desc(sdrRecords.createdAt));
 }
 
 // Gerente aprova comparecimento
 export async function approveAttendance(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const result = await db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Agendamento não encontrado");
   if (record.attendanceStatus === 'approved') throw new Error("Comparecimento já foi aprovado");
-  await db.update(sdrRecords).set({ attendanceStatus: 'approved' }).where(eq(sdrRecords.id, id));
+  await db.update(sdrRecords).set({ attendanceStatus: 'approved' }).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
   // Só gera ponto quando gerente aprova comparecimento do cliente
   // Para agendamentos: este é o único momento que dá ponto (1pt)
   // incrementSales=false pois agendamento NÃO é venda
@@ -1390,14 +1392,14 @@ export async function approveAttendance(id: number) {
 export async function rejectAttendance(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sdrRecords).set({ attendanceStatus: 'rejected' }).where(eq(sdrRecords.id, id));
+  await db.update(sdrRecords).set({ attendanceStatus: 'rejected' }).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
 }
 
 // Gerente marca como não compareceu
 export async function markNoShow(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sdrRecords).set({ attendanceStatus: 'no_show' }).where(eq(sdrRecords.id, id));
+  await db.update(sdrRecords).set({ attendanceStatus: 'no_show' }).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
 }
 
 // Reagendar agendamento (vendedor tenta resgate)
@@ -1409,7 +1411,7 @@ export async function rescheduleSdrRecord(id: number, newDate: number, notes?: s
     attendanceStatus: 'pending',
   };
   if (notes) updateData.notes = notes;
-  await db.update(sdrRecords).set(updateData).where(eq(sdrRecords.id, id));
+  await db.update(sdrRecords).set(updateData).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
 }
 
 // Listar agendamentos aprovados para sorteio
@@ -1421,13 +1423,13 @@ export async function listApprovedAppointments(competitionId?: number) {
     eq(sdrRecords.status, 'approved'),
   ];
   if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
-  return db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.createdAt));
+  return db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(sdrRecords.createdAt));
 }
 
 export async function deleteSdrRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(sdrRecords).where(eq(sdrRecords.id, id)).limit(1);
+  const result = await db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id))).limit(1);
   const record = result[0];
   if (!record) throw new Error("Registro não encontrado");
   if (record.status === 'approved') {
@@ -1444,7 +1446,7 @@ export async function deleteSdrRecord(id: number) {
       ));
     }
   }
-  await db.delete(sdrRecords).where(eq(sdrRecords.id, id));
+  await db.delete(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
 }
 
 // ===== UPDATE SDR RECORD (admin edit) =====
@@ -1472,7 +1474,7 @@ export async function updateSdrRecord(id: number, data: {
   if (data.attendanceMarkedAt !== undefined) updateData.attendanceMarkedAt = data.attendanceMarkedAt;
   if (data.isFeirão !== undefined) updateData.isFeirão = data.isFeirão;
   if (Object.keys(updateData).length > 0) {
-    await db.update(sdrRecords).set(updateData).where(eq(sdrRecords.id, id));
+    await db.update(sdrRecords).set(updateData).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, id)));
   }
   return { success: true };
 }
@@ -1481,11 +1483,11 @@ export async function updateSdrRecord(id: number, data: {
 export async function getAllPendingCount() {
   const db = await getDb();
   if (!db) return { sales: 0, fei: 0, consignment: 0, dispatch: 0, sdr: 0, total: 0 };
-  const [s] = await db.select({ count: sql<number>`count(*)` }).from(sales).where(eq(sales.status, 'pending'));
-  const [f] = await db.select({ count: sql<number>`count(*)` }).from(feiRecords).where(eq(feiRecords.status, 'pending'));
-  const [c] = await db.select({ count: sql<number>`count(*)` }).from(consignmentRecords).where(eq(consignmentRecords.status, 'pending'));
-  const [d] = await db.select({ count: sql<number>`count(*)` }).from(dispatchRecords).where(eq(dispatchRecords.status, 'pending'));
-  const [sdr] = await db.select({ count: sql<number>`count(*)` }).from(sdrRecords).where(eq(sdrRecords.status, 'pending'));
+  const [s] = await db.select({ count: sql<number>`count(*)` }).from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.status, 'pending')));
+  const [f] = await db.select({ count: sql<number>`count(*)` }).from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.status, 'pending')));
+  const [c] = await db.select({ count: sql<number>`count(*)` }).from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.status, 'pending')));
+  const [d] = await db.select({ count: sql<number>`count(*)` }).from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.status, 'pending')));
+  const [sdr] = await db.select({ count: sql<number>`count(*)` }).from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.status, 'pending')));
   const salesCount = Number(s?.count || 0);
   const feiCount = Number(f?.count || 0);
   const consignmentCount = Number(c?.count || 0);
@@ -1500,14 +1502,14 @@ import { appSettings } from "../drizzle/schema";
 export async function getAppSetting(key: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(appSettings).where(eq(appSettings.settingKey, key)).limit(1);
+  const result = await db.select().from(appSettings).where(and(eq(appSettings.tenantId, getCurrentTenantId()), eq(appSettings.settingKey, key))).limit(1);
   return result[0]?.settingValue;
 }
 
 export async function setAppSetting(key: string, value: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.insert(appSettings).values({ settingKey: key, settingValue: value })
+  await db.insert(appSettings).values({ settingKey: key, settingValue: value , tenantId: getCurrentTenantId()})
     .onDuplicateKeyUpdate({ set: { settingValue: value } });
 }
 
@@ -1517,21 +1519,21 @@ export async function setAppSetting(key: string, value: string) {
 export async function createManager(data: { username: string; passwordHash: string; name: string }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(managers).values(data);
+  const result = await db.insert(managers).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function getManagerByUsername(username: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(managers).where(eq(managers.username, username)).limit(1);
+  const result = await db.select().from(managers).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.username, username))).limit(1);
   return result[0] || null;
 }
 
 export async function getManagerById(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(managers).where(eq(managers.id, id)).limit(1);
+  const result = await db.select().from(managers).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.id, id))).limit(1);
   return result[0] || null;
 }
 
@@ -1544,19 +1546,19 @@ export async function listManagers() {
     name: managers.name,
     active: managers.active,
     createdAt: managers.createdAt,
-  }).from(managers).orderBy(managers.name);
+  }).from(managers).where(eq(managers.tenantId, getCurrentTenantId())).orderBy(managers.name);
 }
 
 export async function updateManager(id: number, data: { name?: string; passwordHash?: string; active?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(managers).set(data).where(eq(managers.id, id));
+  await db.update(managers).set(data).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.id, id)));
 }
 
 export async function deleteManager(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(managers).where(eq(managers.id, id));
+  await db.delete(managers).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.id, id)));
 }
 
 // ===== RANKING MENSAL DE VENDAS (sem campanha) =====
@@ -1592,9 +1594,9 @@ export async function getMonthlyRanking(month: number, year: number, category?: 
   const deptFilter = (!category || category === 'vendas' || category === 'feirao') ? 'vendas' : category;
   
   // Buscar vendedores ativos filtrados por departamento
-  const allSellers = await db.select().from(sellers).where(
-    and(eq(sellers.active, true), eq(sellers.department, deptFilter))
-  );
+  const allSellers = await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()),
+    eq(sellers.active, true), eq(sellers.department, deptFilter)
+  ));
   
   if (allSellers.length === 0) {
     return [];
@@ -1651,9 +1653,9 @@ export async function getAppointmentRanking(month: number, year: number) {
   }
   
   // Buscar vendedores ativos dos departamentos vendas e pré-vendas (SDR)
-  const allSellers = await db.select().from(sellers).where(
-    and(eq(sellers.active, true), or(eq(sellers.department, 'vendas'), eq(sellers.department, 'pre_vendas')))
-  );
+  const allSellers = await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()),
+    eq(sellers.active, true), or(eq(sellers.department, 'vendas'), eq(sellers.department, 'pre_vendas'))
+  ));
   
   // Montar ranking com todos que têm agendamentos
   const ranking = allSellers
@@ -1685,33 +1687,33 @@ import { pvOficinas, pvChamados, pvGastos, pvHistorico, pvOrcamentos, pvOrcament
 export async function listOficinas() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(pvOficinas).where(eq(pvOficinas.active, true)).orderBy(pvOficinas.name);
+  return db.select().from(pvOficinas).where(and(eq(pvOficinas.tenantId, getCurrentTenantId()), eq(pvOficinas.active, true))).orderBy(pvOficinas.name);
 }
 
 export async function createOficina(data: InsertPvOficina) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(pvOficinas).values(data);
+  const result = await db.insert(pvOficinas).values({...data, tenantId: getCurrentTenantId()});
   return result[0].insertId;
 }
 
 export async function updateOficina(id: number, data: { name?: string; phone?: string; address?: string; notes?: string; active?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(pvOficinas).set(data).where(eq(pvOficinas.id, id));
+  await db.update(pvOficinas).set(data).where(and(eq(pvOficinas.tenantId, getCurrentTenantId()), eq(pvOficinas.id, id)));
 }
 
 export async function deleteOficina(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(pvOficinas).set({ active: false }).where(eq(pvOficinas.id, id));
+  await db.update(pvOficinas).set({ active: false }).where(and(eq(pvOficinas.tenantId, getCurrentTenantId()), eq(pvOficinas.id, id)));
 }
 
 // --- Chamados Pós-Venda ---
 export async function getNextPvTicketNumber() {
   const db = await getDb();
   if (!db) return "#PV001";
-  const [result] = await db.select({ count: sql<number>`count(*)` }).from(pvChamados);
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(pvChamados).where(eq(pvChamados.tenantId, getCurrentTenantId()));
   const num = Number(result?.count || 0) + 1;
   return `#PV${String(num).padStart(3, '0')}`;
 }
@@ -1719,7 +1721,7 @@ export async function getNextPvTicketNumber() {
 export async function createPvChamado(data: InsertPvChamado) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(pvChamados).values(data);
+  const result = await db.insert(pvChamados).values({...data, tenantId: getCurrentTenantId()});
   const chamadoId = result[0].insertId;
   // Registrar no histórico
   await db.insert(pvHistorico).values({
@@ -1745,15 +1747,15 @@ export async function listPvChamados(filters?: { status?: string; vendedorId?: n
     conditions.push(eq(pvChamados.responsavelPvId, filters.responsavelPvId));
   }
   if (conditions.length > 0) {
-    return db.select().from(pvChamados).where(and(...conditions)).orderBy(desc(pvChamados.updatedAt));
+    return db.select().from(pvChamados).where(and(eq(pvChamados.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(pvChamados.updatedAt));
   }
-  return db.select().from(pvChamados).orderBy(desc(pvChamados.updatedAt));
+  return db.select().from(pvChamados).where(eq(pvChamados.tenantId, getCurrentTenantId())).orderBy(desc(pvChamados.updatedAt));
 }
 
 export async function getPvChamadoById(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.select().from(pvChamados).where(eq(pvChamados.id, id)).limit(1);
+  const result = await db.select().from(pvChamados).where(and(eq(pvChamados.tenantId, getCurrentTenantId()), eq(pvChamados.id, id))).limit(1);
   return result[0] || null;
 }
 
@@ -1781,7 +1783,7 @@ export async function updatePvChamado(id: number, data: {
     if (value !== undefined) updateData[key] = value;
   }
   if (Object.keys(updateData).length > 0) {
-    await db.update(pvChamados).set(updateData).where(eq(pvChamados.id, id));
+    await db.update(pvChamados).set(updateData).where(and(eq(pvChamados.tenantId, getCurrentTenantId()), eq(pvChamados.id, id)));
   }
   // Registrar ação no histórico
   let acao = 'atualizacao';
@@ -1794,7 +1796,7 @@ export async function updatePvChamado(id: number, data: {
   else if (data.servicoRealizado) { acao = 'servico_obs'; descricao = `Observação do serviço: ${data.servicoRealizado.substring(0, 100)}`; }
   else if (data.oficinaId || data.oficinaNome) { acao = 'oficina'; descricao = `Oficina vinculada: ${data.oficinaNome || 'ID ' + data.oficinaId}`; }
   else if (data.prazoEntrega) { acao = 'prazo'; descricao = `Prazo de entrega definido: ${new Date(data.prazoEntrega).toLocaleDateString('pt-BR')}`; }
-  await db.insert(pvHistorico).values({ chamadoId: id, acao, descricao, usuario });
+  await db.insert(pvHistorico).values({ chamadoId: id, acao, descricao, usuario , tenantId: getCurrentTenantId()});
   return { success: true };
 }
 
@@ -1802,9 +1804,9 @@ export async function deletePvChamado(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   // Deletar gastos e histórico associados
-  await db.delete(pvGastos).where(eq(pvGastos.chamadoId, id));
-  await db.delete(pvHistorico).where(eq(pvHistorico.chamadoId, id));
-  await db.delete(pvChamados).where(eq(pvChamados.id, id));
+  await db.delete(pvGastos).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), eq(pvGastos.chamadoId, id)));
+  await db.delete(pvHistorico).where(and(eq(pvHistorico.tenantId, getCurrentTenantId()), eq(pvHistorico.chamadoId, id)));
+  await db.delete(pvChamados).where(and(eq(pvChamados.tenantId, getCurrentTenantId()), eq(pvChamados.id, id)));
 }
 
 // --- Gastos Pós-Venda ---
@@ -1815,15 +1817,15 @@ export async function listPvGastos(chamadoId?: number, statusAprovacao?: string)
   if (chamadoId) conditions.push(eq(pvGastos.chamadoId, chamadoId));
   if (statusAprovacao && statusAprovacao !== 'todos') conditions.push(eq(pvGastos.statusAprovacao, statusAprovacao as any));
   if (conditions.length > 0) {
-    return db.select().from(pvGastos).where(and(...conditions)).orderBy(desc(pvGastos.createdAt));
+    return db.select().from(pvGastos).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(pvGastos.createdAt));
   }
-  return db.select().from(pvGastos).orderBy(desc(pvGastos.createdAt));
+  return db.select().from(pvGastos).where(eq(pvGastos.tenantId, getCurrentTenantId())).orderBy(desc(pvGastos.createdAt));
 }
 
 export async function createPvGasto(data: InsertPvGasto, usuario: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(pvGastos).values(data);
+  const result = await db.insert(pvGastos).values({...data, tenantId: getCurrentTenantId()});
   // Registrar no histórico do chamado
   await db.insert(pvHistorico).values({
     chamadoId: data.chamadoId,
@@ -1845,9 +1847,9 @@ export async function updatePvGastoStatus(id: number, statusAprovacao: string, a
   if (statusAprovacao === 'pago') {
     updateData.pagoEm = Date.now();
   }
-  await db.update(pvGastos).set(updateData).where(eq(pvGastos.id, id));
+  await db.update(pvGastos).set(updateData).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), eq(pvGastos.id, id)));
   // Registrar no histórico
-  const gasto = await db.select().from(pvGastos).where(eq(pvGastos.id, id)).limit(1);
+  const gasto = await db.select().from(pvGastos).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), eq(pvGastos.id, id))).limit(1);
   if (gasto[0]) {
     const statusLabel = statusAprovacao === 'autorizado' ? 'Autorizado' : statusAprovacao === 'recusado' ? 'Recusado' : statusAprovacao === 'pago' ? 'Pago' : statusAprovacao;
     await db.insert(pvHistorico).values({
@@ -1862,21 +1864,21 @@ export async function updatePvGastoStatus(id: number, statusAprovacao: string, a
 export async function deletePvGasto(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(pvGastos).where(eq(pvGastos.id, id));
+  await db.delete(pvGastos).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), eq(pvGastos.id, id)));
 }
 
 // --- Histórico ---
 export async function listPvHistorico(chamadoId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(pvHistorico).where(eq(pvHistorico.chamadoId, chamadoId)).orderBy(desc(pvHistorico.createdAt));
+  return db.select().from(pvHistorico).where(and(eq(pvHistorico.tenantId, getCurrentTenantId()), eq(pvHistorico.chamadoId, chamadoId))).orderBy(desc(pvHistorico.createdAt));
 }
 
 // --- Contadores e Alertas ---
 export async function getPvChamadosCounts() {
   const db = await getDb();
   if (!db) return { aberto: 0, agendado: 0, em_servico: 0, finalizado: 0, entregue: 0, total: 0 };
-  const all = await db.select({ status: pvChamados.status, count: sql<number>`count(*)` }).from(pvChamados).groupBy(pvChamados.status);
+  const all = await db.select({ status: pvChamados.status, count: sql<number>`count(*)` }).from(pvChamados).where(eq(pvChamados.tenantId, getCurrentTenantId())).groupBy(pvChamados.status);
   const counts: any = { aberto: 0, agendado: 0, em_servico: 0, finalizado: 0, entregue: 0, cancelado: 0, total: 0 };
   for (const row of all) {
     counts[row.status] = Number(row.count);
@@ -1891,7 +1893,7 @@ export async function getPvGastosPendentes() {
   const result = await db.select({
     count: sql<number>`count(*)`,
     total: sql<string>`COALESCE(SUM(valor), 0)`,
-  }).from(pvGastos).where(eq(pvGastos.statusAprovacao, 'pendente'));
+  }).from(pvGastos).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), eq(pvGastos.statusAprovacao, 'pendente')));
   return { count: Number(result[0]?.count || 0), total: parseFloat(String(result[0]?.total || '0')) };
 }
 
@@ -1903,14 +1905,14 @@ export async function getPvChamadosAlerta() {
   const in24h = now + 24 * 60 * 60 * 1000;
   
   // Chamados com prazo vencido (não entregues/cancelados)
-  const vencidos = await db.select().from(pvChamados).where(and(
+  const vencidos = await db.select().from(pvChamados).where(and(eq(pvChamados.tenantId, getCurrentTenantId()), and(
     sql`${pvChamados.prazoEntrega} IS NOT NULL`,
     sql`${pvChamados.prazoEntrega} < ${now}`,
     sql`${pvChamados.status} NOT IN ('entregue', 'cancelado')`,
-  )).orderBy(pvChamados.prazoEntrega);
+  ))).orderBy(pvChamados.prazoEntrega);
   
   // Chamados com prazo nas próximas 24h
-  const vencendo = await db.select().from(pvChamados).where(and(
+  const vencendo = await db.select().from(pvChamados).where(and(eq(pvChamados.tenantId, getCurrentTenantId()),
     sql`${pvChamados.prazoEntrega} IS NOT NULL`,
     sql`${pvChamados.prazoEntrega} >= ${now}`,
     sql`${pvChamados.prazoEntrega} <= ${in24h}`,
@@ -1927,7 +1929,7 @@ export async function getPvGastosResumo() {
   const all = await db.select({
     status: pvGastos.statusAprovacao,
     total: sql<string>`COALESCE(SUM(valor), 0)`,
-  }).from(pvGastos).groupBy(pvGastos.statusAprovacao);
+  }).from(pvGastos).where(eq(pvGastos.tenantId, getCurrentTenantId())).groupBy(pvGastos.statusAprovacao);
   const resumo: any = { pendente: 0, autorizado: 0, recusado: 0, pago: 0 };
   for (const row of all) {
     resumo[row.status] = parseFloat(String(row.total));
@@ -1944,13 +1946,13 @@ export async function listAllPvGastosWithChamado(statusAprovacao?: string) {
     conditions.push(eq(pvGastos.statusAprovacao, statusAprovacao as any));
   }
   const gastos = conditions.length > 0
-    ? await db.select().from(pvGastos).where(and(...conditions)).orderBy(desc(pvGastos.createdAt))
-    : await db.select().from(pvGastos).orderBy(desc(pvGastos.createdAt));
+    ? await db.select().from(pvGastos).where(and(eq(pvGastos.tenantId, getCurrentTenantId()), ...conditions)).orderBy(desc(pvGastos.createdAt))
+    : await db.select().from(pvGastos).where(eq(pvGastos.tenantId, getCurrentTenantId())).orderBy(desc(pvGastos.createdAt));
   
   // Buscar chamados associados
   const chamadoIds = Array.from(new Set(gastos.map(g => g.chamadoId)));
   if (chamadoIds.length === 0) return [];
-  const chamados = await db.select().from(pvChamados).where(inArray(pvChamados.id, chamadoIds));
+  const chamados = await db.select().from(pvChamados).where(and(eq(pvChamados.tenantId, getCurrentTenantId()), inArray(pvChamados.id, chamadoIds)));
   const chamadoMap = new Map(chamados.map(c => [c.id, c]));
   
   return gastos.map(g => ({
@@ -1963,58 +1965,60 @@ export async function listAllPvGastosWithChamado(statusAprovacao?: string) {
 
 export async function listMktStrategies() {
   const db = await getDb();
-  return db!.select().from(mktStrategies).orderBy(desc(mktStrategies.createdAt));
+  return db!.select().from(mktStrategies).where(eq(mktStrategies.tenantId, getCurrentTenantId())).orderBy(desc(mktStrategies.createdAt));
 }
 
 export async function createMktStrategy(data: InsertMktStrategy) {
   const db = await getDb();
-  const result = await db!.insert(mktStrategies).values(data);
+  const result = await db!.insert(mktStrategies).values({...data, tenantId: getCurrentTenantId()});
   return { id: result[0].insertId };
 }
 
 export async function updateMktStrategy(id: number, data: Partial<InsertMktStrategy>) {
   const db = await getDb();
-  await db!.update(mktStrategies).set(data).where(eq(mktStrategies.id, id));
+  await db!.update(mktStrategies).set(data).where(and(eq(mktStrategies.tenantId, getCurrentTenantId()), eq(mktStrategies.id, id)));
 }
 
 export async function deleteMktStrategy(id: number) {
   const db = await getDb();
   // Delete associated tasks first
-  await db!.delete(mktTasks).where(eq(mktTasks.strategyId, id));
-  await db!.delete(mktStrategies).where(eq(mktStrategies.id, id));
+  await db!.delete(mktTasks).where(and(eq(mktTasks.tenantId, getCurrentTenantId()), eq(mktTasks.strategyId, id)));
+  await db!.delete(mktStrategies).where(and(eq(mktStrategies.tenantId, getCurrentTenantId()), eq(mktStrategies.id, id)));
 }
 
 export async function listMktTasks(strategyId?: number) {
   const db = await getDb();
   if (strategyId) {
-    return db!.select().from(mktTasks).where(eq(mktTasks.strategyId, strategyId)).orderBy(desc(mktTasks.createdAt));
+    return db!.select().from(mktTasks).where(and(eq(mktTasks.tenantId, getCurrentTenantId()), eq(mktTasks.strategyId, strategyId))).orderBy(desc(mktTasks.createdAt));
   }
-  return db!.select().from(mktTasks).orderBy(desc(mktTasks.createdAt));
+  return db!.select().from(mktTasks).where(eq(mktTasks.tenantId, getCurrentTenantId())).orderBy(desc(mktTasks.createdAt));
 }
 
 export async function createMktTask(data: InsertMktTask) {
   const db = await getDb();
-  const result = await db!.insert(mktTasks).values(data);
+  const result = await db!.insert(mktTasks).values({...data, tenantId: getCurrentTenantId()});
   return { id: result[0].insertId };
 }
 
 export async function updateMktTask(id: number, data: Partial<InsertMktTask>) {
   const db = await getDb();
-  await db!.update(mktTasks).set(data).where(eq(mktTasks.id, id));
+  await db!.update(mktTasks).set(data).where(and(eq(mktTasks.tenantId, getCurrentTenantId()), eq(mktTasks.id, id)));
 }
 
 export async function deleteMktTask(id: number) {
   const db = await getDb();
-  await db!.delete(mktTasks).where(eq(mktTasks.id, id));
+  await db!.delete(mktTasks).where(and(eq(mktTasks.tenantId, getCurrentTenantId()), eq(mktTasks.id, id)));
 }
 
 
 // ===== IAM CONFIG =====
 import { iamConfig, InsertIamConfig } from "../drizzle/schema";
 
+import { getCurrentTenantId } from "./tenantDb";
+
 export async function getIamConfig() {
   const db = await getDb();
-  const rows = await db!.select().from(iamConfig).limit(1);
+  const rows = await db!.select().from(iamConfig).where(eq(iamConfig.tenantId, getCurrentTenantId())).limit(1);
   return rows[0] || null;
 }
 
@@ -2022,7 +2026,7 @@ export async function updateIamConfig(data: Partial<InsertIamConfig>) {
   const db = await getDb();
   const existing = await getIamConfig();
   if (existing) {
-    await db!.update(iamConfig).set(data).where(eq(iamConfig.id, existing.id));
+    await db!.update(iamConfig).set(data).where(and(eq(iamConfig.tenantId, getCurrentTenantId()), eq(iamConfig.id, existing.id)));
     return { ...existing, ...data };
   } else {
     const [result] = await db!.insert(iamConfig).values({ ...data } as InsertIamConfig);
@@ -2045,7 +2049,7 @@ export async function createSaleDocument(data: Partial<InsertSaleDocument> & { s
 export async function getSaleDocumentBySaleId(saleId: number) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.select().from(saleDocuments).where(eq(saleDocuments.saleId, saleId)).limit(1);
+  const result = await db.select().from(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.saleId, saleId))).limit(1);
   return result[0] || null;
 }
 
@@ -2053,7 +2057,7 @@ export async function getSaleDocumentBySaleId(saleId: number) {
 export async function listSaleDocumentsBySeller(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(saleDocuments).where(eq(saleDocuments.sellerId, sellerId)).orderBy(desc(saleDocuments.createdAt));
+  return db.select().from(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.sellerId, sellerId))).orderBy(desc(saleDocuments.createdAt));
 }
 
 // Listar todos os documentos de venda (para despachante/admin)
@@ -2062,15 +2066,15 @@ export async function listAllSaleDocuments(filterStatus?: string) {
   if (!db) return [];
   const conditions = [];
   if (filterStatus) conditions.push(eq(saleDocuments.docStatus, filterStatus as any));
-  if (conditions.length > 0) return db.select().from(saleDocuments).where(and(...conditions)).orderBy(desc(saleDocuments.createdAt));
-  return db.select().from(saleDocuments).orderBy(desc(saleDocuments.createdAt));
+  if (conditions.length > 0) return db.select().from(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(saleDocuments.createdAt));
+  return db.select().from(saleDocuments).where(eq(saleDocuments.tenantId, getCurrentTenantId())).orderBy(desc(saleDocuments.createdAt));
 }
 
 // Vendedor faz upload de CNH
 export async function uploadSaleDocCnh(id: number, cnhUrl: string, cnhKey: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const doc = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  const doc = await db.select().from(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.id, id))).limit(1);
   if (!doc[0]) throw new Error("Documento de venda não encontrado");
   const hasComprovante = !!doc[0].comprovanteUrl;
   const newStatus = hasComprovante ? 'completo' : 'parcial';
@@ -2087,7 +2091,7 @@ export async function uploadSaleDocCnh(id: number, cnhUrl: string, cnhKey: strin
 export async function uploadSaleDocComprovante(id: number, comprovanteUrl: string, comprovanteKey: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const doc = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  const doc = await db.select().from(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.id, id))).limit(1);
   if (!doc[0]) throw new Error("Documento de venda não encontrado");
   const hasCnh = !!doc[0].cnhUrl;
   const newStatus = hasCnh ? 'completo' : 'parcial';
@@ -2104,7 +2108,7 @@ export async function uploadSaleDocComprovante(id: number, comprovanteUrl: strin
 export async function markSaleDocInTransfer(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(saleDocuments).set({ dispatchStatus: 'em_transferencia' }).where(eq(saleDocuments.id, id));
+  await db.update(saleDocuments).set({ dispatchStatus: 'em_transferencia' }).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.id, id)));
 }
 
 // Despachante marca como transferido e inclui documento emitido
@@ -2135,7 +2139,7 @@ export async function countPendingDocsBySeller(sellerId: number) {
 export async function getSaleDocumentById(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.select().from(saleDocuments).where(eq(saleDocuments.id, id)).limit(1);
+  const result = await db.select().from(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.id, id))).limit(1);
   return result[0] || null;
 }
 
@@ -2143,14 +2147,14 @@ export async function getSaleDocumentById(id: number) {
 export async function updateSaleDocNotes(id: number, notes: string | null) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(saleDocuments).set({ notes }).where(eq(saleDocuments.id, id));
+  await db.update(saleDocuments).set({ notes }).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.id, id)));
 }
 
 // Delete a sale document record
 export async function deleteSaleDocument(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(saleDocuments).where(eq(saleDocuments.id, id));
+  await db.delete(saleDocuments).where(and(eq(saleDocuments.tenantId, getCurrentTenantId()), eq(saleDocuments.id, id)));
 }
 
 
@@ -2160,7 +2164,7 @@ export async function deleteSaleDocument(id: number) {
 export async function listPvOrcamentos(chamadoId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(pvOrcamentos).where(eq(pvOrcamentos.chamadoId, chamadoId)).orderBy(desc(pvOrcamentos.createdAt));
+  return db.select().from(pvOrcamentos).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.chamadoId, chamadoId))).orderBy(desc(pvOrcamentos.createdAt));
 }
 
 // Listar todos os orçamentos (para financeiro)
@@ -2168,9 +2172,9 @@ export async function listAllPvOrcamentos(statusAprovacao?: string) {
   const db = await getDb();
   if (!db) return [];
   if (statusAprovacao && statusAprovacao !== 'todos') {
-    return db.select().from(pvOrcamentos).where(eq(pvOrcamentos.statusAprovacao, statusAprovacao as any)).orderBy(desc(pvOrcamentos.createdAt));
+    return db.select().from(pvOrcamentos).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.statusAprovacao, statusAprovacao as any))).orderBy(desc(pvOrcamentos.createdAt));
   }
-  return db.select().from(pvOrcamentos).orderBy(desc(pvOrcamentos.createdAt));
+  return db.select().from(pvOrcamentos).where(eq(pvOrcamentos.tenantId, getCurrentTenantId())).orderBy(desc(pvOrcamentos.createdAt));
 }
 
 // Listar todos os orçamentos com info do chamado (para financeiro)
@@ -2235,14 +2239,14 @@ export async function addPvOrcamentoItem(data: Omit<InsertPvOrcamentoItem, 'id' 
 export async function listPvOrcamentoItens(orcamentoId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(pvOrcamentoItens).where(eq(pvOrcamentoItens.orcamentoId, orcamentoId)).orderBy(pvOrcamentoItens.createdAt);
+  return db.select().from(pvOrcamentoItens).where(and(eq(pvOrcamentoItens.tenantId, getCurrentTenantId()), eq(pvOrcamentoItens.orcamentoId, orcamentoId))).orderBy(pvOrcamentoItens.createdAt);
 }
 
 // Remover item do orçamento
 export async function deletePvOrcamentoItem(id: number, orcamentoId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(pvOrcamentoItens).where(eq(pvOrcamentoItens.id, id));
+  await db.delete(pvOrcamentoItens).where(and(eq(pvOrcamentoItens.tenantId, getCurrentTenantId()), eq(pvOrcamentoItens.id, id)));
   await recalcPvOrcamentoTotal(orcamentoId);
 }
 
@@ -2252,7 +2256,7 @@ async function recalcPvOrcamentoTotal(orcamentoId: number) {
   if (!db) return;
   const [result] = await db.select({
     total: sql<string>`COALESCE(SUM(${pvOrcamentoItens.valorTotal}), 0)`,
-  }).from(pvOrcamentoItens).where(eq(pvOrcamentoItens.orcamentoId, orcamentoId));
+  }).from(pvOrcamentoItens).where(and(eq(pvOrcamentoItens.tenantId, getCurrentTenantId()), eq(pvOrcamentoItens.orcamentoId, orcamentoId)));
   
   await db.update(pvOrcamentos).set({ valorTotal: String(result?.total || '0') }).where(eq(pvOrcamentos.id, orcamentoId));
 }
@@ -2270,10 +2274,10 @@ export async function updatePvOrcamentoStatus(id: number, statusAprovacao: strin
     updateData.motivoReprovacao = motivoReprovacao;
   }
   
-  await db.update(pvOrcamentos).set(updateData).where(eq(pvOrcamentos.id, id));
+  await db.update(pvOrcamentos).set(updateData).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.id, id)));
   
   // Registrar no histórico do chamado
-  const orc = await db.select().from(pvOrcamentos).where(eq(pvOrcamentos.id, id)).limit(1);
+  const orc = await db.select().from(pvOrcamentos).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.id, id))).limit(1);
   if (orc[0]) {
     const statusLabel = statusAprovacao === 'aprovado' ? 'APROVADO' : statusAprovacao === 'reprovado' ? 'REPROVADO' : statusAprovacao === 'pago' ? 'PAGO' : statusAprovacao;
     await db.insert(pvHistorico).values({
@@ -2290,8 +2294,8 @@ export async function deletePvOrcamento(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   // Deletar itens primeiro
-  await db.delete(pvOrcamentoItens).where(eq(pvOrcamentoItens.orcamentoId, id));
-  await db.delete(pvOrcamentos).where(eq(pvOrcamentos.id, id));
+  await db.delete(pvOrcamentoItens).where(and(eq(pvOrcamentoItens.tenantId, getCurrentTenantId()), eq(pvOrcamentoItens.orcamentoId, id)));
+  await db.delete(pvOrcamentos).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.id, id)));
 }
 
 // Contagem de orçamentos pendentes
@@ -2301,7 +2305,7 @@ export async function getPvOrcamentosPendentes() {
   const [result] = await db.select({
     count: sql<number>`count(*)`,
     total: sql<string>`COALESCE(SUM(${pvOrcamentos.valorTotal}), 0)`,
-  }).from(pvOrcamentos).where(eq(pvOrcamentos.statusAprovacao, 'pendente'));
+  }).from(pvOrcamentos).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.statusAprovacao, 'pendente')));
   return { count: Number(result?.count || 0), total: String(result?.total || '0') };
 }
 
@@ -2313,14 +2317,14 @@ export async function getPvOrcamentosResumo() {
     status: pvOrcamentos.statusAprovacao,
     count: sql<number>`count(*)`,
     total: sql<string>`COALESCE(SUM(${pvOrcamentos.valorTotal}), 0)`,
-  }).from(pvOrcamentos).groupBy(pvOrcamentos.statusAprovacao);
+  }).from(pvOrcamentos).where(eq(pvOrcamentos.tenantId, getCurrentTenantId())).groupBy(pvOrcamentos.statusAprovacao);
 }
 
 // Buscar orçamento por ID
 export async function getPvOrcamentoById(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.select().from(pvOrcamentos).where(eq(pvOrcamentos.id, id)).limit(1);
+  const result = await db.select().from(pvOrcamentos).where(and(eq(pvOrcamentos.tenantId, getCurrentTenantId()), eq(pvOrcamentos.id, id))).limit(1);
   return result[0] || null;
 }
 
@@ -2333,7 +2337,7 @@ export async function listFeiraoAgendamentos(competitionId?: number) {
   if (!db) return [];
   const conditions = [eq(sdrRecords.isFeirão, true), eq(sdrRecords.type, 'agendamento')];
   if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
-  return db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.scheduledDate));
+  return db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(sdrRecords.scheduledDate));
 }
 
 // Ranking de feirão: quem mais agendou pro feirão
@@ -2348,7 +2352,7 @@ export async function getRankingFeirao(competitionId?: number) {
     compareceram: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} IN ('attended', 'approved') THEN 1 ELSE 0 END)`,
     naoVieram: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} = 'no_show' THEN 1 ELSE 0 END)`,
     pendentes: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} = 'pending' THEN 1 ELSE 0 END)`,
-  }).from(sdrRecords).where(and(...conditions)).groupBy(sdrRecords.sellerId).orderBy(desc(sql`count(*)`));
+  }).from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), and(...conditions))).groupBy(sdrRecords.sellerId).orderBy(desc(sql`count(*)`));
   return result;
 }
 
@@ -2381,9 +2385,9 @@ export async function findSdrRecordByPhone(phone: string) {
 export async function linkSaleToSdrRecord(saleId: number, sdrRecordId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sales).set({ sdrRecordId }).where(eq(sales.id, saleId));
+  await db.update(sales).set({ sdrRecordId }).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId)));
   // Marcar o agendamento como convertido
-  await db.update(sdrRecords).set({ converted: true }).where(eq(sdrRecords.id, sdrRecordId));
+  await db.update(sdrRecords).set({ converted: true }).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.id, sdrRecordId)));
 }
 
 // Listar vendas vinculadas a agendamentos de um SDR (para controle de comissão)
@@ -2395,10 +2399,10 @@ export async function listSalesLinkedToSdr(sellerId: number) {
     .where(and(eq(sdrRecords.sellerId, sellerId), eq(sdrRecords.type, 'agendamento')));
   if (sdrIds.length === 0) return [];
   const ids = sdrIds.map(r => r.id);
-  return db.select().from(sales).where(and(
+  return db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), and(
     inArray(sales.sdrRecordId, ids),
     eq(sales.status, 'approved'),
-  )).orderBy(desc(sales.createdAt));
+  ))).orderBy(desc(sales.createdAt));
 }
 
 // Buscar agendamentos convertidos de um SDR com detalhes da venda
@@ -2418,7 +2422,7 @@ export async function getSdrConversions(sellerId: number) {
     const saleResult = await db.select().from(sales)
       .where(eq(sales.sdrRecordId, record.id)).limit(1);
     const sale = saleResult[0] || null;
-    const sellerResult = sale ? await db.select().from(sellers).where(eq(sellers.id, sale.sellerId)).limit(1) : [];
+    const sellerResult = sale ? await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, sale.sellerId))).limit(1) : [];
     result.push({
       agendamento: record,
       venda: sale,
@@ -2434,7 +2438,7 @@ export async function getSdrConversions(sellerId: number) {
 export async function createFichaFinanciamento(data: InsertFichaFinanciamento) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(fichasFinanciamento).values(data);
+  const result = await db.insert(fichasFinanciamento).values({...data, tenantId: getCurrentTenantId()});
   const fichaId = result[0].insertId;
   // Criar registros para todos os bancos
   const bancosData: InsertFichaBanco[] = BANCOS_FINANCIAMENTO.map(banco => ({
@@ -2442,7 +2446,7 @@ export async function createFichaFinanciamento(data: InsertFichaFinanciamento) {
     banco,
     status: "pendente" as const,
   }));
-  await db.insert(fichaBancos).values(bancosData);
+  await db.insert(fichaBancos).values(bancosData.map(b => ({...b, tenantId: getCurrentTenantId()})));
   return fichaId;
 }
 
@@ -2453,34 +2457,34 @@ export async function listFichasFinanciamento(opts?: { sellerId?: number; status
   if (opts?.sellerId) conditions.push(eq(fichasFinanciamento.sellerId, opts.sellerId));
   if (opts?.status) conditions.push(eq(fichasFinanciamento.status, opts.status as any));
   if (conditions.length > 0) {
-    return db.select().from(fichasFinanciamento).where(and(...conditions)).orderBy(desc(fichasFinanciamento.createdAt));
+    return db.select().from(fichasFinanciamento).where(and(eq(fichasFinanciamento.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(fichasFinanciamento.createdAt));
   }
-  return db.select().from(fichasFinanciamento).orderBy(desc(fichasFinanciamento.createdAt));
+  return db.select().from(fichasFinanciamento).where(eq(fichasFinanciamento.tenantId, getCurrentTenantId())).orderBy(desc(fichasFinanciamento.createdAt));
 }
 
 export async function getFichaById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(fichasFinanciamento).where(eq(fichasFinanciamento.id, id)).limit(1);
+  const result = await db.select().from(fichasFinanciamento).where(and(eq(fichasFinanciamento.tenantId, getCurrentTenantId()), eq(fichasFinanciamento.id, id))).limit(1);
   return result[0];
 }
 
 export async function updateFichaFinanciamento(id: number, data: Partial<InsertFichaFinanciamento>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(fichasFinanciamento).set(data).where(eq(fichasFinanciamento.id, id));
+  await db.update(fichasFinanciamento).set(data).where(and(eq(fichasFinanciamento.tenantId, getCurrentTenantId()), eq(fichasFinanciamento.id, id)));
 }
 
 export async function listFichaBancos(fichaId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(fichaBancos).where(eq(fichaBancos.fichaId, fichaId)).orderBy(fichaBancos.banco);
+  return db.select().from(fichaBancos).where(and(eq(fichaBancos.tenantId, getCurrentTenantId()), eq(fichaBancos.fichaId, fichaId))).orderBy(fichaBancos.banco);
 }
 
 export async function updateFichaBanco(id: number, data: Partial<InsertFichaBanco>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(fichaBancos).set(data).where(eq(fichaBancos.id, id));
+  await db.update(fichaBancos).set(data).where(and(eq(fichaBancos.tenantId, getCurrentTenantId()), eq(fichaBancos.id, id)));
 }
 
 export async function getFichaFilaCount() {
@@ -2489,7 +2493,7 @@ export async function getFichaFilaCount() {
   const result = await db.select({
     status: fichasFinanciamento.status,
     count: sql<number>`count(*)`,
-  }).from(fichasFinanciamento).groupBy(fichasFinanciamento.status);
+  }).from(fichasFinanciamento).where(eq(fichasFinanciamento.tenantId, getCurrentTenantId())).groupBy(fichasFinanciamento.status);
   const counts: Record<string, number> = {};
   result.forEach(r => { counts[r.status] = Number(r.count); });
   return {
@@ -2505,8 +2509,8 @@ export async function getFichaFilaCount() {
 export async function deleteFichaFinanciamento(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(fichaBancos).where(eq(fichaBancos.fichaId, id));
-  await db.delete(fichasFinanciamento).where(eq(fichasFinanciamento.id, id));
+  await db.delete(fichaBancos).where(and(eq(fichaBancos.tenantId, getCurrentTenantId()), eq(fichaBancos.fichaId, id)));
+  await db.delete(fichasFinanciamento).where(and(eq(fichasFinanciamento.tenantId, getCurrentTenantId()), eq(fichasFinanciamento.id, id)));
 }
 
 
@@ -2536,14 +2540,14 @@ export const AVAILABLE_MODULES = [
 export async function getManagerPermissions(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(managerPermissions).where(eq(managerPermissions.sellerId, sellerId));
+  return db.select().from(managerPermissions).where(and(eq(managerPermissions.tenantId, getCurrentTenantId()), eq(managerPermissions.sellerId, sellerId)));
 }
 
 export async function setManagerPermissions(sellerId: number, permissions: { module: string; canView: boolean; canEdit: boolean }[]) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   // Deletar permissões antigas
-  await db.delete(managerPermissions).where(eq(managerPermissions.sellerId, sellerId));
+  await db.delete(managerPermissions).where(and(eq(managerPermissions.tenantId, getCurrentTenantId()), eq(managerPermissions.sellerId, sellerId)));
   // Inserir novas
   if (permissions.length > 0) {
     await db.insert(managerPermissions).values(
@@ -2560,4 +2564,222 @@ export async function hasManagerPermission(sellerId: number, module: string, act
     .limit(1);
   if (!result[0]) return false;
   return action === 'edit' ? result[0].canEdit : result[0].canView;
+}
+
+
+// ===== VIRADA DE MÊS / MONTHLY SNAPSHOTS =====
+
+export async function createMonthlySnapshot(month: number, year: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const tid = getCurrentTenantId();
+  
+  // Check if snapshot already exists for this month/year/tenant
+  const existing = await db.select().from(monthlySnapshots)
+    .where(and(eq(monthlySnapshots.tenantId, tid), eq(monthlySnapshots.month, month), eq(monthlySnapshots.year, year)))
+    .limit(1);
+  if (existing.length > 0) return { alreadyExists: true, count: existing.length };
+  
+  // Get all active sellers for this tenant
+  const sellersList = await db.select().from(sellers)
+    .where(and(eq(sellers.tenantId, tid), eq(sellers.active, true)))
+    .orderBy(desc(sellers.totalPoints));
+  
+  // Count FEI, consignment, SDR records for the month
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 1);
+  
+  const snapshots: InsertMonthlySnapshot[] = sellersList.map((s, idx) => ({
+    sellerId: s.id,
+    sellerName: s.name,
+    month,
+    year,
+    totalSales: s.totalSales,
+    totalPoints: s.totalPoints,
+    department: s.department,
+    rank: idx + 1,
+    totalFei: 0,
+    totalConsignacao: 0,
+    totalAgendamentos: 0,
+    totalLeads: 0,
+    tenantId: tid,
+  }));
+  
+  if (snapshots.length > 0) {
+    // Count per-seller stats for the month from sales table
+    const monthSales = await db.select().from(sales)
+      .where(and(
+        eq(sales.tenantId, tid),
+        eq(sales.status, "approved"),
+        gte(sales.createdAt, monthStart),
+        lt(sales.createdAt, monthEnd)
+      ));
+    
+    const feiList = await db.select().from(feiRecords)
+      .where(and(
+        eq(feiRecords.tenantId, tid),
+        gte(feiRecords.createdAt, monthStart),
+        lt(feiRecords.createdAt, monthEnd)
+      ));
+    
+    const consignList = await db.select().from(consignmentRecords)
+      .where(and(
+        eq(consignmentRecords.tenantId, tid),
+        gte(consignmentRecords.createdAt, monthStart),
+        lt(consignmentRecords.createdAt, monthEnd)
+      ));
+    
+    const sdrList = await db.select().from(sdrRecords)
+      .where(and(
+        eq(sdrRecords.tenantId, tid),
+        gte(sdrRecords.createdAt, monthStart),
+        lt(sdrRecords.createdAt, monthEnd)
+      ));
+    
+    // Aggregate per seller
+    for (const snap of snapshots) {
+      snap.totalFei = feiList.filter(f => f.sellerId === snap.sellerId).length;
+      snap.totalConsignacao = consignList.filter(c => c.sellerId === snap.sellerId).length;
+      snap.totalAgendamentos = sdrList.filter(r => r.sellerId === snap.sellerId).length;
+      snap.totalLeads = 0; // leads are in CRM
+    }
+    
+    await db.insert(monthlySnapshots).values(snapshots);
+  }
+  
+  return { alreadyExists: false, count: snapshots.length };
+}
+
+export async function createCompetitionSnapshot(competitionId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const tid = getCurrentTenantId();
+  
+  // Get competition
+  const comp = await db.select().from(competitions)
+    .where(and(eq(competitions.tenantId, tid), eq(competitions.id, competitionId)))
+    .limit(1);
+  if (!comp[0]) throw new Error("Competition not found");
+  
+  // Check if already snapshotted
+  const existing = await db.select().from(competitionSnapshots)
+    .where(and(eq(competitionSnapshots.tenantId, tid), eq(competitionSnapshots.competitionId, competitionId)))
+    .limit(1);
+  if (existing.length > 0) return { alreadyExists: true };
+  
+  // Get ranking
+  const participants = await db.select().from(competitionParticipants)
+    .where(and(eq(competitionParticipants.tenantId, tid), eq(competitionParticipants.competitionId, competitionId)))
+    .orderBy(desc(competitionParticipants.points));
+  
+  const sellerIds = participants.map(p => p.sellerId);
+  const sellersList = sellerIds.length > 0 
+    ? await db.select().from(sellers).where(and(eq(sellers.tenantId, tid), inArray(sellers.id, sellerIds)))
+    : [];
+  const sellersMap = new Map(sellersList.map(s => [s.id, s]));
+  
+  const ranking = participants.map((p, idx) => ({
+    position: idx + 1,
+    sellerId: p.sellerId,
+    sellerName: sellersMap.get(p.sellerId)?.name || "Unknown",
+    points: p.points,
+    salesCount: p.salesCount,
+  }));
+  
+  const endDate = comp[0].endDate;
+  const snapshotMonth = endDate ? new Date(endDate).getMonth() + 1 : new Date().getMonth() + 1;
+  const snapshotYear = endDate ? new Date(endDate).getFullYear() : new Date().getFullYear();
+  
+  await db.insert(competitionSnapshots).values({
+    competitionId,
+    competitionName: comp[0].name,
+    competitionType: comp[0].type,
+    category: comp[0].category,
+    startDate: comp[0].startDate,
+    endDate: comp[0].endDate,
+    month: snapshotMonth,
+    year: snapshotYear,
+    rankingJson: JSON.stringify(ranking),
+    championName: ranking[0]?.sellerName || null,
+    championSellerId: ranking[0]?.sellerId || null,
+    tenantId: tid,
+  });
+  
+  return { alreadyExists: false, champion: ranking[0]?.sellerName };
+}
+
+export async function resetMonthlyCounters() {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const tid = getCurrentTenantId();
+  
+  // Reset sellers totalSales and totalPoints to 0
+  await db.update(sellers)
+    .set({ totalSales: 0, totalPoints: 0 })
+    .where(eq(sellers.tenantId, tid));
+  
+  return { success: true };
+}
+
+export async function getMonthlySnapshots(month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const tid = getCurrentTenantId();
+  return db.select().from(monthlySnapshots)
+    .where(and(eq(monthlySnapshots.tenantId, tid), eq(monthlySnapshots.month, month), eq(monthlySnapshots.year, year)))
+    .orderBy(monthlySnapshots.rank);
+}
+
+export async function getCompetitionSnapshotsByMonth(month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const tid = getCurrentTenantId();
+  return db.select().from(competitionSnapshots)
+    .where(and(eq(competitionSnapshots.tenantId, tid), eq(competitionSnapshots.month, month), eq(competitionSnapshots.year, year)));
+}
+
+export async function listAvailableMonths() {
+  const db = await getDb();
+  if (!db) return [];
+  const tid = getCurrentTenantId();
+  const results = await db.selectDistinct({ month: monthlySnapshots.month, year: monthlySnapshots.year })
+    .from(monthlySnapshots)
+    .where(eq(monthlySnapshots.tenantId, tid))
+    .orderBy(desc(monthlySnapshots.year), desc(monthlySnapshots.month));
+  return results;
+}
+
+export async function executeMonthTurnover(closingMonth: number, closingYear: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const tid = getCurrentTenantId();
+  
+  // 1. Create monthly snapshot (archive seller data)
+  const snapshotResult = await createMonthlySnapshot(closingMonth, closingYear);
+  
+  // 2. Snapshot all ended competitions for this month
+  const endedComps = await db.select().from(competitions)
+    .where(and(
+      eq(competitions.tenantId, tid),
+      eq(competitions.status, "finished")
+    ));
+  
+  let compsSnapshotted = 0;
+  for (const comp of endedComps) {
+    try {
+      const result = await createCompetitionSnapshot(comp.id);
+      if (!result.alreadyExists) compsSnapshotted++;
+    } catch (e) {
+      // Skip errors for individual competitions
+    }
+  }
+  
+  // 3. Reset seller counters
+  await resetMonthlyCounters();
+  
+  return {
+    sellersArchived: snapshotResult.count,
+    competitionsArchived: compsSnapshotted,
+    alreadyDone: snapshotResult.alreadyExists,
+  };
 }

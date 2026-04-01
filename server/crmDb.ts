@@ -14,19 +14,21 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 
+import { getCurrentTenantId } from "./tenantDb";
+
 // ===== ADMINS =====
 
 export async function getAdminByUsername(username: string) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(admins).where(eq(admins.username, username)).limit(1);
+  const rows = await db.select().from(admins).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.username, username))).limit(1);
   return rows[0] || null;
 }
 
 export async function getAdminById(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(admins).where(eq(admins.id, id)).limit(1);
+  const rows = await db.select().from(admins).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.id, id))).limit(1);
   return rows[0] || null;
 }
 
@@ -46,19 +48,19 @@ export async function createAdmin(data: { username: string; passwordHash: string
 export async function listAdmins() {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: admins.id, username: admins.username, name: admins.name, role: admins.role, active: admins.active, permissions: admins.permissions, createdAt: admins.createdAt }).from(admins).orderBy(desc(admins.createdAt));
+  return db.select({ id: admins.id, username: admins.username, name: admins.name, role: admins.role, active: admins.active, permissions: admins.permissions, createdAt: admins.createdAt }).from(admins).where(eq(admins.tenantId, getCurrentTenantId())).orderBy(desc(admins.createdAt));
 }
 
 export async function updateAdmin(id: number, data: Partial<{ name: string; passwordHash: string; active: boolean; role: "owner" | "admin"; permissions: string }>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(admins).set(data).where(eq(admins.id, id));
+  await db.update(admins).set(data).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.id, id)));
 }
 
 export async function deleteAdmin(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(admins).where(eq(admins.id, id));
+  await db.delete(admins).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.id, id)));
 }
 
 // ===== CRM LEADS =====
@@ -66,14 +68,14 @@ export async function deleteAdmin(id: number) {
 export async function createLead(data: InsertCrmLead) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(crmLeads).values(data);
+  const result = await db.insert(crmLeads).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
 export async function getLeadById(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(crmLeads).where(eq(crmLeads.id, id)).limit(1);
+  const rows = await db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), eq(crmLeads.id, id))).limit(1);
   return rows[0] || null;
 }
 
@@ -85,7 +87,7 @@ export async function listLeadsBySeller(sellerId: number, opts?: { department?: 
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
   if (opts?.score) conditions.push(eq(crmLeads.score, opts.score as "hot" | "warm" | "cold"));
-  return db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.lastContactDate));
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.lastContactDate));
 }
 export async function listLeadsByDepartment(department: string, opts?: { archived?: boolean; stage?: string }) {
   const db = await getDb();
@@ -93,7 +95,7 @@ export async function listLeadsByDepartment(department: string, opts?: { archive
   const conditions = [eq(crmLeads.department, department)];
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
-  return db.select().from(crmLeads).where(and(...conditions)).orderBy(desc(crmLeads.lastContactDate));
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.lastContactDate));
 }
 
 export async function listAllLeads(opts?: { archived?: boolean; department?: string; sellerId?: number }) {
@@ -104,13 +106,13 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
   if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
   if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(crmLeads).where(where).orderBy(desc(crmLeads.lastContactDate));
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where)).orderBy(desc(crmLeads.lastContactDate));
 }
 
 export async function updateLead(id: number, data: Partial<InsertCrmLead>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(crmLeads).set(data).where(eq(crmLeads.id, id));
+  await db.update(crmLeads).set(data).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), eq(crmLeads.id, id)));
 }
 
 export async function searchLeads(query: string, sellerId?: number) {
@@ -127,15 +129,14 @@ export async function searchLeads(query: string, sellerId?: number) {
   const conditions = sellerId
     ? and(eq(crmLeads.sellerId, sellerId), searchConditions)
     : searchConditions;
-  return db.select().from(crmLeads).where(conditions).orderBy(desc(crmLeads.updatedAt)).limit(50);
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), conditions)).orderBy(desc(crmLeads.updatedAt)).limit(50);
 }
 
 export async function getLeadsNeedingFollowUp(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
   const twoDaysAgo = Date.now() - (48 * 60 * 60 * 1000);
-  return db.select().from(crmLeads).where(
-    and(
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()),
       eq(crmLeads.sellerId, sellerId),
       eq(crmLeads.archived, false),
       eq(crmLeads.convertedToSale, false),
@@ -143,21 +144,18 @@ export async function getLeadsNeedingFollowUp(sellerId: number) {
         lte(crmLeads.lastContactDate, twoDaysAgo),
         isNull(crmLeads.lastContactDate),
       ),
-    )
-  ).orderBy(asc(crmLeads.lastContactDate));
+  )).orderBy(asc(crmLeads.lastContactDate));
 }
 
 export async function getLeadsByVehicleInterest(vehicleQuery: string) {
   const db = await getDb();
   if (!db) return [];
   const searchPattern = `%${vehicleQuery}%`;
-  return db.select().from(crmLeads).where(
-    and(
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()),
       eq(crmLeads.archived, false),
       eq(crmLeads.convertedToSale, false),
       like(crmLeads.vehicleInterest, searchPattern),
-    )
-  ).orderBy(desc(crmLeads.updatedAt));
+  )).orderBy(desc(crmLeads.updatedAt));
 }
 
 export async function getLeadStats(sellerId?: number) {
@@ -170,7 +168,7 @@ export async function getLeadStats(sellerId?: number) {
     score: crmLeads.score,
     convertedToSale: crmLeads.convertedToSale,
     count: sql<number>`COUNT(*)`,
-  }).from(crmLeads).where(conditions).groupBy(crmLeads.score, crmLeads.convertedToSale);
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), conditions)).groupBy(crmLeads.score, crmLeads.convertedToSale);
 
   let total = 0, hot = 0, warm = 0, cold = 0, converted = 0;
   for (const r of rows) {
@@ -185,12 +183,12 @@ export async function getLeadStats(sellerId?: number) {
   const bySource = await db.select({
     source: crmLeads.source,
     count: sql<number>`COUNT(*)`,
-  }).from(crmLeads).where(conditions).groupBy(crmLeads.source);
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), conditions)).groupBy(crmLeads.source);
 
   const byStage = await db.select({
     stage: crmLeads.stage,
     count: sql<number>`COUNT(*)`,
-  }).from(crmLeads).where(conditions).groupBy(crmLeads.stage);
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), conditions)).groupBy(crmLeads.stage);
 
   return { total, hot, warm, cold, converted, bySource, byStage };
 }
@@ -201,15 +199,15 @@ export async function listPipelineStages(department?: string) {
   const db = await getDb();
   if (!db) return [];
   const where = department ? eq(crmPipelineStages.department, department) : undefined;
-  return db.select().from(crmPipelineStages).where(where).orderBy(asc(crmPipelineStages.department), asc(crmPipelineStages.displayOrder));
+  return db.select().from(crmPipelineStages).where(and(eq(crmPipelineStages.tenantId, getCurrentTenantId()), where)).orderBy(asc(crmPipelineStages.department), asc(crmPipelineStages.displayOrder));
 }
 
 export async function getDefaultStage(department: string) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(crmPipelineStages).where(
-    and(eq(crmPipelineStages.department, department), eq(crmPipelineStages.isDefault, true))
-  ).limit(1);
+  const rows = await db.select().from(crmPipelineStages).where(and(eq(crmPipelineStages.tenantId, getCurrentTenantId()),
+    eq(crmPipelineStages.department, department), eq(crmPipelineStages.isDefault, true)
+  )).limit(1);
   return rows[0] || null;
 }
 
@@ -218,14 +216,14 @@ export async function getDefaultStage(department: string) {
 export async function createActivity(data: InsertCrmActivity) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(crmActivities).values(data);
+  const result = await db.insert(crmActivities).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
 export async function listActivitiesByLead(leadId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(crmActivities).where(eq(crmActivities.leadId, leadId)).orderBy(desc(crmActivities.createdAt));
+  return db.select().from(crmActivities).where(and(eq(crmActivities.tenantId, getCurrentTenantId()), eq(crmActivities.leadId, leadId))).orderBy(desc(crmActivities.createdAt));
 }
 
 // ===== CRM INVENTORY =====
@@ -233,14 +231,14 @@ export async function listActivitiesByLead(leadId: number) {
 export async function createInventoryItem(data: InsertCrmInventory) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(crmInventory).values(data);
+  const result = await db.insert(crmInventory).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
 export async function getInventoryById(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(crmInventory).where(eq(crmInventory.id, id)).limit(1);
+  const rows = await db.select().from(crmInventory).where(and(eq(crmInventory.tenantId, getCurrentTenantId()), eq(crmInventory.id, id))).limit(1);
   return rows[0] || null;
 }
 
@@ -259,19 +257,19 @@ export async function listInventory(opts?: { status?: string; search?: string })
     ));
   }
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(crmInventory).where(where).orderBy(desc(crmInventory.createdAt));
+  return db.select().from(crmInventory).where(and(eq(crmInventory.tenantId, getCurrentTenantId()), where)).orderBy(desc(crmInventory.createdAt));
 }
 
 export async function updateInventoryItem(id: number, data: Partial<InsertCrmInventory>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(crmInventory).set(data).where(eq(crmInventory.id, id));
+  await db.update(crmInventory).set(data).where(and(eq(crmInventory.tenantId, getCurrentTenantId()), eq(crmInventory.id, id)));
 }
 
 export async function deleteInventoryItem(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(crmInventory).where(eq(crmInventory.id, id));
+  await db.delete(crmInventory).where(and(eq(crmInventory.tenantId, getCurrentTenantId()), eq(crmInventory.id, id)));
 }
 
 // ===== CRM INVENTORY ALERTS =====
@@ -279,21 +277,21 @@ export async function deleteInventoryItem(id: number) {
 export async function createInventoryAlert(data: InsertCrmInventoryAlert) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(crmInventoryAlerts).values(data);
+  await db.insert(crmInventoryAlerts).values({...data, tenantId: getCurrentTenantId()});
 }
 
 export async function listInventoryAlertsBySeller(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(crmInventoryAlerts).where(
-    and(eq(crmInventoryAlerts.sellerId, sellerId), eq(crmInventoryAlerts.dismissed, false))
-  ).orderBy(desc(crmInventoryAlerts.createdAt));
+  return db.select().from(crmInventoryAlerts).where(and(eq(crmInventoryAlerts.tenantId, getCurrentTenantId()),
+    eq(crmInventoryAlerts.sellerId, sellerId), eq(crmInventoryAlerts.dismissed, false)
+  )).orderBy(desc(crmInventoryAlerts.createdAt));
 }
 
 export async function dismissInventoryAlert(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(crmInventoryAlerts).set({ dismissed: true }).where(eq(crmInventoryAlerts.id, id));
+  await db.update(crmInventoryAlerts).set({ dismissed: true }).where(and(eq(crmInventoryAlerts.tenantId, getCurrentTenantId()), eq(crmInventoryAlerts.id, id)));
 }
 
 // ===== CRM INTEGRATIONS =====
@@ -301,44 +299,44 @@ export async function dismissInventoryAlert(id: number) {
 export async function listIntegrations() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(crmIntegrations).orderBy(desc(crmIntegrations.createdAt));
+  return db.select().from(crmIntegrations).where(eq(crmIntegrations.tenantId, getCurrentTenantId())).orderBy(desc(crmIntegrations.createdAt));
 }
 
 export async function getIntegrationByType(type: string) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(crmIntegrations).where(
-    and(eq(crmIntegrations.type, type), eq(crmIntegrations.active, true))
-  ).limit(1);
+  const rows = await db.select().from(crmIntegrations).where(and(eq(crmIntegrations.tenantId, getCurrentTenantId()),
+    eq(crmIntegrations.type, type), eq(crmIntegrations.active, true)
+  )).limit(1);
   return rows[0] || null;
 }
 
 export async function getIntegrationByToken(token: string) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(crmIntegrations).where(
-    and(eq(crmIntegrations.apiToken, token), eq(crmIntegrations.active, true))
-  ).limit(1);
+  const rows = await db.select().from(crmIntegrations).where(and(eq(crmIntegrations.tenantId, getCurrentTenantId()),
+    eq(crmIntegrations.apiToken, token), eq(crmIntegrations.active, true)
+  )).limit(1);
   return rows[0] || null;
 }
 
 export async function createIntegration(data: InsertCrmIntegration) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(crmIntegrations).values(data);
+  const result = await db.insert(crmIntegrations).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
 export async function updateIntegration(id: number, data: Partial<InsertCrmIntegration>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(crmIntegrations).set(data).where(eq(crmIntegrations.id, id));
+  await db.update(crmIntegrations).set(data).where(and(eq(crmIntegrations.tenantId, getCurrentTenantId()), eq(crmIntegrations.id, id)));
 }
 
 export async function deleteIntegration(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(crmIntegrations).where(eq(crmIntegrations.id, id));
+  await db.delete(crmIntegrations).where(and(eq(crmIntegrations.tenantId, getCurrentTenantId()), eq(crmIntegrations.id, id)));
 }
 
 // ===== CRM CAMPAIGNS =====
@@ -346,26 +344,26 @@ export async function deleteIntegration(id: number) {
 export async function createCampaign(data: InsertCrmCampaign) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(crmCampaigns).values(data);
+  const result = await db.insert(crmCampaigns).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
 export async function listCampaigns() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(crmCampaigns).orderBy(desc(crmCampaigns.createdAt));
+  return db.select().from(crmCampaigns).where(eq(crmCampaigns.tenantId, getCurrentTenantId())).orderBy(desc(crmCampaigns.createdAt));
 }
 
 export async function updateCampaign(id: number, data: Partial<InsertCrmCampaign>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(crmCampaigns).set(data).where(eq(crmCampaigns.id, id));
+  await db.update(crmCampaigns).set(data).where(and(eq(crmCampaigns.tenantId, getCurrentTenantId()), eq(crmCampaigns.id, id)));
 }
 
 export async function deleteCampaign(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(crmCampaigns).where(eq(crmCampaigns.id, id));
+  await db.delete(crmCampaigns).where(and(eq(crmCampaigns.tenantId, getCurrentTenantId()), eq(crmCampaigns.id, id)));
 }
 
 // ===== MARKETING STATS =====
@@ -384,18 +382,18 @@ export async function getMarketingStats(startDate?: number, endDate?: number) {
     total: sql<number>`COUNT(*)`,
     converted: sql<number>`SUM(CASE WHEN ${crmLeads.convertedToSale} = true THEN 1 ELSE 0 END)`,
     totalValue: sql<number>`SUM(CASE WHEN ${crmLeads.convertedToSale} = true THEN ${crmLeads.saleValue} ELSE 0 END)`,
-  }).from(crmLeads).where(where).groupBy(crmLeads.source);
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where)).groupBy(crmLeads.source);
 
   const byDepartment = await db.select({
     department: crmLeads.department,
     total: sql<number>`COUNT(*)`,
     converted: sql<number>`SUM(CASE WHEN ${crmLeads.convertedToSale} = true THEN 1 ELSE 0 END)`,
-  }).from(crmLeads).where(where).groupBy(crmLeads.department);
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where)).groupBy(crmLeads.department);
 
   const totals = await db.select({
     total: sql<number>`COUNT(*)`,
     converted: sql<number>`SUM(CASE WHEN ${crmLeads.convertedToSale} = true THEN 1 ELSE 0 END)`,
-  }).from(crmLeads).where(where);
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where));
 
   const totalLeads = Number(totals[0]?.total || 0);
   const totalConverted = Number(totals[0]?.converted || 0);
@@ -409,26 +407,26 @@ export async function getMarketingStats(startDate?: number, endDate?: number) {
 export async function createMessage(data: InsertCrmMessage) {
   const db = await getDb();
   if (!db) return 0;
-  const [result] = await db.insert(crmMessages).values(data).$returningId();
+  const [result] = await db.insert(crmMessages).values({...data, tenantId: getCurrentTenantId()}).$returningId();
   return result.id;
 }
 
 export async function listMessagesByLead(leadId: number, limit = 100) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(crmMessages).where(eq(crmMessages.leadId, leadId)).orderBy(asc(crmMessages.timestamp)).limit(limit);
+  return db.select().from(crmMessages).where(and(eq(crmMessages.tenantId, getCurrentTenantId()), eq(crmMessages.leadId, leadId))).orderBy(asc(crmMessages.timestamp)).limit(limit);
 }
 
 export async function listMessagesByPhone(phone: string, limit = 100) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(crmMessages).where(eq(crmMessages.phone, phone)).orderBy(asc(crmMessages.timestamp)).limit(limit);
+  return db.select().from(crmMessages).where(and(eq(crmMessages.tenantId, getCurrentTenantId()), eq(crmMessages.phone, phone))).orderBy(asc(crmMessages.timestamp)).limit(limit);
 }
 
 export async function getLastMessageByLead(leadId: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(crmMessages).where(eq(crmMessages.leadId, leadId)).orderBy(desc(crmMessages.timestamp)).limit(1);
+  const rows = await db.select().from(crmMessages).where(and(eq(crmMessages.tenantId, getCurrentTenantId()), eq(crmMessages.leadId, leadId))).orderBy(desc(crmMessages.timestamp)).limit(1);
   return rows[0] || null;
 }
 
@@ -446,7 +444,7 @@ export async function getUnrespondedLeads(thresholdMinutes: number, sellerId?: n
   if (sellerId !== undefined) {
     conditions.push(eq(crmLeads.sellerId, sellerId));
   }
-  const leads = await db.select().from(crmLeads).where(and(...conditions));
+  const leads = await db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions)));
   // Filter: leads where the LAST message is inbound and older than threshold
   // This means the client sent a message and nobody responded yet
   const result = [];
@@ -470,7 +468,7 @@ export async function getSellerResponseStats(sellerId: number) {
   const db = await getDb();
   if (!db) return { avgResponseMinutes: 0, totalLeads: 0, respondedLeads: 0, conversionRate: 0 };
   
-  const sellerLeads = await db.select().from(crmLeads).where(eq(crmLeads.sellerId, sellerId));
+  const sellerLeads = await db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), eq(crmLeads.sellerId, sellerId)));
   let totalResponseTime = 0;
   let respondedCount = 0;
   let convertedCount = 0;

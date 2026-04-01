@@ -2,28 +2,30 @@ import { eq, and, desc, asc, sql, gte, lte, or } from "drizzle-orm";
 import { finCategories, InsertFinCategory, finTransactions, InsertFinTransaction, fuelRecords, type InsertFuelRecord } from "../drizzle/schema";
 import { getDb } from "./db";
 
+import { getCurrentTenantId } from "./tenantDb";
+
 // ===== CATEGORIES =====
 
 export async function listFinCategories(type?: "expense" | "income") {
   const db = await getDb();
   if (!db) return [];
   if (type) {
-    return db.select().from(finCategories).where(and(eq(finCategories.type, type), eq(finCategories.active, true))).orderBy(asc(finCategories.name));
+    return db.select().from(finCategories).where(and(eq(finCategories.tenantId, getCurrentTenantId()), and(eq(finCategories.type, type), eq(finCategories.active, true)))).orderBy(asc(finCategories.name));
   }
-  return db.select().from(finCategories).where(eq(finCategories.active, true)).orderBy(asc(finCategories.type), asc(finCategories.name));
+  return db.select().from(finCategories).where(and(eq(finCategories.tenantId, getCurrentTenantId()), eq(finCategories.active, true))).orderBy(asc(finCategories.type), asc(finCategories.name));
 }
 
 export async function createFinCategory(data: { name: string; type: "expense" | "income"; icon?: string; color?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(finCategories).values(data);
+  const result = await db.insert(finCategories).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
 export async function updateFinCategory(id: number, data: Partial<{ name: string; icon: string; color: string; active: boolean }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(finCategories).set(data).where(eq(finCategories.id, id));
+  await db.update(finCategories).set(data).where(and(eq(finCategories.tenantId, getCurrentTenantId()), eq(finCategories.id, id)));
 }
 
 // ===== TRANSACTIONS =====
@@ -55,7 +57,8 @@ export async function listFinTransactions(filters: {
       .orderBy(asc(finTransactions.dueDate))
       .limit(filters.limit || 50)
       .offset(filters.offset || 0),
-    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(where),
+    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), where)),
+
   ]);
   
   return { items, total: Number(countResult[0]?.count || 0) };
@@ -64,7 +67,7 @@ export async function listFinTransactions(filters: {
 export async function getFinTransaction(id: number) {
   const db = await getDb();
   if (!db) return null;
-  const rows = await db.select().from(finTransactions).where(eq(finTransactions.id, id)).limit(1);
+  const rows = await db.select().from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.id, id))).limit(1);
   return rows[0] || null;
 }
 
@@ -90,7 +93,7 @@ export async function createFinTransaction(data: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(finTransactions).values(data);
+  const result = await db.insert(finTransactions).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
 }
 
@@ -113,19 +116,19 @@ export async function updateFinTransaction(id: number, data: Partial<{
 }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(finTransactions).set(data).where(eq(finTransactions.id, id));
+  await db.update(finTransactions).set(data).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.id, id)));
 }
 
 export async function deleteFinTransaction(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.delete(finTransactions).where(eq(finTransactions.id, id));
+  await db.delete(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.id, id)));
 }
 
 export async function markAsPaid(id: number, paidDate: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(finTransactions).set({ status: "paid", paidDate }).where(eq(finTransactions.id, id));
+  await db.update(finTransactions).set({ status: "paid", paidDate }).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.id, id)));
 }
 
 // ===== DASHBOARD =====
@@ -147,19 +150,19 @@ export async function getFinDashboard(month?: number, year?: number) {
     total: sql<string>`COALESCE(SUM(CASE WHEN type = 'payable' THEN amount ELSE 0 END), 0)`,
     paid: sql<string>`COALESCE(SUM(CASE WHEN type = 'payable' AND status = 'paid' THEN amount ELSE 0 END), 0)`,
     pending: sql<string>`COALESCE(SUM(CASE WHEN type = 'payable' AND status = 'pending' THEN amount ELSE 0 END), 0)`,
-  }).from(finTransactions).where(and(gte(finTransactions.dueDate, startOfMonth), lte(finTransactions.dueDate, endOfMonth)));
+  }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), and(gte(finTransactions.dueDate, startOfMonth), lte(finTransactions.dueDate, endOfMonth))));
   
   // Total receivable this month
   const [receivableResult] = await db.select({
     total: sql<string>`COALESCE(SUM(CASE WHEN type = 'receivable' THEN amount ELSE 0 END), 0)`,
     received: sql<string>`COALESCE(SUM(CASE WHEN type = 'receivable' AND status = 'paid' THEN amount ELSE 0 END), 0)`,
     pending: sql<string>`COALESCE(SUM(CASE WHEN type = 'receivable' AND status = 'pending' THEN amount ELSE 0 END), 0)`,
-  }).from(finTransactions).where(and(gte(finTransactions.dueDate, startOfMonth), lte(finTransactions.dueDate, endOfMonth)));
+  }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), and(gte(finTransactions.dueDate, startOfMonth), lte(finTransactions.dueDate, endOfMonth))));
   
   // Overdue count
   const [overdueResult] = await db.select({
     count: sql<number>`count(*)`,
-  }).from(finTransactions).where(and(eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)));
+  }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), and(eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now))));
   
   // Upcoming due (next 7 days)
   const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000;
@@ -263,21 +266,21 @@ export async function listFuelRecords(filters?: { month?: number; year?: number 
 export async function createFuelRecord(data: InsertFuelRecord) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(fuelRecords).values(data);
+  const result = await db.insert(fuelRecords).values({...data, tenantId: getCurrentTenantId()});
   return { id: result[0].insertId };
 }
 
 export async function updateFuelRecord(id: number, data: Partial<InsertFuelRecord>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(fuelRecords).set(data).where(eq(fuelRecords.id, id));
+  await db.update(fuelRecords).set(data).where(and(eq(fuelRecords.tenantId, getCurrentTenantId()), eq(fuelRecords.id, id)));
   return { success: true };
 }
 
 export async function deleteFuelRecord(id: number) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.delete(fuelRecords).where(eq(fuelRecords.id, id));
+  await db.delete(fuelRecords).where(and(eq(fuelRecords.tenantId, getCurrentTenantId()), eq(fuelRecords.id, id)));
   return { success: true };
 }
 
@@ -295,7 +298,7 @@ export async function getFuelDashboard(month?: number, year?: number) {
     totalLiters: sql<string>`COALESCE(SUM(liters), 0)`,
     totalCost: sql<string>`COALESCE(SUM(totalCost), 0)`,
     recordCount: sql<number>`COUNT(*)`,
-  }).from(fuelRecords).where(and(gte(fuelRecords.fuelDate, start), lte(fuelRecords.fuelDate, end)));
+  }).from(fuelRecords).where(and(eq(fuelRecords.tenantId, getCurrentTenantId()), and(gte(fuelRecords.fuelDate, start), lte(fuelRecords.fuelDate, end))));
   
   return {
     totalLiters: parseFloat(result?.totalLiters || '0'),

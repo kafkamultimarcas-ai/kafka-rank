@@ -2486,6 +2486,37 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     }),
   }),
 
+  // ===== VIRADA DE MÊS / HISTÓRICO =====
+  monthTurnover: router({
+    // Executar virada de mês (admin only)
+    execute: adminProcedure.input(z.object({
+      month: z.number().min(1).max(12),
+      year: z.number().min(2024).max(2030),
+    })).mutation(async ({ input }) => {
+      return db.executeMonthTurnover(input.month, input.year);
+    }),
+
+    // Consultar snapshot de um mês específico
+    getSnapshot: publicProcedure.input(z.object({
+      month: z.number().min(1).max(12),
+      year: z.number().min(2024).max(2030),
+    })).query(async ({ input }) => {
+      const sellers = await db.getMonthlySnapshots(input.month, input.year);
+      const competitions = await db.getCompetitionSnapshotsByMonth(input.month, input.year);
+      return { sellers, competitions };
+    }),
+
+    // Listar meses disponíveis com snapshot
+    availableMonths: publicProcedure.query(async () => {
+      return db.listAvailableMonths();
+    }),
+
+    // Resetar contadores manualmente (admin only)
+    resetCounters: adminProcedure.mutation(async () => {
+      return db.resetMonthlyCounters();
+    }),
+  }),
+
   // ===== SUPER ADMIN (MULTI-TENANT) =====
   superAdmin: superAdminRouter,
 });

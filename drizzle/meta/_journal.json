@@ -295,6 +295,20 @@
       "when": 1774987164333,
       "tag": "0041_ordinary_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1775018296784,
+      "tag": "0042_rapid_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "5",
+      "when": 1775024090252,
+      "tag": "0043_real_harrier",
+      "breakpoints": true
     }
   ]
 }
