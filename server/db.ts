@@ -1,4 +1,4 @@
-import { eq, desc, and, or, sql, inArray, gte, lt } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray, gte, lt, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -35,6 +35,10 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 export function resetDbConnection() {
   _db = null;
+}
+
+export async function getDbInstance() {
+  return getDb();
 }
 
 export async function getDb() {
@@ -128,6 +132,8 @@ const safeSellerColumns = {
   nickname: sellers.nickname,
   photoUrl: sellers.photoUrl,
   photoKey: sellers.photoKey,
+  competitionPhotoUrl: sellers.competitionPhotoUrl,
+  competitionPhotoKey: sellers.competitionPhotoKey,
   phone: sellers.phone,
   email: sellers.email,
   department: sellers.department,
@@ -166,8 +172,23 @@ export async function getSellerByIdInternal(id: number) {
 export async function getSellerByUsername(username: string) {
   const db = await getDb();
   if (!db) return undefined;
+  // 1. Try exact username match (MySQL utf8mb4_unicode_ci is case-insensitive)
   const result = await db.select().from(sellers).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.username, username))).limit(1);
-  return result[0];
+  if (result[0]) return result[0];
+  // 2. Fallback: try matching by name (trimmed, case-insensitive) for users who type their full name
+  const byName = await db.select().from(sellers).where(and(
+    eq(sellers.tenantId, getCurrentTenantId()),
+    sql`LOWER(TRIM(${sellers.name})) = LOWER(TRIM(${username}))`,
+    isNotNull(sellers.passwordHash)
+  )).limit(1);
+  if (byName[0]) return byName[0];
+  // 3. Fallback: try matching by nickname
+  const byNickname = await db.select().from(sellers).where(and(
+    eq(sellers.tenantId, getCurrentTenantId()),
+    sql`LOWER(TRIM(${sellers.nickname})) = LOWER(TRIM(${username}))`,
+    isNotNull(sellers.passwordHash)
+  )).limit(1);
+  return byNickname[0];
 }
 
 export async function updateSellerLastAccess(id: number) {

@@ -62,8 +62,8 @@ function FootballMatchCard({ match, roundLabel, mySellerId, onPhotoChange }: { m
   const teamB = match.teamB;
   const nameA = sellerA?.nickname || sellerA?.name || teamA?.name || "TBD";
   const nameB = sellerB?.nickname || sellerB?.name || teamB?.name || "TBD";
-  const photoA = sellerA?.photoUrl || null;
-  const photoB = sellerB?.photoUrl || null;
+  const photoA = sellerA?.competitionPhotoUrl || sellerA?.photoUrl || null;
+  const photoB = sellerB?.competitionPhotoUrl || sellerB?.photoUrl || null;
   const scoreA = match.scoreA || 0;
   const scoreB = match.scoreB || 0;
   const isFinished = match.status === "finished";
@@ -153,7 +153,7 @@ function FootballMatchCard({ match, roundLabel, mySellerId, onPhotoChange }: { m
 
 // ===== RACE CAR =====
 function RaceCar({ seller, points, maxPoints, rank, color, animate }: {
-  seller: { name: string; nickname?: string | null; photoUrl?: string | null };
+  seller: { name: string; nickname?: string | null; photoUrl?: string | null; competitionPhotoUrl?: string | null };
   points: number; maxPoints: number; rank: number; color: string; animate: boolean;
 }) {
   const [progress, setProgress] = useState(5);
@@ -181,8 +181,8 @@ function RaceCar({ seller, points, maxPoints, rank, color, animate }: {
           className="absolute top-1/2 flex items-center gap-1 transition-all duration-[1500ms] ease-out"
           style={{ left: `${progress}%`, transform: "translate(-50%, -50%)" }}
         >
-          {seller.photoUrl ? (
-            <img src={seller.photoUrl} alt={seller.name}
+          {(seller.competitionPhotoUrl || seller.photoUrl) ? (
+            <img src={seller.competitionPhotoUrl || seller.photoUrl!} alt={seller.name}
               className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 shadow-lg shrink-0"
               style={{ borderColor: color }} />
           ) : (
@@ -459,7 +459,7 @@ export default function RaceTrack() {
                     {/* 2nd place */}
                     <div className="flex flex-col items-center">
                       <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[1]?.seller?.name || "?"} photoUrl={ranking[1]?.seller?.photoUrl} size="lg" borderColor="#9ca3af" isMe={mySellerId === ranking[1]?.seller?.id} onPhotoChange={handlePhotoClick} />
+                        <PlayerAvatar name={ranking[1]?.seller?.name || "?"} photoUrl={ranking[1]?.seller?.competitionPhotoUrl || ranking[1]?.seller?.photoUrl} size="lg" borderColor="#9ca3af" isMe={mySellerId === ranking[1]?.seller?.id} onPhotoChange={handlePhotoClick} />
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-xs font-bold text-white shadow">2</div>
                       </div>
                       <p className="text-xs font-semibold text-foreground text-center truncate max-w-[80px]">{ranking[1]?.seller?.nickname || ranking[1]?.seller?.name}</p>
@@ -472,7 +472,7 @@ export default function RaceTrack() {
                     <div className="flex flex-col items-center -mt-4">
                       <Trophy className="h-7 w-7 text-yellow-500 mb-1" />
                       <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[0]?.seller?.name || "?"} photoUrl={ranking[0]?.seller?.photoUrl} size="xl" borderColor="#eab308" isMe={mySellerId === ranking[0]?.seller?.id} onPhotoChange={handlePhotoClick} />
+                        <PlayerAvatar name={ranking[0]?.seller?.name || "?"} photoUrl={ranking[0]?.seller?.competitionPhotoUrl || ranking[0]?.seller?.photoUrl} size="xl" borderColor="#eab308" isMe={mySellerId === ranking[0]?.seller?.id} onPhotoChange={handlePhotoClick} />
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center text-sm font-bold text-white shadow">1</div>
                       </div>
                       <p className="text-sm font-bold text-foreground text-center truncate max-w-[100px]">{ranking[0]?.seller?.nickname || ranking[0]?.seller?.name}</p>
@@ -484,7 +484,7 @@ export default function RaceTrack() {
                     {/* 3rd place */}
                     <div className="flex flex-col items-center">
                       <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[2]?.seller?.name || "?"} photoUrl={ranking[2]?.seller?.photoUrl} size="md" borderColor="#b45309" isMe={mySellerId === ranking[2]?.seller?.id} onPhotoChange={handlePhotoClick} />
+                        <PlayerAvatar name={ranking[2]?.seller?.name || "?"} photoUrl={ranking[2]?.seller?.competitionPhotoUrl || ranking[2]?.seller?.photoUrl} size="md" borderColor="#b45309" isMe={mySellerId === ranking[2]?.seller?.id} onPhotoChange={handlePhotoClick} />
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-amber-700 flex items-center justify-center text-xs font-bold text-white shadow">3</div>
                       </div>
                       <p className="text-xs font-semibold text-foreground text-center truncate max-w-[80px]">{ranking[2]?.seller?.nickname || ranking[2]?.seller?.name}</p>
@@ -630,7 +630,7 @@ export default function RaceTrack() {
                 <div className="p-3 space-y-2">
                   {team.members.map(member => (
                     <div key={member.participant.id} className="flex items-center gap-3 p-2 rounded-xl bg-background/50">
-                      <PlayerAvatar name={member.seller?.name || "?"} photoUrl={member.seller?.photoUrl} size="sm" borderColor={team.team.color} />
+                      <PlayerAvatar name={member.seller?.name || "?"} photoUrl={member.seller?.competitionPhotoUrl || member.seller?.photoUrl} size="sm" borderColor={team.team.color} />
                       <span className="text-xs text-foreground flex-1 truncate font-semibold">{member.seller?.nickname || member.seller?.name}</span>
                       <span className="text-xs font-heading font-bold text-primary">{member.participant.points} pts</span>
                       <span className="text-[10px] text-muted-foreground">{member.participant.salesCount}v</span>

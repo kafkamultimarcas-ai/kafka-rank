@@ -337,6 +337,20 @@
       "when": 1775158611964,
       "tag": "0047_goofy_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "5",
+      "when": 1775167516749,
+      "tag": "0048_polite_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "5",
+      "when": 1775169312724,
+      "tag": "0049_vengeful_mongu",
+      "breakpoints": true
     }
   ]
 }

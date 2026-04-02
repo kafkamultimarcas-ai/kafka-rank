@@ -55,9 +55,13 @@ async function autoAssignToSDR(leadId: number, department: string): Promise<bool
       .where(eq(crmLeadDistribution.department, department)).limit(1);
     if (!config || !config.enabled) return false;
 
-    const deptSellers = await database.select().from(sellers)
+    const allDeptSellers = await database.select().from(sellers)
       .where(and(eq(sellers.department, department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
       .orderBy(asc(sellers.id));
+    const nowMs = Date.now();
+    const deptSellers = allDeptSellers.filter(s => 
+      !s.leadReceiveBlocked && (!s.leadBanUntil || s.leadBanUntil < nowMs)
+    );
 
     if (deptSellers.length === 0) return false;
 

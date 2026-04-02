@@ -14,7 +14,8 @@ import {
   AlertTriangle, Clock, Check, ArrowUpRight, ArrowDownRight, FileText,
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
   CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2,
-  Shuffle, ArrowRightLeft, Timer, Headphones, Target
+  Shuffle, ArrowRightLeft, Timer, Headphones, Target,
+  ShieldBan, Lock, Unlock, Slash
 } from "lucide-react";
 
 const DEPT_LABELS: Record<string, string> = {
@@ -2143,6 +2144,11 @@ function SDRManagementView() {
   const [selectedLeads, setSelectedLeads] = useState<Set<number>>(new Set());
   const [assignTarget, setAssignTarget] = useState("");
   const [showAllUnassigned, setShowAllUnassigned] = useState(false);
+  const [banSellerId, setBanSellerId] = useState<number | null>(null);
+  const [banDays, setBanDays] = useState(3);
+  const [banReason, setBanReason] = useState("");
+  const [editThreshold, setEditThreshold] = useState(false);
+  const [thresholdValue, setThresholdValue] = useState(10);
   const UNASSIGNED_PAGE_SIZE = 20;
 
   // Fetch SDR sellers (department = pre_vendas)
@@ -2196,6 +2202,21 @@ function SDRManagementView() {
 
   const vendasConfig = useMemo(() => distConfig?.find((c: any) => c.department === "vendas"), [distConfig]);
   const isAutoEnabled = vendasConfig?.enabled ?? false;
+  const transferThreshold = vendasConfig?.transferThresholdMinutes ?? 10;
+
+  // Block/Ban mutations
+  const toggleBlockMut = trpc.sellers.toggleLeadBlock.useMutation({
+    onSuccess: () => { toast.success("Status atualizado!"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const banMut = trpc.sellers.banFromLeads.useMutation({
+    onSuccess: () => { toast.success("Vendedor banido de leads!"); setBanSellerId(null); setBanReason(""); },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeBanMut = trpc.sellers.removeBan.useMutation({
+    onSuccess: () => { toast.success("Ban removido!"); },
+    onError: (e) => toast.error(e.message),
+  });
 
   // Stats
   const stats = useMemo(() => {
@@ -2435,27 +2456,78 @@ function SDRManagementView() {
         </div>
       )}
 
-      {/* Leads per Seller Distribution */}
+      {/* Leads por Vendedor + Bloqueio/Ban */}
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-primary" /> Leads por Vendedor
         </h3>
         {vendorSellers.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {vendorSellers.map((s: any) => {
               const count = sellerLeadCounts[s.id] || 0;
               const maxCount = Math.max(...Object.values(sellerLeadCounts), 1);
+              const isBlocked = s.leadReceiveBlocked;
+              const isBanned = s.leadBanUntil && s.leadBanUntil > Date.now();
+              const banExpiry = isBanned ? new Date(s.leadBanUntil).toLocaleDateString('pt-BR') : null;
               return (
-                <div key={s.id} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-bold text-primary">{(s.nickname || s.name || "?").charAt(0).toUpperCase()}</span>
+                <div key={s.id} className={`p-3 rounded-lg border transition-all ${
+                  isBlocked ? 'border-red-500/40 bg-red-500/5' :
+                  isBanned ? 'border-orange-500/40 bg-orange-500/5' :
+                  'border-border bg-card/50'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      isBlocked ? 'bg-red-500/20' : isBanned ? 'bg-orange-500/20' : 'bg-primary/10'
+                    }`}>
+                      <span className={`text-[10px] font-bold ${
+                        isBlocked ? 'text-red-400' : isBanned ? 'text-orange-400' : 'text-primary'
+                      }`}>{(s.nickname || s.name || "?").charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-foreground font-medium truncate">{s.nickname || s.name}</span>
+                        {isBlocked && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold shrink-0">BLOQUEADO</span>}
+                        {isBanned && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-bold shrink-0">BAN até {banExpiry}</span>}
+                      </div>
+                      <div className="flex-1 h-5 bg-accent/30 rounded-full overflow-hidden relative mt-1">
+                        <div className={`h-full rounded-full transition-all duration-700 ${
+                          isBlocked || isBanned ? 'bg-gradient-to-r from-gray-500/40 to-gray-500/20' : 'bg-gradient-to-r from-primary/60 to-primary/30'
+                        }`} style={{ width: `${Math.max((count / maxCount) * 100, 2)}%` }} />
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">{count} leads</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => toggleBlockMut.mutate({ sellerId: s.id, blocked: !isBlocked })}
+                        title={isBlocked ? 'Desbloquear leads' : 'Bloquear leads'}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          isBlocked ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400' : 'bg-red-500/10 hover:bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {isBlocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                      </button>
+                      {isBanned ? (
+                        <button
+                          onClick={() => removeBanMut.mutate({ sellerId: s.id })}
+                          title="Remover ban"
+                          className="p-1.5 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-all"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setBanSellerId(s.id); setBanDays(3); setBanReason(''); }}
+                          title="Aplicar ban temporário"
+                          className="p-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 transition-all"
+                        >
+                          <ShieldBan className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs text-foreground w-28 truncate font-medium">{s.nickname || s.name}</span>
-                  <div className="flex-1 h-6 bg-accent/30 rounded-full overflow-hidden relative">
-                    <div className="h-full bg-gradient-to-r from-primary/60 to-primary/30 rounded-full transition-all duration-700"
-                      style={{ width: `${Math.max((count / maxCount) * 100, 2)}%` }} />
-                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">{count} leads</span>
-                  </div>
+                  {s.leadBanReason && isBanned && (
+                    <p className="text-[10px] text-orange-400/70 mt-1 ml-11">Motivo: {s.leadBanReason}</p>
+                  )}
                 </div>
               );
             })}
@@ -2464,6 +2536,40 @@ function SDRManagementView() {
           <p className="text-sm text-muted-foreground text-center py-4">Nenhum vendedor ativo</p>
         )}
       </div>
+
+      {/* Ban Dialog */}
+      {banSellerId && (
+        <div className="rounded-xl border-2 border-orange-500/40 bg-orange-500/5 p-4">
+          <h3 className="text-sm font-bold text-orange-400 mb-3 flex items-center gap-2">
+            <ShieldBan className="w-4 h-4" /> Aplicar Ban — {allSellers?.find((s: any) => s.id === banSellerId)?.nickname || allSellers?.find((s: any) => s.id === banSellerId)?.name}
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Dias de ban *</label>
+              <div className="flex gap-2">
+                {[1, 3, 7, 14, 30].map(d => (
+                  <button key={d} onClick={() => setBanDays(d)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      banDays === d ? 'bg-orange-500 text-white' : 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
+                    }`}>{d}d</button>
+                ))}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-muted-foreground mb-1 block">Motivo (opcional)</label>
+              <Input value={banReason} onChange={e => setBanReason(e.target.value)}
+                placeholder="Ex: Não respondeu 5 leads seguidos" className="h-9" />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button onClick={() => banMut.mutate({ sellerId: banSellerId, days: banDays, reason: banReason || undefined })}
+              disabled={banMut.isPending} className="bg-orange-600 hover:bg-orange-700 text-white">
+              {banMut.isPending ? 'Aplicando...' : `Banir por ${banDays} dia(s)`}
+            </Button>
+            <Button variant="outline" onClick={() => setBanSellerId(null)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
 
       {/* Unassigned Leads - Manual Distribution */}
       {(unassignedLeads?.length || 0) > 0 && (
@@ -2564,11 +2670,32 @@ function SDRManagementView() {
         </div>
       )}
 
-      {/* Alert Configuration Info */}
+      {/* Alert Configuration - Configurable */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-          <Bell className="w-4 h-4 text-amber-400" /> Regras de Alerta Automático
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Bell className="w-4 h-4 text-amber-400" /> Regras de Alerta Automático
+          </h3>
+          {!editThreshold ? (
+            <button onClick={() => { setEditThreshold(true); setThresholdValue(transferThreshold); }}
+              className="text-[10px] text-primary hover:text-primary/80 font-medium flex items-center gap-1">
+              <Edit className="w-3 h-3" /> Editar tempos
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">Transferência após:</span>
+              <Input type="number" min={3} max={120} value={thresholdValue}
+                onChange={e => setThresholdValue(parseInt(e.target.value) || 10)}
+                className="h-7 w-16 text-xs text-center" />
+              <span className="text-[10px] text-muted-foreground">min</span>
+              <Button size="sm" className="h-7 text-xs bg-primary" onClick={() => {
+                updateConfigMut.mutate({ department: 'vendas', enabled: isAutoEnabled, transferThresholdMinutes: thresholdValue });
+                setEditThreshold(false);
+              }}>Salvar</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditThreshold(false)}>X</Button>
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
             <div className="flex items-center gap-2 mb-1">
@@ -2580,14 +2707,14 @@ function SDRManagementView() {
           <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
             <div className="flex items-center gap-2 mb-1">
               <AlertTriangle className="w-4 h-4 text-orange-400" />
-              <span className="text-xs font-bold text-orange-400">8 minutos</span>
+              <span className="text-xs font-bold text-orange-400">{Math.max(1, transferThreshold - 2)} minutos</span>
             </div>
             <p className="text-[10px] text-muted-foreground">Vendedor recebe aviso: "Lead será transferido em 2 minutos se não responder!"</p>
           </div>
           <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
             <div className="flex items-center gap-2 mb-1">
               <ArrowRightLeft className="w-4 h-4 text-red-400" />
-              <span className="text-xs font-bold text-red-400">10 minutos</span>
+              <span className="text-xs font-bold text-red-400">{transferThreshold} minutos</span>
             </div>
             <p className="text-[10px] text-muted-foreground">Lead é transferido automaticamente para outro vendedor. Vendedor anterior é notificado.</p>
           </div>

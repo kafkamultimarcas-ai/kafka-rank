@@ -23,6 +23,8 @@ export const sellers = mysqlTable("sellers", {
   nickname: varchar("nickname", { length: 100 }),
   photoUrl: text("photoUrl"),
   photoKey: varchar("photoKey", { length: 500 }),
+  competitionPhotoUrl: text("competitionPhotoUrl"), // foto separada para competição (não altera a principal)
+  competitionPhotoKey: varchar("competitionPhotoKey", { length: 500 }),
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 320 }),
   department: varchar("department", { length: 100 }).default("vendas"), // vendas, pre_vendas, fei, consignacao, despachante
@@ -33,6 +35,9 @@ export const sellers = mysqlTable("sellers", {
   passwordHash: varchar("passwordHash", { length: 255 }),
   lastAccess: bigint("lastAccess", { mode: "number" }),
   sellerRole: varchar("sellerRole", { length: 20 }).default("vendedor"), // vendedor, gerente
+  leadReceiveBlocked: boolean("leadReceiveBlocked").default(false).notNull(), // bloqueado de receber leads
+  leadBanUntil: bigint("leadBanUntil", { mode: "number" }), // timestamp até quando está banido de receber leads
+  leadBanReason: varchar("leadBanReason", { length: 255 }), // motivo do ban
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),

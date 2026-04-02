@@ -510,14 +510,18 @@ export async function autoReassignLead(leadId: number) {
   const lead = await getLeadById(leadId);
   if (!lead || lead.sellerId === 0) return null;
   
-  // Get all active sellers in same department, excluding current and gerentes
-  const allSellers = await db.select().from(sellers)
+  // Get all active sellers in same department, excluding current, gerentes, blocked, banned
+  const allSellersRaw = await db.select().from(sellers)
     .where(and(
       eq(sellers.department, lead.department),
       eq(sellers.active, true),
       ne(sellers.id, lead.sellerId),
       ne(sellers.sellerRole, "gerente")
     ));
+  const nowMs = Date.now();
+  const allSellers = allSellersRaw.filter(s => 
+    !s.leadReceiveBlocked && (!s.leadBanUntil || s.leadBanUntil < nowMs)
+  );
   if (allSellers.length === 0) return null;
   
   // Pick seller with fewest active leads (round-robin by load)

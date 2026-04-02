@@ -101,6 +101,36 @@ export const appRouter = router({
       return { url };
     }),
 
+    // === BLOQUEAR/BANIR VENDEDOR DE RECEBER LEADS ===
+    toggleLeadBlock: adminProcedure.input(z.object({
+      sellerId: z.number(),
+      blocked: z.boolean(),
+    })).mutation(async ({ input }) => {
+      await db.updateSeller(input.sellerId, { leadReceiveBlocked: input.blocked });
+      return { success: true };
+    }),
+    banFromLeads: adminProcedure.input(z.object({
+      sellerId: z.number(),
+      days: z.number().min(1).max(365),
+      reason: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const banUntil = Date.now() + (input.days * 24 * 60 * 60 * 1000);
+      await db.updateSeller(input.sellerId, {
+        leadBanUntil: banUntil,
+        leadBanReason: input.reason || `Ban de ${input.days} dia(s) por não responder leads`,
+      });
+      return { success: true, banUntil };
+    }),
+    removeBan: adminProcedure.input(z.object({
+      sellerId: z.number(),
+    })).mutation(async ({ input }) => {
+      await db.updateSeller(input.sellerId, {
+        leadBanUntil: null as any,
+        leadBanReason: null as any,
+      });
+      return { success: true };
+    }),
+
     // === LOGIN DE VENDEDOR POR SENHA ===
     login: publicProcedure.input(z.object({
       username: z.string().min(1),
@@ -260,10 +290,11 @@ export const appRouter = router({
       const seller = await db.getSellerById(sellerId);
       if (!seller || !seller.active) throw new Error('Vendedor não encontrado');
       const ext = input.mimeType.split('/')[1] || 'jpg';
-      const fileKey = `sellers/${sellerId}-avatar-${nanoid(8)}.${ext}`;
+      const fileKey = `sellers/${sellerId}-competition-${nanoid(8)}.${ext}`;
       const buffer = Buffer.from(input.base64, 'base64');
       const { url } = await storagePut(fileKey, buffer, input.mimeType);
-      await db.updateSeller(sellerId, { photoUrl: url, photoKey: fileKey });
+      // Salvar como foto da competição (NÃO altera a foto principal do cadastro)
+      await db.updateSeller(sellerId, { competitionPhotoUrl: url, competitionPhotoKey: fileKey });
       return { url };
     }),
   }),
@@ -2615,7 +2646,56 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     })).query(async ({ input }) => {
       const sellers = await db.getMonthlySnapshots(input.month, input.year);
       const competitions = await db.getCompetitionSnapshotsByMonth(input.month, input.year);
-      return { sellers, competitions };
+      
+      // Fallback: se não há snapshot, buscar dados de vendas ao vivo do mês
+      if (!sellers || sellers.length === 0) {
+        const liveRanking = await db.getMonthlyRanking(input.month, input.year);
+        if (liveRanking && liveRanking.length > 0) {
+          // Buscar F&I e agendamentos do mês para enriquecer o fallback
+          const startStr = `${input.year}-${String(input.month).padStart(2, '0')}-01 00:00:00`;
+          const endMonth = input.month === 12 ? 1 : input.month + 1;
+          const endYear = input.month === 12 ? input.year + 1 : input.year;
+          const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
+          
+          const feiMap = new Map<number, number>();
+          const agendMap = new Map<number, number>();
+          try {
+            const dbConn = await db.getDbInstance();
+            if (dbConn) {
+              const { feiRecords, sdrRecords } = await import('../drizzle/schema');
+              const { and: andOp, eq: eqOp, sql: sqlOp } = await import('drizzle-orm');
+              const feiRows = await dbConn.select({ sellerId: feiRecords.sellerId, cnt: sqlOp`COUNT(*)`.as('cnt') })
+                .from(feiRecords)
+                .where(andOp(eqOp(feiRecords.status, 'approved'), sqlOp`CAST(${feiRecords.createdAt} AS CHAR) >= ${startStr}`, sqlOp`CAST(${feiRecords.createdAt} AS CHAR) < ${endStr}`))
+                .groupBy(feiRecords.sellerId);
+              for (const row of feiRows) feiMap.set(row.sellerId, Number(row.cnt));
+              const sdrRows = await dbConn.select({ sellerId: sdrRecords.sellerId, cnt: sqlOp`COUNT(*)`.as('cnt') })
+                .from(sdrRecords)
+                .where(andOp(eqOp(sdrRecords.status, 'approved'), eqOp(sdrRecords.type, 'agendamento'), sqlOp`CAST(${sdrRecords.createdAt} AS CHAR) >= ${startStr}`, sqlOp`CAST(${sdrRecords.createdAt} AS CHAR) < ${endStr}`))
+                .groupBy(sdrRecords.sellerId);
+              for (const row of sdrRows) agendMap.set(row.sellerId, Number(row.cnt));
+            }
+          } catch (e) { /* ignore - F&I/agendamento data is optional */ }
+          
+          const liveSellers = liveRanking.map((r, idx) => ({
+            id: r.seller.id,
+            sellerId: r.seller.id,
+            sellerName: r.seller.name,
+            sellerNickname: r.seller.nickname || '',
+            sellerPhotoUrl: r.seller.competitionPhotoUrl || r.seller.photoUrl || null,
+            department: r.seller.department,
+            totalSales: r.salesCount,
+            totalPoints: r.points,
+            totalFei: feiMap.get(r.seller.id) || 0,
+            totalAgendamentos: agendMap.get(r.seller.id) || 0,
+            rank: idx + 1,
+            month: input.month,
+            year: input.year,
+          }));
+          return { sellers: liveSellers, competitions, isFallback: true };
+        }
+      }
+      return { sellers, competitions, isFallback: false };
     }),
 
     // Listar meses disponíveis com snapshot

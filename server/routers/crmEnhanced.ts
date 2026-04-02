@@ -201,10 +201,14 @@ export const crmDistributionRouter = router({
     const unassigned = await crmDb.listAllLeads({ sellerId: 0, department: input.department });
     if (unassigned.length === 0) return { distributed: 0, total: 0, assignments: [] };
 
-    // Get active vendedores (not gerente, not SDR)
-    const vendedores = await database.select().from(sellers).where(
+    // Get active vendedores (not gerente, not SDR, not blocked/banned)
+    const allVendedores = await database.select().from(sellers).where(
       and(eq(sellers.department, input.department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente"))
     ).orderBy(asc(sellers.id));
+    const now = Date.now();
+    const vendedores = allVendedores.filter(s => 
+      !s.leadReceiveBlocked && (!s.leadBanUntil || s.leadBanUntil < now)
+    );
 
     if (vendedores.length === 0) return { distributed: 0, total: unassigned.length, assignments: [] };
 
@@ -269,10 +273,14 @@ export const crmDistributionRouter = router({
     const [config] = await database.select().from(crmLeadDistribution).where(eq(crmLeadDistribution.department, input.department)).limit(1);
     if (!config || !config.enabled) return { assigned: false, reason: "Distribution not enabled" };
 
-    // Get active sellers in department (exclude gerentes)
-    const deptSellers = await database.select().from(sellers).where(
+    // Get active sellers in department (exclude gerentes, blocked, banned)
+    const allDeptSellers = await database.select().from(sellers).where(
       and(eq(sellers.department, input.department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente"))
     ).orderBy(asc(sellers.id));
+    const nowTs = Date.now();
+    const deptSellers = allDeptSellers.filter(s => 
+      !s.leadReceiveBlocked && (!s.leadBanUntil || s.leadBanUntil < nowTs)
+    );
 
     if (deptSellers.length === 0) return { assigned: false, reason: "No sellers in department" };
 
