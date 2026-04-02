@@ -10,7 +10,7 @@ import {
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
   Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
-  Volume2, Download, Play, File, Square, Handshake, Power, Shuffle
+  Volume2, Download, Play, File, Square, Handshake, Power, Shuffle, CheckCheck
 } from "lucide-react";
 
 // Detect media type from URL extension as fallback
@@ -1643,8 +1643,20 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
         </div>
       </div>
 
+      {/* Acknowledged badge */}
+      {lead.acknowledgedAt && (
+        <div className="flex items-center gap-1 mt-1 px-2 py-0.5 rounded-lg bg-green-500/10 border border-green-500/20">
+          <CheckCheck className="w-3 h-3 text-green-400" />
+          <span className="text-[9px] text-green-400 font-medium">Confirmado pelo vendedor</span>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex gap-1.5 mt-2">
+        {/* Acknowledge button - only show if not yet acknowledged */}
+        {!lead.acknowledgedAt && lead.sellerId > 0 && !isSDR && (
+          <AcknowledgeButton leadId={lead.id} sellerId={lead.sellerId} />
+        )}
         <button onClick={onChat}
           className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 transition-all active:scale-95">
           <MessageCircle className="w-4 h-4 text-green-400" />
@@ -1837,5 +1849,29 @@ function NewLeadModal({ sellerId, department, onClose, onCreated }: {
         </form>
       </div>
     </div>
+  );
+}
+
+
+// Acknowledge button component - vendedor confirma que recebeu o lead
+function AcknowledgeButton({ leadId, sellerId }: { leadId: number; sellerId: number }) {
+  const utils = trpc.useUtils();
+  const ack = trpc.crmLeads.acknowledge.useMutation({
+    onSuccess: () => {
+      toast.success("Lead confirmado! Não será mais transferido automaticamente.");
+      utils.crmLeads.invalidate();
+    },
+    onError: () => toast.error("Erro ao confirmar lead"),
+  });
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); ack.mutate({ leadId, sellerId }); }}
+      disabled={ack.isPending}
+      className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 transition-all active:scale-95"
+      title="Confirmar recebimento do lead (impede transferência automática)"
+    >
+      <CheckCheck className="w-4 h-4 text-emerald-400" />
+      <span className="text-[10px] font-bold text-emerald-400">Recebi</span>
+    </button>
   );
 }

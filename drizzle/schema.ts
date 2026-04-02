@@ -426,6 +426,7 @@ export const crmLeads = mysqlTable("crm_leads", {
   archived: boolean("archived").default(false).notNull(),
   convertedToSale: boolean("convertedToSale").default(false).notNull(),
   saleValue: int("saleValue").default(0), // valor da venda em centavos (quando convertido)
+  acknowledgedAt: bigint("acknowledgedAt", { mode: "number" }), // timestamp quando vendedor confirmou recebimento do lead
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
@@ -578,6 +579,7 @@ export const crmLeadDistribution = mysqlTable("crm_lead_distribution", {
   id: int("id").autoincrement().primaryKey(),
   department: varchar("department", { length: 50 }).notNull().unique(),
   enabled: boolean("enabled").default(false).notNull(),
+  transferThresholdMinutes: int("transferThresholdMinutes").default(10).notNull(), // tempo em minutos para transferir lead sem resposta
   lastAssignedSellerId: int("lastAssignedSellerId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),

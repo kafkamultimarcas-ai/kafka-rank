@@ -338,6 +338,21 @@ export const crmLeadsRouter = router({
     if (input.filterAssignment === "unassigned") return allLeads.filter(l => l.sellerId === 0);
     return allLeads.filter(l => l.sellerId > 0);
   }),
+
+  // Vendedor confirma que recebeu o lead (impede transferência automática)
+  acknowledge: publicProcedure.input(z.object({
+    leadId: z.number(),
+    sellerId: z.number(),
+  })).mutation(async ({ input }) => {
+    await crmDb.updateLead(input.leadId, { acknowledgedAt: Date.now() });
+    await crmDb.createActivity({
+      leadId: input.leadId,
+      sellerId: input.sellerId,
+      type: "observacao",
+      description: "Vendedor confirmou recebimento do lead (Recebi/OK).",
+    });
+    return { success: true };
+  }),
 });
 
 // ===== CRM PIPELINE =====

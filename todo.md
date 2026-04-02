@@ -1705,3 +1705,15 @@
 ## CRM - Ordenação de Leads/Conversas
 - [x] Corrigir ordenação dos leads para mais recentes primeiro (por última atividade/updatedAt)
 - [x] Leads com atividade mais recente aparecem no topo (backend + frontend)
+
+## CRM - Configuração e Transferência de Leads
+- [x] Tela de configuração com tempo de transferência configurável (transferThresholdMinutes)
+- [x] Impedir transferência automática de leads com conversa ativa (hasActiveConversation)
+- [x] Botão "Recebi/OK" para vendedor confirmar recebimento (acknowledgedAt + AcknowledgeButton)
+- [x] Verificar mensagens outbound do vendedor antes de transferir lead
+
+## Competição - Visual Esportivo para Vendedores
+- [x] Redesenhar tela de competição do vendedor com visual de placar de futebol (pódio, ranking, VS cards)
+- [x] Mostrar fotos dos vendedores como avatares nos confrontos e ranking
+- [x] Exibir Mata-Mata com visual VS esportivo para vendedores (Swords icon, AO VIVO badge)
+- [x] Mostrar equipes visíveis para vendedores na competição (aba Equipes com membros)

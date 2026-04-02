@@ -1,12 +1,49 @@
 import * as crmDb from "./crmDb";
 import { getDb, withRetry, createNotification } from "./db";
-import { crmLeadDistribution, sellers, crmLeads } from "../drizzle/schema";
-import { eq, and, asc, ne, sql } from "drizzle-orm";
+import { crmLeadDistribution, sellers, crmLeads, crmMessages } from "../drizzle/schema";
+import { eq, and, asc, ne, desc, sql } from "drizzle-orm";
 import { sendPushLeadTransferred } from "./pushService";
 
 const SDR_THRESHOLD_MINUTES = 5;
-const SELLER_THRESHOLD_MINUTES = 10;
-const SDR_TRANSFER_WARNING_MINUTES = 8; // Aviso ao SDR que lead será transferido em 2min
+const DEFAULT_SELLER_THRESHOLD_MINUTES = 10;
+
+/** Get the configured transfer threshold for a department (from DB config) */
+async function getTransferThreshold(department: string): Promise<number> {
+  try {
+    const database = await getDb();
+    if (!database) return DEFAULT_SELLER_THRESHOLD_MINUTES;
+    const [config] = await database.select().from(crmLeadDistribution)
+      .where(eq(crmLeadDistribution.department, department)).limit(1);
+    return config?.transferThresholdMinutes || DEFAULT_SELLER_THRESHOLD_MINUTES;
+  } catch {
+    return DEFAULT_SELLER_THRESHOLD_MINUTES;
+  }
+}
+
+/** Check if a lead has an active conversation (seller has sent outbound messages) */
+async function hasActiveConversation(leadId: number): Promise<boolean> {
+  try {
+    const database = await getDb();
+    if (!database) return false;
+    // Check if seller sent any outbound message to this lead
+    const outbound = await database.select({ id: crmMessages.id }).from(crmMessages)
+      .where(and(eq(crmMessages.leadId, leadId), eq(crmMessages.direction, "outbound")))
+      .limit(1);
+    return outbound.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Check if a lead was acknowledged by the seller */
+async function isLeadAcknowledged(leadId: number): Promise<boolean> {
+  try {
+    const lead = await crmDb.getLeadById(leadId);
+    return !!(lead?.acknowledgedAt);
+  } catch {
+    return false;
+  }
+}
 
 /** Auto-assign an unassigned lead to the next SDR via round-robin */
 async function autoAssignToSDR(leadId: number, department: string): Promise<boolean> {
@@ -49,7 +86,7 @@ async function autoAssignToSDR(leadId: number, department: string): Promise<bool
     sendPushLeadTransferred(nextSeller.id, lead?.name || 'Lead', null).catch(console.error);
     createNotification({
       title: '🚨 NOVO LEAD AUTOMÁTICO!',
-      message: `${lead?.name || 'Lead'} foi atribuído a você automaticamente. Responda em até ${SELLER_THRESHOLD_MINUTES} minutos!`,
+      message: `${lead?.name || 'Lead'} foi atribuído a você automaticamente. Confirme o recebimento clicando em "Recebi"!`,
       type: 'urgent',
       sellerId: nextSeller.id,
       targetType: 'seller',
@@ -63,17 +100,15 @@ async function autoAssignToSDR(leadId: number, department: string): Promise<bool
   }
 }
 
-/** Send warning to SDR that lead will be transferred soon */
-async function sendTransferWarning(lead: any): Promise<void> {
+/** Send warning to seller that lead will be transferred soon */
+async function sendTransferWarning(lead: any, minutesLeft: number): Promise<void> {
   try {
     if (!lead.sellerId || lead.sellerId === 0) return;
-    
-    const minutesLeft = SELLER_THRESHOLD_MINUTES - SDR_TRANSFER_WARNING_MINUTES;
     
     // Create notification for the current seller
     await createNotification({
       title: '⚠️ LEAD SERÁ TRANSFERIDO!',
-      message: `${lead.name || 'Lead'} será transferido para outro vendedor em ${minutesLeft} minutos se não responder! Responda AGORA!`,
+      message: `${lead.name || 'Lead'} será transferido para outro vendedor em ${minutesLeft} minutos se não responder! Clique em "Recebi" ou responda AGORA!`,
       type: 'urgent',
       sellerId: lead.sellerId,
       targetType: 'seller',
@@ -84,7 +119,7 @@ async function sendTransferWarning(lead: any): Promise<void> {
       leadId: lead.id,
       sellerId: lead.sellerId,
       type: "observacao",
-      description: `⚠️ Aviso: lead será transferido em ${minutesLeft}min se não houver resposta.`,
+      description: `⚠️ Aviso: lead será transferido em ${minutesLeft}min se não houver resposta ou confirmação.`,
     });
 
     console.log(`[Alert Checker] Aviso de transferência enviado para vendedor #${lead.sellerId} sobre lead #${lead.id}`);
@@ -117,16 +152,31 @@ async function _checkAlertsInner() {
       }
     }
 
-    // 2. Send transfer warnings (8min without response - 2min before transfer)
-    const warningAlerts = await crmDb.getUnrespondedLeads(SDR_TRANSFER_WARNING_MINUTES);
+    // 2. Get configured threshold for vendas department
+    const sellerThreshold = await getTransferThreshold("vendas");
+    const warningMinutes = Math.max(1, sellerThreshold - 2); // Aviso 2min antes
+
+    // 3. Send transfer warnings (threshold-2 min without response)
+    const warningAlerts = await crmDb.getUnrespondedLeads(warningMinutes);
     const warningLeads = warningAlerts.filter(l => l.sellerId > 0);
     for (const lead of warningLeads) {
       if (!warnedLeads.has(lead.id)) {
+        // Skip if lead was acknowledged by seller
+        if (await isLeadAcknowledged(lead.id)) {
+          console.log(`[Alert Checker] Lead #${lead.id} já foi confirmado pelo vendedor - não avisar`);
+          continue;
+        }
+        // Skip if seller has active conversation with lead
+        if (await hasActiveConversation(lead.id)) {
+          console.log(`[Alert Checker] Lead #${lead.id} tem conversa ativa - não avisar`);
+          continue;
+        }
         // Check if this lead is NOT yet at the transfer threshold
         const createdTs = typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt!).getTime();
         const minutesSinceCreation = (Date.now() - createdTs) / 60000;
-        if (minutesSinceCreation < SELLER_THRESHOLD_MINUTES) {
-          await sendTransferWarning(lead);
+        if (minutesSinceCreation < sellerThreshold) {
+          const minutesLeft = Math.ceil(sellerThreshold - minutesSinceCreation);
+          await sendTransferWarning(lead, minutesLeft);
           warnedLeads.add(lead.id);
           // Clean up old entries after 30 minutes
           setTimeout(() => warnedLeads.delete(lead.id), 30 * 60 * 1000);
@@ -134,24 +184,49 @@ async function _checkAlertsInner() {
       }
     }
 
-    // 3. Check seller alerts (leads with sellerId>0 unresponded for 10+ min) and auto-reassign
-    const sellerAlerts = await crmDb.getUnrespondedLeads(SELLER_THRESHOLD_MINUTES);
+    // 4. Check seller alerts (leads with sellerId>0 unresponded for threshold+ min) and auto-reassign
+    const sellerAlerts = await crmDb.getUnrespondedLeads(sellerThreshold);
     const sellerUnresponded = sellerAlerts.filter(l => l.sellerId > 0);
     
     for (const lead of sellerUnresponded) {
-      // Check if lead is in active negotiation - don't transfer
-      if (lead.stage === 'Em Negociacao' || lead.stage === 'Em Negociação') {
-        console.log(`[Alert Checker] Lead #${lead.id} em negociação ativa - não transferir`);
+      // CHECK 1: Lead was acknowledged by seller - DON'T transfer
+      if (await isLeadAcknowledged(lead.id)) {
+        console.log(`[Alert Checker] Lead #${lead.id} confirmado pelo vendedor (Recebi/OK) - não transferir`);
         continue;
       }
+
+      // CHECK 2: Seller has active conversation (sent outbound messages) - DON'T transfer
+      if (await hasActiveConversation(lead.id)) {
+        console.log(`[Alert Checker] Lead #${lead.id} tem conversa ativa com vendedor - não transferir`);
+        continue;
+      }
+
+      // CHECK 3: Lead is in active negotiation stage - DON'T transfer
+      if (lead.stage === 'Em Negociacao' || lead.stage === 'Em Negociação' || lead.stage === 'Proposta' || lead.stage === 'Fechamento') {
+        console.log(`[Alert Checker] Lead #${lead.id} em negociação ativa (${lead.stage}) - não transferir`);
+        continue;
+      }
+
+      // CHECK 4: Check if auto-distribution is enabled
+      const database = await getDb();
+      if (database) {
+        const [config] = await database.select().from(crmLeadDistribution)
+          .where(eq(crmLeadDistribution.department, lead.department || "vendas")).limit(1);
+        if (!config || !config.enabled) {
+          continue; // Auto-distribution disabled, don't transfer
+        }
+      }
       
-      console.log(`[Alert Checker] Lead #${lead.id} (${lead.name}) sem resposta do vendedor #${lead.sellerId} por ${SELLER_THRESHOLD_MINUTES}+ min. Auto-reatribuindo...`);
+      console.log(`[Alert Checker] Lead #${lead.id} (${lead.name}) sem resposta do vendedor #${lead.sellerId} por ${sellerThreshold}+ min. Auto-reatribuindo...`);
       const result = await crmDb.autoReassignLead(lead.id);
       if (result) {
+        // Reset acknowledgedAt for the new seller
+        await crmDb.updateLead(lead.id, { acknowledgedAt: null as any });
+
         // Notify old seller that lead was taken
         createNotification({
           title: '📤 LEAD TRANSFERIDO',
-          message: `${lead.name || 'Lead'} foi transferido para ${result.newSellerName} por falta de resposta em ${SELLER_THRESHOLD_MINUTES} minutos.`,
+          message: `${lead.name || 'Lead'} foi transferido para ${result.newSellerName} por falta de resposta em ${sellerThreshold} minutos.`,
           type: 'info',
           sellerId: lead.sellerId,
           targetType: 'seller',
@@ -161,7 +236,7 @@ async function _checkAlertsInner() {
         sendPushLeadTransferred(result.newSellerId, lead.name || 'Lead', null).catch(console.error);
         createNotification({
           title: '📲 LEAD TRANSFERIDO PARA VOCÊ!',
-          message: `${lead.name || 'Lead'} foi transferido para você. Responda agora!`,
+          message: `${lead.name || 'Lead'} foi transferido para você. Clique em "Recebi" para confirmar!`,
           type: 'urgent',
           sellerId: result.newSellerId,
           targetType: 'seller',
@@ -191,7 +266,7 @@ export function startAlertChecker(intervalMinutes: number = 2) {
     checkAlerts().catch(console.error);
   }, intervalMinutes * 60 * 1000);
 
-  console.log(`[Alert Checker] Scheduled every ${intervalMinutes} minutes (SDR: ${SDR_THRESHOLD_MINUTES}min, Vendedor: ${SELLER_THRESHOLD_MINUTES}min, Warning: ${SDR_TRANSFER_WARNING_MINUTES}min)`);
+  console.log(`[Alert Checker] Scheduled every ${intervalMinutes} minutes (SDR: ${SDR_THRESHOLD_MINUTES}min, Vendedor: configurable via CRM settings)`);
 }
 
 export function stopAlertChecker() {

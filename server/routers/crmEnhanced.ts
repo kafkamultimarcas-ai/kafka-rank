@@ -172,14 +172,19 @@ export const crmDistributionRouter = router({
   updateConfig: publicProcedure.input(z.object({
     department: z.string(),
     enabled: z.boolean(),
+    transferThresholdMinutes: z.number().min(1).max(120).optional(),
   })).mutation(async ({ input }) => {
     const database = await getDb();
     if (!database) throw new Error("DB not available");
     const existing = await database.select().from(crmLeadDistribution).where(eq(crmLeadDistribution.department, input.department)).limit(1);
+    const updateData: any = { enabled: input.enabled };
+    if (input.transferThresholdMinutes !== undefined) {
+      updateData.transferThresholdMinutes = input.transferThresholdMinutes;
+    }
     if (existing.length > 0) {
-      await database.update(crmLeadDistribution).set({ enabled: input.enabled }).where(eq(crmLeadDistribution.department, input.department));
+      await database.update(crmLeadDistribution).set(updateData).where(eq(crmLeadDistribution.department, input.department));
     } else {
-      await database.insert(crmLeadDistribution).values(input);
+      await database.insert(crmLeadDistribution).values({ department: input.department, ...updateData });
     }
     return { success: true };
   }),
