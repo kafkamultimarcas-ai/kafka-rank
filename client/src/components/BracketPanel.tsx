@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Shuffle, Trash2, Trophy, Swords, Crown, ChevronRight, AlertTriangle } from "lucide-react";
+import { Shuffle, Trash2, Trophy, Swords, Crown, ChevronRight, AlertTriangle, ArrowRightLeft, Edit2, Check, X } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 
@@ -10,9 +10,17 @@ type BracketPanelProps = {
   competitionStatus: string; // "draft" | "active" | "finished"
 };
 
+type SwapSelection = {
+  matchId: number;
+  side: "A" | "B";
+  name: string;
+} | null;
+
 export default function BracketPanel({ competitionId, competitionType, competitionStatus }: BracketPanelProps) {
   const utils = trpc.useUtils();
   const { data: matches, isLoading } = trpc.bracket.list.useQuery({ competitionId });
+  const { data: participants } = trpc.participants.list.useQuery({ competitionId });
+  const { data: teams } = trpc.teams.list.useQuery({ competitionId });
   const sortear = trpc.bracket.sortear.useMutation({
     onSuccess: (data) => {
       utils.bracket.list.invalidate();
@@ -37,8 +45,28 @@ export default function BracketPanel({ competitionId, competitionType, competiti
       toast.success("Vencedor definido!");
     },
   });
+  const swapParticipants = trpc.bracket.swapParticipants.useMutation({
+    onSuccess: () => {
+      utils.bracket.list.invalidate();
+      toast.success("Participantes trocados!");
+      setSwapSelection(null);
+      setEditMode(false);
+    },
+    onError: (err) => toast.error(err.message || "Erro ao trocar"),
+  });
+  const editMatch = trpc.bracket.editMatch.useMutation({
+    onSuccess: () => {
+      utils.bracket.list.invalidate();
+      toast.success("Confronto atualizado!");
+      setEditingSlot(null);
+    },
+    onError: (err) => toast.error(err.message || "Erro ao editar"),
+  });
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [swapSelection, setSwapSelection] = useState<SwapSelection>(null);
+  const [editingSlot, setEditingSlot] = useState<{ matchId: number; side: "A" | "B" } | null>(null);
 
   const isTeamType = competitionType === "team" || competitionType === "group";
 
@@ -59,6 +87,18 @@ export default function BracketPanel({ competitionId, competitionType, competiti
   }, [roundsMap]);
 
   const totalRounds = rounds.length;
+
+  // Build list of all available sellers/teams for the dropdown
+  const availableEntities = useMemo(() => {
+    if (isTeamType) {
+      return (teams || []).map((t: any) => ({ id: t.id, name: t.name }));
+    } else {
+      return (participants || []).map((p: any) => ({
+        id: p.sellerId,
+        name: p.seller?.name || p.seller?.nickname || `Vendedor #${p.sellerId}`,
+      }));
+    }
+  }, [isTeamType, teams, participants]);
 
   function getRoundLabel(round: number) {
     if (totalRounds === 1) return "Final";
@@ -121,6 +161,36 @@ export default function BracketPanel({ competitionId, competitionType, competiti
     });
   }
 
+  function handleSlotClick(matchId: number, side: "A" | "B", name: string) {
+    if (!editMode) return;
+    if (!swapSelection) {
+      // First selection
+      setSwapSelection({ matchId, side, name });
+      toast.info(`Selecionado: ${name}. Agora toque no participante para trocar.`);
+    } else {
+      // Second selection - do the swap
+      if (swapSelection.matchId === matchId && swapSelection.side === side) {
+        // Clicked same slot, deselect
+        setSwapSelection(null);
+        return;
+      }
+      swapParticipants.mutate({
+        matchIdFrom: swapSelection.matchId,
+        sideFrom: swapSelection.side,
+        matchIdTo: matchId,
+        sideTo: side,
+      });
+    }
+  }
+
+  function handleEditSlotSelect(matchId: number, side: "A" | "B", entityId: number) {
+    if (isTeamType) {
+      editMatch.mutate({ matchId, side, newTeamId: entityId });
+    } else {
+      editMatch.mutate({ matchId, side, newSellerId: entityId });
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="mt-4 p-4 rounded-lg bg-secondary/30 animate-pulse">
@@ -152,6 +222,20 @@ export default function BracketPanel({ competitionId, competitionType, competiti
           )}
           {matches && matches.length > 0 && competitionStatus !== "finished" && (
             <>
+              {/* Edit mode toggle */}
+              <Button
+                size="sm"
+                variant={editMode ? "default" : "outline"}
+                className={`h-8 text-xs gap-1 ${editMode ? "bg-amber-600 hover:bg-amber-700 text-white" : "text-amber-400 border-amber-500/50 hover:bg-amber-500/20"}`}
+                onClick={() => {
+                  setEditMode(!editMode);
+                  setSwapSelection(null);
+                  setEditingSlot(null);
+                }}
+              >
+                <ArrowRightLeft className="h-3 w-3" />
+                {editMode ? "Sair Edição" : "Editar Chaves"}
+              </Button>
               {confirmClear ? (
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-destructive">Tem certeza?</span>
@@ -172,6 +256,21 @@ export default function BracketPanel({ competitionId, competitionType, competiti
           )}
         </div>
       </div>
+
+      {/* Edit mode instructions */}
+      {editMode && (
+        <div className="mb-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-center gap-2 mb-1">
+            <ArrowRightLeft className="h-4 w-4 text-amber-400" />
+            <span className="text-xs font-bold text-amber-400">MODO EDIÇÃO</span>
+          </div>
+          <p className="text-xs text-amber-300/80">
+            {swapSelection
+              ? `Selecionado: "${swapSelection.name}". Toque em outro participante para trocar de lugar, ou toque no mesmo para cancelar.`
+              : "Toque em um participante para selecioná-lo, depois toque em outro para trocar de lugar. Ou toque no ícone de lápis para substituir por outro participante."}
+          </p>
+        </div>
+      )}
 
       {/* Empty state */}
       {(!matches || matches.length === 0) && (
@@ -216,6 +315,10 @@ export default function BracketPanel({ competitionId, competitionType, competiti
                     isTeamType={isTeamType}
                     isFinal={round === totalRounds}
                     isActive={competitionStatus === "active"}
+                    editMode={editMode}
+                    swapSelection={swapSelection}
+                    editingSlot={editingSlot}
+                    availableEntities={availableEntities}
                     getEntityName={getEntityName}
                     getEntityColor={getEntityColor}
                     getEntityId={getEntityId}
@@ -223,6 +326,10 @@ export default function BracketPanel({ competitionId, competitionType, competiti
                     onIncrementScore={handleIncrementScore}
                     onDecrementScore={handleDecrementScore}
                     onDefineWinner={handleDefineWinner}
+                    onSlotClick={handleSlotClick}
+                    onEditSlotStart={(matchId, side) => setEditingSlot({ matchId, side })}
+                    onEditSlotCancel={() => setEditingSlot(null)}
+                    onEditSlotSelect={handleEditSlotSelect}
                   />
                 ))}
               </div>
@@ -235,14 +342,19 @@ export default function BracketPanel({ competitionId, competitionType, competiti
 }
 
 function MatchCard({
-  match, isTeamType, isFinal, isActive,
+  match, isTeamType, isFinal, isActive, editMode, swapSelection, editingSlot, availableEntities,
   getEntityName, getEntityColor, getEntityId, isWinner,
   onIncrementScore, onDecrementScore, onDefineWinner,
+  onSlotClick, onEditSlotStart, onEditSlotCancel, onEditSlotSelect,
 }: {
   match: any;
   isTeamType: boolean;
   isFinal: boolean;
   isActive: boolean;
+  editMode: boolean;
+  swapSelection: SwapSelection;
+  editingSlot: { matchId: number; side: "A" | "B" } | null;
+  availableEntities: { id: number; name: string }[];
   getEntityName: (m: any, s: "A" | "B") => string;
   getEntityColor: (m: any, s: "A" | "B") => string;
   getEntityId: (m: any, s: "A" | "B") => number | null;
@@ -250,6 +362,10 @@ function MatchCard({
   onIncrementScore: (m: any, s: "A" | "B") => void;
   onDecrementScore: (m: any, s: "A" | "B") => void;
   onDefineWinner: (m: any, s: "A" | "B") => void;
+  onSlotClick: (matchId: number, side: "A" | "B", name: string) => void;
+  onEditSlotStart: (matchId: number, side: "A" | "B") => void;
+  onEditSlotCancel: () => void;
+  onEditSlotSelect: (matchId: number, side: "A" | "B", entityId: number) => void;
 }) {
   const isFinished = match.status === "finished";
   const nameA = getEntityName(match, "A");
@@ -260,49 +376,130 @@ function MatchCard({
   const winnerB = isWinner(match, "B");
   const isBye = !getEntityId(match, "B");
 
-  return (
-    <div className={`rounded-lg border overflow-hidden transition-all ${
-      isFinal ? "border-yellow-500/40 bg-yellow-500/5" :
-      isFinished ? "border-border/50 bg-secondary/10 opacity-80" :
-      "border-border bg-secondary/20"
-    }`}>
-      {/* Side A */}
-      <div className={`flex items-center gap-2 px-3 py-2.5 ${
-        winnerA ? "bg-green-500/15" : ""
-      }`}>
-        <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: colorA }} />
+  const isSelectedA = swapSelection?.matchId === match.id && swapSelection?.side === "A";
+  const isSelectedB = swapSelection?.matchId === match.id && swapSelection?.side === "B";
+  const isEditingA = editingSlot?.matchId === match.id && editingSlot?.side === "A";
+  const isEditingB = editingSlot?.matchId === match.id && editingSlot?.side === "B";
+
+  function renderSide(side: "A" | "B") {
+    const name = side === "A" ? nameA : nameB;
+    const color = side === "A" ? colorA : colorB;
+    const winner = side === "A" ? winnerA : winnerB;
+    const isSelected = side === "A" ? isSelectedA : isSelectedB;
+    const isEditing = side === "A" ? isEditingA : isEditingB;
+    const score = side === "A" ? match.scoreA : match.scoreB;
+    const isByeSide = side === "B" && isBye;
+
+    // If editing this slot, show dropdown
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1 px-2 py-1.5 bg-amber-500/10">
+          <select
+            className="flex-1 bg-secondary/80 text-foreground text-xs rounded px-2 py-1.5 border border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) {
+                onEditSlotSelect(match.id, side, parseInt(e.target.value));
+              }
+            }}
+          >
+            <option value="" disabled>Selecionar...</option>
+            {availableEntities.map((entity) => (
+              <option key={entity.id} value={entity.id}>
+                {entity.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => onEditSlotCancel()}
+            className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-secondary/50"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className={`flex items-center gap-2 px-3 py-2.5 transition-all ${
+          winner ? "bg-green-500/15" : ""
+        } ${editMode && !isFinished ? "cursor-pointer hover:bg-amber-500/10" : ""} ${
+          isSelected ? "bg-amber-500/20 ring-1 ring-amber-500/60" : ""
+        }`}
+        onClick={() => {
+          if (editMode && !isFinished && !isByeSide) {
+            onSlotClick(match.id, side, name);
+          }
+        }}
+      >
+        <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: color }} />
         <span className={`text-sm flex-1 truncate ${
-          winnerA ? "font-bold text-green-400" : isFinished && !winnerA ? "text-muted-foreground" : "text-foreground"
+          isSelected ? "font-bold text-amber-400" :
+          winner ? "font-bold text-green-400" :
+          isFinished && !winner ? "text-muted-foreground" :
+          "text-foreground"
         }`}>
-          {nameA}
+          {isByeSide ? "—" : name}
         </span>
-        {winnerA && <Crown className="h-4 w-4 text-yellow-400 shrink-0" />}
+        {isSelected && <ArrowRightLeft className="h-3.5 w-3.5 text-amber-400 shrink-0 animate-pulse" />}
+        {winner && <Crown className="h-4 w-4 text-yellow-400 shrink-0" />}
+        {/* Edit button (pencil) to replace a specific participant */}
+        {editMode && !isFinished && !isByeSide && !isSelected && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditSlotStart(match.id, side);
+            }}
+            className="w-5 h-5 rounded flex items-center justify-center text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/20"
+            title="Substituir participante"
+          >
+            <Edit2 className="h-3 w-3" />
+          </button>
+        )}
         {/* Score controls */}
-        {isActive && !isFinished && !isBye && (
+        {!editMode && isActive && !isFinished && !isBye && (
           <div className="flex items-center gap-0.5 shrink-0">
             <button
-              onClick={() => onDecrementScore(match, "A")}
+              onClick={() => onDecrementScore(match, side)}
               className="w-5 h-5 rounded text-xs text-muted-foreground hover:bg-secondary/50 flex items-center justify-center"
             >
               -
             </button>
             <span className="text-lg font-heading font-bold text-foreground w-6 text-center">
-              {match.scoreA}
+              {score}
             </span>
             <button
-              onClick={() => onIncrementScore(match, "A")}
+              onClick={() => onIncrementScore(match, side)}
               className="w-5 h-5 rounded text-xs text-green-400 hover:bg-green-500/20 flex items-center justify-center"
             >
               +
             </button>
           </div>
         )}
-        {(isFinished || isBye) && (
+        {!editMode && (isFinished || (isBye && side === "B")) && (
           <span className="text-lg font-heading font-bold text-foreground w-6 text-center shrink-0">
-            {match.scoreA}
+            {isByeSide ? "—" : score}
+          </span>
+        )}
+        {!editMode && (isFinished || isBye) && side === "A" && (
+          <span className="text-lg font-heading font-bold text-foreground w-6 text-center shrink-0">
+            {score}
           </span>
         )}
       </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg border overflow-hidden transition-all ${
+      isFinal ? "border-yellow-500/40 bg-yellow-500/5" :
+      isFinished ? "border-border/50 bg-secondary/10 opacity-80" :
+      editMode ? "border-amber-500/30 bg-secondary/20" :
+      "border-border bg-secondary/20"
+    }`}>
+      {/* Side A */}
+      {renderSide("A")}
 
       {/* VS divider */}
       <div className="flex items-center justify-between px-3 py-0.5 bg-secondary/30 border-y border-border/30">
@@ -310,7 +507,7 @@ function MatchCard({
           {isBye ? "BYE" : "vs"}
         </span>
         {/* Winner buttons */}
-        {isActive && !isFinished && !isBye && (
+        {!editMode && isActive && !isFinished && !isBye && (
           <div className="flex items-center gap-1">
             <button
               onClick={() => onDefineWinner(match, "A")}
@@ -328,50 +525,19 @@ function MatchCard({
             </button>
           </div>
         )}
-        {isFinished && match.winnerId && (
+        {editMode && !isFinished && (
+          <span className="text-[10px] text-amber-400 font-medium">Toque para trocar</span>
+        )}
+        {!editMode && isFinished && match.winnerId && (
           <span className="text-[10px] text-green-400 font-medium">Encerrado</span>
         )}
       </div>
 
       {/* Side B */}
-      <div className={`flex items-center gap-2 px-3 py-2.5 ${
-        winnerB ? "bg-green-500/15" : ""
-      }`}>
-        <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: colorB }} />
-        <span className={`text-sm flex-1 truncate ${
-          winnerB ? "font-bold text-green-400" : isFinished && !winnerB ? "text-muted-foreground" : "text-foreground"
-        }`}>
-          {isBye ? "—" : nameB}
-        </span>
-        {winnerB && <Crown className="h-4 w-4 text-yellow-400 shrink-0" />}
-        {isActive && !isFinished && !isBye && (
-          <div className="flex items-center gap-0.5 shrink-0">
-            <button
-              onClick={() => onDecrementScore(match, "B")}
-              className="w-5 h-5 rounded text-xs text-muted-foreground hover:bg-secondary/50 flex items-center justify-center"
-            >
-              -
-            </button>
-            <span className="text-lg font-heading font-bold text-foreground w-6 text-center">
-              {match.scoreB}
-            </span>
-            <button
-              onClick={() => onIncrementScore(match, "B")}
-              className="w-5 h-5 rounded text-xs text-green-400 hover:bg-green-500/20 flex items-center justify-center"
-            >
-              +
-            </button>
-          </div>
-        )}
-        {(isFinished || isBye) && (
-          <span className="text-lg font-heading font-bold text-foreground w-6 text-center shrink-0">
-            {isBye ? "—" : match.scoreB}
-          </span>
-        )}
-      </div>
+      {renderSide("B")}
 
       {/* Motivational alert for losing side */}
-      {isActive && !isFinished && !isBye && match.scoreA !== match.scoreB && (
+      {!editMode && isActive && !isFinished && !isBye && match.scoreA !== match.scoreB && (
         <div className="px-3 py-1.5 bg-orange-500/10 border-t border-orange-500/20">
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="h-3 w-3 text-orange-400 shrink-0" />

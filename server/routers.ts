@@ -452,6 +452,54 @@ export const appRouter = router({
       });
       return { success: true };
     }),
+    // Trocar participantes entre dois slots de confrontos diferentes
+    swapParticipants: adminProcedure.input(z.object({
+      matchIdFrom: z.number(),
+      sideFrom: z.enum(["A", "B"]),
+      matchIdTo: z.number(),
+      sideTo: z.enum(["A", "B"]),
+    })).mutation(async ({ input }) => {
+      const matchFrom = await db.getBracketMatch(input.matchIdFrom);
+      const matchTo = await db.getBracketMatch(input.matchIdTo);
+      if (!matchFrom || !matchTo) throw new Error("Confronto não encontrado");
+      // Get the entity IDs from each side
+      const fromTeamKey = input.sideFrom === "A" ? "teamAId" : "teamBId";
+      const fromSellerKey = input.sideFrom === "A" ? "sellerAId" : "sellerBId";
+      const toTeamKey = input.sideTo === "A" ? "teamAId" : "teamBId";
+      const toSellerKey = input.sideTo === "A" ? "sellerAId" : "sellerBId";
+      // Swap values
+      const tempTeam = (matchFrom as any)[fromTeamKey];
+      const tempSeller = (matchFrom as any)[fromSellerKey];
+      await db.updateBracketMatch(input.matchIdFrom, {
+        [fromTeamKey]: (matchTo as any)[toTeamKey],
+        [fromSellerKey]: (matchTo as any)[toSellerKey],
+      } as any);
+      await db.updateBracketMatch(input.matchIdTo, {
+        [toTeamKey]: tempTeam,
+        [toSellerKey]: tempSeller,
+      } as any);
+      return { success: true };
+    }),
+    // Editar um confronto específico - trocar um participante por outro
+    editMatch: adminProcedure.input(z.object({
+      matchId: z.number(),
+      side: z.enum(["A", "B"]),
+      newSellerId: z.number().optional(),
+      newTeamId: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      const match = await db.getBracketMatch(input.matchId);
+      if (!match) throw new Error("Confronto não encontrado");
+      const updateData: any = {};
+      if (input.side === "A") {
+        if (input.newSellerId !== undefined) updateData.sellerAId = input.newSellerId;
+        if (input.newTeamId !== undefined) updateData.teamAId = input.newTeamId;
+      } else {
+        if (input.newSellerId !== undefined) updateData.sellerBId = input.newSellerId;
+        if (input.newTeamId !== undefined) updateData.teamBId = input.newTeamId;
+      }
+      await db.updateBracketMatch(input.matchId, updateData);
+      return { success: true };
+    }),
     // Limpar todos os confrontos de uma competição
     limpar: adminProcedure.input(z.object({
       competitionId: z.number(),

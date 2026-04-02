@@ -1695,3 +1695,9 @@
 - [x] Gerar relatório de agendamentos em PDF para download (não apenas link)
 - [x] Botão de exportar PDF na tela de agendamentos (Admin + Vendedor)
 - [x] PDF formatado com tabela igual ao relatório web para enviar por WhatsApp/e-mail
+
+## Mata-Mata - Edição de Equipes/Brackets
+- [x] Permitir gestor editar/trocar competidores nos brackets do Mata-Mata
+- [x] UI para selecionar e trocar participantes entre confrontos (toque-para-trocar)
+- [x] Botão de lápis para substituir participante por outro da lista
+- [x] Backend swapParticipants e editMatch para salvar alterações nos brackets
