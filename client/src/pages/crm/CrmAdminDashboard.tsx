@@ -2005,7 +2005,7 @@ function AdvancedAiConfig() {
 function AdminPipelineView() {
   const [dept, setDept] = useState("vendas");
   const { data: stages } = trpc.crmPipeline.getStages.useQuery({ department: dept });
-  const { data: leads, refetch } = trpc.crmLeads.listAll.useQuery({ department: dept, archived: false }, { refetchInterval: 10000 });
+  const { data: leads, refetch } = trpc.crmLeads.listAll.useQuery({ department: dept, archived: false }, { refetchInterval: 5000 });
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const [, navigate] = useLocation();
   const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);

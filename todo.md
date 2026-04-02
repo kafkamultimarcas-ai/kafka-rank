@@ -1658,3 +1658,8 @@
 - [x] Transferência automática após 10 min sem resposta
 - [x] SDR qualifica e distribui lead para vendedor
 - [x] Histórico de distribuição (quem recebeu, quando, transferências)
+
+## Leads em tempo real estilo WhatsApp - 01/04/2026
+- [x] Ordenar leads por último recebido no topo (mais recente primeiro, como WhatsApp)
+- [x] Auto-refresh em tempo real (polling 5s) para novos leads aparecerem automaticamente
+- [x] Aplicar ordenação em todas as views do CRM (Conversas, Todos os Clientes, Painel SDR, Pipeline, Command Center)

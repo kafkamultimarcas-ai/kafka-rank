@@ -321,7 +321,7 @@ export const crmTimeAlertsRouter = router({
         // Created recently but lastContactDate is still the creation time (no real contact)
         sql`${crmLeads.createdAt} >= DATE_SUB(NOW(), INTERVAL 20 MINUTE)`,
       )
-    ).orderBy(asc(crmLeads.createdAt));
+    ).orderBy(desc(crmLeads.createdAt));
 
     return urgentLeads.map(lead => {
       const createdTs = new Date(lead.createdAt!).getTime();

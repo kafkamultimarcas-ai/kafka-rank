@@ -752,10 +752,10 @@ export default function CrmCommandCenter() {
 
   // SDRs see ALL leads via listForSDR, sellers see their own
   const { data: sellerLeads, refetch: refetchSellerLeads } = trpc.crmLeads.listBySeller.useQuery(
-    { sellerId, archived: false }, { enabled: sellerId > 0 && !isSDR, refetchInterval: 10000 }
+    { sellerId, archived: false }, { enabled: sellerId > 0 && !isSDR, refetchInterval: 5000 }
   );
   const { data: sdrLeads, refetch: refetchSDR } = trpc.crmLeads.listForSDR.useQuery(
-    { archived: false }, { enabled: isSDR && sellerId > 0, refetchInterval: 10000 }
+    { archived: false }, { enabled: isSDR && sellerId > 0, refetchInterval: 5000 }
   );
   const leads = isSDR ? sdrLeads : sellerLeads;
   const refetchLeads = isSDR ? refetchSDR : refetchSellerLeads;
@@ -1182,8 +1182,8 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
   const recentLeads = useMemo(() => {
     return [...leads]
       .sort((a: any, b: any) => {
-        const aTime = a.lastContactDate || new Date(a.createdAt).getTime();
-        const bTime = b.lastContactDate || new Date(b.createdAt).getTime();
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
         return bTime - aTime;
       })
       .slice(0, 5);

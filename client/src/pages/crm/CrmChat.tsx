@@ -211,7 +211,7 @@ function LeadList({
   filterScore: string | null;
   setFilterScore: (s: string | null) => void;
 }) {
-  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 10000 });
+  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 5000 });
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
     { query: searchQuery },
     { enabled: searchQuery.length >= 2 }
@@ -258,13 +258,13 @@ function LeadList({
     if (filterScore) {
       base = base.filter((l: any) => l.score === filterScore);
     }
-    // Sort: alerts first, then by lastContactDate desc
+    // Sort: alerts first, then by createdAt desc (newest on top, like WhatsApp)
     return [...base].sort((a: any, b: any) => {
       const aAlert = alertLeadIds.has(a.id) ? 1 : 0;
       const bAlert = alertLeadIds.has(b.id) ? 1 : 0;
       if (aAlert !== bAlert) return bAlert - aAlert;
-      const aTime = a.lastContactDate || new Date(a.createdAt).getTime();
-      const bTime = b.lastContactDate || new Date(b.createdAt).getTime();
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
       return bTime - aTime;
     });
   }, [allLeads, searchResults, searchQuery, sellerId, isSdr, filterScore, alertLeadIds]);
