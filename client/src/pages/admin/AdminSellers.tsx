@@ -28,7 +28,8 @@ function getDeptInfo(dept: string | null | undefined) {
 
 export default function AdminSellers() {
   const { data: sellers, isLoading } = trpc.sellers.list.useQuery({});
-  const { data: availableModules } = trpc.managerPerms.modules.useQuery();
+  const { data: availableModules } = trpc.sellers.permissionModules.useQuery();
+  const { data: managerModules } = trpc.managerPerms.modules.useQuery();
   const utils = trpc.useUtils();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSeller, setEditingSeller] = useState<any>(null);
@@ -43,9 +44,14 @@ export default function AdminSellers() {
   const [permsDialog, setPermsDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
   const [permsState, setPermsState] = useState<Record<string, { canView: boolean; canEdit: boolean }>>({});
 
-  const permsQuery = trpc.managerPerms.get.useQuery(
+  const permsQuery = trpc.sellers.getPermissions.useQuery(
     { sellerId: permsDialog.seller?.id || 0 },
     { enabled: !!permsDialog.seller?.id && permsDialog.open }
+  );
+  // Keep manager perms query for gerentes
+  const managerPermsQuery = trpc.managerPerms.get.useQuery(
+    { sellerId: permsDialog.seller?.id || 0 },
+    { enabled: !!permsDialog.seller?.id && permsDialog.open && permsDialog.seller?.sellerRole === 'gerente' }
   );
 
   const filteredSellers = useMemo(() => {
@@ -107,9 +113,13 @@ export default function AdminSellers() {
     onError: () => toast.error("Erro ao alterar papel."),
   });
 
-  const setPermsMutation = trpc.managerPerms.set.useMutation({
-    onSuccess: () => { utils.managerPerms.get.invalidate(); toast.success("Permissões salvas!"); setPermsDialog({ open: false, seller: null }); },
+  const setPermsMutation = trpc.sellers.setPermissions.useMutation({
+    onSuccess: () => { utils.sellers.getPermissions.invalidate(); toast.success("Permissões salvas!"); setPermsDialog({ open: false, seller: null }); },
     onError: () => toast.error("Erro ao salvar permissões."),
+  });
+  const initPermsMutation = trpc.sellers.initPermissions.useMutation({
+    onSuccess: () => { utils.sellers.getPermissions.invalidate(); toast.success("Permissões padrão aplicadas!"); },
+    onError: () => toast.error("Erro ao inicializar permissões."),
   });
 
   function resetForm() {
@@ -186,9 +196,13 @@ export default function AdminSellers() {
   function savePermissions() {
     if (!permsDialog.seller) return;
     const permissions = Object.entries(permsState)
-      .filter(([_, v]) => v.canView || v.canEdit)
       .map(([module, v]) => ({ module, canView: v.canView, canEdit: v.canEdit }));
     setPermsMutation.mutate({ sellerId: permsDialog.seller.id, permissions });
+  }
+
+  function initDefaultPerms() {
+    if (!permsDialog.seller) return;
+    initPermsMutation.mutate({ sellerId: permsDialog.seller.id, department: permsDialog.seller.department || 'vendas' });
   }
 
   return (
@@ -385,24 +399,22 @@ export default function AdminSellers() {
                           <p>{isGerente ? "Remover papel de gerente" : "Tornar gerente"}</p>
                         </TooltipContent>
                       </Tooltip>
-                      {/* Permissões (só aparece se for gerente) */}
-                      {isGerente && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openPermsDialog(seller)}
-                            >
-                              <Eye className="h-4 w-4 text-amber-400" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            <p>Configurar permissões</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
+                      {/* Permissões de visibilidade - para TODOS os colaboradores */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => openPermsDialog(seller)}
+                          >
+                            <Eye className="h-4 w-4 text-blue-400" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>Controle de visibilidade</p>
+                        </TooltipContent>
+                      </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -530,34 +542,40 @@ export default function AdminSellers() {
             </DialogContent>
           </Dialog>
 
-          {/* Dialog de Permissões do Gerente */}
+          {/* Dialog de Permissões / Visibilidade */}
           <Dialog open={permsDialog.open} onOpenChange={(open) => { if (!open) setPermsDialog({ open: false, seller: null }); }}>
             <DialogContent className="bg-card border-border max-w-lg max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-heading text-foreground flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-amber-400" />
-                  Permissões: {permsDialog.seller?.name}
+                  <Eye className="h-5 w-5 text-blue-400" />
+                  Controle de Visibilidade: {permsDialog.seller?.nickname || permsDialog.seller?.name}
                 </DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-muted-foreground mb-4">
-                Defina quais módulos este gerente pode visualizar e/ou editar.
+              <p className="text-sm text-muted-foreground mb-2">
+                Defina o que este colaborador pode <strong>ver</strong> e <strong>editar</strong> no sistema.
+              </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                Setor: <span className="text-foreground font-medium">{getDeptInfo(permsDialog.seller?.department).label}</span>
+                {' — '}O sistema já aplica permissões padrão por setor, mas você pode personalizar manualmente.
               </p>
               {permsQuery.isLoading ? (
                 <div className="py-8 text-center text-muted-foreground">Carregando...</div>
               ) : (
                 <div className="space-y-2">
                   {(availableModules || []).map((mod: any) => {
-                    const current = permsState[mod.key] || { canView: false, canEdit: false };
+                    const modKey = typeof mod === 'string' ? mod : mod.key;
+                    const modLabel = typeof mod === 'string' ? mod : mod.label;
+                    const current = permsState[modKey] || { canView: false, canEdit: false };
                     return (
-                      <div key={mod.key} className="flex items-center justify-between py-2 px-3 rounded-lg bg-accent/30 hover:bg-accent/50 transition-colors">
-                        <span className="text-sm text-foreground font-medium">{mod.label}</span>
+                      <div key={modKey} className="flex items-center justify-between py-2 px-3 rounded-lg bg-accent/30 hover:bg-accent/50 transition-colors">
+                        <span className="text-sm text-foreground font-medium">{modLabel}</span>
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => {
                               const newView = !current.canView;
                               setPermsState(prev => ({
                                 ...prev,
-                                [mod.key]: { canView: newView, canEdit: newView ? current.canEdit : false },
+                                [modKey]: { canView: newView, canEdit: newView ? current.canEdit : false },
                               }));
                             }}
                             className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
@@ -571,7 +589,7 @@ export default function AdminSellers() {
                               const newEdit = !current.canEdit;
                               setPermsState(prev => ({
                                 ...prev,
-                                [mod.key]: { canView: newEdit ? true : current.canView, canEdit: newEdit },
+                                [modKey]: { canView: newEdit ? true : current.canView, canEdit: newEdit },
                               }));
                             }}
                             className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
@@ -586,20 +604,45 @@ export default function AdminSellers() {
                   })}
                 </div>
               )}
-              <div className="flex gap-3 mt-4">
+              <div className="flex flex-wrap gap-2 mt-4">
                 <Button
                   variant="outline"
-                  className="flex-1 border-border text-foreground"
+                  size="sm"
+                  className="border-border text-foreground text-xs"
+                  onClick={initDefaultPerms}
+                  disabled={initPermsMutation.isPending}
+                >
+                  {initPermsMutation.isPending ? "Aplicando..." : "Padrão por setor"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-border text-foreground text-xs"
                   onClick={() => {
-                    // Marcar todos como canView
                     const newState: Record<string, { canView: boolean; canEdit: boolean }> = {};
                     (availableModules || []).forEach((mod: any) => {
-                      newState[mod.key] = { canView: true, canEdit: false };
+                      const k = typeof mod === 'string' ? mod : mod.key;
+                      newState[k] = { canView: true, canEdit: false };
                     });
                     setPermsState(newState);
                   }}
                 >
-                  Marcar todos (ver)
+                  Liberar tudo (ver)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-border text-foreground text-xs"
+                  onClick={() => {
+                    const newState: Record<string, { canView: boolean; canEdit: boolean }> = {};
+                    (availableModules || []).forEach((mod: any) => {
+                      const k = typeof mod === 'string' ? mod : mod.key;
+                      newState[k] = { canView: false, canEdit: false };
+                    });
+                    setPermsState(newState);
+                  }}
+                >
+                  Bloquear tudo
                 </Button>
                 <Button
                   className="flex-1 racing-gradient text-white"

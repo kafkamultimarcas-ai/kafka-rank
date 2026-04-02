@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
-import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X } from "lucide-react";
+import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X, User } from "lucide-react";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -127,6 +127,7 @@ export default function RegisterSale() {
   const [saleLeadSource, setSaleLeadSource] = useState<string>("");
 
   // F&I fields
+  const [feiCustomerName, setFeiCustomerName] = useState("");
   const [customerCpf, setCustomerCpf] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [bankName, setBankName] = useState("");
@@ -332,9 +333,13 @@ export default function RegisterSale() {
           }
           break;
         case "fei":
+          if (!feiCustomerName) { toast.error("Informe o nome do cliente!"); return; }
+          if (!customerCpf) { toast.error("Informe o CPF do cliente!"); return; }
+          if (!vehiclePlate) { toast.error("Informe a placa do veículo!"); return; }
           if (!bankName || !returnType) { toast.error("Informe o banco e o tipo de retorno!"); return; }
           result = await registerFei.mutateAsync({
             sellerId: sid, competitionId: cid,
+            customerName: feiCustomerName,
             customerCpf: customerCpf || undefined,
             vehiclePlate: vehiclePlate || undefined,
             bankName, returnType,
@@ -698,16 +703,24 @@ export default function RegisterSale() {
             {/* F&I */}
             {category === "fei" && (
               <>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-400" />
+                    Nome do cliente *
+                  </Label>
+                  <Input value={feiCustomerName} onChange={e => setFeiCustomerName(e.target.value)}
+                    placeholder="Nome completo do cliente" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Placa</Label>
-                    <Input value={vehiclePlate} onChange={e => setVehiclePlate(e.target.value.toUpperCase())}
-                      placeholder="ABC1D23" maxLength={7} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">CPF do cliente</Label>
+                    <Label className="text-gray-300 font-semibold text-sm">CPF do cliente *</Label>
                     <Input value={customerCpf} onChange={e => setCustomerCpf(e.target.value)}
                       placeholder="000.000.000-00" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold text-sm">Placa do veículo *</Label>
+                    <Input value={vehiclePlate} onChange={e => setVehiclePlate(e.target.value.toUpperCase())}
+                      placeholder="ABC1D23" maxLength={7} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -738,9 +751,10 @@ export default function RegisterSale() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-gray-300 font-semibold text-sm">Data pagamento</Label>
+                    <Label className="text-gray-300 font-semibold text-sm">Data pgto banco</Label>
                     <Input value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
                       type="date" className="bg-gray-800 border-gray-700 text-white" />
+                    <p className="text-[10px] text-gray-500">Data que o banco pagou (pode ser diferente do dia do lançamento)</p>
                   </div>
                 </div>
                 <div className="space-y-2">

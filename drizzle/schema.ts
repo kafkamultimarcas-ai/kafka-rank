@@ -136,6 +136,9 @@ export const feiRecords = mysqlTable("fei_records", {
   returnType: varchar("returnType", { length: 10 }), // R1, R2, R3, R4, R5
   paymentDate: bigint("paymentDate", { mode: "number" }), // data que o banco pagou a ficha
   notes: text("notes"), // observações do F&I
+  lastEditedBy: varchar("lastEditedBy", { length: 255 }), // quem editou por último
+  lastEditedAt: timestamp("lastEditedAt"), // quando foi editado
+  editNotes: text("editNotes"), // motivo da edição
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -144,6 +147,36 @@ export const feiRecords = mysqlTable("fei_records", {
 
 export type FeiRecord = typeof feiRecords.$inferSelect;
 export type InsertFeiRecord = typeof feiRecords.$inferInsert;
+
+// Audit log para edições de F&I
+export const feiAuditLogs = mysqlTable("fei_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  feiRecordId: int("feiRecordId").notNull(),
+  editedBy: varchar("editedBy", { length: 255 }).notNull(),
+  editedAt: timestamp("editedAt").defaultNow().notNull(),
+  fieldChanged: varchar("fieldChanged", { length: 100 }).notNull(),
+  oldValue: text("oldValue"),
+  newValue: text("newValue"),
+  reason: text("reason"),
+  tenantId: int("tenantId").notNull().default(1),
+});
+
+export type FeiAuditLog = typeof feiAuditLogs.$inferSelect;
+export type InsertFeiAuditLog = typeof feiAuditLogs.$inferInsert;
+
+// Permissões por vendedor (controle de visibilidade)
+export const sellerPermissions = mysqlTable("seller_permissions", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  module: varchar("module", { length: 50 }).notNull(), // vendas, fei, consignacao, pos_venda, financeiro, crm, metas, agendamentos, treinamentos, estoque, marketing
+  canView: boolean("canView").default(false).notNull(),
+  canEdit: boolean("canEdit").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+
+export type SellerPermission = typeof sellerPermissions.$inferSelect;
+export type InsertSellerPermission = typeof sellerPermissions.$inferInsert;
 
 // Registros de Consignação
 export const consignmentRecords = mysqlTable("consignment_records", {
@@ -636,6 +669,7 @@ export const pvChamados = mysqlTable("pv_chamados", {
   responsavelPvId: int("responsavelPvId"), // quem do pós-venda pegou
   oficinaId: int("oficinaId"), // oficina parceira vinculada
   oficinaNome: varchar("oficinaNome", { length: 255 }), // caso digite manualmente
+  tipoVeiculo: mysqlEnum("tipoVeiculo", ["loja", "consignado"]).default("loja").notNull(), // se o carro é da loja ou consignado
   // Status e datas
   status: mysqlEnum("status", ["aberto", "agendado", "em_servico", "finalizado", "entregue", "cancelado"]).default("aberto").notNull(),
   dataEntradaAgendada: bigint("dataEntradaAgendada", { mode: "number" }), // quando cliente vai trazer
@@ -695,6 +729,9 @@ export const pvOrcamentos = mysqlTable("pv_orcamentos", {
   motivoReprovacao: text("motivoReprovacao"), // motivo se reprovado
   criadoPor: varchar("criadoPor", { length: 255 }).notNull(), // quem lançou (pós-venda)
   criadoPorId: int("criadoPorId"), // sellerId de quem lançou
+  editadoPor: varchar("editadoPor", { length: 255 }), // quem editou por último (financeiro)
+  editadoEm: bigint("editadoEm", { mode: "number" }), // quando foi editado
+  editMotivo: text("editMotivo"), // motivo da edição
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
@@ -863,6 +900,8 @@ export const fichasFinanciamento = mysqlTable("fichas_financiamento", {
   // Quem do F&I está analisando
   feiResponsavelId: int("feiResponsavelId"),
   feiResponsavelNome: varchar("feiResponsavelNome", { length: 255 }),
+  // Data que o banco efetivamente pagou (pode ser diferente da data de aprovação)
+  dataPagamentoBanco: bigint("dataPagamentoBanco", { mode: "number" }),
   // Timestamps de controle
   inicioAnalise: bigint("inicioAnalise", { mode: "number" }), // quando F&I pegou a ficha
   fimAnalise: bigint("fimAnalise", { mode: "number" }), // quando F&I finalizou

@@ -26,6 +26,8 @@ import {
   bracketMatches, InsertBracketMatch,
   monthlySnapshots, InsertMonthlySnapshot,
   competitionSnapshots, InsertCompetitionSnapshot,
+  feiAuditLogs, InsertFeiAuditLog,
+  sellerPermissions, InsertSellerPermission,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -934,11 +936,12 @@ export async function updateFeiRecord(id: number, data: {
   returnType?: string;
   paymentDate?: number | null;
   notes?: string;
-}) {
+}, editedBy?: string, editReason?: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id))).limit(1);
   if (!result[0]) throw new Error("Registro F&I não encontrado");
+  const oldRecord = result[0];
   const updateData: any = {};
   if (data.customerCpf !== undefined) updateData.customerCpf = data.customerCpf;
   if (data.customerName !== undefined) updateData.customerName = data.customerName;
@@ -948,11 +951,49 @@ export async function updateFeiRecord(id: number, data: {
   if (data.returnType !== undefined) updateData.returnType = data.returnType;
   if (data.paymentDate !== undefined) updateData.paymentDate = data.paymentDate;
   if (data.notes !== undefined) updateData.notes = data.notes;
+  // Track who edited and when
+  if (editedBy) {
+    updateData.lastEditedBy = editedBy;
+    updateData.lastEditedAt = new Date();
+    if (editReason) updateData.editNotes = editReason;
+  }
   if (Object.keys(updateData).length > 0) {
     await db.update(feiRecords).set(updateData).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id)));
   }
+  // Create audit log entries for each changed field
+  if (editedBy) {
+    const fieldLabels: Record<string, string> = {
+      customerCpf: 'CPF', customerName: 'Nome do Cliente', vehiclePlate: 'Placa',
+      bankName: 'Banco', financedValue: 'Valor Financiado', returnType: 'Retorno',
+      paymentDate: 'Data Pagamento', notes: 'Observações',
+    };
+    for (const [key, newVal] of Object.entries(data)) {
+      if (newVal === undefined) continue;
+      const oldVal = (oldRecord as any)[key];
+      const oldStr = oldVal != null ? String(oldVal) : '';
+      const newStr = newVal != null ? String(newVal) : '';
+      if (oldStr !== newStr) {
+        await db.insert(feiAuditLogs).values({
+          feiRecordId: id,
+          editedBy,
+          fieldChanged: fieldLabels[key] || key,
+          oldValue: oldStr || null,
+          newValue: newStr || null,
+          reason: editReason || null,
+          tenantId: getCurrentTenantId(),
+        });
+      }
+    }
+  }
   const updated = await db.select().from(feiRecords).where(and(eq(feiRecords.tenantId, getCurrentTenantId()), eq(feiRecords.id, id))).limit(1);
   return updated[0];
+}
+
+// Get F&I audit logs
+export async function listFeiAuditLogs(feiRecordId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(feiAuditLogs).where(and(eq(feiAuditLogs.tenantId, getCurrentTenantId()), eq(feiAuditLogs.feiRecordId, feiRecordId))).orderBy(desc(feiAuditLogs.editedAt));
 }
 
 // ===== CONSIGNMENT RECORDS =====
@@ -2798,3 +2839,85 @@ export async function executeMonthTurnover(closingMonth: number, closingYear: nu
     alreadyDone: snapshotResult.alreadyExists,
   };
 }
+
+
+// ===== SELLER PERMISSIONS (visibility control) =====
+const DEFAULT_MODULES = [
+  { key: 'vendas', label: 'Vendas' },
+  { key: 'fei', label: 'F&I / Financiamento' },
+  { key: 'consignacao', label: 'Consignação' },
+  { key: 'pos_venda', label: 'Pós-Venda' },
+  { key: 'financeiro', label: 'Financeiro' },
+  { key: 'crm', label: 'CRM / Leads' },
+  { key: 'metas', label: 'Metas' },
+  { key: 'agendamentos', label: 'Agendamentos' },
+  { key: 'treinamentos', label: 'Treinamentos' },
+  { key: 'estoque', label: 'Estoque' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'ranking', label: 'Ranking / Competição' },
+  { key: 'equipe', label: 'Equipe / Colaboradores' },
+  { key: 'despachante', label: 'Despachante' },
+];
+
+export async function getSellerPermissions(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sellerPermissions)
+    .where(and(eq(sellerPermissions.tenantId, getCurrentTenantId()), eq(sellerPermissions.sellerId, sellerId)));
+}
+
+export async function setSellerPermission(sellerId: number, module: string, canView: boolean, canEdit: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Check if permission already exists
+  const existing = await db.select().from(sellerPermissions)
+    .where(and(
+      eq(sellerPermissions.tenantId, getCurrentTenantId()),
+      eq(sellerPermissions.sellerId, sellerId),
+      eq(sellerPermissions.module, module),
+    )).limit(1);
+  if (existing[0]) {
+    await db.update(sellerPermissions)
+      .set({ canView, canEdit })
+      .where(eq(sellerPermissions.id, existing[0].id));
+  } else {
+    await db.insert(sellerPermissions).values({
+      sellerId, module, canView, canEdit, tenantId: getCurrentTenantId(),
+    });
+  }
+}
+
+export async function setSellerPermissionsBulk(sellerId: number, permissions: { module: string; canView: boolean; canEdit: boolean }[]) {
+  for (const perm of permissions) {
+    await setSellerPermission(sellerId, perm.module, perm.canView, perm.canEdit);
+  }
+}
+
+export async function initDefaultSellerPermissions(sellerId: number, department: string) {
+  const db = await getDb();
+  if (!db) return;
+  // Check if already has permissions
+  const existing = await db.select().from(sellerPermissions)
+    .where(and(eq(sellerPermissions.tenantId, getCurrentTenantId()), eq(sellerPermissions.sellerId, sellerId)));
+  if (existing.length > 0) return; // Already initialized
+  
+  // Default permissions based on department
+  const deptDefaults: Record<string, string[]> = {
+    vendas: ['vendas', 'crm', 'metas', 'agendamentos', 'treinamentos'],
+    fei: ['fei', 'vendas'],
+    consignacao: ['consignacao', 'vendas'],
+    pos_venda: ['pos_venda'],
+    despachante: ['vendas'],
+  };
+  
+  const allowedModules = deptDefaults[department] || ['vendas'];
+  
+  for (const mod of DEFAULT_MODULES) {
+    const canView = allowedModules.includes(mod.key);
+    await db.insert(sellerPermissions).values({
+      sellerId, module: mod.key, canView, canEdit: canView, tenantId: getCurrentTenantId(),
+    });
+  }
+}
+
+export { DEFAULT_MODULES as SELLER_PERMISSION_MODULES };

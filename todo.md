@@ -1663,3 +1663,30 @@
 - [x] Ordenar leads por último recebido no topo (mais recente primeiro, como WhatsApp)
 - [x] Auto-refresh em tempo real (polling 5s) para novos leads aparecerem automaticamente
 - [x] Aplicar ordenação em todas as views do CRM (Conversas, Todos os Clientes, Painel SDR, Pipeline, Command Center)
+
+### Pós-Venda - Melhorias
+- [ ] Fornecedor auto-preenchido quando lançar nota/orçamento
+- [ ] Opção de marcar carro como Consignado ou Loja no chamado
+- [ ] Permitir lançar notas em carros já finalizados (nota que veio depois)
+- [ ] Visão geral mais fácil na tela principal do pós-venda
+- [ ] Orçamento vai direto pro financeiro para aprovação
+- [ ] Vendedor só vê chamados de pós-venda dos seus próprios carros
+- [ ] Vendedor recebe alerta quando serviço é finalizado
+
+### Financeiro - Aprovação e Controle
+- [ ] Financeiro recebe orçamentos para aprovar ou marcar como pago
+- [ ] Só financeiro ou admin pode aprovar orçamentos
+- [ ] Edição pelo financeiro com registro de alteração (audit log)
+- [ ] Filtro/visão de Loja vs Consignado no financeiro
+
+### F&I - Melhorias Financeiro
+- [x] Permitir edição de fichas já lançadas (corrigir valor, dados) - AdminFei com dialog de edição + motivo + audit log
+- [x] Nome do cliente obrigatório no cadastro F&I - campo customerName adicionado e validado
+- [x] Data de lançamento visível no sistema - createdAt exibido no AdminFei
+- [x] Campo Data de Pagamento no Banco (separado da data de lançamento) - dataPagamentoBanco na MesaCredito
+- [x] CPF e dados do carro obrigatórios no cadastro - validação obrigatória no RegisterSale
+
+### Controle de Visibilidade por Setor
+- [x] Ícone de olho na tela Equipe para controlar permissões por vendedor - Eye icon em todos os colaboradores
+- [x] Permissões padrão automáticas por setor (vendedor só vê o dele, financeiro só financeiro, etc.) - initDefaultSellerPermissions
+- [x] Opção manual para liberar acesso extra - botões "Liberar tudo", "Bloquear tudo", "Padrão por setor"

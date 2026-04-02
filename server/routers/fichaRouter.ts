@@ -187,17 +187,30 @@ export const fichaRouter = router({
     return { message: "Banco atualizado" };
   }),
 
+  // F&I atualiza data de pagamento do banco
+  setDataPagamento: publicProcedure.input(z.object({
+    fichaId: z.number(),
+    dataPagamentoBanco: z.number(),
+  })).mutation(async ({ input }) => {
+    await updateFichaFinanciamento(input.fichaId, {
+      dataPagamentoBanco: input.dataPagamentoBanco,
+    });
+    return { message: "Data de pagamento atualizada" };
+  }),
+
   // F&I finaliza análise da ficha
   finalizarAnalise: publicProcedure.input(z.object({
     fichaId: z.number(),
     status: z.enum(["aprovado", "recusado", "parcial"]),
     observacoesFei: z.string().optional(),
+    dataPagamentoBanco: z.number().optional(),
   })).mutation(async ({ input }) => {
     const ficha = await getFichaById(input.fichaId);
     await updateFichaFinanciamento(input.fichaId, {
       status: input.status,
       observacoesFei: input.observacoesFei,
       fimAnalise: Date.now(),
+      ...(input.dataPagamentoBanco ? { dataPagamentoBanco: input.dataPagamentoBanco } : {}),
     });
 
     // Notificar vendedor

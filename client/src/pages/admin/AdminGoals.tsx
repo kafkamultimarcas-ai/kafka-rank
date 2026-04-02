@@ -2,9 +2,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Target, Plus, Trash2, Award, TrendingUp } from "lucide-react";
+import { Target, Plus, Trash2, TrendingUp, DollarSign, Trophy, Banknote, Pencil, Check, X } from "lucide-react";
 
 const CATEGORY_OPTIONS = [
   { value: "vendas", label: "Vendas" },
@@ -14,7 +14,6 @@ const CATEGORY_OPTIONS = [
   { value: "feirao", label: "Feirão" },
   { value: "pre_vendas", label: "Pré-Vendas" },
 ];
-
 const CATEGORY_COLORS: Record<string, string> = {
   vendas: "bg-red-500/20 text-red-400",
   fei: "bg-green-500/20 text-green-400",
@@ -23,12 +22,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   feirao: "bg-orange-500/20 text-orange-400",
   pre_vendas: "bg-cyan-500/20 text-cyan-400",
 };
+const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export default function AdminGoals() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [showForm, setShowForm] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [editTarget, setEditTarget] = useState("");
+  const [editBonus, setEditBonus] = useState("");
+  const [editBonusValue, setEditBonusValue] = useState("");
 
   // Form state
   const [type, setType] = useState<"store" | "individual">("store");
@@ -41,6 +46,7 @@ export default function AdminGoals() {
   const utils = trpc.useUtils();
   const { data: goals, isLoading } = trpc.goals.list.useQuery({ month, year });
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+
   const createGoal = trpc.goals.create.useMutation({
     onSuccess: () => {
       toast.success("Meta criada!");
@@ -52,8 +58,9 @@ export default function AdminGoals() {
   });
   const updateGoal = trpc.goals.update.useMutation({
     onSuccess: () => {
-      toast.success("Progresso atualizado!");
+      toast.success("Meta atualizada!");
       utils.goals.list.invalidate();
+      setEditingGoalId(null);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -91,7 +98,35 @@ export default function AdminGoals() {
     });
   };
 
-  const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const startEdit = (goal: any) => {
+    setEditingGoalId(goal.id);
+    setEditValue(String(goal.currentValue));
+    setEditTarget(String(goal.targetValue));
+    setEditBonus(goal.bonusDescription || "");
+    setEditBonusValue(goal.bonusValue ? String(goal.bonusValue) : "");
+  };
+
+  const saveEdit = (goalId: number) => {
+    const updates: any = {};
+    if (editValue !== "") updates.currentValue = parseInt(editValue);
+    if (editTarget !== "") updates.targetValue = parseInt(editTarget);
+    if (editBonus !== undefined) updates.bonusDescription = editBonus;
+    if (editBonusValue !== "") updates.bonusValue = parseFloat(editBonusValue);
+    updateGoal.mutate({ id: goalId, ...updates });
+  };
+
+  // Generate month tabs - show 6 months: 3 before, current, 2 after
+  const monthTabs = useMemo(() => {
+    const tabs = [];
+    for (let i = -3; i <= 2; i++) {
+      let m = now.getMonth() + 1 + i;
+      let y = now.getFullYear();
+      if (m < 1) { m += 12; y -= 1; }
+      if (m > 12) { m -= 12; y += 1; }
+      tabs.push({ month: m, year: y, label: `${MONTH_NAMES[m - 1]} ${y}` });
+    }
+    return tabs;
+  }, []);
 
   return (
     <DashboardLayout>
@@ -107,21 +142,27 @@ export default function AdminGoals() {
           </Button>
         </div>
 
-        {/* Month Selector */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); }}>
-            ←
-          </Button>
-          <span className="font-heading font-bold text-lg px-4">{MONTH_NAMES[month - 1]} {year}</span>
-          <Button variant="outline" size="sm" onClick={() => { if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); }}>
-            →
-          </Button>
+        {/* Month Tabs */}
+        <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-thin">
+          {monthTabs.map((tab) => (
+            <button
+              key={`${tab.month}-${tab.year}`}
+              onClick={() => { setMonth(tab.month); setYear(tab.year); }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+                month === tab.month && year === tab.year
+                  ? "bg-primary text-primary-foreground shadow-lg"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Create Form */}
         {showForm && (
           <div className="racing-card p-6 space-y-4">
-            <h3 className="font-heading font-bold text-foreground">Criar Meta</h3>
+            <h3 className="font-heading font-bold text-foreground">Criar Meta para {MONTH_NAMES[month - 1]} {year}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Tipo</label>
@@ -166,11 +207,11 @@ export default function AdminGoals() {
                 </div>
               )}
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Descrição do Bônus (opcional)</label>
-                <Input value={bonusDescription} onChange={e => setBonusDescription(e.target.value)} placeholder="Ex: Almoço especial" />
+                <label className="text-sm text-muted-foreground mb-1 block">Descrição do Prêmio (opcional)</label>
+                <Input value={bonusDescription} onChange={e => setBonusDescription(e.target.value)} placeholder="Ex: Almoço especial + bônus" />
               </div>
               <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Valor do Bônus R$ (opcional)</label>
+                <label className="text-sm text-muted-foreground mb-1 block">Valor do Prêmio R$ (opcional)</label>
                 <Input type="number" value={bonusValue} onChange={e => setBonusValue(e.target.value)} placeholder="Ex: 500" />
               </div>
             </div>
@@ -199,61 +240,25 @@ export default function AdminGoals() {
               <div>
                 <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase">Metas da Loja</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {goals.filter(g => g.type === "store").map(goal => {
-                    const pct = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
-                    return (
-                      <div key={goal.id} className="racing-card p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[goal.category] || ""}`}>
-                            {CATEGORY_OPTIONS.find(c => c.value === goal.category)?.label || goal.category}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {goal.achieved && <Award className="h-4 w-4 text-emerald-400" />}
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                              if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id });
-                            }}>
-                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="flex items-end gap-2 mb-2">
-                          <span className="font-heading font-bold text-2xl text-foreground">{goal.currentValue}</span>
-                          <span className="text-sm text-muted-foreground">/ {goal.targetValue}</span>
-                          <span className="text-sm font-bold text-primary ml-auto">{pct}%</span>
-                        </div>
-                        <div className="w-full h-3 rounded-full bg-muted overflow-hidden mb-2">
-                          <div className={`h-full rounded-full ${goal.achieved ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        {goal.bonusDescription && (
-                          <p className="text-xs text-yellow-500 flex items-center gap-1">
-                            <Award className="h-3 w-3" /> {goal.bonusDescription}
-                            {goal.bonusValue ? ` — R$ ${goal.bonusValue.toLocaleString("pt-BR")}` : ""}
-                          </p>
-                        )}
-                        <div className="flex gap-2 mt-3">
-                          <Input
-                            type="number"
-                            placeholder="Novo valor"
-                            className="h-8 text-sm"
-                            onKeyDown={e => {
-                              if (e.key === "Enter") {
-                                const val = parseInt((e.target as HTMLInputElement).value);
-                                if (val >= 0) {
-                                  updateGoal.mutate({ id: goal.id, currentValue: val });
-                                  (e.target as HTMLInputElement).value = "";
-                                }
-                              }
-                            }}
-                          />
-                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
-                            updateGoal.mutate({ id: goal.id, currentValue: goal.currentValue + 1 });
-                          }}>
-                            <TrendingUp className="h-3 w-3 mr-1" /> +1
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {goals.filter(g => g.type === "store").map(goal => (
+                    <GoalCard
+                      key={goal.id}
+                      goal={goal}
+                      isEditing={editingGoalId === goal.id}
+                      editValue={editValue}
+                      editTarget={editTarget}
+                      editBonus={editBonus}
+                      editBonusValue={editBonusValue}
+                      setEditValue={setEditValue}
+                      setEditTarget={setEditTarget}
+                      setEditBonus={setEditBonus}
+                      setEditBonusValue={setEditBonusValue}
+                      onEdit={() => startEdit(goal)}
+                      onSave={() => saveEdit(goal.id)}
+                      onCancel={() => setEditingGoalId(null)}
+                      onDelete={() => { if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id }); }}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -264,51 +269,26 @@ export default function AdminGoals() {
                 <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase">Metas Individuais</h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {goals.filter(g => g.type === "individual").map(goal => {
-                    const pct = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
                     const seller = sellers?.find(s => s.id === goal.sellerId);
                     return (
-                      <div key={goal.id} className="racing-card p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {seller?.photoUrl ? (
-                              <img src={seller.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold">
-                                {seller?.name?.charAt(0) || "?"}
-                              </div>
-                            )}
-                            <span className="font-semibold text-sm text-foreground">{seller?.nickname || seller?.name || "?"}</span>
-                          </div>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
-                            if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id });
-                          }}>
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </Button>
-                        </div>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[goal.category] || ""}`}>
-                          {CATEGORY_OPTIONS.find(c => c.value === goal.category)?.label || goal.category}
-                        </span>
-                        <div className="flex items-end gap-2 mt-2 mb-2">
-                          <span className="font-heading font-bold text-xl text-foreground">{goal.currentValue}</span>
-                          <span className="text-sm text-muted-foreground">/ {goal.targetValue}</span>
-                          <span className="text-sm font-bold text-primary ml-auto">{pct}%</span>
-                        </div>
-                        <div className="w-full h-2.5 rounded-full bg-muted overflow-hidden mb-2">
-                          <div className={`h-full rounded-full ${goal.achieved ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        {goal.bonusDescription && (
-                          <p className="text-xs text-yellow-500 flex items-center gap-1">
-                            <Award className="h-3 w-3" /> {goal.bonusDescription}
-                          </p>
-                        )}
-                        <div className="flex gap-2 mt-2">
-                          <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => {
-                            updateGoal.mutate({ id: goal.id, currentValue: goal.currentValue + 1 });
-                          }}>
-                            +1
-                          </Button>
-                        </div>
-                      </div>
+                      <GoalCard
+                        key={goal.id}
+                        goal={goal}
+                        seller={seller}
+                        isEditing={editingGoalId === goal.id}
+                        editValue={editValue}
+                        editTarget={editTarget}
+                        editBonus={editBonus}
+                        editBonusValue={editBonusValue}
+                        setEditValue={setEditValue}
+                        setEditTarget={setEditTarget}
+                        setEditBonus={setEditBonus}
+                        setEditBonusValue={setEditBonusValue}
+                        onEdit={() => startEdit(goal)}
+                        onSave={() => saveEdit(goal.id)}
+                        onCancel={() => setEditingGoalId(null)}
+                        onDelete={() => { if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id }); }}
+                      />
                     );
                   })}
                 </div>
@@ -318,5 +298,119 @@ export default function AdminGoals() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+// Goal Card Component - visual with prize money display
+function GoalCard({ goal, seller, isEditing, editValue, editTarget, editBonus, editBonusValue,
+  setEditValue, setEditTarget, setEditBonus, setEditBonusValue,
+  onEdit, onSave, onCancel, onDelete }: {
+  goal: any; seller?: any; isEditing: boolean;
+  editValue: string; editTarget: string; editBonus: string; editBonusValue: string;
+  setEditValue: (v: string) => void; setEditTarget: (v: string) => void;
+  setEditBonus: (v: string) => void; setEditBonusValue: (v: string) => void;
+  onEdit: () => void; onSave: () => void; onCancel: () => void; onDelete: () => void;
+}) {
+  const pct = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
+  const isAchieved = goal.achieved || goal.currentValue >= goal.targetValue;
+
+  return (
+    <div className={`racing-card p-4 ${isAchieved ? "ring-1 ring-emerald-500/50" : ""}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          {seller && (
+            seller.photoUrl ? (
+              <img src={seller.photoUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold">
+                {seller.name?.charAt(0) || "?"}
+              </div>
+            )
+          )}
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[goal.category] || ""}`}>
+            {CATEGORY_OPTIONS.find(c => c.value === goal.category)?.label || goal.category}
+          </span>
+          {seller && <span className="font-semibold text-sm text-foreground">{seller.nickname || seller.name}</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {isAchieved && <Trophy className="h-4 w-4 text-emerald-400" />}
+          {!isEditing && (
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Editar">
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}>
+            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Progress */}
+      {isEditing ? (
+        <div className="space-y-2 mb-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-muted-foreground">Atual</label>
+              <Input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">Meta</label>
+              <Input type="number" value={editTarget} onChange={e => setEditTarget(e.target.value)} className="h-8 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground">Prêmio</label>
+            <Input value={editBonus} onChange={e => setEditBonus(e.target.value)} className="h-8 text-sm" placeholder="Descrição do prêmio" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground">Valor R$</label>
+            <Input type="number" value={editBonusValue} onChange={e => setEditBonusValue(e.target.value)} className="h-8 text-sm" placeholder="0" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs flex-1 gap-1" onClick={onSave}>
+              <Check className="h-3 w-3" /> Salvar
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onCancel}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-end gap-2 mb-2">
+            <span className="font-heading font-bold text-2xl text-foreground">{goal.currentValue}</span>
+            <span className="text-sm text-muted-foreground">/ {goal.targetValue}</span>
+            <span className={`text-sm font-bold ml-auto ${isAchieved ? "text-emerald-400" : "text-primary"}`}>{pct}%</span>
+          </div>
+          <div className="w-full h-3 rounded-full bg-muted overflow-hidden mb-3">
+            <div className={`h-full rounded-full transition-all ${isAchieved ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
+          </div>
+        </>
+      )}
+
+      {/* Prize Display - Visual with money */}
+      {!isEditing && (goal.bonusDescription || goal.bonusValue) && (
+        <div className="mt-2 p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 via-green-500/10 to-emerald-500/10 border border-emerald-500/20">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <Banknote className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-emerald-400/70 uppercase font-bold tracking-wider">Prêmio</p>
+              {goal.bonusValue ? (
+                <p className="font-heading font-bold text-lg text-emerald-400">
+                  R$ {Number(goal.bonusValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </p>
+              ) : null}
+              {goal.bonusDescription && (
+                <p className="text-xs text-emerald-300/80 truncate">{goal.bonusDescription}</p>
+              )}
+            </div>
+            <DollarSign className="h-6 w-6 text-emerald-500/30" />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -511,6 +511,7 @@ describe("F&I router", () => {
     const result = await caller.fei.register({
       sellerId: 1, bankName: "Santander", returnType: "R1",
       financedValue: 5000000, paymentDate: Date.now(),
+      customerName: "João Silva",
     });
     expect(result.id).toBe(1);
     expect(result.message).toContain("F&I");

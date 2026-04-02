@@ -209,9 +209,35 @@ export const appRouter = router({
       await db.updateSeller(input.id, { username: input.username, passwordHash });
       return { success: true };
     }),
+    // === PERMISSÕES DE VENDEDOR ===
+    getPermissions: publicProcedure.input(z.object({
+      sellerId: z.number(),
+    })).query(async ({ input }) => {
+      return db.getSellerPermissions(input.sellerId);
+    }),
+    setPermissions: adminProcedure.input(z.object({
+      sellerId: z.number(),
+      permissions: z.array(z.object({
+        module: z.string(),
+        canView: z.boolean(),
+        canEdit: z.boolean(),
+      })),
+    })).mutation(async ({ input }) => {
+      await db.setSellerPermissionsBulk(input.sellerId, input.permissions);
+      return { success: true };
+    }),
+    initPermissions: adminProcedure.input(z.object({
+      sellerId: z.number(),
+      department: z.string(),
+    })).mutation(async ({ input }) => {
+      await db.initDefaultSellerPermissions(input.sellerId, input.department);
+      return { success: true };
+    }),
+    permissionModules: publicProcedure.query(() => {
+      return db.SELLER_PERMISSION_MODULES;
+    }),
   }),
-
-  // ===== COMPETITIONS =====
+  // ===== COMPETITIONS ======
   competitions: router({
     list: publicProcedure.input(z.object({ status: z.string().optional() }).optional()).query(async ({ input }) => {
       return db.listCompetitions(input?.status);
@@ -1066,7 +1092,7 @@ export const appRouter = router({
       sellerId: z.number(),
       competitionId: z.number().optional(),
       customerCpf: z.string().optional(),
-      customerName: z.string().optional(),
+      customerName: z.string().min(1, "Nome do cliente é obrigatório"),
       vehiclePlate: z.string().optional(),
       bankName: z.string().min(1),
       financedValue: z.number().optional(),
@@ -1155,10 +1181,18 @@ export const appRouter = router({
       returnType: z.string().optional(),
       paymentDate: z.number().nullable().optional(),
       notes: z.string().optional(),
-    })).mutation(async ({ input }) => {
-      const { id, ...data } = input;
-      const updated = await db.updateFeiRecord(id, data);
+      editReason: z.string().optional(),
+    })).mutation(async ({ input, ctx }) => {
+      const { id, editReason, ...data } = input;
+      const editorName = ctx.user?.name || 'Usuário';
+      const updated = await db.updateFeiRecord(id, data, editorName, editReason);
       return updated;
+    }),
+    // Audit log for a specific F&I record
+    auditLogs: publicProcedure.input(z.object({
+      feiRecordId: z.number(),
+    })).query(async ({ input }) => {
+      return db.listFeiAuditLogs(input.feiRecordId);
     }),
     // Busca veículo por placa no inventário
     lookupPlate: publicProcedure.input(z.object({

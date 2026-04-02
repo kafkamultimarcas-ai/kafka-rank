@@ -1,0 +1,1 @@
+ALTER TABLE `fichas_financiamento` ADD `dataPagamentoBanco` bigint;

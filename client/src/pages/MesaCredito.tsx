@@ -135,6 +135,7 @@ export default function MesaCredito() {
   const [bancoQtdParcelas, setBancoQtdParcelas] = useState("");
   const [bancoTaxa, setBancoTaxa] = useState("");
   const [obsGeral, setObsGeral] = useState("");
+  const [dataPagamentoBanco, setDataPagamentoBanco] = useState("");
 
   const handleIniciarAnalise = async (fichaId: number) => {
     if (!feiSellerId) { toast.error("Selecione quem é o F&I!"); return; }
@@ -161,15 +162,19 @@ export default function MesaCredito() {
     toast.success("Banco atualizado!");
   };
 
+  const setDataPagamentoMutation = trpc.fichas.setDataPagamento.useMutation({ onSuccess: () => refetchDetail() });
+
   const handleFinalizar = async (status: "aprovado" | "recusado" | "parcial") => {
     if (!selectedFichaId) return;
     await finalizarAnalise.mutateAsync({
       fichaId: selectedFichaId,
       status,
       observacoesFei: obsGeral || undefined,
+      dataPagamentoBanco: dataPagamentoBanco ? new Date(dataPagamentoBanco).getTime() : undefined,
     });
     toast.success(`Ficha ${status === "aprovado" ? "APROVADA" : status === "recusado" ? "RECUSADA" : "PARCIALMENTE APROVADA"}!`);
     setSelectedFichaId(null);
+    setDataPagamentoBanco("");
   };
 
   return (
@@ -485,6 +490,35 @@ export default function MesaCredito() {
                   </div>
                 )}
 
+                {/* Data de pagamento do banco */}
+                {(fichaDetail.status === "em_analise" || fichaDetail.status === "aprovado" || fichaDetail.status === "parcial") && (
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 space-y-2">
+                    <h3 className="text-sm font-bold text-blue-400">DATA DE PAGAMENTO DO BANCO</h3>
+                    <p className="text-[10px] text-gray-400">Data que o banco efetivamente pagou o financiamento (pode ser diferente da data de aprovação)</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={dataPagamentoBanco || (fichaDetail.dataPagamentoBanco ? new Date(fichaDetail.dataPagamentoBanco).toISOString().split('T')[0] : '')}
+                        onChange={e => setDataPagamentoBanco(e.target.value)}
+                        className="bg-gray-800 border border-blue-500/30 text-white rounded-lg p-2 text-sm flex-1"
+                      />
+                      {(fichaDetail.status === "aprovado" || fichaDetail.status === "parcial") && dataPagamentoBanco && (
+                        <Button size="sm" onClick={() => {
+                          if (selectedFichaId && dataPagamentoBanco) {
+                            setDataPagamentoMutation.mutate({ fichaId: selectedFichaId, dataPagamentoBanco: new Date(dataPagamentoBanco).getTime() });
+                            toast.success("Data de pagamento atualizada!");
+                          }
+                        }} className="bg-blue-600 hover:bg-blue-700 text-xs">
+                          Salvar Data
+                        </Button>
+                      )}
+                    </div>
+                    {fichaDetail.dataPagamentoBanco && (
+                      <p className="text-xs text-blue-300">Registrado: {new Date(fichaDetail.dataPagamentoBanco).toLocaleDateString('pt-BR')}</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Botões de finalização */}
                 {(fichaDetail.status === "em_analise") && (
                   <div className="space-y-2">
@@ -511,6 +545,13 @@ export default function MesaCredito() {
                   <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-3">
                     <h3 className="text-xs font-bold text-purple-400 mb-1">OBS. DO F&I:</h3>
                     <p className="text-sm text-purple-200">{fichaDetail.observacoesFei}</p>
+                  </div>
+                )}
+                {/* Mostrar data de pagamento se já registrada */}
+                {fichaDetail.dataPagamentoBanco && fichaDetail.status !== "em_analise" && (
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+                    <h3 className="text-xs font-bold text-blue-400 mb-1">PAGAMENTO DO BANCO:</h3>
+                    <p className="text-sm text-blue-200">{new Date(fichaDetail.dataPagamentoBanco).toLocaleDateString('pt-BR')}</p>
                   </div>
                 )}
 
