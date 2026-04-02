@@ -1722,3 +1722,13 @@
 - [x] Vendedor agora vê visual esportivo com abas Corrida/Mata-Mata/Equipes (RaceTrack.tsx reescrito)
 - [x] Confrontos Mata-Mata com placar estilo futebol: Foto Nome SCORE VS SCORE Nome Foto
 - [x] RaceTrack.tsx atualizado com FootballMatchCard, PlayerAvatar, badges AO VIVO e coroa para vencedor
+
+### Foto de Perfil do Vendedor
+- [x] Vendedor pode trocar sua foto direto na tela de competição (botão câmera no avatar)
+- [x] Foto aparece nos placares do Mata-Mata, ranking e pista de corrida
+- [x] Upload via S3 com preview antes de salvar
+## Ranking Mensal - TOP EQUIPE
+- [x] Ranking zera todo mês automaticamente (filtro por mês atual via getMonthlyRanking)
+- [x] Aba "Mês Anterior" para consultar ranking do mês passado (via monthTurnover.getSnapshot)
+- [x] Aba "Destaques" com campeões/destaques do mês anterior como incentivo (pódio + destaque F&I + agendamentos)
+- [x] Cada mês atualiza automaticamente (ranking atual recalcula em tempo real, snapshots salvos na virada)

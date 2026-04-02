@@ -1630,6 +1630,7 @@ export async function getMonthlyRanking(month: number, year: number, category?: 
   // Buscar todas as vendas aprovadas do mês
   const monthSales = await db.select().from(sales)
     .where(and(
+      eq(sales.tenantId, getCurrentTenantId()),
       eq(sales.status, 'approved'),
       sql`CAST(${sales.createdAt} AS CHAR) >= ${startStr}`,
       sql`CAST(${sales.createdAt} AS CHAR) < ${endStr}`,
@@ -2692,13 +2693,26 @@ export async function createMonthlySnapshot(month: number, year: number) {
         lt(sdrRecords.createdAt, monthEnd)
       ));
     
-    // Aggregate per seller
+    // Aggregate per seller - use MONTHLY counts, not cumulative
+    const salesBySeller = new Map<number, { count: number; points: number }>();
+    for (const sale of monthSales) {
+      const existing = salesBySeller.get(sale.sellerId) || { count: 0, points: 0 };
+      existing.count += 1;
+      existing.points += sale.points || 1;
+      salesBySeller.set(sale.sellerId, existing);
+    }
     for (const snap of snapshots) {
+      const monthlySalesData = salesBySeller.get(snap.sellerId) || { count: 0, points: 0 };
+      snap.totalSales = monthlySalesData.count;
+      snap.totalPoints = monthlySalesData.points;
       snap.totalFei = feiList.filter(f => f.sellerId === snap.sellerId).length;
       snap.totalConsignacao = consignList.filter(c => c.sellerId === snap.sellerId).length;
       snap.totalAgendamentos = sdrList.filter(r => r.sellerId === snap.sellerId).length;
       snap.totalLeads = 0; // leads are in CRM
     }
+    // Re-sort by monthly sales count for correct ranking
+    snapshots.sort((a, b) => (b.totalSales ?? 0) - (a.totalSales ?? 0) || (b.totalPoints ?? 0) - (a.totalPoints ?? 0));
+    snapshots.forEach((s, idx) => { s.rank = idx + 1; });
     
     await db.insert(monthlySnapshots).values(snapshots);
   }
@@ -2781,9 +2795,22 @@ export async function getMonthlySnapshots(month: number, year: number) {
   const db = await getDb();
   if (!db) return [];
   const tid = getCurrentTenantId();
-  return db.select().from(monthlySnapshots)
+  const snaps = await db.select().from(monthlySnapshots)
     .where(and(eq(monthlySnapshots.tenantId, tid), eq(monthlySnapshots.month, month), eq(monthlySnapshots.year, year)))
     .orderBy(monthlySnapshots.rank);
+  // Enrich with current seller photos and nicknames
+  if (snaps.length > 0) {
+    const sellerIds = snaps.map(s => s.sellerId);
+    const sellersList = await db.select({ id: sellers.id, nickname: sellers.nickname, photoUrl: sellers.photoUrl })
+      .from(sellers).where(inArray(sellers.id, sellerIds));
+    const sellerMap = new Map(sellersList.map(s => [s.id, s]));
+    return snaps.map(s => ({
+      ...s,
+      sellerNickname: sellerMap.get(s.sellerId)?.nickname || null,
+      sellerPhotoUrl: sellerMap.get(s.sellerId)?.photoUrl || null,
+    }));
+  }
+  return snaps.map(s => ({ ...s, sellerNickname: null as string | null, sellerPhotoUrl: null as string | null }));
 }
 
 export async function getCompetitionSnapshotsByMonth(month: number, year: number) {

@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid } from "lucide-react";
+import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -85,6 +85,23 @@ export default function Home() {
     if (!sellers) return [];
     return sellers.filter(s => !s.department || s.department === 'vendas');
   }, [sellers]);
+
+  // TOP EQUIPE - Ranking mensal com abas
+  const [topEquipeTab, setTopEquipeTab] = useState<"atual" | "anterior" | "destaques">("atual");
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  // Ranking do mês atual (vendas aprovadas deste mês)
+  const { data: currentMonthRanking } = trpc.goals.monthlyRanking.useQuery(
+    { month: currentMonth, year: currentYear, category: 'vendas' },
+  );
+  // Snapshot do mês anterior (dados históricos)
+  const { data: prevMonthSnapshot } = trpc.monthTurnover.getSnapshot.useQuery(
+    { month: prevMonth, year: prevYear },
+    { enabled: topEquipeTab === 'anterior' || topEquipeTab === 'destaques' }
+  );
+  const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   return (
     <div className="min-h-screen bg-background">
@@ -625,47 +642,260 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Top Vendedores - apenas department vendas */}
-      {vendedores.length > 0 && (
-        <section className="py-12 sm:py-16 border-t border-border">
-          <div className="container">
-            <div className="flex items-center gap-3 mb-8">
-              <Users className="h-6 w-6 text-primary" />
-              <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">TOP EQUIPE</h2>
+      {/* Top Vendedores - Ranking Mensal com Abas */}
+      <section className="py-12 sm:py-16 border-t border-border">
+        <div className="container">
+          <div className="flex items-center gap-3 mb-6">
+            <Users className="h-6 w-6 text-primary" />
+            <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">TOP EQUIPE</h2>
+          </div>
+          {/* Tab Navigation */}
+          <div className="flex gap-1 mb-6 overflow-x-auto pb-1">
+            <button
+              onClick={() => setTopEquipeTab('atual')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                topEquipeTab === 'atual'
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                  : 'text-muted-foreground hover:text-foreground bg-card/50 border border-border/50'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" /> Mês Atual
+            </button>
+            <button
+              onClick={() => setTopEquipeTab('anterior')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                topEquipeTab === 'anterior'
+                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                  : 'text-muted-foreground hover:text-foreground bg-card/50 border border-border/50'
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5" /> Mês Anterior
+            </button>
+            <button
+              onClick={() => setTopEquipeTab('destaques')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
+                topEquipeTab === 'destaques'
+                  ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/30'
+                  : 'text-muted-foreground hover:text-foreground bg-card/50 border border-border/50'
+              }`}
+            >
+              <Star className="w-3.5 h-3.5" /> Destaques
+            </button>
+          </div>
+
+          {/* MÊS ATUAL TAB */}
+          {topEquipeTab === 'atual' && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                Ranking de vendas — <span className="font-semibold text-foreground">{MONTH_NAMES[currentMonth - 1]} {currentYear}</span>
+              </p>
+              {(!currentMonthRanking || currentMonthRanking.length === 0) ? (
+                <div className="racing-card p-8 text-center">
+                  <Trophy className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhuma venda aprovada neste mês ainda.</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">O ranking atualiza automaticamente conforme as vendas são aprovadas.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {currentMonthRanking.map((entry, idx) => (
+                    <button
+                      key={entry.seller.id}
+                      onClick={() => setLocation(`/vendedor/${entry.seller.id}`)}
+                      className="racing-card p-4 flex items-center gap-4 hover:border-primary/50 transition-all text-left"
+                    >
+                      <div className="relative shrink-0">
+                        <div className={`absolute -top-1 -left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white z-10 ${
+                          idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-primary'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        {entry.seller.photoUrl ? (
+                          <img src={entry.seller.photoUrl} alt={entry.seller.name} className="w-14 h-14 rounded-full object-cover border-2 border-border" />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-lg font-bold text-accent-foreground border-2 border-border">
+                            {entry.seller.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground truncate">{entry.seller.nickname || entry.seller.name}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-muted-foreground">{entry.salesCount} vendas</span>
+                          <span className="text-xs font-medium text-primary">{entry.points} pts</span>
+                        </div>
+                      </div>
+                      {idx === 0 && <Crown className="h-5 w-5 text-yellow-500 shrink-0" />}
+                      {idx > 0 && <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {vendedores.map((seller, idx) => (
-                <button
-                  key={seller.id}
-                  onClick={() => setLocation(`/vendedor/${seller.id}`)}
-                  className="racing-card p-4 flex items-center gap-4 hover:border-primary/50 transition-all text-left"
-                >
-                  <div className="relative shrink-0">
-                    <div className="absolute -top-1 -left-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground z-10">
-                      {idx + 1}
+          )}
+
+          {/* MÊS ANTERIOR TAB */}
+          {topEquipeTab === 'anterior' && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-blue-400" />
+                Resultado final — <span className="font-semibold text-foreground">{MONTH_NAMES[prevMonth - 1]} {prevYear}</span>
+              </p>
+              {(!prevMonthSnapshot?.sellers || prevMonthSnapshot.sellers.filter(s => s.department === 'vendas' || !s.department).length === 0) ? (
+                <div className="racing-card p-8 text-center">
+                  <Trophy className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhum dado do mês anterior disponível.</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">O histórico é salvo automaticamente na virada do mês.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {prevMonthSnapshot.sellers
+                    .filter(s => s.department === 'vendas' || !s.department)
+                    .map((snap, idx) => (
+                    <div
+                      key={snap.id}
+                      className="racing-card p-4 flex items-center gap-4 text-left"
+                    >
+                      <div className="relative shrink-0">
+                        <div className={`absolute -top-1 -left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white z-10 ${
+                          idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-700' : 'bg-muted-foreground'
+                        }`}>
+                          {snap.rank || idx + 1}
+                        </div>
+                        {snap.sellerPhotoUrl ? (
+                          <img src={snap.sellerPhotoUrl} alt={snap.sellerName} className="w-14 h-14 rounded-full object-cover border-2 border-border" />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-lg font-bold text-accent-foreground border-2 border-border">
+                            {snap.sellerName.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground truncate">{snap.sellerNickname || snap.sellerName}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-muted-foreground">{snap.totalSales} vendas</span>
+                          <span className="text-xs font-medium text-primary">{snap.totalPoints} pts</span>
+                        </div>
+                      </div>
+                      {idx === 0 && <Crown className="h-5 w-5 text-yellow-500 shrink-0" />}
                     </div>
-                    {seller.photoUrl ? (
-                      <img src={seller.photoUrl} alt={seller.name} className="w-14 h-14 rounded-full object-cover border-2 border-border" />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-lg font-bold text-accent-foreground border-2 border-border">
-                        {seller.name.charAt(0)}
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DESTAQUES TAB */}
+          {topEquipeTab === 'destaques' && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-6 flex items-center gap-2">
+                <Star className="h-4 w-4 text-yellow-400" />
+                Campeões de <span className="font-semibold text-foreground">{MONTH_NAMES[prevMonth - 1]} {prevYear}</span>
+              </p>
+              {(!prevMonthSnapshot?.sellers || prevMonthSnapshot.sellers.filter(s => s.department === 'vendas' || !s.department).length === 0) ? (
+                <div className="racing-card p-8 text-center">
+                  <Star className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhum destaque disponível.</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Os destaques aparecem após a virada do mês.</p>
+                </div>
+              ) : (() => {
+                const vendasRanking = prevMonthSnapshot.sellers.filter(s => s.department === 'vendas' || !s.department);
+                const top3 = vendasRanking.slice(0, 3);
+                const topFei = prevMonthSnapshot.sellers.filter(s => s.department === 'vendas' || !s.department).sort((a, b) => (b.totalFei ?? 0) - (a.totalFei ?? 0))[0];
+                const topAgendamentos = prevMonthSnapshot.sellers.filter(s => s.department === 'vendas' || !s.department).sort((a, b) => (b.totalAgendamentos ?? 0) - (a.totalAgendamentos ?? 0))[0];
+                return (
+                  <div className="space-y-6">
+                    {/* Podium */}
+                    {top3.length >= 3 && (
+                      <div className="racing-card p-6">
+                        <h3 className="font-heading font-bold text-sm text-center text-muted-foreground mb-6 uppercase tracking-wider">Pódio de Vendas</h3>
+                        <div className="flex items-end justify-center gap-3 sm:gap-6">
+                          {/* 2nd */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative mb-2">
+                              {top3[1].sellerPhotoUrl ? (
+                                <img src={top3[1].sellerPhotoUrl} className="w-14 h-14 rounded-full object-cover ring-2 ring-gray-400" />
+                              ) : (
+                                <div className="w-14 h-14 rounded-full bg-accent flex items-center justify-center text-lg font-bold ring-2 ring-gray-400">{top3[1].sellerName.charAt(0)}</div>
+                              )}
+                              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-xs font-bold text-white">2</div>
+                            </div>
+                            <p className="text-xs font-bold text-foreground text-center truncate max-w-[80px]">{top3[1].sellerNickname || top3[1].sellerName}</p>
+                            <p className="text-[10px] text-muted-foreground">{top3[1].totalSales} vendas</p>
+                            <div className="w-20 h-14 racing-card mt-2 flex items-center justify-center">
+                              <span className="font-heading text-2xl font-bold text-gray-400">2</span>
+                            </div>
+                          </div>
+                          {/* 1st */}
+                          <div className="flex flex-col items-center -mt-4">
+                            <Crown className="h-7 w-7 text-yellow-500 mb-1" />
+                            <div className="relative mb-2">
+                              {top3[0].sellerPhotoUrl ? (
+                                <img src={top3[0].sellerPhotoUrl} className="w-18 h-18 rounded-full object-cover ring-3 ring-yellow-400" />
+                              ) : (
+                                <div className="w-18 h-18 rounded-full bg-accent flex items-center justify-center text-xl font-bold ring-3 ring-yellow-400">{top3[0].sellerName.charAt(0)}</div>
+                              )}
+                              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center text-sm font-bold text-white">1</div>
+                            </div>
+                            <p className="text-sm font-bold text-foreground text-center truncate max-w-[100px]">{top3[0].sellerNickname || top3[0].sellerName}</p>
+                            <p className="text-xs text-yellow-400 font-bold">{top3[0].totalSales} vendas</p>
+                            <div className="w-24 h-18 racing-card mt-2 flex items-center justify-center glow-orange">
+                              <span className="font-heading text-3xl font-bold text-primary">1</span>
+                            </div>
+                          </div>
+                          {/* 3rd */}
+                          <div className="flex flex-col items-center">
+                            <div className="relative mb-2">
+                              {top3[2].sellerPhotoUrl ? (
+                                <img src={top3[2].sellerPhotoUrl} className="w-12 h-12 rounded-full object-cover ring-2 ring-amber-700" />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-base font-bold ring-2 ring-amber-700">{top3[2].sellerName.charAt(0)}</div>
+                              )}
+                              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-amber-700 flex items-center justify-center text-xs font-bold text-white">3</div>
+                            </div>
+                            <p className="text-xs font-bold text-foreground text-center truncate max-w-[80px]">{top3[2].sellerNickname || top3[2].sellerName}</p>
+                            <p className="text-[10px] text-muted-foreground">{top3[2].totalSales} vendas</p>
+                            <div className="w-18 h-12 racing-card mt-2 flex items-center justify-center">
+                              <span className="font-heading text-xl font-bold text-amber-700">3</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-foreground truncate">{seller.nickname || seller.name}</p>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-muted-foreground">{seller.totalSales} vendas</span>
-                      <span className="text-xs font-medium text-primary">{seller.totalPoints} pts</span>
+                    {/* Destaques Extras */}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {topFei && (topFei.totalFei ?? 0) > 0 && (
+                        <div className="racing-card p-4 flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
+                            <DollarSign className="h-6 w-6 text-green-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] text-green-400 font-bold uppercase tracking-wider">Destaque F&I</p>
+                            <p className="font-semibold text-foreground truncate">{topFei.sellerNickname || topFei.sellerName}</p>
+                            <p className="text-xs text-muted-foreground">{topFei.totalFei} registros F&I</p>
+                          </div>
+                        </div>
+                      )}
+                      {topAgendamentos && (topAgendamentos.totalAgendamentos ?? 0) > 0 && (
+                        <div className="racing-card p-4 flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
+                            <CalendarPlus className="h-6 w-6 text-cyan-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Destaque Agendamentos</p>
+                            <p className="font-semibold text-foreground truncate">{topAgendamentos.sellerNickname || topAgendamentos.sellerName}</p>
+                            <p className="text-xs text-muted-foreground">{topAgendamentos.totalAgendamentos} agendamentos</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                </button>
-              ))}
+                );
+              })()}
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
+      </section>
 
       {/* Ranking de Agendamentos */}
       <section className="py-12 sm:py-16 border-t border-border">

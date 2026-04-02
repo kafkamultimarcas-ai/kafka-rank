@@ -236,6 +236,36 @@ export const appRouter = router({
     permissionModules: publicProcedure.query(() => {
       return db.SELLER_PERMISSION_MODULES;
     }),
+    // === VENDEDOR TROCA SUA PRÓPRIA FOTO ===
+    uploadMyPhoto: publicProcedure.input(z.object({
+      base64: base64Schema,
+      mimeType: z.string(),
+    })).mutation(async ({ input, ctx }) => {
+      let sellerId: number | null = null;
+      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
+        sellerId = -((ctx.user as any).id + 1000000);
+      }
+      if (!sellerId) {
+        try {
+          const { parse: parseCookie } = await import('cookie');
+          const cookies = parseCookie(ctx.req.headers.cookie || '');
+          const sellerToken = cookies.seller_session;
+          if (sellerToken) {
+            const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number };
+            sellerId = payload.sellerId;
+          }
+        } catch (e) {}
+      }
+      if (!sellerId) throw new Error('Você precisa estar logado como vendedor');
+      const seller = await db.getSellerById(sellerId);
+      if (!seller || !seller.active) throw new Error('Vendedor não encontrado');
+      const ext = input.mimeType.split('/')[1] || 'jpg';
+      const fileKey = `sellers/${sellerId}-avatar-${nanoid(8)}.${ext}`;
+      const buffer = Buffer.from(input.base64, 'base64');
+      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+      await db.updateSeller(sellerId, { photoUrl: url, photoKey: fileKey });
+      return { url };
+    }),
   }),
   // ===== COMPETITIONS ======
   competitions: router({

@@ -1,8 +1,9 @@
 import { trpc } from "@/lib/trpc";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Trophy, Zap, Target, Award, Swords, Crown, Shield, Flame } from "lucide-react";
+import { ArrowLeft, Trophy, Zap, Target, Award, Swords, Crown, Shield, Flame, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useRef, useCallback } from "react";
+import { toast } from "sonner";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
@@ -12,33 +13,51 @@ const CAR_COLORS = [
 ];
 
 // ===== PLAYER AVATAR =====
-function PlayerAvatar({ name, photoUrl, size = "md", borderColor }: {
+function PlayerAvatar({ name, photoUrl, size = "md", borderColor, isMe, onPhotoChange }: {
   name: string; photoUrl?: string | null; size?: "sm" | "md" | "lg" | "xl"; borderColor?: string;
+  isMe?: boolean; onPhotoChange?: () => void;
 }) {
   const sizes = { sm: "w-8 h-8 text-[10px]", md: "w-12 h-12 text-sm", lg: "w-16 h-16 text-lg", xl: "w-20 h-20 text-xl" };
   const initials = name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
   const bColor = borderColor || "border-primary/40";
+  const borderStyle = typeof borderColor === 'string' && borderColor.startsWith('#') ? { borderColor } : {};
+  const borderClass = typeof borderColor === 'string' && borderColor.startsWith('#') ? '' : bColor;
 
-  if (photoUrl) {
-    return (
-      <div className={`${sizes[size]} rounded-full overflow-hidden border-2 ${typeof borderColor === 'string' && borderColor.startsWith('#') ? '' : bColor} shadow-lg shrink-0`}
-        style={typeof borderColor === 'string' && borderColor.startsWith('#') ? { borderColor } : {}}>
-        <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
-      </div>
-    );
-  }
-  return (
-    <div className={`${sizes[size]} rounded-full flex items-center justify-center font-heading font-bold border-2 ${typeof borderColor === 'string' && borderColor.startsWith('#') ? '' : bColor} bg-gradient-to-br from-primary/20 to-primary/5 text-primary shrink-0`}
-      style={typeof borderColor === 'string' && borderColor.startsWith('#') ? { borderColor } : {}}>
+  const avatar = photoUrl ? (
+    <div className={`${sizes[size]} rounded-full overflow-hidden border-2 ${borderClass} shadow-lg shrink-0`}
+      style={borderStyle}>
+      <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
+    </div>
+  ) : (
+    <div className={`${sizes[size]} rounded-full flex items-center justify-center font-heading font-bold border-2 ${borderClass} bg-gradient-to-br from-primary/20 to-primary/5 text-primary shrink-0`}
+      style={borderStyle}>
       {initials}
     </div>
   );
+
+  if (isMe && onPhotoChange) {
+    return (
+      <div className="relative cursor-pointer group" onClick={onPhotoChange}>
+        {avatar}
+        <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <Camera className="w-4 h-4 text-white" />
+        </div>
+        <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg border-2 border-background">
+          <Camera className="w-2.5 h-2.5 text-primary-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  return avatar;
 }
 
 // ===== FOOTBALL SCOREBOARD MATCH CARD =====
-function FootballMatchCard({ match, roundLabel }: { match: any; roundLabel?: string }) {
+function FootballMatchCard({ match, roundLabel, mySellerId, onPhotoChange }: { match: any; roundLabel?: string; mySellerId?: number | null; onPhotoChange?: () => void }) {
   const sellerA = match.sellerA;
   const sellerB = match.sellerB;
+  const isMyA = mySellerId && (match.sellerAId === mySellerId);
+  const isMyB = mySellerId && (match.sellerBId === mySellerId);
   const teamA = match.teamA;
   const teamB = match.teamB;
   const nameA = sellerA?.nickname || sellerA?.name || teamA?.name || "TBD";
@@ -80,7 +99,7 @@ function FootballMatchCard({ match, roundLabel }: { match: any; roundLabel?: str
           {/* Player A side */}
           <div className={`flex-1 flex flex-col items-center gap-2 ${winnerIsB && isFinished ? "opacity-40" : ""}`}>
             <div className="relative">
-              <PlayerAvatar name={nameA} photoUrl={photoA} size="lg" borderColor={winnerIsA ? "#22c55e" : teamA?.color} />
+              <PlayerAvatar name={nameA} photoUrl={photoA} size="lg" borderColor={winnerIsA ? "#22c55e" : teamA?.color} isMe={!!isMyA} onPhotoChange={onPhotoChange} />
               {winnerIsA && (
                 <div className="absolute -top-2 -right-1">
                   <Crown className="w-5 h-5 text-yellow-400 drop-shadow-lg" />
@@ -108,7 +127,7 @@ function FootballMatchCard({ match, roundLabel }: { match: any; roundLabel?: str
           {/* Player B side */}
           <div className={`flex-1 flex flex-col items-center gap-2 ${winnerIsA && isFinished ? "opacity-40" : ""}`}>
             <div className="relative">
-              <PlayerAvatar name={nameB} photoUrl={photoB} size="lg" borderColor={winnerIsB ? "#22c55e" : teamB?.color} />
+              <PlayerAvatar name={nameB} photoUrl={photoB} size="lg" borderColor={winnerIsB ? "#22c55e" : teamB?.color} isMe={!!isMyB} onPhotoChange={onPhotoChange} />
               {winnerIsB && (
                 <div className="absolute -top-2 -right-1">
                   <Crown className="w-5 h-5 text-yellow-400 drop-shadow-lg" />
@@ -203,11 +222,64 @@ export default function RaceTrack() {
   const competitionId = parseInt(params.id || "0");
   const [animate, setAnimate] = useState(true);
   const [activeTab, setActiveTab] = useState<"corrida" | "matamata" | "equipes">("corrida");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: competition } = trpc.competitions.getById.useQuery({ id: competitionId });
   const { data: ranking } = trpc.competitions.ranking.useQuery({ id: competitionId }, { refetchInterval: 15000 });
   const { data: teamRanking } = trpc.competitions.teamRanking.useQuery({ id: competitionId }, { refetchInterval: 15000 });
   const { data: bracketMatches } = trpc.bracket.list.useQuery({ competitionId }, { refetchInterval: 15000 });
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
+  const utils = trpc.useUtils();
+
+  const uploadPhotoMut = trpc.sellers.uploadMyPhoto.useMutation({
+    onSuccess: () => {
+      toast.success("Foto atualizada!");
+      utils.competitions.ranking.invalidate();
+      utils.competitions.teamRanking.invalidate();
+      utils.bracket.list.invalidate();
+      utils.sellers.me.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handlePhotoClick = useCallback(() => {
+    if (uploading) return;
+    fileInputRef.current?.click();
+  }, [uploading]);
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione uma imagem (JPG, PNG, etc.)');
+      return;
+    }
+    if (file.size > 7 * 1024 * 1024) {
+      toast.error('Imagem muito grande. M\u00e1ximo 7MB.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        await uploadPhotoMut.mutateAsync({ base64, mimeType: file.type });
+        setUploading(false);
+      };
+      reader.onerror = () => {
+        toast.error('Erro ao ler arquivo');
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setUploading(false);
+    }
+    // Reset input
+    e.target.value = '';
+  }, [uploadPhotoMut]);
+
+  const mySellerId = sellerSession?.id || null;
 
   const isTeamComp = competition?.type === "team" || competition?.type === "group";
   const hasBracket = bracketMatches && bracketMatches.length > 0;
@@ -263,6 +335,14 @@ export default function RaceTrack() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Hidden file input for photo upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center gap-4 h-14">
@@ -278,6 +358,12 @@ export default function RaceTrack() {
               </p>
             </div>
           </div>
+          {sellerSession && (
+            <Button variant="ghost" size="sm" className="text-xs gap-1.5 text-muted-foreground hover:text-primary" onClick={handlePhotoClick} disabled={uploading}>
+              <Camera className="w-3.5 h-3.5" />
+              {uploading ? "Enviando..." : "Minha Foto"}
+            </Button>
+          )}
           {competition.status === "active" && (
             <span className="flex items-center gap-1.5 text-xs font-medium text-green-400 shrink-0">
               <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
@@ -373,7 +459,7 @@ export default function RaceTrack() {
                     {/* 2nd place */}
                     <div className="flex flex-col items-center">
                       <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[1]?.seller?.name || "?"} photoUrl={ranking[1]?.seller?.photoUrl} size="lg" borderColor="#9ca3af" />
+                        <PlayerAvatar name={ranking[1]?.seller?.name || "?"} photoUrl={ranking[1]?.seller?.photoUrl} size="lg" borderColor="#9ca3af" isMe={mySellerId === ranking[1]?.seller?.id} onPhotoChange={handlePhotoClick} />
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-xs font-bold text-white shadow">2</div>
                       </div>
                       <p className="text-xs font-semibold text-foreground text-center truncate max-w-[80px]">{ranking[1]?.seller?.nickname || ranking[1]?.seller?.name}</p>
@@ -386,7 +472,7 @@ export default function RaceTrack() {
                     <div className="flex flex-col items-center -mt-4">
                       <Trophy className="h-7 w-7 text-yellow-500 mb-1" />
                       <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[0]?.seller?.name || "?"} photoUrl={ranking[0]?.seller?.photoUrl} size="xl" borderColor="#eab308" />
+                        <PlayerAvatar name={ranking[0]?.seller?.name || "?"} photoUrl={ranking[0]?.seller?.photoUrl} size="xl" borderColor="#eab308" isMe={mySellerId === ranking[0]?.seller?.id} onPhotoChange={handlePhotoClick} />
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center text-sm font-bold text-white shadow">1</div>
                       </div>
                       <p className="text-sm font-bold text-foreground text-center truncate max-w-[100px]">{ranking[0]?.seller?.nickname || ranking[0]?.seller?.name}</p>
@@ -398,7 +484,7 @@ export default function RaceTrack() {
                     {/* 3rd place */}
                     <div className="flex flex-col items-center">
                       <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[2]?.seller?.name || "?"} photoUrl={ranking[2]?.seller?.photoUrl} size="md" borderColor="#b45309" />
+                        <PlayerAvatar name={ranking[2]?.seller?.name || "?"} photoUrl={ranking[2]?.seller?.photoUrl} size="md" borderColor="#b45309" isMe={mySellerId === ranking[2]?.seller?.id} onPhotoChange={handlePhotoClick} />
                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-amber-700 flex items-center justify-center text-xs font-bold text-white shadow">3</div>
                       </div>
                       <p className="text-xs font-semibold text-foreground text-center truncate max-w-[80px]">{ranking[2]?.seller?.nickname || ranking[2]?.seller?.name}</p>
@@ -501,6 +587,8 @@ export default function RaceTrack() {
                         key={match.id}
                         match={match}
                         roundLabel={matches.length === 1 || round === totalRounds ? roundName(round) : undefined}
+                        mySellerId={mySellerId}
+                        onPhotoChange={handlePhotoClick}
                       />
                     ))}
                 </div>
