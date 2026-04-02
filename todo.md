@@ -1732,3 +1732,15 @@
 - [x] Aba "Mês Anterior" para consultar ranking do mês passado (via monthTurnover.getSnapshot)
 - [x] Aba "Destaques" com campeões/destaques do mês anterior como incentivo (pódio + destaque F&I + agendamentos)
 - [x] Cada mês atualiza automaticamente (ranking atual recalcula em tempo real, snapshots salvos na virada)
+## CRM - Aba Meus Leads Aceitos
+- [x] Filtro "Aceitos" / "Pendentes" / "Todos" no CRM do vendedor para organizar leads
+- [x] Cards visuais com nome, telefone, tempo sem resposta, origem, temperatura (quente/morno/frio)
+- [x] Botões de ação rápida: Recebi, Chat, Ligar, Transferir, Ver detalhes
+- [x] Filtros por origem (Manual, WhatsApp) e temperatura
+- [x] Busca por nome, telefone, placa
+- [x] Alerta visual para leads urgentes sem resposta (vermelho pulsante + contador)
+## Push Notifications - Leads Novos
+- [x] Notificação push no celular quando vendedor recebe lead novo (fora do app)
+- [x] Service Worker com ações "Abrir CRM" e "Ligar" para notificações de lead
+- [x] Prompt de permissão de notificação no CRM (botão sino amarelo no header)
+- [x] Envio de push via Web Push API quando lead é criado/atribuído/transferido

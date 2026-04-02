@@ -122,6 +122,10 @@ export const crmLeadsRouter = router({
       type: "criacao",
       description: `Lead criado: ${input.name}`,
     });
+    // Send push notification to the seller about the new lead
+    if (input.sellerId > 0) {
+      sendPushNewLead(input.sellerId, input.name, input.phone || null, input.source || null, input.vehicleInterest || null).catch(console.error);
+    }
     return { id };
   }),
 

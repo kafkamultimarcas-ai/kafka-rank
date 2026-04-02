@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
   Search, Phone, MessageCircle, Calendar, ChevronRight, Flame, Thermometer,
   Snowflake, Plus, ArrowLeft, Clock, AlertTriangle, User, Car,
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
-  Zap, Bell, Timer, CheckCircle, ArrowUpRight, BarChart3,
+  Zap, Bell, BellRing, Timer, CheckCircle, ArrowUpRight, BarChart3,
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
   Volume2, Download, Play, File, Square, Handshake, Power, Shuffle, CheckCheck
 } from "lucide-react";
@@ -162,6 +163,7 @@ function minutesSinceCreation(createdAt: any): number {
 
 type TabView = "dashboard" | "leads" | "pipeline" | "templates";
 type AssignmentFilter = "all" | "unassigned" | "assigned";
+type LeadStatusFilter = "all" | "accepted" | "pending";
 
 function formatChatTime(ts: number) {
   return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -743,12 +745,14 @@ export default function CrmCommandCenter() {
   const [activeTab, setActiveTab] = useState<TabView>("leads");
   const [showTemplates, setShowTemplates] = useState<number | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("all");
+  const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>("all");
   const [chatLeadId, setChatLeadId] = useState<number | null>(null);
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const sellerId = sellerSession?.id || 0;
   const dept = sellerSession?.department || "vendas";
   const isSDR = dept === "pre_vendas";
+  const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications(sellerId || undefined);
 
   // SDRs see ALL leads via listForSDR, sellers see their own
   const { data: sellerLeads, refetch: refetchSellerLeads } = trpc.crmLeads.listBySeller.useQuery(
@@ -799,9 +803,9 @@ export default function CrmCommandCenter() {
   });
 
   // Leads with urgency alerts + assignment filter
-  const { urgentLeads, warningLeads, normalLeads, filteredLeads, assignmentStats } = useMemo(() => {
+  const { urgentLeads, warningLeads, normalLeads, filteredLeads, assignmentStats, acceptedCount, pendingCount } = useMemo(() => {
     const displayLeads = searchQuery.length >= 2 ? searchResults : leads;
-    if (!displayLeads) return { urgentLeads: [], warningLeads: [], normalLeads: [], filteredLeads: [], assignmentStats: { total: 0, unassigned: 0, assigned: 0 } };
+    if (!displayLeads) return { urgentLeads: [], warningLeads: [], normalLeads: [], filteredLeads: [], assignmentStats: { total: 0, unassigned: 0, assigned: 0 }, acceptedCount: 0, pendingCount: 0 };
 
     // Assignment stats
     const total = displayLeads.length;
@@ -835,9 +839,20 @@ export default function CrmCommandCenter() {
     let all = [...urgent, ...warning, ...normal];
     if (filterScore) all = all.filter(l => l.score === filterScore);
     if (filterSource) all = all.filter(l => l.source === filterSource);
+    // Lead status filter (accepted/pending) for non-SDR sellers
+    if (!isSDR && leadStatusFilter === "accepted") {
+      all = all.filter(l => l.acknowledgedAt);
+    } else if (!isSDR && leadStatusFilter === "pending") {
+      all = all.filter(l => !l.acknowledgedAt);
+    }
 
-    return { urgentLeads: urgent, warningLeads: warning, normalLeads: normal, filteredLeads: all, assignmentStats: { total, unassigned, assigned } };
-  }, [leads, searchResults, searchQuery, filterScore, filterSource, isSDR, assignmentFilter]);
+    // Compute accepted/pending counts
+    const baseForCount = [...urgent, ...warning, ...normal];
+    const acceptedCount = baseForCount.filter(l => l.acknowledgedAt).length;
+    const pendingCount = baseForCount.filter(l => !l.acknowledgedAt).length;
+
+    return { urgentLeads: urgent, warningLeads: warning, normalLeads: normal, filteredLeads: all, assignmentStats: { total, unassigned, assigned }, acceptedCount, pendingCount };
+  }, [leads, searchResults, searchQuery, filterScore, filterSource, isSDR, assignmentFilter, leadStatusFilter]);
 
   const moveStage = trpc.crmLeads.moveStage.useMutation({
     onSuccess: () => { refetchLeads(); toast.success("Etapa atualizada!"); },
@@ -903,6 +918,19 @@ export default function CrmCommandCenter() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {pushSupported && !isSubscribed && permission !== "denied" && (
+              <button
+                onClick={async () => {
+                  const ok = await subscribePush();
+                  if (ok) toast.success("Notificações ativadas! Você será avisado de novos leads.");
+                }}
+                className="p-1.5 hover:bg-accent rounded-lg"
+                title="Ativar notificações de leads"
+              >
+                <Bell className="w-5 h-5 text-yellow-500" />
+              </button>
+            )}
+            {isSubscribed && <BellRing className="w-4 h-4 text-emerald-500" />}
             {(urgentLeads.length > 0 || warningLeads.length > 0) && (
               <div className="relative">
                 <Bell className="w-5 h-5 text-red-400 animate-pulse" />
@@ -1023,6 +1051,23 @@ export default function CrmCommandCenter() {
 
       {activeTab === "leads" && (
         <div className="px-3 mt-3">
+          {/* Seller: Accepted/Pending filter */}
+          {!isSDR && (
+            <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
+              <button onClick={() => setLeadStatusFilter("all")}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${leadStatusFilter === "all" ? "bg-primary/20 border-primary/40 text-primary" : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <LayoutGrid className="w-3 h-3" /> Todos {(leads || []).length}
+              </button>
+              <button onClick={() => setLeadStatusFilter("accepted")}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${leadStatusFilter === "accepted" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <CheckCheck className="w-3 h-3" /> Aceitos {acceptedCount}
+              </button>
+              <button onClick={() => setLeadStatusFilter("pending")}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${leadStatusFilter === "pending" ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <Clock className="w-3 h-3" /> Pendentes {pendingCount}
+              </button>
+            </div>
+          )}
           {/* SDR Assignment filter */}
           {isSDR && (
             <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">

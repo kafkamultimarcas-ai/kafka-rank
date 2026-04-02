@@ -56,6 +56,13 @@ self.addEventListener("push", (event) => {
       if (payload.data && payload.data.type) {
         // Customize actions based on notification type
         switch (payload.data.type) {
+          case "new_lead":
+          case "lead_transferred":
+            data.actions = [
+              { action: "open", title: "Abrir CRM" },
+              { action: "call", title: "Ligar" },
+            ];
+            break;
           case "pending_sale":
           case "pending_record":
             data.actions = [
