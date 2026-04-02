@@ -1182,8 +1182,8 @@ function SDRDashboard({ stats, assignmentStats, leads, sellerMap, vendorSellers,
   const recentLeads = useMemo(() => {
     return [...leads]
       .sort((a: any, b: any) => {
-        const aTime = new Date(a.createdAt).getTime();
-        const bTime = new Date(b.createdAt).getTime();
+        const aTime = a.lastContactDate || new Date(a.updatedAt || a.createdAt).getTime();
+        const bTime = b.lastContactDate || new Date(b.updatedAt || b.createdAt).getTime();
         return bTime - aTime;
       })
       .slice(0, 5);

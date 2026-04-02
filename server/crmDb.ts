@@ -87,7 +87,7 @@ export async function listLeadsBySeller(sellerId: number, opts?: { department?: 
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
   if (opts?.score) conditions.push(eq(crmLeads.score, opts.score as "hot" | "warm" | "cold"));
-  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.createdAt));
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.updatedAt));
 }
 export async function listLeadsByDepartment(department: string, opts?: { archived?: boolean; stage?: string }) {
   const db = await getDb();
@@ -95,7 +95,7 @@ export async function listLeadsByDepartment(department: string, opts?: { archive
   const conditions = [eq(crmLeads.department, department)];
   if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
   if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
-  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.createdAt));
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.updatedAt));
 }
 
 export async function listAllLeads(opts?: { archived?: boolean; department?: string; sellerId?: number }) {
@@ -106,7 +106,7 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
   if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
   if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where)).orderBy(desc(crmLeads.createdAt));
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where)).orderBy(desc(crmLeads.updatedAt));
 }
 
 export async function updateLead(id: number, data: Partial<InsertCrmLead>) {
@@ -129,7 +129,7 @@ export async function searchLeads(query: string, sellerId?: number) {
   const conditions = sellerId
     ? and(eq(crmLeads.sellerId, sellerId), searchConditions)
     : searchConditions;
-  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), conditions)).orderBy(desc(crmLeads.createdAt)).limit(50);
+  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), conditions)).orderBy(desc(crmLeads.updatedAt)).limit(50);
 }
 
 export async function getLeadsNeedingFollowUp(sellerId: number) {

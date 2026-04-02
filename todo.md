@@ -1701,3 +1701,7 @@
 - [x] UI para selecionar e trocar participantes entre confrontos (toque-para-trocar)
 - [x] Botão de lápis para substituir participante por outro da lista
 - [x] Backend swapParticipants e editMatch para salvar alterações nos brackets
+
+## CRM - Ordenação de Leads/Conversas
+- [x] Corrigir ordenação dos leads para mais recentes primeiro (por última atividade/updatedAt)
+- [x] Leads com atividade mais recente aparecem no topo (backend + frontend)
