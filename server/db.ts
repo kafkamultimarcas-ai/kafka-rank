@@ -48,27 +48,42 @@ export async function getDb() {
 }
 
 /** Wrapper that retries once on ECONNRESET */
-export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch (err: any) {
-    if (err?.cause?.code === 'ECONNRESET' || err?.message?.includes('ECONNRESET')) {
-      console.warn('[Database] ECONNRESET - reconnecting and retrying...');
-      resetDbConnection();
+export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
       return await fn();
+    } catch (err: any) {
+      const isRetryable = err?.cause?.code === 'ECONNRESET' || err?.message?.includes('ECONNRESET') ||
+        err?.cause?.code === 'ETIMEDOUT' || err?.message?.includes('ETIMEDOUT') ||
+        err?.cause?.code === 'ECONNREFUSED' || err?.message?.includes('Connection lost');
+      if (isRetryable && attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        console.warn(`[Database] Connection error (attempt ${attempt + 1}/${maxRetries}) - retrying in ${delay}ms...`);
+        resetDbConnection();
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
     }
-    throw err;
   }
+  throw new Error('withRetry: should not reach here');
 }
 
 // Raw SQL query helper for audit trail and ad-hoc updates
 export async function rawQuery(query: string, params: any[] = []) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  return db.execute(sql.raw(query.replace(/\?/g, () => {
-    const val = params.shift();
-    return typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : String(val);
-  })));
+  // Use Drizzle's sql template for proper parameterized queries
+  const chunks: any[] = [];
+  const parts = query.split('?');
+  for (let i = 0; i < parts.length; i++) {
+    chunks.push(sql.raw(parts[i]));
+    if (i < params.length) {
+      chunks.push(sql`${params[i]}`);
+    }
+  }
+  const combined = sql.join(chunks, sql.raw(''));
+  return db.execute(combined);
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

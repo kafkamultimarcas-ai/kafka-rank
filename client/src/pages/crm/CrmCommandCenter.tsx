@@ -823,7 +823,7 @@ export default function CrmCommandCenter() {
     filtered.forEach((lead: any) => {
       const mins = minutesSinceCreation(lead.createdAt);
       const lastContact = lead.lastContactDate ? Math.floor((Date.now() - lead.lastContactDate) / (1000 * 60)) : 999;
-      if (lastContact === 999 && mins >= 20) {
+      if (lastContact === 999 && mins >= 10) {
         urgent.push({ ...lead, _alertType: "transfer" });
       } else if (lastContact === 999 && mins >= 5) {
         warning.push({ ...lead, _alertType: "priority" });
@@ -939,10 +939,10 @@ export default function CrmCommandCenter() {
           <div className="flex items-center gap-2 mb-2">
             <Timer className="w-5 h-5 text-red-400" />
             <span className="text-xs font-bold text-red-400 uppercase tracking-wider">
-              URGENTE! {urgentLeads.length} lead(s) sem resposta há 20min+
+              URGENTE! {urgentLeads.length} lead(s) sem resposta há 10min+
             </span>
           </div>
-          <p className="text-[10px] text-red-300/80 mb-2">Esses leads serão redistribuídos automaticamente. Responda AGORA!</p>
+          <p className="text-[10px] text-red-300/80 mb-2">Esses leads serão transferidos automaticamente para outro vendedor. Responda AGORA!</p>
           {urgentLeads.slice(0, 3).map((lead: any) => (
             <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-red-500/20">
               <div className="flex-1 min-w-0">

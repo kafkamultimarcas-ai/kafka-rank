@@ -69,6 +69,9 @@ async function startServer() {
   app.use("/api/trpc/sellerSession.login", loginLimiter);
   app.use("/api/trpc/managers.login", loginLimiter);
   app.use("/api/trpc/access.verify", loginLimiter);
+  app.use("/api/trpc/superAdmin.login", loginLimiter);
+  app.use("/api/trpc/crmAdmin.login", loginLimiter);
+  app.use("/api/trpc/sellerSession.register", loginLimiter);
 
   // Rate limit para webhooks públicos: 30 por minuto por IP (anti spam)
   const webhookLimiter = rateLimit({

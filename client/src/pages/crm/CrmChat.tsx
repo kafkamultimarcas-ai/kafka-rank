@@ -397,7 +397,7 @@ function LeadList({
                     )}
                     {!lead.vehicleInterest && lead.notes && (
                       <span className="text-[11px] text-muted-foreground truncate flex-1">
-                        {lead.notes.substring(0, 50)}
+                        {lead.notes.replace(/^Primeira mensagem:\s*/i, '').substring(0, 50)}
                       </span>
                     )}
                     {!lead.vehicleInterest && !lead.notes && (

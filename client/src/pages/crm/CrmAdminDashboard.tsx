@@ -13,7 +13,8 @@ import {
   Package, DollarSign, Shield, Menu, X, Bell, Wallet, Receipt, Camera,
   AlertTriangle, Clock, Check, ArrowUpRight, ArrowDownRight, FileText,
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
-  CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2
+  CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2,
+  Shuffle, ArrowRightLeft, Timer, Headphones, Target
 } from "lucide-react";
 
 const DEPT_LABELS: Record<string, string> = {
@@ -35,7 +36,7 @@ const DEPT_COLORS: Record<string, string> = {
   financeiro: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
 };
 
-type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial";
+type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr";
 
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
@@ -73,6 +74,7 @@ export default function CrmAdminDashboard() {
     { key: "financial" as const, icon: Wallet, label: "Financeiro" },
     { key: "campaigns" as const, icon: Megaphone, label: "Campanhas" },
     { key: "marketing" as const, icon: BarChart3, label: "Marketing" },
+    { key: "sdr" as const, icon: Headphones, label: "Painel SDR" },
     { key: "settings" as const, icon: Settings, label: "Ajustes" },
   ];
 
@@ -182,6 +184,7 @@ export default function CrmAdminDashboard() {
           {activeView === "marketing" && <MarketingView />}
           {activeView === "settings" && <SettingsView />}
           {activeView === "pipeline" && <AdminPipelineView />}
+          {activeView === "sdr" && <SDRManagementView />}
         </div>
       </main>
     </div>
@@ -2125,6 +2128,470 @@ function AdminPipelineView() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+
+// ===== SDR MANAGEMENT VIEW =====
+function SDRManagementView() {
+  const [showCreateSDR, setShowCreateSDR] = useState(false);
+  const [sdrForm, setSdrForm] = useState({ name: "", nickname: "", phone: "", email: "" });
+  const [selectedSDR, setSelectedSDR] = useState<number | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedLeads, setSelectedLeads] = useState<Set<number>>(new Set());
+  const [assignTarget, setAssignTarget] = useState("");
+  const [showAllUnassigned, setShowAllUnassigned] = useState(false);
+  const UNASSIGNED_PAGE_SIZE = 20;
+
+  // Fetch SDR sellers (department = pre_vendas)
+  const { data: allSellers } = trpc.sellers.list.useQuery();
+  const sdrSellers = useMemo(() => (allSellers || []).filter((s: any) => s.department === "pre_vendas" && s.active), [allSellers]);
+  const vendorSellers = useMemo(() => (allSellers || []).filter((s: any) => (s.department === "vendas" || !s.department) && s.active), [allSellers]);
+
+  // Fetch all leads and unassigned leads
+  const { data: allLeads, refetch: refetchLeads } = trpc.crmLeads.listAll.useQuery({ archived: false });
+  const { data: unassignedLeads, refetch: refetchUnassigned } = trpc.crmLeads.listUnassigned.useQuery({});
+
+  // Distribution config
+  const { data: distConfig, refetch: refetchConfig } = trpc.crmDistribution.getConfig.useQuery();
+  const updateConfigMut = trpc.crmDistribution.updateConfig.useMutation({
+    onSuccess: () => { refetchConfig(); toast.success("Configuração atualizada!"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const autoDistributeMut = trpc.crmDistribution.autoDistributeToSellers.useMutation({
+    onSuccess: (data) => {
+      refetchLeads(); refetchUnassigned();
+      if (data.distributed > 0) toast.success(`${data.distributed} leads distribuídos!`);
+      else toast.info("Nenhum lead para distribuir.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Create SDR seller
+  const createSeller = trpc.sellers.create.useMutation({
+    onSuccess: () => {
+      toast.success("SDR criado com sucesso!");
+      setSdrForm({ name: "", nickname: "", phone: "", email: "" });
+      setShowCreateSDR(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Assign lead
+  const assignLead = trpc.crmLeads.assignToSeller.useMutation({
+    onSuccess: () => { refetchLeads(); refetchUnassigned(); toast.success("Lead transferido!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Bulk assign
+  const bulkAssign = trpc.crmLeads.bulkAssign.useMutation({
+    onSuccess: (r: any) => {
+      refetchLeads(); refetchUnassigned(); setSelectedLeads(new Set()); setBulkMode(false);
+      toast.success(`${r.assigned} leads distribuídos!`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const vendasConfig = useMemo(() => distConfig?.find((c: any) => c.department === "vendas"), [distConfig]);
+  const isAutoEnabled = vendasConfig?.enabled ?? false;
+
+  // Stats
+  const stats = useMemo(() => {
+    if (!allLeads) return { total: 0, unassigned: 0, assigned: 0, hot: 0, waiting5min: 0, waiting10min: 0 };
+    const now = Date.now();
+    return {
+      total: allLeads.length,
+      unassigned: allLeads.filter(l => l.sellerId === 0).length,
+      assigned: allLeads.filter(l => l.sellerId > 0).length,
+      hot: allLeads.filter(l => l.score === "hot").length,
+      waiting5min: allLeads.filter(l => {
+        const created = typeof l.createdAt === 'number' ? l.createdAt : new Date(l.createdAt!).getTime();
+        return l.sellerId === 0 && (now - created) > 5 * 60000;
+      }).length,
+      waiting10min: allLeads.filter(l => {
+        const created = typeof l.createdAt === 'number' ? l.createdAt : new Date(l.createdAt!).getTime();
+        return l.sellerId > 0 && (now - created) > 10 * 60000;
+      }).length,
+    };
+  }, [allLeads]);
+
+  // Leads per seller
+  const sellerLeadCounts = useMemo(() => {
+    if (!allLeads) return {} as Record<number, number>;
+    return allLeads.reduce((acc, l) => { if (l.sellerId > 0) acc[l.sellerId] = (acc[l.sellerId] || 0) + 1; return acc; }, {} as Record<number, number>);
+  }, [allLeads]);
+
+  // Leads per SDR
+  const sdrLeadCounts = useMemo(() => {
+    if (!allLeads) return {} as Record<number, number>;
+    // SDRs are tracked by who created the activity
+    return {};
+  }, [allLeads]);
+
+  const sellerMap = useMemo(() => {
+    if (!allSellers) return {} as Record<number, string>;
+    return allSellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
+  }, [allSellers]);
+
+  const toggleLead = (id: number) => {
+    setSelectedLeads(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkAssign = () => {
+    if (!assignTarget || selectedLeads.size === 0) return;
+    bulkAssign.mutate({
+      leadIds: Array.from(selectedLeads),
+      newSellerId: parseInt(assignTarget),
+      currentSellerId: 0,
+    });
+  };
+
+  const crmTimeAgo = (ts: number | string | Date | null | undefined) => {
+    if (!ts) return "—";
+    const ms = typeof ts === 'number' ? ts : new Date(ts).getTime();
+    const diff = Date.now() - ms;
+    if (diff < 60000) return "agora";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}min`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+    return `${Math.floor(diff / 86400000)}d`;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <Headphones className="w-5 h-5 text-purple-400" /> Painel SDR
+          </h2>
+          <p className="text-xs text-muted-foreground">Gerencie SDRs, distribua leads e monitore tempos de resposta</p>
+        </div>
+        <Button size="sm" onClick={() => setShowCreateSDR(!showCreateSDR)} className="bg-purple-600 hover:bg-purple-700 text-white">
+          <Plus className="w-3.5 h-3.5 mr-1" /> Novo SDR
+        </Button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="rounded-xl border border-border bg-card p-3 text-center">
+          <Users className="w-4 h-4 text-primary mx-auto mb-1" />
+          <p className="text-xl font-bold text-foreground">{stats.total}</p>
+          <p className="text-[10px] text-muted-foreground">Total Leads</p>
+        </div>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-center">
+          <UserPlus className="w-4 h-4 text-amber-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-amber-400">{stats.unassigned}</p>
+          <p className="text-[10px] text-amber-400/70">Sem Vendedor</p>
+        </div>
+        <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 text-center">
+          <CheckCircle className="w-4 h-4 text-cyan-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-cyan-400">{stats.assigned}</p>
+          <p className="text-[10px] text-cyan-400/70">Com Vendedor</p>
+        </div>
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-center">
+          <Flame className="w-4 h-4 text-red-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-red-400">{stats.hot}</p>
+          <p className="text-[10px] text-red-400/70">Quentes</p>
+        </div>
+        <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-3 text-center">
+          <Timer className="w-4 h-4 text-orange-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-orange-400">{stats.waiting5min}</p>
+          <p className="text-[10px] text-orange-400/70">5min+ sem SDR</p>
+        </div>
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-center">
+          <AlertTriangle className="w-4 h-4 text-red-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-red-400">{stats.waiting10min}</p>
+          <p className="text-[10px] text-red-400/70">10min+ sem resposta</p>
+        </div>
+      </div>
+
+      {/* Distribution Controls */}
+      <div className="rounded-xl border-2 border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-indigo-500/5 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Shuffle className="w-4 h-4 text-purple-400" /> Distribuição de Leads
+          </h3>
+          <button
+            onClick={() => updateConfigMut.mutate({ department: "vendas", enabled: !isAutoEnabled })}
+            disabled={updateConfigMut.isPending}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all ${
+              isAutoEnabled
+                ? "bg-green-500/20 text-green-400 border-2 border-green-500/40 shadow-lg shadow-green-500/10"
+                : "bg-gray-500/20 text-gray-400 border-2 border-gray-500/30"
+            }`}
+          >
+            <Power className="w-3.5 h-3.5" />
+            {isAutoEnabled ? "AUTOMÁTICO ATIVO" : "MANUAL"}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-card/50 border border-border">
+            <p className="text-xs font-medium text-foreground mb-1">Modo Automático</p>
+            <p className="text-[10px] text-muted-foreground">Leads novos são distribuídos automaticamente por round-robin entre os vendedores ativos. Se não responderem em 10 minutos, o lead é transferido.</p>
+          </div>
+          <div className="p-3 rounded-lg bg-card/50 border border-border">
+            <p className="text-xs font-medium text-foreground mb-1">Modo Manual</p>
+            <p className="text-[10px] text-muted-foreground">Você escolhe para qual vendedor enviar cada lead. Use os botões abaixo para distribuir individualmente ou em lote.</p>
+          </div>
+        </div>
+        {(unassignedLeads?.length || 0) > 0 && (
+          <div className="mt-3 flex gap-2">
+            <Button
+              onClick={() => autoDistributeMut.mutate({ department: "vendas", sdrSellerId: sdrSellers[0]?.id || 0 })}
+              disabled={autoDistributeMut.isPending}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold"
+            >
+              <Shuffle className="w-4 h-4 mr-2" />
+              {autoDistributeMut.isPending ? "Distribuindo..." : `Distribuir ${unassignedLeads?.length} leads automaticamente`}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setBulkMode(!bulkMode); setSelectedLeads(new Set()); }}
+              className="border-purple-500/30 text-purple-400"
+            >
+              <ArrowRightLeft className="w-4 h-4 mr-1" /> Manual
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* SDR Team */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+          <Headphones className="w-4 h-4 text-purple-400" /> Equipe SDR ({sdrSellers.length})
+        </h3>
+        {sdrSellers.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {sdrSellers.map((sdr: any) => (
+              <div key={sdr.id} className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-all">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <Headphones className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-foreground truncate">{sdr.nickname || sdr.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{sdr.phone || sdr.email || "SDR"}</p>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Ativo</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <Headphones className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Nenhum SDR cadastrado</p>
+            <p className="text-xs text-muted-foreground/60 mb-3">Crie SDRs para gerenciar a distribuição de leads</p>
+            <Button size="sm" onClick={() => setShowCreateSDR(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Plus className="w-3.5 h-3.5 mr-1" /> Criar Primeiro SDR
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Create SDR Form */}
+      {showCreateSDR && (
+        <div className="rounded-xl border-2 border-purple-500/30 bg-card p-4">
+          <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-purple-400" /> Novo SDR
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Nome *</label>
+              <Input value={sdrForm.name} onChange={e => setSdrForm({...sdrForm, name: e.target.value})} placeholder="Nome completo" className="h-9" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Apelido</label>
+              <Input value={sdrForm.nickname} onChange={e => setSdrForm({...sdrForm, nickname: e.target.value})} placeholder="Apelido (opcional)" className="h-9" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Telefone</label>
+              <Input value={sdrForm.phone} onChange={e => setSdrForm({...sdrForm, phone: e.target.value})} placeholder="(47) 99999-9999" className="h-9" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+              <Input value={sdrForm.email} onChange={e => setSdrForm({...sdrForm, email: e.target.value})} placeholder="email@exemplo.com" className="h-9" />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button
+              onClick={() => {
+                if (!sdrForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+                createSeller.mutate({ name: sdrForm.name, nickname: sdrForm.nickname || undefined, phone: sdrForm.phone || undefined, email: sdrForm.email || undefined, department: "pre_vendas" });
+              }}
+              disabled={createSeller.isPending}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {createSeller.isPending ? "Criando..." : "Criar SDR"}
+            </Button>
+            <Button variant="outline" onClick={() => setShowCreateSDR(false)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Leads per Seller Distribution */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-primary" /> Leads por Vendedor
+        </h3>
+        {vendorSellers.length > 0 ? (
+          <div className="space-y-2">
+            {vendorSellers.map((s: any) => {
+              const count = sellerLeadCounts[s.id] || 0;
+              const maxCount = Math.max(...Object.values(sellerLeadCounts), 1);
+              return (
+                <div key={s.id} className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-primary">{(s.nickname || s.name || "?").charAt(0).toUpperCase()}</span>
+                  </div>
+                  <span className="text-xs text-foreground w-28 truncate font-medium">{s.nickname || s.name}</span>
+                  <div className="flex-1 h-6 bg-accent/30 rounded-full overflow-hidden relative">
+                    <div className="h-full bg-gradient-to-r from-primary/60 to-primary/30 rounded-full transition-all duration-700"
+                      style={{ width: `${Math.max((count / maxCount) * 100, 2)}%` }} />
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">{count} leads</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhum vendedor ativo</p>
+        )}
+      </div>
+
+      {/* Unassigned Leads - Manual Distribution */}
+      {(unassignedLeads?.length || 0) > 0 && (
+        <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/5 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> {unassignedLeads?.length} Leads Aguardando Distribuição
+            </h3>
+            {bulkMode && selectedLeads.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-foreground font-medium">{selectedLeads.size} selecionados</span>
+                <select value={assignTarget} onChange={e => setAssignTarget(e.target.value)}
+                  className="h-8 px-2 text-xs rounded-lg border border-border bg-background text-foreground">
+                  <option value="">Vendedor...</option>
+                  {vendorSellers.map((s: any) => <option key={s.id} value={s.id}>{s.nickname || s.name}</option>)}
+                </select>
+                <Button size="sm" onClick={handleBulkAssign} disabled={!assignTarget || bulkAssign.isPending}
+                  className="h-8 bg-purple-600 hover:bg-purple-700 text-white text-xs">
+                  {bulkAssign.isPending ? "..." : "Distribuir"}
+                </Button>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            {(showAllUnassigned ? unassignedLeads : unassignedLeads?.slice(0, UNASSIGNED_PAGE_SIZE))?.map((lead: any) => {
+              const created = typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt).getTime();
+              const waitMinutes = Math.floor((Date.now() - created) / 60000);
+              const isUrgent = waitMinutes >= 10;
+              const isWarning = waitMinutes >= 5 && waitMinutes < 10;
+              return (
+                <div key={lead.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                  isUrgent ? "border-red-500/50 bg-red-500/10" :
+                  isWarning ? "border-amber-500/40 bg-amber-500/10" :
+                  "border-border bg-card"
+                } ${bulkMode && selectedLeads.has(lead.id) ? "ring-2 ring-purple-500/50" : ""}`}>
+                  {bulkMode && (
+                    <input type="checkbox" checked={selectedLeads.has(lead.id)} onChange={() => toggleLead(lead.id)} className="rounded border-border" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground truncate">{lead.name}</span>
+                      {isUrgent && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/30 text-red-400 font-bold animate-pulse">
+                          {waitMinutes}min!
+                        </span>
+                      )}
+                      {isWarning && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-400 font-bold">
+                          {waitMinutes}min
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      {lead.phone && <span>{lead.phone}</span>}
+                      {lead.vehicleInterest && <span>• {lead.vehicleInterest}</span>}
+                      {lead.source && <span>• {lead.source}</span>}
+                    </div>
+                  </div>
+                  {!bulkMode && (
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        defaultValue=""
+                        onChange={e => {
+                          const v = parseInt(e.target.value);
+                          if (v) assignLead.mutate({ leadId: lead.id, newSellerId: v, currentSellerId: 0 });
+                        }}
+                        className="h-8 px-2 text-[10px] rounded-lg border border-border bg-background text-foreground min-w-[110px]"
+                      >
+                        <option value="">Enviar para →</option>
+                        {vendorSellers.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                        ))}
+                      </select>
+                      {lead.phone && (
+                        <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
+                          className="p-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 active:scale-95">
+                          <MessageCircle className="w-3.5 h-3.5 text-green-400" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {(unassignedLeads?.length || 0) > UNASSIGNED_PAGE_SIZE && !showAllUnassigned && (
+            <button onClick={() => setShowAllUnassigned(true)}
+              className="w-full mt-3 py-2 text-xs font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/15 rounded-lg transition-all">
+              Ver todos os {unassignedLeads?.length} leads ({(unassignedLeads?.length || 0) - UNASSIGNED_PAGE_SIZE} restantes)
+            </button>
+          )}
+          {showAllUnassigned && (unassignedLeads?.length || 0) > UNASSIGNED_PAGE_SIZE && (
+            <button onClick={() => setShowAllUnassigned(false)}
+              className="w-full mt-3 py-2 text-xs font-bold text-muted-foreground hover:text-foreground bg-accent/30 hover:bg-accent/50 rounded-lg transition-all">
+              Mostrar menos
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Alert Configuration Info */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+          <Bell className="w-4 h-4 text-amber-400" /> Regras de Alerta Automático
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+            <div className="flex items-center gap-2 mb-1">
+              <Timer className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-amber-400">5 minutos</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Lead sem SDR é distribuído automaticamente para o próximo vendedor (round-robin)</p>
+          </div>
+          <div className="p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-4 h-4 text-orange-400" />
+              <span className="text-xs font-bold text-orange-400">8 minutos</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Vendedor recebe aviso: "Lead será transferido em 2 minutos se não responder!"</p>
+          </div>
+          <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/20">
+            <div className="flex items-center gap-2 mb-1">
+              <ArrowRightLeft className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-bold text-red-400">10 minutos</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Lead é transferido automaticamente para outro vendedor. Vendedor anterior é notificado.</p>
+          </div>
+        </div>
       </div>
     </div>
   );

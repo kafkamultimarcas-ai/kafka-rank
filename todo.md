@@ -1623,3 +1623,38 @@
 - [x] Link no menu lateral (DashboardLayout)
 - [x] Endpoints tRPC: executar virada, listar snapshots, listar meses
 - [ ] Virada automática via cron job (dia 1 de cada mês)
+
+## Sprint: Correção Total + Segurança + CRM Visual + SDR - 01/04/2026
+
+### Bugs - Varredura Completa
+- [x] Auditar todos os console errors no browser - 0 erros
+- [x] Auditar todos os erros de rede (HTTP 4xx/5xx) - 0 erros HTTP
+- [x] Auditar TypeScript errors (0 tolerância) - 0 erros TS
+- [x] Corrigir todos os bugs encontrados - ECONNRESET fix, threshold 20→10min
+
+### Segurança
+- [x] Auditar rate limiting em rotas sensíveis - adicionado em Super Admin e CRM Admin login
+- [x] Auditar validação de input (zod) em todas as rotas - OK
+- [x] Auditar SQL injection protection - rawQuery corrigido para queries parametrizadas
+- [x] Auditar XSS protection - nenhum dangerouslySetInnerHTML
+- [x] Auditar CSRF protection - helmet configurado
+- [x] Auditar autenticação/autorização em todas as rotas protegidas - OK
+- [x] Auditar exposição de dados sensíveis - safeColumns exclui passwordHash
+- [x] Implementar melhorias de segurança encontradas
+
+### CRM - Melhoria Visual
+- [x] Redesign visual do CRM - tema escuro consistente, badges coloridos
+- [x] Cards de lead mais visuais com temperatura/score colorido
+- [x] Dashboard CRM com métricas visuais (gráficos, funil)
+- [x] Filtros mais intuitivos e visuais
+- [x] Botão de distribuição automática/manual visível
+
+### SDR - Painel Próprio
+- [x] Painel SDR dedicado com visão de leads recebidos
+- [x] Criar/gerenciar múltiplos SDRs - botão Novo SDR no painel
+- [x] Distribuição automática de leads entre SDRs (round-robin)
+- [x] Distribuição manual de leads para SDR específico
+- [x] Alerta de 10 minutos: aviso que lead será transferido se SDR não responder
+- [x] Transferência automática após 10 min sem resposta
+- [x] SDR qualifica e distribui lead para vendedor
+- [x] Histórico de distribuição (quem recebeu, quando, transferências)
