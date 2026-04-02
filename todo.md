@@ -1717,3 +1717,8 @@
 - [x] Mostrar fotos dos vendedores como avatares nos confrontos e ranking
 - [x] Exibir Mata-Mata com visual VS esportivo para vendedores (Swords icon, AO VIVO badge)
 - [x] Mostrar equipes visíveis para vendedores na competição (aba Equipes com membros)
+
+## Competição - Fix Visual Vendedor
+- [x] Vendedor agora vê visual esportivo com abas Corrida/Mata-Mata/Equipes (RaceTrack.tsx reescrito)
+- [x] Confrontos Mata-Mata com placar estilo futebol: Foto Nome SCORE VS SCORE Nome Foto
+- [x] RaceTrack.tsx atualizado com FootballMatchCard, PlayerAvatar, badges AO VIVO e coroa para vencedor
