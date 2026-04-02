@@ -1690,3 +1690,8 @@
 - [x] Ícone de olho na tela Equipe para controlar permissões por vendedor - Eye icon em todos os colaboradores
 - [x] Permissões padrão automáticas por setor (vendedor só vê o dele, financeiro só financeiro, etc.) - initDefaultSellerPermissions
 - [x] Opção manual para liberar acesso extra - botões "Liberar tudo", "Bloquear tudo", "Padrão por setor"
+
+## Relatório de Agendamentos em PDF
+- [x] Gerar relatório de agendamentos em PDF para download (não apenas link)
+- [x] Botão de exportar PDF na tela de agendamentos (Admin + Vendedor)
+- [x] PDF formatado com tabela igual ao relatório web para enviar por WhatsApp/e-mail

@@ -9,8 +9,9 @@ import {
   CalendarClock, Search, Trash2, Edit2, Phone, Mail, Car, Clock,
   CheckCircle2, XCircle, AlertCircle, UserCheck, User,
   AlertTriangle, PhoneCall, Save, X, Bell, CalendarPlus,
-  Timer, Siren, Flame, Printer, Bot, ArrowRightLeft, RotateCcw,
+  Timer, Siren, Flame, Printer, Bot, ArrowRightLeft, RotateCcw, Download,
 } from "lucide-react";
+import { exportAgendamentosPDF } from "@/lib/pdfExport";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
@@ -198,30 +199,13 @@ function formatDateShort(ts: number | string | Date | null) {
       if (r.status === 'approved' && r.attendanceStatus === 'pending') return true;
       return false;
     });
-    if (rescueAndActive.length === 0) { toast.info("Nenhum agendamento para imprimir"); return; }
-    let html = `<html><head><meta charset="utf-8"><title>Agendamentos</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#333}h1{font-size:18px;border-bottom:2px solid #e74c3c;padding-bottom:8px}h2{font-size:14px;margin-top:20px;color:#e74c3c}table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th{background:#2c3e50;color:white;padding:8px;text-align:left}td{padding:6px 8px;border-bottom:1px solid #ddd}.rescue{background:#fff3cd}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold}.rescue-badge{background:#e74c3c;color:white}.active-badge{background:#27ae60;color:white}@media print{body{padding:0}}</style></head><body>`;
-    html += `<h1>Agendamentos - ${new Date().toLocaleDateString('pt-BR')}</h1>`;
-    const rescues = rescueAndActive.filter(r => r.attendanceStatus === 'no_show' || (r.scheduledDate && now - r.scheduledDate > FORTY_EIGHT_HOURS));
-    const actives = rescueAndActive.filter(r => !rescues.includes(r));
-    if (rescues.length > 0) {
-      html += `<h2>RESGATES (${rescues.length})</h2><table><tr><th>Ticket</th><th>Cliente</th><th>Telefone</th><th>Ve\u00edculo</th><th>Vendedor</th><th>Agendado</th><th>Obs</th></tr>`;
-      rescues.forEach(r => {
-        html += `<tr class="rescue"><td>${r.ticketNumber || '#' + r.id}</td><td>${r.customerName || '-'}</td><td>${r.customerPhone || '-'}</td><td>${r.vehicleInterest || '-'}</td><td>${sellerMap.get(r.sellerId) || '?'}</td><td>${r.scheduledDate ? formatDate(r.scheduledDate) : '-'}</td><td>${r.notes || '-'}</td></tr>`;
-      });
-      html += '</table>';
-    }
-    if (actives.length > 0) {
-      html += `<h2>ATIVOS (${actives.length})</h2><table><tr><th>Ticket</th><th>Cliente</th><th>Telefone</th><th>Ve\u00edculo</th><th>Vendedor</th><th>Agendado</th><th>Obs</th></tr>`;
-      actives.forEach(r => {
-        html += `<tr><td>${r.ticketNumber || '#' + r.id}</td><td>${r.customerName || '-'}</td><td>${r.customerPhone || '-'}</td><td>${r.vehicleInterest || '-'}</td><td>${sellerMap.get(r.sellerId) || '?'}</td><td>${r.scheduledDate ? formatDate(r.scheduledDate) : '-'}</td><td>${r.notes || '-'}</td></tr>`;
-      });
-      html += '</table>';
-    }
-    html += '</body></html>';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
-    if (printWindow) { printWindow.onload = () => { printWindow.print(); }; }
+    if (rescueAndActive.length === 0) { toast.info("Nenhum agendamento para exportar"); return; }
+    const success = exportAgendamentosPDF({
+      records: rescueAndActive,
+      sellerMap,
+      title: "Relatório de Agendamentos",
+    });
+    if (success) toast.success("PDF baixado com sucesso!");
   }
 
   function handleTransfer(recordId: number) {
@@ -247,9 +231,9 @@ function formatDateShort(ts: number | string | Date | null) {
             <h1 className="text-2xl font-bold font-heading">Agendamentos</h1>
           </div>
           <div className="flex items-center gap-2 text-sm flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-orange-500 text-orange-400 hover:bg-orange-500/20">
-              <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Imprimir / PDF</span>
+            <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-emerald-500 text-emerald-400 hover:bg-emerald-500/20">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Baixar PDF</span>
             </Button>
             {rescueRecords.length > 0 && (
               <span className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 font-bold animate-pulse flex items-center gap-1.5">

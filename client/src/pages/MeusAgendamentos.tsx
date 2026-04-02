@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { exportAgendamentosPDF } from "@/lib/pdfExport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo, useEffect, useCallback } from "react";
@@ -274,32 +275,19 @@ export default function MeusAgendamentos() {
       return;
     }
     const sellerName = seller?.name || 'Vendedor';
-    const dateStr = new Date().toLocaleDateString('pt-BR');
-    let html = `<html><head><meta charset="utf-8"><title>Agendamentos - ${sellerName}</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#333}h1{font-size:18px;border-bottom:2px solid #e74c3c;padding-bottom:8px}h2{font-size:14px;margin-top:20px;color:#e74c3c}table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}th{background:#2c3e50;color:white;padding:8px;text-align:left}td{padding:6px 8px;border-bottom:1px solid #ddd}.rescue{background:#fff3cd}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:bold}.rescue-badge{background:#e74c3c;color:white}.active-badge{background:#27ae60;color:white}.feirao-badge{background:#f39c12;color:white}@media print{body{padding:0}}</style></head><body>`;
-    html += `<h1>Agendamentos - ${sellerName} (${dateStr})</h1>`;
-    if (rescueList.length > 0) {
-      html += `<h2>RESGATAR CLIENTES (${rescueList.length})</h2>`;
-      html += '<table><tr><th>#</th><th>Cliente</th><th>Telefone</th><th>Interesse</th><th>Agendado</th><th>Obs</th></tr>';
-      rescueList.forEach((a: any) => {
-        html += `<tr class="rescue"><td>${a.ticketNumber || '-'}</td><td>${a.customerName || '-'}</td><td>${a.customerPhone || '-'}</td><td>${a.vehicleInterest || '-'}</td><td>${a.scheduledDate ? new Date(Number(a.scheduledDate)).toLocaleString('pt-BR') : '-'}</td><td>${a.notes || ''}</td></tr>`;
-      });
-      html += '</table>';
+    // Build a simple sellerMap from allSellers
+    const sellerMap = new Map<number, string>();
+    if (allSellers) {
+      allSellers.forEach((s: any) => sellerMap.set(s.id, s.name));
     }
-    if (activeList.length > 0) {
-      html += `<h2>AGENDAMENTOS ATIVOS (${activeList.length})</h2>`;
-      html += '<table><tr><th>#</th><th>Cliente</th><th>Telefone</th><th>Interesse</th><th>Agendado</th><th>Obs</th></tr>';
-      activeList.forEach((a: any) => {
-        html += `<tr><td>${a.ticketNumber || '-'}</td><td>${a.customerName || '-'}</td><td>${a.customerPhone || '-'}</td><td>${a.vehicleInterest || '-'}</td><td>${a.scheduledDate ? new Date(Number(a.scheduledDate)).toLocaleString('pt-BR') : '-'}</td><td>${a.notes || ''}</td></tr>`;
-      });
-      html += '</table>';
-    }
-    html += '</body></html>';
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
-    if (printWindow) {
-      printWindow.onload = () => { printWindow.print(); };
-    }
+    sellerMap.set(sellerId, sellerName);
+    const success = exportAgendamentosPDF({
+      records: allList,
+      sellerMap,
+      title: `Agendamentos - ${sellerName}`,
+      sellerName,
+    });
+    if (success) toast.success('PDF baixado com sucesso!');
   };
 
   const resetForm = () => {
@@ -933,9 +921,9 @@ export default function MeusAgendamentos() {
             <span className="font-heading font-bold text-sm text-foreground">AGENDAMENTOS</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-orange-500 text-orange-400 hover:bg-orange-500/20">
-              <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Imprimir</span>
+            <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-emerald-500 text-emerald-400 hover:bg-emerald-500/20">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Baixar PDF</span>
             </Button>
             <Button size="sm" onClick={() => setShowForm(!showForm)} className="gap-1.5 bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4" />
