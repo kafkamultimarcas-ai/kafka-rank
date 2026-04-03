@@ -2,9 +2,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Target, Plus, Trash2, TrendingUp, DollarSign, Trophy, Banknote, Pencil, Check, X, Flame, Star, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Target, Plus, Trash2, TrendingUp, DollarSign, Trophy, Banknote, Pencil, Check, X, Flame, Star, CheckCircle, Clock, AlertTriangle, Bell, Send, Eye, Filter, Users, BarChart3, Gift } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const CATEGORY_OPTIONS = [
@@ -23,6 +23,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   feirao: "bg-orange-500/20 text-orange-400",
   pre_vendas: "bg-cyan-500/20 text-cyan-400",
 };
+const DEPT_COLORS: Record<string, string> = {
+  vendas: "border-red-500/30 bg-red-500/5",
+  fei: "border-green-500/30 bg-green-500/5",
+  consignacao: "border-blue-500/30 bg-blue-500/5",
+  despachante: "border-purple-500/30 bg-purple-500/5",
+  feirao: "border-orange-500/30 bg-orange-500/5",
+  pre_vendas: "border-cyan-500/30 bg-cyan-500/5",
+};
 const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export default function AdminGoals() {
@@ -35,6 +43,9 @@ export default function AdminGoals() {
   const [editTarget, setEditTarget] = useState("");
   const [editBonus, setEditBonus] = useState("");
   const [editBonusValue, setEditBonusValue] = useState("");
+  const [activeTab, setActiveTab] = useState<"goals" | "status">("goals");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "accepted">("all");
+  const [statusCategoryFilter, setStatusCategoryFilter] = useState<string>("all");
 
   // Form state
   const [type, setType] = useState<"store" | "individual">("store");
@@ -43,8 +54,6 @@ export default function AdminGoals() {
   const [bonusDescription, setBonusDescription] = useState("");
   const [bonusValue, setBonusValue] = useState("");
   const [sellerId, setSellerId] = useState("");
-
-  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -55,9 +64,16 @@ export default function AdminGoals() {
 
   const acceptGoal = trpc.goals.accept.useMutation({
     onSuccess: () => {
-      toast.success("Meta aceita! Vamos juntos! \uD83D\uDD25");
+      toast.success("Meta aceita! Vamos juntos! 🔥");
       utils.goals.list.invalidate();
       utils.goals.myPendingGoals.invalidate();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const resendNotification = trpc.goals.resendNotification.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(data.message || "Notificação reenviada!");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -130,12 +146,10 @@ export default function AdminGoals() {
     updateGoal.mutate({ id: goalId, ...updates });
   };
 
-  // Get the dynamic person label based on category
   const getPersonLabel = (cat: string) => {
     return CATEGORY_OPTIONS.find(c => c.value === cat)?.personLabel || "Colaborador";
   };
 
-  // Filter sellers by category/sector
   const filteredSellers = useMemo(() => {
     if (!sellers) return [];
     const categoryToDept: Record<string, string[]> = {
@@ -151,7 +165,6 @@ export default function AdminGoals() {
     return sellers.filter(s => depts.includes(s.department || "vendas"));
   }, [sellers, category]);
 
-  // Generate month tabs - show 6 months: 3 before, current, 2 after
   const monthTabs = useMemo(() => {
     const tabs = [];
     for (let i = -3; i <= 2; i++) {
@@ -164,20 +177,84 @@ export default function AdminGoals() {
     return tabs;
   }, []);
 
+  // ===== STATUS PANEL DATA =====
+  const individualGoals = useMemo(() => {
+    if (!goals) return [];
+    return goals.filter((g: any) => g.type === "individual");
+  }, [goals]);
+
+  const statusStats = useMemo(() => {
+    const total = individualGoals.length;
+    const accepted = individualGoals.filter((g: any) => g.accepted).length;
+    const pending = total - accepted;
+    const pct = total > 0 ? Math.round((accepted / total) * 100) : 0;
+    // By category
+    const byCategory: Record<string, { total: number; accepted: number; pending: number }> = {};
+    individualGoals.forEach((g: any) => {
+      if (!byCategory[g.category]) byCategory[g.category] = { total: 0, accepted: 0, pending: 0 };
+      byCategory[g.category].total++;
+      if (g.accepted) byCategory[g.category].accepted++;
+      else byCategory[g.category].pending++;
+    });
+    return { total, accepted, pending, pct, byCategory };
+  }, [individualGoals]);
+
+  const filteredStatusGoals = useMemo(() => {
+    let filtered = individualGoals;
+    if (statusFilter === "pending") filtered = filtered.filter((g: any) => !g.accepted);
+    if (statusFilter === "accepted") filtered = filtered.filter((g: any) => g.accepted);
+    if (statusCategoryFilter !== "all") filtered = filtered.filter((g: any) => g.category === statusCategoryFilter);
+    return filtered;
+  }, [individualGoals, statusFilter, statusCategoryFilter]);
+
+  // Categories that have individual goals
+  const activeCategories = useMemo(() => {
+    const cats = new Set(individualGoals.map((g: any) => g.category));
+    return CATEGORY_OPTIONS.filter(c => cats.has(c.value));
+  }, [individualGoals]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <Target className="h-6 w-6 text-primary" />
             <h1 className="font-heading font-bold text-2xl text-foreground">Metas</h1>
           </div>
-          {isAdmin && (
-            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Meta
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <>
+                <Button
+                  variant={activeTab === "goals" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab("goals")}
+                  className="gap-1.5"
+                >
+                  <Target className="h-3.5 w-3.5" /> Metas
+                </Button>
+                <Button
+                  variant={activeTab === "status" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveTab("status")}
+                  className="gap-1.5"
+                >
+                  <Eye className="h-3.5 w-3.5" /> Status Aceitação
+                  {statusStats.pending > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                      {statusStats.pending}
+                    </span>
+                  )}
+                </Button>
+              </>
+            )}
+            {isAdmin && activeTab === "goals" && (
+              <Button onClick={() => setShowForm(!showForm)} className="gap-2" size="sm">
+                <Plus className="h-4 w-4" />
+                Nova Meta
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Month Tabs */}
@@ -197,7 +274,7 @@ export default function AdminGoals() {
           ))}
         </div>
 
-        {/* Pending Goals Modal for non-admin */}
+        {/* ===== PENDING GOALS BANNER (Non-admin collaborators) ===== */}
         {!isAdmin && pendingGoals && pendingGoals.length > 0 && (
           <div className="racing-card p-5 border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-orange-500/5">
             <div className="flex items-center gap-3 mb-4">
@@ -205,8 +282,8 @@ export default function AdminGoals() {
                 <AlertTriangle className="h-6 w-6 text-amber-400" />
               </div>
               <div>
-                <h3 className="font-heading font-bold text-lg text-foreground">Novas Metas Para Voce!</h3>
-                <p className="text-sm text-muted-foreground">Aceite suas metas para comecar a competir</p>
+                <h3 className="font-heading font-bold text-lg text-foreground">Novas Metas Para Você!</h3>
+                <p className="text-sm text-muted-foreground">Aceite suas metas para começar a competir</p>
               </div>
             </div>
             <div className="space-y-3">
@@ -220,7 +297,7 @@ export default function AdminGoals() {
                   </div>
                   {(pg.bonusDescription || pg.bonusValue) && (
                     <div className="mb-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                      <p className="text-[10px] text-emerald-400 uppercase font-bold">Premio</p>
+                      <p className="text-[10px] text-emerald-400 uppercase font-bold">Prêmio</p>
                       {pg.bonusValue && <p className="font-bold text-emerald-400">R$ {Number(pg.bonusValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>}
                       {pg.bonusDescription && <p className="text-xs text-emerald-300/80">{pg.bonusDescription}</p>}
                     </div>
@@ -239,144 +316,415 @@ export default function AdminGoals() {
           </div>
         )}
 
-        {/* Create Form */}
-        {showForm && isAdmin && (
-          <div className="racing-card p-6 space-y-4">
-            <h3 className="font-heading font-bold text-foreground">Criar Meta para {MONTH_NAMES[month - 1]} {year}</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Tipo</label>
-                <select
-                  value={type}
-                  onChange={e => setType(e.target.value as "store" | "individual")}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="store">Meta da Loja (Geral)</option>
-                  <option value="individual">Meta Individual</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
-                <select
-                  value={category}
-                  onChange={e => setCategory(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                >
-                  {CATEGORY_OPTIONS.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Valor da Meta</label>
-                <Input type="number" value={targetValue} onChange={e => setTargetValue(e.target.value)} placeholder="Ex: 50" />
-              </div>
-              {type === "individual" && (
-                <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">{getPersonLabel(category)}</label>
-                  <select
-                    value={sellerId}
-                    onChange={e => setSellerId(e.target.value)}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">Selecione o {getPersonLabel(category).toLowerCase()}...</option>
-                    {filteredSellers.map(s => (
-                      <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
-                    ))}
-                  </select>
+        {/* ===== ADMIN: STATUS ACEITAÇÃO TAB ===== */}
+        {isAdmin && activeTab === "status" && (
+          <div className="space-y-5">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="racing-card p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Send className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground uppercase font-bold">Enviadas</span>
                 </div>
-              )}
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Descrição do Prêmio (opcional)</label>
-                <Input value={bonusDescription} onChange={e => setBonusDescription(e.target.value)} placeholder="Ex: Almoço especial + bônus" />
+                <p className="font-heading font-bold text-3xl text-foreground">{statusStats.total}</p>
               </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Valor do Prêmio R$ (opcional)</label>
-                <Input type="number" value={bonusValue} onChange={e => setBonusValue(e.target.value)} placeholder="Ex: 500" />
+              <div className="racing-card p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <CheckCircle className="h-4 w-4 text-emerald-400" />
+                  <span className="text-xs text-muted-foreground uppercase font-bold">Aceitas</span>
+                </div>
+                <p className="font-heading font-bold text-3xl text-emerald-400">{statusStats.accepted}</p>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleCreate} disabled={createGoal.isPending}>
-                {createGoal.isPending ? "Criando..." : "Criar Meta"}
-              </Button>
-              <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Button>
-            </div>
-          </div>
-        )}
-
-        {/* Goals List */}
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-        ) : !goals || goals.length === 0 ? (
-          <div className="racing-card p-8 text-center">
-            <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Nenhuma meta para {MONTH_NAMES[month - 1]} {year}.</p>
-            {isAdmin && <p className="text-sm text-muted-foreground mt-1">Clique em "Nova Meta" para criar.</p>}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Store Goals */}
-            {goals.filter(g => g.type === "store").length > 0 && (
-              <div>
-                <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase">Metas da Loja</h3>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {goals.filter(g => g.type === "store").map(goal => (
-                    <GoalCard
-                      key={goal.id}
-                      goal={goal}
-                      isEditing={editingGoalId === goal.id}
-                      editValue={editValue}
-                      editTarget={editTarget}
-                      editBonus={editBonus}
-                      editBonusValue={editBonusValue}
-                      setEditValue={setEditValue}
-                      setEditTarget={setEditTarget}
-                      setEditBonus={setEditBonus}
-                      setEditBonusValue={setEditBonusValue}
-                      onEdit={() => startEdit(goal)}
-                      onSave={() => saveEdit(goal.id)}
-                      onCancel={() => setEditingGoalId(null)}
-                      onDelete={() => { if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id }); }}
-                    />
-                  ))}
+              <div className="racing-card p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Clock className="h-4 w-4 text-amber-400" />
+                  <span className="text-xs text-muted-foreground uppercase font-bold">Pendentes</span>
+                </div>
+                <p className="font-heading font-bold text-3xl text-amber-400">{statusStats.pending}</p>
+              </div>
+              <div className="racing-card p-4 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground uppercase font-bold">% Aceite</span>
+                </div>
+                <p className="font-heading font-bold text-3xl text-foreground">{statusStats.pct}%</p>
+                <div className="w-full h-2 rounded-full bg-muted mt-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${statusStats.pct}%` }} />
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Individual Goals */}
-            {goals.filter(g => g.type === "individual").length > 0 && (
-              <div>
-                <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase">
-                  {isAdmin ? "Metas Individuais" : "Sua Meta"}
+            {/* Per-Category Summary */}
+            {Object.keys(statusStats.byCategory).length > 0 && (
+              <div className="racing-card p-4">
+                <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase flex items-center gap-2">
+                  <Users className="h-4 w-4" /> Aceitação por Setor
                 </h3>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {goals.filter(g => g.type === "individual").map(goal => {
-                    const seller = sellers?.find(s => s.id === goal.sellerId);
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {Object.entries(statusStats.byCategory).map(([cat, stats]) => {
+                    const catInfo = CATEGORY_OPTIONS.find(c => c.value === cat);
+                    const catPct = stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : 0;
                     return (
-                      <GoalCard
-                        key={goal.id}
-                        goal={goal}
-                        seller={seller}
-                        isEditing={editingGoalId === goal.id}
-                        editValue={editValue}
-                        editTarget={editTarget}
-                        editBonus={editBonus}
-                        editBonusValue={editBonusValue}
-                        setEditValue={setEditValue}
-                        setEditTarget={setEditTarget}
-                        setEditBonus={setEditBonus}
-                        setEditBonusValue={setEditBonusValue}
-                        onEdit={() => startEdit(goal)}
-                        onSave={() => saveEdit(goal.id)}
-                        onCancel={() => setEditingGoalId(null)}
-                        onDelete={() => { if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id }); }}
-                      />
+                      <div key={cat} className={`p-3 rounded-lg border ${DEPT_COLORS[cat] || "border-border"}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${CATEGORY_COLORS[cat] || ""}`}>
+                            {catInfo?.label || cat}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{stats.accepted}/{stats.total}</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${catPct === 100 ? "bg-emerald-500" : "bg-primary"}`}
+                            style={{ width: `${catPct}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-1.5">
+                          <span className="text-[10px] text-emerald-400">{stats.accepted} aceitas</span>
+                          {stats.pending > 0 && <span className="text-[10px] text-amber-400">{stats.pending} pendentes</span>}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               </div>
             )}
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <button
+                onClick={() => setStatusFilter("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  statusFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                Todas ({statusStats.total})
+              </button>
+              <button
+                onClick={() => setStatusFilter("pending")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  statusFilter === "pending" ? "bg-amber-500 text-white" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                Pendentes ({statusStats.pending})
+              </button>
+              <button
+                onClick={() => setStatusFilter("accepted")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  statusFilter === "accepted" ? "bg-emerald-500 text-white" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                Aceitas ({statusStats.accepted})
+              </button>
+              <span className="text-muted-foreground text-xs">|</span>
+              <button
+                onClick={() => setStatusCategoryFilter("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  statusCategoryFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                Todos Setores
+              </button>
+              {activeCategories.map(cat => (
+                <button
+                  key={cat.value}
+                  onClick={() => setStatusCategoryFilter(cat.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    statusCategoryFilter === cat.value
+                      ? CATEGORY_COLORS[cat.value]?.replace("/20", "").replace("text-", "bg-").split(" ")[0] + " text-white"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Individual Goals Status List */}
+            {filteredStatusGoals.length === 0 ? (
+              <div className="racing-card p-8 text-center">
+                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {individualGoals.length === 0
+                    ? `Nenhuma meta individual criada para ${MONTH_NAMES[month - 1]} ${year}.`
+                    : "Nenhuma meta encontrada com os filtros selecionados."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredStatusGoals.map((goal: any) => {
+                  const seller = sellers?.find((s: any) => s.id === goal.sellerId);
+                  const pct = Math.min(100, Math.round((goal.currentValue / goal.targetValue) * 100));
+                  const isAchieved = goal.achieved || goal.currentValue >= goal.targetValue;
+                  return (
+                    <div
+                      key={goal.id}
+                      className={`racing-card p-4 border-l-4 ${
+                        goal.accepted
+                          ? "border-l-emerald-500"
+                          : "border-l-amber-500"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Avatar */}
+                        <div className="flex-shrink-0">
+                          {seller?.photoUrl ? (
+                            <img src={seller.photoUrl} alt="" className="w-12 h-12 rounded-full object-cover ring-2 ring-border" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold ring-2 ring-border">
+                              {seller?.name?.charAt(0) || "?"}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-foreground">{seller?.nickname || seller?.name || "Colaborador"}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[goal.category] || ""}`}>
+                              {CATEGORY_OPTIONS.find(c => c.value === goal.category)?.label || goal.category}
+                            </span>
+                            {isAchieved && <Trophy className="h-4 w-4 text-emerald-400" />}
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${isAchieved ? "bg-emerald-500" : "bg-primary"}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">
+                              {goal.currentValue}/{goal.targetValue} ({pct}%)
+                            </span>
+                          </div>
+
+                          {/* Bonus info */}
+                          {(goal.bonusDescription || goal.bonusValue) && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Gift className="h-3 w-3 text-emerald-400" />
+                              <span className="text-[11px] text-emerald-400">
+                                {goal.bonusValue ? `R$ ${Number(goal.bonusValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : ""}
+                                {goal.bonusValue && goal.bonusDescription ? " — " : ""}
+                                {goal.bonusDescription || ""}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Status + Actions */}
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          {goal.accepted ? (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                              <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                              <span className="text-xs font-bold text-emerald-400">Aceita</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30">
+                              <Clock className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                              <span className="text-xs font-bold text-amber-400">Pendente</span>
+                            </div>
+                          )}
+                          {goal.accepted && goal.acceptedAt && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(goal.acceptedAt).toLocaleDateString("pt-BR")} às {new Date(goal.acceptedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          )}
+                          {!goal.accepted && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-[10px] gap-1 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                              onClick={() => resendNotification.mutate({ id: goal.id })}
+                              disabled={resendNotification.isPending}
+                            >
+                              <Bell className="h-3 w-3" />
+                              {resendNotification.isPending ? "Enviando..." : "Reenviar"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+        )}
+
+        {/* ===== GOALS TAB (Create + List) ===== */}
+        {(activeTab === "goals" || !isAdmin) && (
+          <>
+            {/* Create Form */}
+            {showForm && isAdmin && (
+              <div className="racing-card p-6 space-y-4">
+                <h3 className="font-heading font-bold text-foreground">Criar Meta para {MONTH_NAMES[month - 1]} {year}</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Tipo</label>
+                    <select
+                      value={type}
+                      onChange={e => setType(e.target.value as "store" | "individual")}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="store">Meta da Loja (Geral)</option>
+                      <option value="individual">Meta Individual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Categoria</label>
+                    <select
+                      value={category}
+                      onChange={e => setCategory(e.target.value)}
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      {CATEGORY_OPTIONS.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Valor da Meta</label>
+                    <Input type="number" value={targetValue} onChange={e => setTargetValue(e.target.value)} placeholder="Ex: 50" />
+                  </div>
+                  {type === "individual" && (
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-1 block">{getPersonLabel(category)}</label>
+                      <select
+                        value={sellerId}
+                        onChange={e => setSellerId(e.target.value)}
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Selecione o {getPersonLabel(category).toLowerCase()}...</option>
+                        {filteredSellers.map(s => (
+                          <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Descrição do Prêmio (opcional)</label>
+                    <Input value={bonusDescription} onChange={e => setBonusDescription(e.target.value)} placeholder="Ex: Almoço especial + bônus" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Valor do Prêmio R$ (opcional)</label>
+                    <Input type="number" value={bonusValue} onChange={e => setBonusValue(e.target.value)} placeholder="Ex: 500" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleCreate} disabled={createGoal.isPending}>
+                    {createGoal.isPending ? "Criando..." : "Criar Meta"}
+                  </Button>
+                  <Button variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Goals List */}
+            {isLoading ? (
+              <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+            ) : !goals || goals.length === 0 ? (
+              <div className="racing-card p-8 text-center">
+                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Nenhuma meta para {MONTH_NAMES[month - 1]} {year}.</p>
+                {isAdmin && <p className="text-sm text-muted-foreground mt-1">Clique em "Nova Meta" para criar.</p>}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Store Goals */}
+                {goals.filter((g: any) => g.type === "store").length > 0 && (
+                  <div>
+                    <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" /> Metas da Loja
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {goals.filter((g: any) => g.type === "store").map((goal: any) => (
+                        <GoalCard
+                          key={goal.id}
+                          goal={goal}
+                          isAdmin={isAdmin}
+                          isEditing={editingGoalId === goal.id}
+                          editValue={editValue}
+                          editTarget={editTarget}
+                          editBonus={editBonus}
+                          editBonusValue={editBonusValue}
+                          setEditValue={setEditValue}
+                          setEditTarget={setEditTarget}
+                          setEditBonus={setEditBonus}
+                          setEditBonusValue={setEditBonusValue}
+                          onEdit={() => startEdit(goal)}
+                          onSave={() => saveEdit(goal.id)}
+                          onCancel={() => setEditingGoalId(null)}
+                          onDelete={() => { if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id }); }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Individual Goals - grouped by category for admin */}
+                {goals.filter((g: any) => g.type === "individual").length > 0 && (
+                  <div>
+                    <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase flex items-center gap-2">
+                      <Star className="h-4 w-4" /> {isAdmin ? "Metas Individuais" : "Suas Metas e Bônus"}
+                    </h3>
+
+                    {/* Non-admin: show their goals prominently */}
+                    {!isAdmin && (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {goals.filter((g: any) => g.type === "individual").map((goal: any) => {
+                          const seller = sellers?.find((s: any) => s.id === goal.sellerId);
+                          return (
+                            <GoalCard
+                              key={goal.id}
+                              goal={goal}
+                              seller={seller}
+                              isAdmin={false}
+                              isEditing={false}
+                              editValue="" editTarget="" editBonus="" editBonusValue=""
+                              setEditValue={() => {}} setEditTarget={() => {}} setEditBonus={() => {}} setEditBonusValue={() => {}}
+                              onEdit={() => {}} onSave={() => {}} onCancel={() => {}} onDelete={() => {}}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Admin: show grouped by category */}
+                    {isAdmin && (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {goals.filter((g: any) => g.type === "individual").map((goal: any) => {
+                          const seller = sellers?.find((s: any) => s.id === goal.sellerId);
+                          return (
+                            <GoalCard
+                              key={goal.id}
+                              goal={goal}
+                              seller={seller}
+                              isAdmin={true}
+                              isEditing={editingGoalId === goal.id}
+                              editValue={editValue}
+                              editTarget={editTarget}
+                              editBonus={editBonus}
+                              editBonusValue={editBonusValue}
+                              setEditValue={setEditValue}
+                              setEditTarget={setEditTarget}
+                              setEditBonus={setEditBonus}
+                              setEditBonusValue={setEditBonusValue}
+                              onEdit={() => startEdit(goal)}
+                              onSave={() => saveEdit(goal.id)}
+                              onCancel={() => setEditingGoalId(null)}
+                              onDelete={() => { if (confirm("Excluir esta meta?")) deleteGoal.mutate({ id: goal.id }); }}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </DashboardLayout>

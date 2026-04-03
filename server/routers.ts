@@ -2100,6 +2100,25 @@ export const appRouter = router({
       } catch {}
       return { success: true, message: 'Meta aceita!' };
     }),
+    // Reenviar notificação de meta pendente para o colaborador
+    resendNotification: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      const allGoals = await db.listGoals({});
+      const goal = allGoals.find((g: any) => g.id === input.id);
+      if (!goal) throw new Error('Meta não encontrada');
+      if (goal.accepted) throw new Error('Meta já foi aceita');
+      if (!goal.sellerId) throw new Error('Meta sem colaborador associado');
+      const seller = await db.getSellerById(goal.sellerId);
+      if (!seller) throw new Error('Colaborador não encontrado');
+      const catLabel = goal.category === 'vendas' ? 'Vendas' : goal.category === 'fei' ? 'F&I' : goal.category === 'consignacao' ? 'Consignação' : goal.category === 'despachante' ? 'Despachante' : goal.category === 'pre_vendas' ? 'Pré-Vendas' : goal.category;
+      try {
+        await sendPushToSeller(goal.sellerId!, {
+          title: '🎯 Meta Pendente de Aceitação!',
+          body: `Você tem uma meta de ${catLabel} (${goal.targetValue} unidades) aguardando aceitação. Acesse o app e aceite!`,
+          tag: `goal-reminder-${goal.id}`,
+        });
+      } catch {}
+      return { success: true, message: `Notificação reenviada para ${seller.nickname || seller.name}!` };
+    }),
     // Ranking mensal de vendas (separado da campanha)
     monthlyRanking: publicProcedure.input(z.object({
       month: z.number().min(1).max(12),

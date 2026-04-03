@@ -1795,3 +1795,11 @@
 - [x] Add pending goals banner for non-admin users with accept button
 - [x] Backend: myPendingGoals and accept procedures added to goals router
 - [x] Schema: added accepted, acceptedAt, acceptedBy fields to goals table
+
+## Painel de Status de Aceitação de Metas (Admin + Colaboradores)
+- [x] Painel admin: resumo estatístico de aceitação (total, aceitas, pendentes, % por setor)
+- [x] Painel admin: lista de todas as metas individuais agrupadas por setor com status
+- [x] Painel admin: filtro por status (todas, pendentes, aceitas) e por setor
+- [x] Painel admin: botão reenviar notificação para metas pendentes
+- [x] Colaboradores: painel "Minhas Metas e Bônus" visível para todos os setores
+- [x] Colaboradores: exibição clara de meta, progresso, bônus e status de aceitação
