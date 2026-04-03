@@ -1767,3 +1767,20 @@
 - [x] Mostrar ícone do canal no chat inline para identificar origem da conversa
 - [x] Ícones de canal em todas as áreas do CRM (pipeline, detalhes do lead, etc.)
 - [x] Suporte visual para Instagram no CRM com logo identificável
+
+## IA Atendente Automática - Sistema Completo
+- [x] Schema: tabela ai_attendant_config (toggle on/off, horários, prompt, configurações)
+- [x] Schema: tabela credit_applications (fila de fichas para aprovação F&I)
+- [x] Schema: campo ai_handled no lead para rastrear leads atendidos pela IA
+- [x] Backend: handler de conversa IA humanizada via WhatsApp (coleta dados, agenda, ficha)
+- [x] Backend: lógica de horário comercial (ativar IA fora do horário / feriados)
+- [x] Backend: criação automática de ficha de crédito na fila F&I
+- [x] Backend: agendamento automático feito pela IA
+- [x] Backend: distribuição automática do lead para vendedor após IA coletar dados
+- [x] Backend: alerta para vendedor/SDR quando IA faz agendamento ou ficha
+- [x] Frontend: painel de configuração da IA (toggle, horários, prompt editável)
+- [x] Frontend: aba "Fichas Pendentes" no F&I com fila de aprovação
+- [x] Frontend: visibilidade total para SDR dos atendimentos da IA
+- [x] Frontend: alertas de agendamento feito pela IA
+- [x] Frontend: vendedor vê apenas seus leads/fichas, F&I vê todos
+- [x] Prompt da IA: conversão, agendamento, coleta de dados, simulação, ficha cadastral

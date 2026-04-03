@@ -1053,6 +1053,23 @@ export function registerWebhookRoutes(app: Express) {
                 const dbConn = await getDb();
                 if (!dbConn) { releaseAiLock(leadIdForAi); return; }
 
+                // === AI ATTENDANT CHECK (priority over simple auto-reply) ===
+                try {
+                  const { handleAttendantMessage, getAttendantConfig, isAttendantActive } = await import("./ai-attendant");
+                  const attendantCfg = await getAttendantConfig();
+                  if (attendantCfg && attendantCfg.attendantEnabled && isAttendantActive(attendantCfg)) {
+                    const result = await handleAttendantMessage(leadIdForAi, messageText, phone);
+                    if (result.sent) {
+                      console.log(`[AI Attendant] Handled lead #${leadIdForAi}, action: ${result.action || 'reply'}`);
+                      releaseAiLock(leadIdForAi);
+                      return;
+                    }
+                  }
+                } catch (attendantErr: any) {
+                  console.error(`[AI Attendant] Error, falling back to simple auto-reply:`, attendantErr.message);
+                }
+                // === END AI ATTENDANT CHECK ===
+
                 // Check per-lead AI setting FIRST (individual toggle)
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
                 const aiRaw = aiResult as any;

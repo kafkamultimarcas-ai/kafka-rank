@@ -11,7 +11,7 @@ import {
   Mic, MicOff, LayoutGrid, List, Eye, TrendingUp, Target, Image,
   Zap, Bell, BellRing, Timer, CheckCircle, ArrowUpRight, BarChart3,
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
-  Volume2, Download, Play, File, Square, Handshake, Power, Shuffle, CheckCheck
+  Volume2, Download, Play, File, Square, Handshake, Power, Shuffle, CheckCheck, CreditCard
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge, ChannelIndicator } from "@/components/ChannelIcon";
 
@@ -162,7 +162,7 @@ function minutesSinceCreation(createdAt: any): number {
   return Math.floor((Date.now() - ts) / (1000 * 60));
 }
 
-type TabView = "dashboard" | "leads" | "pipeline" | "templates";
+type TabView = "dashboard" | "leads" | "pipeline" | "templates" | "fichas";
 type AssignmentFilter = "all" | "unassigned" | "assigned";
 type LeadStatusFilter = "all" | "accepted" | "pending";
 
@@ -970,6 +970,7 @@ export default function CrmCommandCenter() {
             { key: "dashboard" as TabView, label: "Resumo", icon: BarChart3 },
             { key: "leads" as TabView, label: "Clientes", icon: User },
             { key: "pipeline" as TabView, label: "Etapas", icon: Target },
+            { key: "fichas" as TabView, label: "Fichas", icon: CreditCard },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
@@ -1213,6 +1214,10 @@ export default function CrmCommandCenter() {
           isSDR={isSDR} sellerMap={sellerMap}
           onMoveStage={(id, stage) => moveStage.mutate({ id, newStage: stage, sellerId })}
           onView={(id) => navigate(`/crm/lead/${id}`)} />
+      )}
+
+      {activeTab === "fichas" && (
+        <SellerFichasView sellerId={sellerId} />
       )}
 
       {/* Modal novo lead */}
@@ -2041,5 +2046,101 @@ function AcknowledgeButton({ leadId, sellerId }: { leadId: number; sellerId: num
       <CheckCheck className="w-4 h-4 text-emerald-400" />
       <span className="text-[10px] font-bold text-emerald-400">Recebi</span>
     </button>
+  );
+}
+
+
+// ===== SELLER FICHAS VIEW =====
+function SellerFichasView({ sellerId }: { sellerId: number }) {
+  const { data: applications } = trpc.crmAi.listCreditApplications.useQuery({ sellerId });
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const statusColors: Record<string, string> = {
+    pending: "text-amber-400 bg-amber-500/10 border-amber-500/30",
+    analyzing: "text-blue-400 bg-blue-500/10 border-blue-500/30",
+    approved: "text-green-400 bg-green-500/10 border-green-500/30",
+    rejected: "text-red-400 bg-red-500/10 border-red-500/30",
+    cancelled: "text-muted-foreground bg-muted border-border",
+  };
+  const statusLabels: Record<string, string> = {
+    pending: "Pendente", analyzing: "Em Análise", approved: "Aprovada",
+    rejected: "Rejeitada", cancelled: "Cancelada",
+  };
+
+  if (!applications || applications.length === 0) {
+    return (
+      <div className="text-center py-12 px-4">
+        <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">Nenhuma ficha de crédito nos seus leads</p>
+        <p className="text-[10px] text-muted-foreground/50 mt-1">Fichas criadas pela IA aparecerão aqui</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 px-3 pb-20">
+      <div className="flex items-center gap-2 mb-2">
+        <CreditCard className="w-4 h-4 text-amber-400" />
+        <h3 className="text-sm font-bold text-foreground">Fichas de Crédito</h3>
+        <span className="text-[10px] text-muted-foreground">({applications.length})</span>
+      </div>
+
+      {applications.map((app: any) => (
+        <div key={app.id} className="rounded-xl border border-border bg-card overflow-hidden">
+          <button
+            onClick={() => setExpandedId(expandedId === app.id ? null : app.id)}
+            className="w-full p-3 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${statusColors[app.status] || ''}`}>
+                {app.status === 'approved' ? '✓' : app.status === 'rejected' ? '✗' : '⏳'}
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-medium text-foreground">{app.customerName || app.leadName || 'Sem nome'}</div>
+                <div className="text-[10px] text-muted-foreground">{app.vehicleInterest || 'Veículo não informado'}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusColors[app.status] || ''}`}>
+                {statusLabels[app.status] || app.status}
+              </span>
+              <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === app.id ? 'rotate-90' : ''}`} />
+            </div>
+          </button>
+
+          {expandedId === app.id && (
+            <div className="border-t border-border p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "CPF", value: app.customerCpf },
+                  { label: "Renda", value: app.customerIncome ? `R$ ${Number(app.customerIncome).toLocaleString('pt-BR')}` : null },
+                  { label: "Entrada", value: app.downPayment ? `R$ ${Number(app.downPayment).toLocaleString('pt-BR')}` : null },
+                  { label: "Veículo Troca", value: app.tradeInVehicle },
+                  { label: "KM Troca", value: app.tradeInKm ? `${Number(app.tradeInKm).toLocaleString('pt-BR')} km` : null },
+                  { label: "Prazo", value: app.financingTerm ? `${app.financingTerm} meses` : null },
+                  { label: "Criado", value: app.createdAt ? new Date(Number(app.createdAt)).toLocaleString('pt-BR') : null },
+                ].filter(f => f.value).map(f => (
+                  <div key={f.label}>
+                    <div className="text-[10px] text-muted-foreground">{f.label}</div>
+                    <div className="text-xs font-medium text-foreground">{f.value}</div>
+                  </div>
+                ))}
+              </div>
+              {app.feiNotes && (
+                <div className="p-2 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="text-[10px] text-primary font-medium">Observação F&I:</div>
+                  <div className="text-xs text-foreground">{app.feiNotes}</div>
+                </div>
+              )}
+              {app.aiCollected && (
+                <div className="flex items-center gap-1 text-[10px] text-purple-400">
+                  <Zap className="w-3 h-3" /> Dados coletados automaticamente pela IA
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

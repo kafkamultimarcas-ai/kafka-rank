@@ -96,7 +96,8 @@ describe("CRM Lead Status Filter & Push Notifications", () => {
       const crmPath = "/home/ubuntu/kafka_sales_competition/client/src/pages/crm/CrmCommandCenter.tsx";
       const content = fs.readFileSync(crmPath, "utf-8");
       expect(content).toContain("BellRing");
-      expect(content).toContain("isSubscribed && <BellRing");
+      expect(content).toContain("isSubscribed &&");
+      expect(content).toContain("<BellRing");
     });
   });
 

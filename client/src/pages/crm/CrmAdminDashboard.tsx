@@ -38,7 +38,7 @@ const DEPT_COLORS: Record<string, string> = {
   financeiro: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
 };
 
-type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr";
+type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas";
 
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
@@ -76,6 +76,8 @@ export default function CrmAdminDashboard() {
     { key: "financial" as const, icon: Wallet, label: "Financeiro" },
     { key: "campaigns" as const, icon: Megaphone, label: "Campanhas" },
     { key: "marketing" as const, icon: BarChart3, label: "Marketing" },
+    { key: "attendant" as const, icon: Bot, label: "IA Atendente" },
+    { key: "fichas" as const, icon: CreditCard, label: "Fichas de Cr\u00e9dito" },
     { key: "sdr" as const, icon: Headphones, label: "Painel SDR" },
     { key: "settings" as const, icon: Settings, label: "Ajustes" },
   ];
@@ -187,6 +189,8 @@ export default function CrmAdminDashboard() {
           {activeView === "settings" && <SettingsView />}
           {activeView === "pipeline" && <AdminPipelineView />}
           {activeView === "sdr" && <SDRManagementView />}
+          {activeView === "attendant" && <AIAttendantView />}
+          {activeView === "fichas" && <CreditApplicationsView />}
         </div>
       </main>
     </div>
@@ -2143,6 +2147,8 @@ function AdminPipelineView() {
 // ===== SDR MANAGEMENT VIEW =====
 function SDRManagementView() {
   const [showCreateSDR, setShowCreateSDR] = useState(false);
+  const { data: aiStats } = trpc.crmAi.getAttendantStats.useQuery(undefined, { refetchInterval: 15000 });
+  const { data: aiConfig } = trpc.crmAi.getAttendantConfig.useQuery();
   const [sdrForm, setSdrForm] = useState({ name: "", nickname: "", phone: "", email: "" });
   const [selectedSDR, setSelectedSDR] = useState<number | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
@@ -2302,6 +2308,28 @@ function SDRManagementView() {
           <Plus className="w-3.5 h-3.5 mr-1" /> Novo SDR
         </Button>
       </div>
+
+      {/* AI Attendant Status Banner */}
+      {aiConfig && (
+        <div className={`p-3 rounded-xl border-2 flex items-center justify-between ${aiConfig.attendantEnabled ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-card'}`}>
+          <div className="flex items-center gap-3">
+            <Bot className={`w-5 h-5 ${aiConfig.attendantEnabled ? 'text-green-400' : 'text-muted-foreground'}`} />
+            <div>
+              <span className={`text-sm font-bold ${aiConfig.attendantEnabled ? 'text-green-400' : 'text-muted-foreground'}`}>
+                IA Atendente {aiConfig.attendantEnabled ? 'ATIVA' : 'DESATIVADA'}
+              </span>
+              {aiConfig.attendantEnabled && aiStats && (
+                <div className="flex gap-3 text-[10px] text-muted-foreground mt-0.5">
+                  <span>{aiStats.totalLeadsHandled} leads atendidos</span>
+                  <span className="text-amber-400">{aiStats.fichasPending} fichas pendentes</span>
+                  <span className="text-blue-400">{aiStats.appointmentsToday} agendamentos hoje</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {aiConfig.attendantEnabled && <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -2725,6 +2753,368 @@ function SDRManagementView() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// ===== AI ATTENDANT VIEW =====
+function AIAttendantView() {
+  const { data: config, refetch: refetchConfig } = trpc.crmAi.getAttendantConfig.useQuery();
+  const { data: stats } = trpc.crmAi.getAttendantStats.useQuery(undefined, { refetchInterval: 15000 });
+  const setConfig = trpc.crmAi.setAttendantConfig.useMutation({
+    onSuccess: () => { refetchConfig(); toast.success("Configuração salva!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const [localPrompt, setLocalPrompt] = useState("");
+  const [localMaxMsg, setLocalMaxMsg] = useState(30);
+
+  useEffect(() => {
+    if (config) {
+      setLocalPrompt(config.attendantPrompt || "");
+      setLocalMaxMsg(config.attendantMaxMessages || 30);
+    }
+  }, [config]);
+
+  if (!config) return <div className="text-center text-muted-foreground py-8">Carregando...</div>;
+
+  const isActive = config.attendantEnabled;
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      {/* Header with big toggle */}
+      <div className={`p-6 rounded-2xl border-2 transition-all ${isActive ? 'border-green-500/50 bg-green-500/5' : 'border-border bg-card'}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isActive ? 'bg-green-500/20' : 'bg-muted'}`}>
+              <Bot className={`w-7 h-7 ${isActive ? 'text-green-400' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">IA Atendente Automática</h2>
+              <p className="text-xs text-muted-foreground">Atendimento humanizado por IA quando a loja está fechada</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setConfig.mutate({ attendantEnabled: !isActive })}
+            className={`relative w-16 h-8 rounded-full transition-all duration-300 ${isActive ? 'bg-green-500' : 'bg-muted-foreground/30'}`}
+          >
+            <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-lg transition-all duration-300 ${isActive ? 'left-9' : 'left-1'}`} />
+          </button>
+        </div>
+
+        {isActive && (
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-green-400 font-medium">IA Ativa</span>
+            <span className="text-muted-foreground">— Respondendo clientes automaticamente</span>
+          </div>
+        )}
+      </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="p-3 rounded-xl bg-card border border-border">
+            <div className="text-2xl font-bold text-foreground">{stats.totalLeadsHandled}</div>
+            <div className="text-[10px] text-muted-foreground">Leads Atendidos</div>
+          </div>
+          <div className="p-3 rounded-xl bg-card border border-border">
+            <div className="text-2xl font-bold text-amber-400">{stats.fichasPending}</div>
+            <div className="text-[10px] text-muted-foreground">Fichas Pendentes</div>
+          </div>
+          <div className="p-3 rounded-xl bg-card border border-border">
+            <div className="text-2xl font-bold text-green-400">{stats.fichasApproved}</div>
+            <div className="text-[10px] text-muted-foreground">Fichas Aprovadas</div>
+          </div>
+          <div className="p-3 rounded-xl bg-card border border-border">
+            <div className="text-2xl font-bold text-blue-400">{stats.appointmentsPending}</div>
+            <div className="text-[10px] text-muted-foreground">Agendamentos Pendentes</div>
+          </div>
+          <div className="p-3 rounded-xl bg-card border border-border">
+            <div className="text-2xl font-bold text-purple-400">{stats.appointmentsToday}</div>
+            <div className="text-[10px] text-muted-foreground">Agendamentos Hoje</div>
+          </div>
+        </div>
+      )}
+
+      {/* Mode Selection */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Clock className="w-4 h-4 text-primary" /> Modo de Funcionamento
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { value: 'off_hours', label: 'Fora do Horário', desc: 'Ativa quando a loja fecha', icon: '🌙' },
+            { value: 'always', label: 'Sempre Ativa', desc: 'Responde 24 horas', icon: '⚡' },
+            { value: 'holidays', label: 'Feriados/Especial', desc: 'Apenas em datas específicas', icon: '📅' },
+          ].map(mode => (
+            <button key={mode.value}
+              onClick={() => setConfig.mutate({ attendantMode: mode.value as any })}
+              className={`p-4 rounded-xl border-2 text-left transition-all ${config.attendantMode === mode.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}>
+              <div className="text-xl mb-1">{mode.icon}</div>
+              <div className="text-sm font-bold text-foreground">{mode.label}</div>
+              <div className="text-[10px] text-muted-foreground">{mode.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Features Toggles */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Zap className="w-4 h-4 text-primary" /> Funcionalidades Automáticas
+        </h3>
+        <div className="space-y-3">
+          {[
+            { key: 'attendantCollectData', label: 'Coletar Dados do Cliente', desc: 'Nome, CPF, renda, endereço automaticamente', icon: FileText },
+            { key: 'attendantAutoSchedule', label: 'Agendar Visitas', desc: 'Marca agendamento na loja automaticamente', icon: Calendar },
+            { key: 'attendantAutoFicha', label: 'Enviar Ficha para F&I', desc: 'Cria ficha de crédito automática quando cliente quer financiar', icon: CreditCard },
+            { key: 'attendantAutoDistribute', label: 'Distribuir para Vendedor', desc: 'Distribui o lead para vendedor disponível', icon: Shuffle },
+            { key: 'attendantTankPromo', label: 'Promoção Tanque Cheio', desc: 'Menciona tanque cheio ao agendar visita', icon: Zap },
+          ].map(feature => {
+            const isOn = (config as any)[feature.key];
+            return (
+              <div key={feature.key} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/50">
+                <div className="flex items-center gap-3">
+                  <feature.icon className={`w-4 h-4 ${isOn ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{feature.label}</div>
+                    <div className="text-[10px] text-muted-foreground">{feature.desc}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setConfig.mutate({ [feature.key]: !isOn } as any)}
+                  className={`relative w-11 h-6 rounded-full transition-all ${isOn ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                >
+                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Max Messages */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-primary" /> Limite de Mensagens por Lead
+        </h3>
+        <div className="flex items-center gap-4">
+          <input
+            type="range" min={5} max={100} value={localMaxMsg}
+            onChange={e => setLocalMaxMsg(Number(e.target.value))}
+            className="flex-1 accent-primary"
+          />
+          <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
+          <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
+            <Save className="w-3 h-3 mr-1" /> Salvar
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Após esse número de mensagens, a IA para de responder e o lead precisa de atendimento humano.</p>
+      </div>
+
+      {/* Custom Prompt */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Edit className="w-4 h-4 text-primary" /> Instruções Personalizadas
+        </h3>
+        <p className="text-xs text-muted-foreground">Adicione instruções extras para a IA. Ex: "Não mencione preços", "Foque em SUVs", "Mencione a promoção de Páscoa".</p>
+        <textarea
+          value={localPrompt}
+          onChange={e => setLocalPrompt(e.target.value)}
+          placeholder="Ex: Estamos com promoção especial de Páscoa, mencione isso nas conversas..."
+          className="w-full h-32 p-3 rounded-lg bg-background border border-border text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+        />
+        <Button onClick={() => setConfig.mutate({ attendantPrompt: localPrompt })}>
+          <Save className="w-3 h-3 mr-1" /> Salvar Instruções
+        </Button>
+      </div>
+
+      {/* How it works */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-3">
+        <h3 className="text-sm font-bold text-foreground">Como Funciona</h3>
+        <div className="space-y-2">
+          {[
+            { step: "1", text: "Cliente manda mensagem no WhatsApp fora do horário" },
+            { step: "2", text: "IA responde de forma humanizada, como um vendedor real" },
+            { step: "3", text: "IA coleta dados: nome, CPF, renda, veículo de interesse" },
+            { step: "4", text: "Se cliente quer financiar, IA cria ficha de crédito automática" },
+            { step: "5", text: "IA agenda visita presencial e menciona promoção do tanque cheio" },
+            { step: "6", text: "Lead é distribuído para vendedor com alerta de agendamento" },
+            { step: "7", text: "Ficha vai para fila de aprovação do F&I automaticamente" },
+          ].map(item => (
+            <div key={item.step} className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{item.step}</div>
+              <p className="text-xs text-muted-foreground">{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== CREDIT APPLICATIONS VIEW (Fichas de Crédito) =====
+function CreditApplicationsView() {
+  const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const { data: applications, refetch } = trpc.crmAi.listCreditApplications.useQuery({ status: statusFilter as any });
+  const updateApp = trpc.crmAi.updateCreditApplication.useMutation({
+    onSuccess: () => { refetch(); toast.success("Ficha atualizada!"); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
+
+  const statusColors: Record<string, string> = {
+    pending: "text-amber-400 bg-amber-500/10",
+    analyzing: "text-blue-400 bg-blue-500/10",
+    approved: "text-green-400 bg-green-500/10",
+    rejected: "text-red-400 bg-red-500/10",
+    cancelled: "text-muted-foreground bg-muted",
+  };
+  const statusLabels: Record<string, string> = {
+    pending: "Pendente", analyzing: "Em Análise", approved: "Aprovada",
+    rejected: "Rejeitada", cancelled: "Cancelada",
+  };
+
+  return (
+    <div className="space-y-4 max-w-5xl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+            <CreditCard className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Fichas de Crédito</h2>
+            <p className="text-xs text-muted-foreground">Fila de aprovação - F&I</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {['pending', 'analyzing', 'approved', 'rejected', 'all'].map(status => (
+          <button key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${statusFilter === status ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-muted-foreground hover:text-foreground'}`}>
+            {status === 'all' ? 'Todas' : statusLabels[status] || status}
+            {status === 'pending' && applications && statusFilter === 'pending' && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-400 text-[10px]">{applications.length}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Applications List */}
+      {!applications || applications.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Nenhuma ficha {statusLabels[statusFilter]?.toLowerCase() || ''}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {applications.map((app: any) => (
+            <div key={app.id} className="rounded-xl border border-border bg-card overflow-hidden">
+              {/* Card Header */}
+              <button
+                onClick={() => setExpandedId(expandedId === app.id ? null : app.id)}
+                className="w-full p-4 flex items-center justify-between hover:bg-accent/30 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {(app.customerName || app.leadName || '?')[0]?.toUpperCase()}
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-foreground">{app.customerName || app.leadName || 'Sem nome'}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {app.vehicleInterest || 'Veículo não informado'} • {app.customerCpf || 'CPF não informado'}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[app.status] || ''}`}>
+                    {statusLabels[app.status] || app.status}
+                  </span>
+                  {app.aiCollected && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-purple-400 bg-purple-500/10">IA</span>
+                  )}
+                  <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === app.id ? 'rotate-90' : ''}`} />
+                </div>
+              </button>
+
+              {/* Expanded Details */}
+              {expandedId === app.id && (
+                <div className="border-t border-border p-4 space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <DetailField label="Nome" value={app.customerName} />
+                    <DetailField label="CPF" value={app.customerCpf} />
+                    <DetailField label="RG" value={app.customerRg} />
+                    <DetailField label="Nascimento" value={app.customerBirthDate} />
+                    <DetailField label="Telefone" value={app.customerPhone || app.leadPhone} />
+                    <DetailField label="Email" value={app.customerEmail} />
+                    <DetailField label="Endereço" value={app.customerAddress} />
+                    <DetailField label="Renda" value={app.customerIncome ? `R$ ${Number(app.customerIncome).toLocaleString('pt-BR')}` : null} />
+                    <DetailField label="Empregador" value={app.customerEmployer} />
+                    <DetailField label="Tempo de Emprego" value={app.customerEmploymentTime} />
+                    <DetailField label="Veículo Interesse" value={app.vehicleInterest} />
+                    <DetailField label="Entrada" value={app.downPayment ? `R$ ${Number(app.downPayment).toLocaleString('pt-BR')}` : null} />
+                    <DetailField label="Veículo Troca" value={app.tradeInVehicle} />
+                    <DetailField label="Placa Troca" value={app.tradeInPlate} />
+                    <DetailField label="KM Troca" value={app.tradeInKm ? `${Number(app.tradeInKm).toLocaleString('pt-BR')} km` : null} />
+                    <DetailField label="Prazo" value={app.financingTerm ? `${app.financingTerm} meses` : null} />
+                    <DetailField label="Origem" value={app.leadSource} />
+                    <DetailField label="Criado em" value={app.createdAt ? new Date(Number(app.createdAt)).toLocaleString('pt-BR') : null} />
+                  </div>
+
+                  {/* F&I Notes */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">Observações F&I</label>
+                    <textarea
+                      value={notes || app.feiNotes || ''}
+                      onChange={e => setNotes(e.target.value)}
+                      placeholder="Adicionar observações sobre a análise..."
+                      className="w-full h-20 p-2 rounded-lg bg-background border border-border text-xs text-foreground resize-none"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    {app.status === 'pending' && (
+                      <Button size="sm" variant="outline" className="text-blue-400 border-blue-500/30"
+                        onClick={() => updateApp.mutate({ id: app.id, status: 'analyzing', feiNotes: notes || undefined })}>
+                        <Eye className="w-3 h-3 mr-1" /> Iniciar Análise
+                      </Button>
+                    )}
+                    {(app.status === 'pending' || app.status === 'analyzing') && (
+                      <>
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => updateApp.mutate({ id: app.id, status: 'approved', feiNotes: notes || undefined })}>
+                          <CheckCircle className="w-3 h-3 mr-1" /> Aprovar
+                        </Button>
+                        <Button size="sm" variant="destructive"
+                          onClick={() => updateApp.mutate({ id: app.id, status: 'rejected', feiNotes: notes || undefined })}>
+                          <XCircle className="w-3 h-3 mr-1" /> Rejeitar
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: any }) {
+  return (
+    <div>
+      <div className="text-[10px] text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium text-foreground">{value || <span className="text-muted-foreground/50">—</span>}</div>
     </div>
   );
 }

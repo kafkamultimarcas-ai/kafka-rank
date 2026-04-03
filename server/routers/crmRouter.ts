@@ -1192,6 +1192,203 @@ ${chatHistory || '(Primeira mensagem)'}`;
     const result = await runInactiveDispatch();
     return result;
   }),
+
+  // ===== AI ATTENDANT CONFIG =====
+  getAttendantConfig: publicProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    const defaults = {
+      attendantEnabled: false, attendantMode: 'off_hours', attendantPrompt: '',
+      attendantSchedule: null as string | null, attendantCollectData: true, attendantAutoSchedule: true,
+      attendantAutoFicha: true, attendantAutoDistribute: true, attendantTankPromo: true,
+      attendantMaxMessages: 30,
+    };
+    if (!dbConn) return defaults;
+    try {
+      const { sql } = await import("drizzle-orm");
+      const result = await dbConn.execute(sql`SELECT attendantEnabled, attendantMode, attendantPrompt, attendantSchedule, attendantCollectData, attendantAutoSchedule, attendantAutoFicha, attendantAutoDistribute, attendantTankPromo, attendantMaxMessages FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        return {
+          attendantEnabled: !!r.attendantEnabled,
+          attendantMode: r.attendantMode || 'off_hours',
+          attendantPrompt: r.attendantPrompt || '',
+          attendantSchedule: r.attendantSchedule || null,
+          attendantCollectData: r.attendantCollectData !== undefined ? !!r.attendantCollectData : true,
+          attendantAutoSchedule: r.attendantAutoSchedule !== undefined ? !!r.attendantAutoSchedule : true,
+          attendantAutoFicha: r.attendantAutoFicha !== undefined ? !!r.attendantAutoFicha : true,
+          attendantAutoDistribute: r.attendantAutoDistribute !== undefined ? !!r.attendantAutoDistribute : true,
+          attendantTankPromo: r.attendantTankPromo !== undefined ? !!r.attendantTankPromo : true,
+          attendantMaxMessages: r.attendantMaxMessages || 30,
+        };
+      }
+      return defaults;
+    } catch { return defaults; }
+  }),
+
+  setAttendantConfig: protectedProcedure.input(z.object({
+    attendantEnabled: z.boolean().optional(),
+    attendantMode: z.enum(['always', 'off_hours', 'holidays']).optional(),
+    attendantPrompt: z.string().optional(),
+    attendantSchedule: z.string().optional(),
+    attendantCollectData: z.boolean().optional(),
+    attendantAutoSchedule: z.boolean().optional(),
+    attendantAutoFicha: z.boolean().optional(),
+    attendantAutoDistribute: z.boolean().optional(),
+    attendantTankPromo: z.boolean().optional(),
+    attendantMaxMessages: z.number().min(1).max(100).optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    const now = Date.now();
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
+      attendantEnabled = ${input.attendantEnabled !== undefined ? (input.attendantEnabled ? 1 : 0) : sql`attendantEnabled`},
+      attendantMode = ${input.attendantMode !== undefined ? input.attendantMode : sql`attendantMode`},
+      attendantPrompt = ${input.attendantPrompt !== undefined ? input.attendantPrompt : sql`attendantPrompt`},
+      attendantSchedule = ${input.attendantSchedule !== undefined ? input.attendantSchedule : sql`attendantSchedule`},
+      attendantCollectData = ${input.attendantCollectData !== undefined ? (input.attendantCollectData ? 1 : 0) : sql`attendantCollectData`},
+      attendantAutoSchedule = ${input.attendantAutoSchedule !== undefined ? (input.attendantAutoSchedule ? 1 : 0) : sql`attendantAutoSchedule`},
+      attendantAutoFicha = ${input.attendantAutoFicha !== undefined ? (input.attendantAutoFicha ? 1 : 0) : sql`attendantAutoFicha`},
+      attendantAutoDistribute = ${input.attendantAutoDistribute !== undefined ? (input.attendantAutoDistribute ? 1 : 0) : sql`attendantAutoDistribute`},
+      attendantTankPromo = ${input.attendantTankPromo !== undefined ? (input.attendantTankPromo ? 1 : 0) : sql`attendantTankPromo`},
+      attendantMaxMessages = ${input.attendantMaxMessages !== undefined ? input.attendantMaxMessages : sql`attendantMaxMessages`},
+      updatedAt = ${now}
+    WHERE id = 1`);
+    return { success: true };
+  }),
+
+  // ===== CREDIT APPLICATIONS (Fichas de Crédito) =====
+  listCreditApplications: publicProcedure.input(z.object({
+    status: z.enum(['pending', 'analyzing', 'approved', 'rejected', 'cancelled', 'all']).optional(),
+    sellerId: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql } = await import("drizzle-orm");
+    try {
+      let whereExtra = '';
+      if (input?.status && input.status !== 'all') {
+        whereExtra += ` AND ca.status = '${input.status}'`;
+      }
+      if (input?.sellerId) {
+        whereExtra += ` AND ca.sellerId = ${input.sellerId}`;
+      }
+      const result = await dbConn.execute(sql`SELECT ca.*, cl.name as leadName, cl.phone as leadPhone, cl.source as leadSource FROM credit_applications ca LEFT JOIN crm_leads cl ON ca.leadId = cl.id WHERE 1=1 ${sql.raw(whereExtra)} ORDER BY ca.createdAt DESC`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      return (rows || []).map((r: any) => ({
+        ...r,
+        customerIncome: Number(r.customerIncome || 0),
+        downPayment: Number(r.downPayment || 0),
+        tradeInKm: Number(r.tradeInKm || 0),
+        tradeInValue: Number(r.tradeInValue || 0),
+        financingTerm: Number(r.financingTerm || 48),
+        financingValue: Number(r.financingValue || 0),
+      }));
+    } catch (e: any) {
+      console.error('[CreditApp] Error listing:', e.message);
+      return [];
+    }
+  }),
+
+  updateCreditApplication: protectedProcedure.input(z.object({
+    id: z.number(),
+    status: z.enum(['pending', 'analyzing', 'approved', 'rejected', 'cancelled']).optional(),
+    feiNotes: z.string().optional(),
+    bankPreference: z.string().optional(),
+    financingValue: z.number().optional(),
+    financingTerm: z.number().optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    const now = Date.now();
+    await dbConn.execute(sql`UPDATE credit_applications SET 
+      status = ${input.status !== undefined ? input.status : sql`status`},
+      feiNotes = ${input.feiNotes !== undefined ? input.feiNotes : sql`feiNotes`},
+      bankPreference = ${input.bankPreference !== undefined ? input.bankPreference : sql`bankPreference`},
+      financingValue = ${input.financingValue !== undefined ? input.financingValue : sql`financingValue`},
+      financingTerm = ${input.financingTerm !== undefined ? input.financingTerm : sql`financingTerm`},
+      feiAnalyzedAt = ${input.status === 'approved' || input.status === 'rejected' ? now : sql`feiAnalyzedAt`},
+      updatedAt = ${now}
+    WHERE id = ${input.id}`);
+    return { success: true };
+  }),
+
+  // ===== AI APPOINTMENTS =====
+  listAiAppointments: publicProcedure.input(z.object({
+    status: z.enum(['pending', 'confirmed', 'attended', 'no_show', 'cancelled', 'all']).optional(),
+    sellerId: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql } = await import("drizzle-orm");
+    try {
+      let whereClause = '';
+      if (input?.status && input.status !== 'all') {
+        whereClause += ` AND a.status = '${input.status}'`;
+      }
+      if (input?.sellerId) {
+        whereClause += ` AND a.sellerId = ${input.sellerId}`;
+      }
+      const result = await dbConn.execute(sql`SELECT a.*, cl.name as leadName, cl.phone as leadPhone, cl.source as leadSource, s.name as sellerName FROM ai_appointments a LEFT JOIN crm_leads cl ON a.leadId = cl.id LEFT JOIN sellers s ON a.sellerId = s.id WHERE 1=1 ${sql.raw(whereClause)} ORDER BY a.scheduledDate ASC`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      return rows || [];
+    } catch (e: any) {
+      console.error('[AiAppointments] Error listing:', e.message);
+      return [];
+    }
+  }),
+
+  updateAiAppointment: protectedProcedure.input(z.object({
+    id: z.number(),
+    status: z.enum(['pending', 'confirmed', 'attended', 'no_show', 'cancelled']).optional(),
+    sellerId: z.number().optional(),
+    notes: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    await dbConn.execute(sql`UPDATE ai_appointments SET 
+      status = ${input.status !== undefined ? input.status : sql`status`},
+      sellerId = ${input.sellerId !== undefined ? input.sellerId : sql`sellerId`},
+      notes = ${input.notes !== undefined ? input.notes : sql`notes`}
+    WHERE id = ${input.id}`);
+    return { success: true };
+  }),
+
+  // Get attendant stats
+  getAttendantStats: publicProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { totalLeadsHandled: 0, fichasPending: 0, fichasApproved: 0, appointmentsPending: 0, appointmentsToday: 0 };
+    const { sql } = await import("drizzle-orm");
+    try {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const leadsResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_leads WHERE aiHandled = 1`);
+      const fichasPendingResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM credit_applications WHERE status = 'pending'`);
+      const fichasApprovedResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM credit_applications WHERE status = 'approved'`);
+      const aptPendingResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM ai_appointments WHERE status = 'pending'`);
+      const aptTodayResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM ai_appointments WHERE scheduledDate >= ${todayStart.getTime()} AND scheduledDate < ${todayStart.getTime() + 86400000}`);
+      const extract = (r: any) => { const raw = r as any; const rows = Array.isArray(raw?.[0]) ? raw[0] : raw; return Number(rows?.[0]?.cnt || 0); };
+      return {
+        totalLeadsHandled: extract(leadsResult),
+        fichasPending: extract(fichasPendingResult),
+        fichasApproved: extract(fichasApprovedResult),
+        appointmentsPending: extract(aptPendingResult),
+        appointmentsToday: extract(aptTodayResult),
+      };
+    } catch { return { totalLeadsHandled: 0, fichasPending: 0, fichasApproved: 0, appointmentsPending: 0, appointmentsToday: 0 }; }
+  }),
 });
 
 // ===== PERFORMANCE & ALERTS =====
