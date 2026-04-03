@@ -118,6 +118,10 @@ export const sales = mysqlTable("sales", {
   value: int("value").default(0),
   leadSource: varchar("leadSource", { length: 50 }), // 'lead_loja' ou 'lead_vendedor'
   customerPhone: varchar("customerPhone", { length: 20 }), // telefone do comprador para cruzar com agendamento
+  customerName: varchar("customerName", { length: 255 }), // nome completo do cliente
+  customerEmail: varchar("customerEmail", { length: 320 }), // email do cliente
+  customerCpf: varchar("customerCpf", { length: 14 }), // CPF do cliente
+  customerBirthday: varchar("customerBirthday", { length: 10 }), // data de nascimento DD/MM/AAAA
   sdrRecordId: int("sdrRecordId"), // vínculo com agendamento de origem (preenchido automaticamente pelo cruzamento de telefone)
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
@@ -359,6 +363,9 @@ export const goals = mysqlTable("goals", {
   accepted: boolean("accepted").default(false).notNull(), // meta individual aceita pelo colaborador
   acceptedAt: bigint("acceptedAt", { mode: "number" }), // timestamp quando aceitou
   acceptedBy: int("acceptedBy"), // sellerId de quem aceitou
+  deadline: bigint("deadline", { mode: "number" }), // prazo para aceitar (timestamp, ex: 48h após criação)
+  reminderSentAt: bigint("reminderSentAt", { mode: "number" }), // quando o lembrete foi enviado
+  reminderCount: int("reminderCount").default(0).notNull(), // quantos lembretes foram enviados
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
@@ -428,6 +435,8 @@ export const crmLeads = mysqlTable("crm_leads", {
   source: varchar("source", { length: 100 }).default("manual").notNull(), // manual, whatsapp, olx, webmotors, socarrao, facebook, instagram, trafego_pago, indicacao, loja
   stage: varchar("stage", { length: 100 }).default("novo").notNull(), // etapa do pipeline
   score: mysqlEnum("score", ["hot", "warm", "cold"]).default("warm").notNull(), // temperatura do lead
+  cpf: varchar("cpf", { length: 14 }), // CPF do cliente
+  birthday: varchar("birthday", { length: 10 }), // data de nascimento DD/MM/AAAA
   notes: text("notes"), // observações gerais
   nextContactDate: bigint("nextContactDate", { mode: "number" }), // data do próximo contato agendado
   lastContactDate: bigint("lastContactDate", { mode: "number" }), // último contato

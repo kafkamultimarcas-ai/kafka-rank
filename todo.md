@@ -1803,3 +1803,27 @@
 - [x] Painel admin: botão reenviar notificação para metas pendentes
 - [x] Colaboradores: painel "Minhas Metas e Bônus" visível para todos os setores
 - [x] Colaboradores: exibição clara de meta, progresso, bônus e status de aceitação
+
+## Melhoria Completa do Módulo Financeiro
+- [x] Auditoria completa do módulo financeiro (schema, rotas, frontend)
+- [x] Gerar relatório de melhorias com prompt detalhado
+- [x] Marcar contas como pagas (status pago/pendente/vencido)
+- [x] Planilhas visuais com exportação PDF para impressão
+- [x] Painel financeiro simplificado e visual (menos complicado)
+- [x] Separação de despesas pós-venda das demais contas
+- [x] Relatórios mensais completos (receitas, despesas, lucro)
+- [x] Categorias de despesas organizadas (pós-venda, gasolina, fixas, variáveis)
+- [x] Backup do sistema completo
+- [x] Preparar sistema para mercado (qualidade profissional)
+
+## Melhorias Metas Individuais
+- [x] Prazo de aceitação de 48h para metas individuais
+- [x] Lembrete automático quando colaborador não aceitar em 48h
+- [x] Histórico de metas mês a mês para cada colaborador
+- [x] Tela de evolução de metas ao longo dos meses
+
+## Cadastro Completo de Clientes + Aniversário
+- [x] Adicionar campos: data nascimento, email, CPF, nome completo no cadastro de clientes
+- [x] Tela de aniversariantes do dia/semana/mês
+- [x] Disparo automático de mensagem de parabéns via WhatsApp
+- [x] Prompt personalizado para mensagem de aniversário Kafka Multimarcas

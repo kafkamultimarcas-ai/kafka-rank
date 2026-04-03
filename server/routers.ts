@@ -709,6 +709,10 @@ export const appRouter = router({
       description: z.string().optional(),
       leadSource: z.enum(['lead_loja', 'lead_vendedor']),
       customerPhone: z.string().optional(),
+      customerName: z.string().optional(),
+      customerEmail: z.string().optional(),
+      customerCpf: z.string().optional(),
+      customerBirthday: z.string().optional(),
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
@@ -2055,8 +2059,24 @@ export const appRouter = router({
       targetValue: z.number().min(1),
       bonusDescription: z.string().optional(),
       bonusValue: z.number().optional(),
+      deadlineHours: z.number().optional().default(48),
     })).mutation(async ({ input }) => {
-      const id = await db.createGoal(input);
+      const { deadlineHours, ...goalData } = input;
+      const deadline = goalData.type === 'individual' && goalData.sellerId
+        ? Date.now() + (deadlineHours || 48) * 60 * 60 * 1000
+        : undefined;
+      const id = await db.createGoal({ ...goalData, deadline } as any);
+      // Enviar push para o colaborador se for meta individual
+      if (goalData.type === 'individual' && goalData.sellerId) {
+        const catLabel = goalData.category === 'vendas' ? 'Vendas' : goalData.category === 'fei' ? 'F&I' : goalData.category === 'consignacao' ? 'Consignação' : goalData.category === 'despachante' ? 'Despachante' : goalData.category === 'pre_vendas' ? 'Pré-Vendas' : goalData.category;
+        try {
+          await sendPushToSeller(goalData.sellerId, {
+            title: '🎯 Nova Meta Individual!',
+            body: `Você recebeu uma meta de ${catLabel} (${goalData.targetValue} unidades). Aceite em até ${deadlineHours || 48}h!`,
+            tag: `goal-new-${id}`,
+          });
+        } catch {}
+      }
       return { id, message: "Meta criada!" };
     }),
     update: adminProcedure.input(z.object({
@@ -2117,7 +2137,21 @@ export const appRouter = router({
           tag: `goal-reminder-${goal.id}`,
         });
       } catch {}
+      // Atualizar contagem de lembretes
+      await db.updateGoal(goal.id, { reminderSentAt: Date.now(), reminderCount: (goal.reminderCount || 0) + 1 } as any);
       return { success: true, message: `Notificação reenviada para ${seller.nickname || seller.name}!` };
+    }),
+    // Verificar metas expiradas (prazo 48h) e notificar admin
+    checkExpiredGoals: publicProcedure.query(async () => {
+      const allGoals = await db.listGoals({});
+      const now = Date.now();
+      const expired = allGoals.filter((g: any) => 
+        g.type === 'individual' && !g.accepted && g.deadline && now > g.deadline
+      );
+      const pending = allGoals.filter((g: any) =>
+        g.type === 'individual' && !g.accepted && g.deadline && now <= g.deadline
+      );
+      return { expired: expired.length, pending: pending.length, expiredGoals: expired };
     }),
     // Ranking mensal de vendas (separado da campanha)
     monthlyRanking: publicProcedure.input(z.object({
@@ -2750,6 +2784,95 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     // Resetar contadores manualmente (admin only)
     resetCounters: adminProcedure.mutation(async () => {
       return db.resetMonthlyCounters();
+    }),
+  }),
+
+  // ===== ANIVERSARIANTES =====
+  birthday: router({
+    // Buscar aniversariantes do dia (de sales + crmLeads)
+    todayBirthdays: adminProcedure.query(async () => {
+      const database = await db.getDbInstance();
+      if (!database) return [];
+      const { sales, crmLeads } = await import('../drizzle/schema');
+      const { sql: sqlOp } = await import('drizzle-orm');
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const pattern = `${dd}/${mm}`;
+      
+      // Buscar de sales
+      const salesBdays = await database.select({
+        id: sales.id, name: sales.customerName, phone: sales.customerPhone,
+        email: sales.customerEmail, birthday: sales.customerBirthday,
+        vehicleModel: sales.vehicleModel,
+      }).from(sales).where(sqlOp`${sales.customerBirthday} LIKE ${pattern + '%'}`);
+      
+      // Buscar de crmLeads
+      const leadBdays = await database.select({
+        id: crmLeads.id, name: crmLeads.name, phone: crmLeads.phone,
+        email: crmLeads.email, birthday: crmLeads.birthday,
+      }).from(crmLeads).where(sqlOp`${crmLeads.birthday} LIKE ${pattern + '%'}`);
+      
+      const results: Array<{ id: number; name: string | null; phone: string | null; email: string | null; birthday: string | null; source: string; vehicleModel?: string | null; sent?: boolean }> = [];
+      const seenPhones = new Set<string>();
+      
+      for (const s of salesBdays) {
+        const key = s.phone?.replace(/\D/g, '') || `sale-${s.id}`;
+        if (!seenPhones.has(key)) {
+          seenPhones.add(key);
+          results.push({ ...s, source: 'venda', vehicleModel: s.vehicleModel });
+        }
+      }
+      for (const l of leadBdays) {
+        const key = l.phone?.replace(/\D/g, '') || `lead-${l.id}`;
+        if (!seenPhones.has(key)) {
+          seenPhones.add(key);
+          results.push({ ...l, source: 'lead' });
+        }
+      }
+      return results;
+    }),
+
+    // Enviar parabéns via WhatsApp
+    sendBirthdayMessage: adminProcedure.input(z.object({
+      phone: z.string(),
+      name: z.string(),
+      customMessage: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const name = input.name.split(' ')[0]; // Primeiro nome
+      const message = input.customMessage || 
+        `\u{1F382} Parabéns, ${name}! \u{1F389}\n\nA equipe *Kafka Multimarcas* deseja a você um feliz aniversário! \u{1F31F}\n\nQue este novo ciclo seja repleto de conquistas, saúde e muita prosperidade! \u{1F680}\n\nConte sempre conosco! \u{2764}\uFE0F\n\n_Kafka Multimarcas - Onde seus sonhos ganham rodas!_`;
+      
+      const result = await zapi.sendText(input.phone, message);
+      if (!result.success) throw new Error(result.error || 'Erro ao enviar mensagem');
+      return { success: true, message: 'Parabéns enviado com sucesso!' };
+    }),
+
+    // Enviar parabéns em massa para todos os aniversariantes
+    sendBulkBirthday: adminProcedure.input(z.object({
+      contacts: z.array(z.object({
+        phone: z.string(),
+        name: z.string(),
+      })),
+      customMessage: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      let sent = 0;
+      let failed = 0;
+      for (const contact of input.contacts) {
+        try {
+          const name = contact.name.split(' ')[0];
+          const message = input.customMessage?.replace('{nome}', name) || 
+            `\u{1F382} Parabéns, ${name}! \u{1F389}\n\nA equipe *Kafka Multimarcas* deseja a você um feliz aniversário! \u{1F31F}\n\nQue este novo ciclo seja repleto de conquistas, saúde e muita prosperidade! \u{1F680}\n\nConte sempre conosco! \u{2764}\uFE0F\n\n_Kafka Multimarcas - Onde seus sonhos ganham rodas!_`;
+          const result = await zapi.sendText(contact.phone, message);
+          if (result.success) sent++;
+          else failed++;
+          // Delay entre mensagens para evitar ban
+          await new Promise(r => setTimeout(r, 3000));
+        } catch {
+          failed++;
+        }
+      }
+      return { sent, failed, total: input.contacts.length };
     }),
   }),
 

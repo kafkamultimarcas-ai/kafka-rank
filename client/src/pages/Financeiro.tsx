@@ -1,12 +1,15 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { 
   DollarSign, ArrowLeft, Wrench, Clock, ChevronDown, ChevronUp, Phone, Car, 
   User, AlertTriangle, MapPin, FileText, MessageCircle, PhoneCall, Search,
   Plus, CheckCircle, X, Calendar, Receipt, TrendingUp, TrendingDown, LogOut,
-  Fuel, Mic, MicOff, Loader2, Shield, ShieldCheck, ShieldAlert, Edit2, Trash2
+  Fuel, Mic, MicOff, Loader2, Shield, ShieldCheck, ShieldAlert, Edit2, Trash2,
+  Download, Printer, BarChart3, PieChart, Filter, Check, XCircle, Eye,
+  ChevronLeft, ChevronRight, CircleDollarSign, Banknote, CreditCard,
+  FileSpreadsheet, ArrowUpDown, MoreVertical, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,25 +24,38 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   entregue: { label: "Entregue", color: "text-gray-400", bg: "bg-gray-500/20", border: "border-gray-500/40", emoji: "🚗" },
 };
 
+const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 function formatDate(d: any) {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
-
+function formatDateFull(d: any) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
 function formatCurrency(value: string | number) {
   const num = typeof value === "string" ? parseFloat(value) : value;
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
 }
 
-type MainTab = "pos-venda" | "contas" | "gasolina";
+type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios";
 
 export default function Financeiro() {
   const [, navigate] = useLocation();
-  const [mainTab, setMainTab] = useState<MainTab>("pos-venda");
+  const [mainTab, setMainTab] = useState<MainTab>("dashboard");
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const logoutMutation = trpc.sellers.logout.useMutation({
     onSuccess: () => navigate("/"),
   });
+
+  const tabs: { key: MainTab; label: string; icon: any; color: string }[] = [
+    { key: "dashboard", label: "Painel", icon: BarChart3, color: "cyan" },
+    { key: "contas", label: "Contas", icon: Receipt, color: "emerald" },
+    { key: "pos-venda", label: "Pós-Venda", icon: Wrench, color: "orange" },
+    { key: "gasolina", label: "Gasolina", icon: Fuel, color: "yellow" },
+    { key: "relatorios", label: "Relatórios", icon: FileSpreadsheet, color: "purple" },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950">
@@ -71,45 +87,939 @@ export default function Financeiro() {
       </header>
 
       {/* Tab Switcher */}
-      <div className="border-b border-gray-800 bg-gray-950/80">
-        <div className="container flex px-4">
-          <button
-            onClick={() => setMainTab("pos-venda")}
-            className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-all ${
-              mainTab === "pos-venda"
-                ? "border-orange-500 text-orange-400"
-                : "border-transparent text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            <Wrench className="h-4 w-4 inline mr-1.5" />
-            Pós-Venda
-          </button>
-          <button
-            onClick={() => setMainTab("contas")}
-            className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-all ${
-              mainTab === "contas"
-                ? "border-emerald-500 text-emerald-400"
-                : "border-transparent text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            <Receipt className="h-4 w-4 inline mr-1.5" />
-            Contas
-          </button>
-          <button
-            onClick={() => setMainTab("gasolina")}
-            className={`flex-1 py-3 text-sm font-bold text-center border-b-2 transition-all ${
-              mainTab === "gasolina"
-                ? "border-yellow-500 text-yellow-400"
-                : "border-transparent text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            <Fuel className="h-4 w-4 inline mr-1.5" />
-            Gasolina
-          </button>
+      <div className="border-b border-gray-800 bg-gray-950/80 overflow-x-auto">
+        <div className="container flex px-2 min-w-max">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            const active = mainTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setMainTab(tab.key)}
+                className={`flex-shrink-0 py-3 px-3 text-xs font-bold text-center border-b-2 transition-all ${
+                  active
+                    ? `border-${tab.color}-500 text-${tab.color}-400`
+                    : "border-transparent text-gray-500 hover:text-gray-300"
+                }`}
+                style={active ? { borderColor: `var(--color-${tab.color}-500, currentColor)` } : {}}
+              >
+                <Icon className="h-4 w-4 inline mr-1" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {mainTab === "pos-venda" ? <PosVendaTab /> : mainTab === "contas" ? <ContasTab /> : <GasolinaTab />}
+      {mainTab === "dashboard" && <DashboardTab />}
+      {mainTab === "contas" && <ContasTab />}
+      {mainTab === "pos-venda" && <PosVendaTab />}
+      {mainTab === "gasolina" && <GasolinaTab />}
+      {mainTab === "relatorios" && <RelatoriosTab />}
+    </div>
+  );
+}
+
+// ===== DASHBOARD TAB =====
+function DashboardTab() {
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const { data: dashboard } = trpc.finTransactions.dashboard.useQuery({ month, year });
+  const { data: overdue } = trpc.finTransactions.overdue.useQuery();
+  const { data: upcoming } = trpc.finTransactions.upcomingDue.useQuery({ days: 7 });
+  const { data: fuelDash } = trpc.fuel.dashboard.useQuery({ month, year });
+  const { data: pvGastos } = trpc.pvGastos.list.useQuery({ chamadoId: 0 });
+
+  const prevMonth = () => {
+    if (month === 1) { setMonth(12); setYear(year - 1); }
+    else setMonth(month - 1);
+  };
+  const nextMonth = () => {
+    if (month === 12) { setMonth(1); setYear(year + 1); }
+    else setMonth(month + 1);
+  };
+
+  const d = dashboard || { totalPayable: 0, totalPaid: 0, pendingPayable: 0, totalReceivable: 0, totalReceived: 0, pendingReceivable: 0, overdue: 0, upcomingDue: [] };
+  const balance = d.totalReceivable - d.totalPayable;
+  const pvTotal = useMemo(() => {
+    if (!pvGastos || !Array.isArray(pvGastos)) return 0;
+    return pvGastos.filter((g: any) => {
+      const dt = new Date(g.createdAt);
+      return dt.getMonth() + 1 === month && dt.getFullYear() === year;
+    }).reduce((s: number, g: any) => s + Number(g.valor || 0), 0);
+  }, [pvGastos, month, year]);
+
+  return (
+    <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+      {/* Month Selector */}
+      <div className="flex items-center justify-between bg-gray-900/80 border border-gray-800 rounded-xl p-3">
+        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <div className="text-center">
+          <p className="text-white font-bold text-lg">{MONTH_NAMES[month - 1]}</p>
+          <p className="text-gray-500 text-xs">{year}</p>
+        </div>
+        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400">
+          <ChevronRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Balance Card */}
+      <div className={`rounded-2xl p-5 border-2 ${balance >= 0 ? 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-green-500/5' : 'border-red-500/30 bg-gradient-to-br from-red-500/10 to-orange-500/5'}`}>
+        <p className="text-xs text-gray-400 uppercase font-bold tracking-wider mb-1">Balanço do Mês</p>
+        <p className={`text-3xl font-bold ${balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {formatCurrency(balance)}
+        </p>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Total a Receber</p>
+            <p className="text-lg font-bold text-emerald-400">{formatCurrency(d.totalReceivable)}</p>
+            <p className="text-[10px] text-emerald-400/60">Recebido: {formatCurrency(d.totalReceived)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Total a Pagar</p>
+            <p className="text-lg font-bold text-red-400">{formatCurrency(d.totalPayable)}</p>
+            <p className="text-[10px] text-red-400/60">Pago: {formatCurrency(d.totalPaid)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl p-3 border text-center bg-red-500/10 border-red-500/20">
+          <AlertTriangle className="h-5 w-5 text-red-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-red-400">{d.overdue}</p>
+          <p className="text-[9px] text-gray-500">Vencidas</p>
+        </div>
+        <div className="rounded-xl p-3 border text-center bg-orange-500/10 border-orange-500/20">
+          <Wrench className="h-5 w-5 text-orange-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-orange-400">{formatCurrency(pvTotal)}</p>
+          <p className="text-[9px] text-gray-500">Pós-Venda</p>
+        </div>
+        <div className="rounded-xl p-3 border text-center bg-yellow-500/10 border-yellow-500/20">
+          <Fuel className="h-5 w-5 text-yellow-400 mx-auto mb-1" />
+          <p className="text-xl font-bold text-yellow-400">{formatCurrency(fuelDash?.totalCost || 0)}</p>
+          <p className="text-[9px] text-gray-500">Gasolina</p>
+        </div>
+      </div>
+
+      {/* Overdue Alert */}
+      {overdue && overdue.length > 0 && (
+        <div className="rounded-xl border-2 border-red-500/40 bg-red-500/10 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <p className="font-bold text-red-400 text-sm">Contas Vencidas ({overdue.length})</p>
+          </div>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {overdue.slice(0, 5).map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between text-xs">
+                <span className="text-gray-300 truncate flex-1">{t.description}</span>
+                <span className="text-red-400 font-bold ml-2">{formatCurrency(t.amount)}</span>
+              </div>
+            ))}
+            {overdue.length > 5 && <p className="text-[10px] text-gray-500 text-center">+{overdue.length - 5} mais...</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming Due */}
+      {upcoming && upcoming.length > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Clock className="h-5 w-5 text-amber-400" />
+            <p className="font-bold text-amber-400 text-sm">Vencendo em Breve ({upcoming.length})</p>
+          </div>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {upcoming.slice(0, 5).map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between text-xs">
+                <span className="text-gray-300 truncate flex-1">{t.description}</span>
+                <div className="flex items-center gap-2 ml-2">
+                  <span className="text-gray-500">{formatDate(t.dueDate)}</span>
+                  <span className="text-amber-400 font-bold">{formatCurrency(t.amount)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== CONTAS TAB (Exclusivo Financeiro) =====
+function ContasTab() {
+  const { data: categories } = trpc.finCategories.list.useQuery();
+  const utils = trpc.useUtils();
+  const now = new Date();
+  const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
+  const [filterYear, setFilterYear] = useState(now.getFullYear());
+  const startDate = useMemo(() => new Date(filterYear, filterMonth - 1, 1).getTime(), [filterMonth, filterYear]);
+  const endDate = useMemo(() => new Date(filterYear, filterMonth, 0, 23, 59, 59).getTime(), [filterMonth, filterYear]);
+  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery({ startDate, endDate });
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
+  const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [editingTx, setEditingTx] = useState<any>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  
+  // Form state
+  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
+  const [txDescription, setTxDescription] = useState("");
+  const [txAmount, setTxAmount] = useState("");
+  const [txDueDate, setTxDueDate] = useState("");
+  const [txSupplier, setTxSupplier] = useState("");
+  const [txNotes, setTxNotes] = useState("");
+  const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
+  const [txNeedsApproval, setTxNeedsApproval] = useState(false);
+  const [txRecurrence, setTxRecurrence] = useState("none");
+  
+  const createTransaction = trpc.finTransactions.create.useMutation({
+    onSuccess: () => { refetch(); setShowForm(false); resetForm(); toast.success("Conta lançada!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const updateTransaction = trpc.finTransactions.update.useMutation({
+    onSuccess: () => { refetch(); setEditingTx(null); resetForm(); toast.success("Conta atualizada!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const deleteTransaction = trpc.finTransactions.delete.useMutation({
+    onSuccess: () => { refetch(); toast.success("Conta excluída!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const markPaid = trpc.finTransactions.markPaid.useMutation({
+    onSuccess: () => { refetch(); toast.success("Conta marcada como PAGA!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const approveTransaction = trpc.finTransactions.approveTransaction.useMutation({
+    onSuccess: () => { refetch(); toast.success("Autorização processada!"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  
+  const resetForm = () => {
+    setTxType("payable"); setTxDescription(""); setTxAmount("");
+    setTxDueDate(""); setTxSupplier(""); setTxNotes("");
+    setTxCategoryId(null); setTxNeedsApproval(false); setTxRecurrence("none");
+  };
+
+  const startEdit = (t: any) => {
+    setEditingTx(t);
+    setTxType(t.type);
+    setTxDescription(t.description);
+    setTxAmount(String(t.amount));
+    setTxDueDate(t.dueDate ? new Date(t.dueDate).toISOString().split("T")[0] : "");
+    setTxSupplier(t.supplier || "");
+    setTxNotes(t.notes || "");
+    setTxCategoryId(t.categoryId);
+    setShowForm(true);
+  };
+
+  const allTransactions: any[] = (transactionsData as any)?.items || (Array.isArray(transactionsData) ? transactionsData : []);
+  
+  const filtered = useMemo(() => {
+    let list = allTransactions;
+    const now = Date.now();
+    if (typeFilter !== "all") list = list.filter((t: any) => t.type === typeFilter);
+    if (filter === "pending") list = list.filter((t: any) => t.status === "pending");
+    else if (filter === "paid") list = list.filter((t: any) => t.status === "paid");
+    else if (filter === "overdue") list = list.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
+    else if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((t: any) => t.description?.toLowerCase().includes(q) || t.supplier?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q));
+    }
+    return list.sort((a: any, b: any) => a.dueDate - b.dueDate);
+  }, [allTransactions, filter, typeFilter, searchQuery]);
+
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const pending = allTransactions.filter((t: any) => t.status === "pending");
+    const paid = allTransactions.filter((t: any) => t.status === "paid");
+    const overdue = allTransactions.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
+    const needApproval = allTransactions.filter((t: any) => t.approvalStatus === "pending_approval");
+    const totalPayable = allTransactions.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    const totalReceivable = allTransactions.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    const totalPaid = paid.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    const totalReceived = paid.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    return { pending: pending.length, paid: paid.length, overdue: overdue.length, needApproval: needApproval.length, totalPayable, totalReceivable, totalPaid, totalReceived };
+  }, [allTransactions]);
+
+  const getCategoryName = (catId: number) => {
+    const cat = (categories || []).find((c: any) => c.id === catId);
+    return cat?.name || "Sem categoria";
+  };
+  
+  const handleAudioResult = (parsed: any) => {
+    if (parsed.description) setTxDescription(parsed.description);
+    if (parsed.amount) setTxAmount(String(parsed.amount));
+    if (parsed.supplier) setTxSupplier(parsed.supplier);
+    if (parsed.notes) setTxNotes(parsed.notes);
+    if (parsed.type === "receivable") setTxType("receivable");
+    if (parsed.dueDate) {
+      try {
+        const parts = parsed.dueDate.split("/");
+        if (parts.length === 3) {
+          const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          setTxDueDate(d.toISOString().split("T")[0]);
+        }
+      } catch {}
+    }
+    setShowForm(true);
+    toast.success("Dados preenchidos pelo áudio!");
+  };
+
+  const prevMonth = () => {
+    if (filterMonth === 1) { setFilterMonth(12); setFilterYear(filterYear - 1); }
+    else setFilterMonth(filterMonth - 1);
+  };
+  const nextMonth = () => {
+    if (filterMonth === 12) { setFilterMonth(1); setFilterYear(filterYear + 1); }
+    else setFilterMonth(filterMonth + 1);
+  };
+
+  return (
+    <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+      {/* Month Selector */}
+      <div className="flex items-center justify-between bg-gray-900/80 border border-gray-800 rounded-xl p-2">
+        <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <p className="text-white font-bold text-sm">{MONTH_NAMES[filterMonth - 1]} {filterYear}</p>
+        <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl p-3 border bg-emerald-500/10 border-emerald-500/20">
+          <p className="text-[9px] text-gray-500 uppercase font-bold">A Receber</p>
+          <p className="text-lg font-bold text-emerald-400">{formatCurrency(stats.totalReceivable)}</p>
+          <p className="text-[10px] text-emerald-400/60">Recebido: {formatCurrency(stats.totalReceived)}</p>
+        </div>
+        <div className="rounded-xl p-3 border bg-red-500/10 border-red-500/20">
+          <p className="text-[9px] text-gray-500 uppercase font-bold">A Pagar</p>
+          <p className="text-lg font-bold text-red-400">{formatCurrency(stats.totalPayable)}</p>
+          <p className="text-[10px] text-red-400/60">Pago: {formatCurrency(stats.totalPaid)}</p>
+        </div>
+      </div>
+
+      {/* Status Filters */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        {[
+          { key: "all" as const, label: "Todas", count: allTransactions.length, color: "gray" },
+          { key: "overdue" as const, label: "Vencidas", count: stats.overdue, color: "red" },
+          { key: "pending" as const, label: "Pendentes", count: stats.pending, color: "amber" },
+          { key: "paid" as const, label: "Pagas", count: stats.paid, color: "emerald" },
+          { key: "approval" as const, label: "Autorizar", count: stats.needApproval, color: "purple" },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(filter === f.key ? "all" : f.key)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+              filter === f.key
+                ? `bg-${f.color}-500/30 text-${f.color}-400 ring-1 ring-${f.color}-500/50`
+                : "bg-gray-800/50 text-gray-500 hover:text-gray-300"
+            }`}
+            style={filter === f.key ? { backgroundColor: `color-mix(in srgb, var(--color-${f.color}-500, #888) 20%, transparent)` } : {}}
+          >
+            {f.label} ({f.count})
+          </button>
+        ))}
+      </div>
+
+      {/* Type Filter */}
+      <div className="flex gap-1.5">
+        {[
+          { key: "all" as const, label: "Todos", icon: CircleDollarSign },
+          { key: "payable" as const, label: "A Pagar", icon: TrendingDown },
+          { key: "receivable" as const, label: "A Receber", icon: TrendingUp },
+        ].map(f => (
+          <button key={f.key} onClick={() => setTypeFilter(typeFilter === f.key ? "all" : f.key)}
+            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
+              typeFilter === f.key ? "bg-gray-700 text-white" : "bg-gray-800/50 text-gray-500"
+            }`}
+          >
+            <f.icon className="h-3 w-3" /> {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Botão Nova Conta + Audio */}
+      <div className="space-y-2">
+        <button
+          onClick={() => { setShowForm(!showForm); setEditingTx(null); if (showForm) resetForm(); }}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
+        >
+          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {showForm ? "Cancelar" : "Nova Conta"}
+        </button>
+        {!showForm && (
+          <AudioLauncher onResult={handleAudioResult} context="conta_pagar" />
+        )}
+      </div>
+
+      {/* Formulário de nova conta / edição */}
+      {showForm && (
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-bold text-white">{editingTx ? "Editar Conta" : "Nova Conta"}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Tipo *</label>
+              <select value={txType} onChange={e => setTxType(e.target.value as any)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+                <option value="payable">A Pagar</option>
+                <option value="receivable">A Receber</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Categoria</label>
+              <select value={txCategoryId?.toString() || ""} onChange={e => setTxCategoryId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+                <option value="">Sem categoria</option>
+                {(categories || []).map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Descrição *</label>
+            <Input value={txDescription} onChange={e => setTxDescription(e.target.value)}
+              placeholder="Ex: Boleto energia, Aluguel loja..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Valor (R$) *</label>
+              <Input type="number" step="0.01" value={txAmount} onChange={e => setTxAmount(e.target.value)}
+                placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Vencimento *</label>
+              <Input type="date" value={txDueDate} onChange={e => setTxDueDate(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Fornecedor</label>
+            <Input value={txSupplier} onChange={e => setTxSupplier(e.target.value)}
+              placeholder="Ex: CEMIG, Imobiliária..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+          {!editingTx && (
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-bold">Recorrência</label>
+              <select value={txRecurrence} onChange={e => setTxRecurrence(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+                <option value="none">Sem recorrência</option>
+                <option value="monthly">Mensal</option>
+                <option value="weekly">Semanal</option>
+                <option value="yearly">Anual</option>
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Observações</label>
+            <Input value={txNotes} onChange={e => setTxNotes(e.target.value)}
+              placeholder="Notas adicionais..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+          </div>
+          
+          {!editingTx && (
+            <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-purple-400" />
+                <div>
+                  <p className="text-xs font-bold text-purple-300">Precisa de Autorização</p>
+                  <p className="text-[10px] text-gray-500">Envia notificação para o gestor aprovar</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setTxNeedsApproval(!txNeedsApproval)}
+                className={`w-11 h-6 rounded-full transition-all relative ${txNeedsApproval ? 'bg-purple-500' : 'bg-gray-700'}`}>
+                <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all pointer-events-none ${txNeedsApproval ? 'left-5.5' : 'left-0.5'}`} />
+              </button>
+            </div>
+          )}
+          
+          {!editingTx && <AudioLauncher onResult={handleAudioResult} context={txType === "receivable" ? "conta_receber" : "conta_pagar"} />}
+          
+          <Button onClick={() => {
+            if (!txDescription.trim() || !txAmount || !txDueDate) return toast.error("Preencha descrição, valor e vencimento");
+            if (editingTx) {
+              updateTransaction.mutate({
+                id: editingTx.id,
+                description: txDescription,
+                amount: txAmount,
+                dueDate: new Date(txDueDate + "T12:00:00").getTime(),
+                categoryId: txCategoryId,
+                supplier: txSupplier || undefined,
+                notes: txNotes || undefined,
+              });
+            } else {
+              createTransaction.mutate({
+                type: txType,
+                description: txDescription,
+                amount: txAmount,
+                dueDate: new Date(txDueDate + "T12:00:00").getTime(),
+                categoryId: txCategoryId,
+                supplier: txSupplier || undefined,
+                notes: txNotes || undefined,
+                recurrence: txRecurrence as any,
+                needsApproval: txNeedsApproval,
+                createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
+              });
+            }
+          }} disabled={createTransaction.isPending || updateTransaction.isPending}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
+            {(createTransaction.isPending || updateTransaction.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : 
+              editingTx ? <><Edit2 className="h-4 w-4 mr-2" /> Salvar Alterações</> : <><Receipt className="h-4 w-4 mr-2" /> Lançar Conta</>}
+          </Button>
+        </div>
+      )}
+
+      {/* Busca */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Buscar por descrição, fornecedor..."
+          className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none" />
+      </div>
+
+      {/* Lista de transações */}
+      {filtered.length > 0 ? (
+        <div className="space-y-2">
+          {filtered.map((t: any) => {
+            const now = Date.now();
+            const isOverdue = (t.status === "pending" || t.status === "overdue") && t.dueDate < now;
+            const isPaid = t.status === "paid";
+            const isPayable = t.type === "payable";
+            const needsAuth = t.approvalStatus === "pending_approval";
+            const isApproved = t.approvalStatus === "approved";
+            const isRejected = t.approvalStatus === "rejected";
+            const isExpanded = expandedId === t.id;
+            return (
+              <div key={t.id} className={`rounded-xl border transition-all ${
+                needsAuth ? "bg-purple-500/10 border-purple-500/30" :
+                isOverdue ? "bg-red-500/10 border-red-500/30" :
+                isPaid ? "bg-emerald-500/10 border-emerald-500/20" :
+                "bg-gray-900/60 border-gray-800"
+              }`}>
+                <button onClick={() => setExpandedId(isExpanded ? null : t.id)} className="w-full p-4 text-left">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {isPayable ? <TrendingDown className="h-3.5 w-3.5 text-red-400 shrink-0" /> : <TrendingUp className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
+                        <p className="text-sm font-bold text-white truncate">{t.description}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
+                        <span className="bg-gray-800 px-1.5 py-0.5 rounded">{getCategoryName(t.categoryId)}</span>
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(t.dueDate)}</span>
+                        {t.supplier && <span className="text-gray-400">{t.supplier}</span>}
+                        {isOverdue && <span className="text-red-400 font-bold animate-pulse">VENCIDA</span>}
+                        {isPaid && <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle className="h-3 w-3" /> Paga {t.paidDate ? formatDate(t.paidDate) : ""}</span>}
+                        {needsAuth && <span className="text-purple-400 font-bold flex items-center gap-0.5"><Shield className="h-3 w-3" /> Aguardando</span>}
+                        {isApproved && <span className="text-green-400 flex items-center gap-0.5"><ShieldCheck className="h-3 w-3" /> Autorizada</span>}
+                        {isRejected && <span className="text-red-400 flex items-center gap-0.5"><ShieldAlert className="h-3 w-3" /> Rejeitada</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <p className={`text-sm font-bold ${isPayable ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {isPayable ? '-' : '+'}{formatCurrency(t.amount)}
+                      </p>
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-gray-600" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-600" />}
+                    </div>
+                  </div>
+                </button>
+                
+                {/* Expanded Actions */}
+                {isExpanded && (
+                  <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-3">
+                    {t.notes && <p className="text-xs text-gray-400">{t.notes}</p>}
+                    {t.createdByName && <p className="text-[10px] text-gray-600">Lançado por: {t.createdByName}</p>}
+                    {t.receiptUrl && (
+                      <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-cyan-400 hover:underline">
+                        <Eye className="h-3 w-3" /> Ver Comprovante
+                      </a>
+                    )}
+                    
+                    <div className="flex flex-wrap gap-2">
+                      {/* MARCAR COMO PAGO */}
+                      {!isPaid && t.status !== "cancelled" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); markPaid.mutate({ id: t.id, paidDate: Date.now() }); }}
+                          disabled={markPaid.isPending}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          {markPaid.isPending ? "Processando..." : "Marcar como Pago"}
+                        </button>
+                      )}
+                      
+                      {/* EDITAR */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startEdit(t); }}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" /> Editar
+                      </button>
+                      
+                      {/* EXCLUIR */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (confirm("Excluir esta conta?")) deleteTransaction.mutate({ id: t.id }); }}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Excluir
+                      </button>
+                      
+                      {/* AUTORIZAR/REJEITAR */}
+                      {needsAuth && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); approveTransaction.mutate({ id: t.id, approved: true, approvedBy: sellerSession?.name || "Admin" }); }}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-bold"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" /> Autorizar
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); approveTransaction.mutate({ id: t.id, approved: false, approvedBy: sellerSession?.name || "Admin" }); }}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold"
+                          >
+                            <ShieldAlert className="h-3.5 w-3.5" /> Rejeitar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-10 text-center">
+          <Receipt className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Nenhuma conta encontrada para {MONTH_NAMES[filterMonth - 1]} {filterYear}.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== RELATÓRIOS TAB =====
+function RelatoriosTab() {
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const startDate = useMemo(() => new Date(year, month - 1, 1).getTime(), [month, year]);
+  const endDate = useMemo(() => new Date(year, month, 0, 23, 59, 59).getTime(), [month, year]);
+  const { data: transactionsData } = trpc.finTransactions.list.useQuery({ startDate, endDate, limit: 500 });
+  const { data: categories } = trpc.finCategories.list.useQuery();
+  const { data: fuelRecords } = trpc.fuel.list.useQuery({ month, year });
+  const { data: pvGastos } = trpc.pvGastos.list.useQuery({ chamadoId: 0 });
+
+  const allTx: any[] = (transactionsData as any)?.items || [];
+  
+  const getCategoryName = (catId: number) => {
+    const cat = (categories || []).find((c: any) => c.id === catId);
+    return cat?.name || "Sem categoria";
+  };
+
+  // Category breakdown
+  const categoryBreakdown = useMemo(() => {
+    const map: Record<string, { name: string; payable: number; receivable: number; paid: number; count: number }> = {};
+    allTx.forEach((t: any) => {
+      const catName = getCategoryName(t.categoryId);
+      if (!map[catName]) map[catName] = { name: catName, payable: 0, receivable: 0, paid: 0, count: 0 };
+      map[catName].count++;
+      if (t.type === "payable") map[catName].payable += Number(t.amount || 0);
+      else map[catName].receivable += Number(t.amount || 0);
+      if (t.status === "paid") map[catName].paid += Number(t.amount || 0);
+    });
+    return Object.values(map).sort((a, b) => (b.payable + b.receivable) - (a.payable + a.receivable));
+  }, [allTx, categories]);
+
+  // Pós-venda totals
+  const pvMonthTotal = useMemo(() => {
+    if (!pvGastos || !Array.isArray(pvGastos)) return { total: 0, count: 0, items: [] as any[] };
+    const monthItems = pvGastos.filter((g: any) => {
+      const dt = new Date(g.createdAt);
+      return dt.getMonth() + 1 === month && dt.getFullYear() === year;
+    });
+    return {
+      total: monthItems.reduce((s: number, g: any) => s + Number(g.valor || 0), 0),
+      count: monthItems.length,
+      items: monthItems,
+    };
+  }, [pvGastos, month, year]);
+
+  // Fuel totals
+  const fuelTotal = useMemo(() => {
+    const records = fuelRecords || [];
+    return {
+      total: records.reduce((s: number, r: any) => s + Number(r.totalCost || 0), 0),
+      liters: records.reduce((s: number, r: any) => s + Number(r.liters || 0), 0),
+      count: records.length,
+    };
+  }, [fuelRecords]);
+
+  // Summary
+  const summary = useMemo(() => {
+    const payable = allTx.filter((t: any) => t.type === "payable");
+    const receivable = allTx.filter((t: any) => t.type === "receivable");
+    const paid = allTx.filter((t: any) => t.status === "paid");
+    const pending = allTx.filter((t: any) => t.status === "pending" || t.status === "overdue");
+    return {
+      totalPayable: payable.reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+      totalReceivable: receivable.reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+      totalPaid: paid.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+      totalReceived: paid.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+      pendingCount: pending.length,
+      paidCount: paid.length,
+      totalCount: allTx.length,
+    };
+  }, [allTx]);
+
+  const prevMonth = () => { if (month === 1) { setMonth(12); setYear(year - 1); } else setMonth(month - 1); };
+  const nextMonth = () => { if (month === 12) { setMonth(1); setYear(year + 1); } else setMonth(month + 1); };
+
+  // Generate printable report
+  const handlePrint = () => {
+    const printContent = `
+      <html><head><title>Relatório Financeiro - ${MONTH_NAMES[month - 1]} ${year}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        h1 { color: #1a1a1a; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { color: #444; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: bold; }
+        .total { font-weight: bold; font-size: 14px; }
+        .green { color: #16a34a; } .red { color: #dc2626; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+        .summary-box { border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+        .summary-box h3 { margin: 0 0 5px; font-size: 12px; color: #888; text-transform: uppercase; }
+        .summary-box p { margin: 0; font-size: 22px; font-weight: bold; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h1>Relatório Financeiro — ${MONTH_NAMES[month - 1]} ${year}</h1>
+      <p>Gerado em: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}</p>
+      
+      <div class="summary-grid">
+        <div class="summary-box"><h3>Total a Receber</h3><p class="green">${formatCurrency(summary.totalReceivable)}</p></div>
+        <div class="summary-box"><h3>Total a Pagar</h3><p class="red">${formatCurrency(summary.totalPayable)}</p></div>
+        <div class="summary-box"><h3>Recebido</h3><p class="green">${formatCurrency(summary.totalReceived)}</p></div>
+        <div class="summary-box"><h3>Pago</h3><p class="red">${formatCurrency(summary.totalPaid)}</p></div>
+      </div>
+      <p class="total">Balanço: <span class="${(summary.totalReceivable - summary.totalPayable) >= 0 ? 'green' : 'red'}">${formatCurrency(summary.totalReceivable - summary.totalPayable)}</span></p>
+      
+      <h2>Despesas por Categoria</h2>
+      <table>
+        <tr><th>Categoria</th><th>Qtd</th><th>A Pagar</th><th>A Receber</th><th>Pago</th></tr>
+        ${categoryBreakdown.map(c => `<tr><td>${c.name}</td><td>${c.count}</td><td class="red">${formatCurrency(c.payable)}</td><td class="green">${formatCurrency(c.receivable)}</td><td>${formatCurrency(c.paid)}</td></tr>`).join("")}
+      </table>
+      
+      <h2>Pós-Venda</h2>
+      <p>Total de gastos: <strong class="red">${formatCurrency(pvMonthTotal.total)}</strong> (${pvMonthTotal.count} lançamentos)</p>
+      
+      <h2>Gasolina</h2>
+      <p>Total gasto: <strong class="red">${formatCurrency(fuelTotal.total)}</strong> | ${fuelTotal.liters.toFixed(1)} litros | ${fuelTotal.count} abastecimentos</p>
+      
+      <h2>Todas as Transações</h2>
+      <table>
+        <tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Fornecedor</th><th>Categoria</th><th>Valor</th><th>Status</th></tr>
+        ${allTx.sort((a: any, b: any) => a.dueDate - b.dueDate).map((t: any) => `<tr>
+          <td>${formatDateFull(t.dueDate)}</td>
+          <td>${t.type === "payable" ? "Pagar" : "Receber"}</td>
+          <td>${t.description}</td>
+          <td>${t.supplier || "-"}</td>
+          <td>${getCategoryName(t.categoryId)}</td>
+          <td class="${t.type === "payable" ? "red" : "green"}">${formatCurrency(t.amount)}</td>
+          <td>${t.status === "paid" ? "✅ Pago" : t.status === "overdue" ? "⚠️ Vencido" : "⏳ Pendente"}</td>
+        </tr>`).join("")}
+      </table>
+      
+      <p style="margin-top:40px;text-align:center;color:#999;font-size:11px;">Kafka Rank — Sistema de Gestão</p>
+      </body></html>
+    `;
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 500);
+    }
+  };
+
+  // Export CSV
+  const handleExportCSV = () => {
+    const headers = "Data,Tipo,Descrição,Fornecedor,Categoria,Valor,Status\n";
+    const rows = allTx.sort((a: any, b: any) => a.dueDate - b.dueDate).map((t: any) =>
+      `${formatDateFull(t.dueDate)},${t.type === "payable" ? "A Pagar" : "A Receber"},"${t.description}","${t.supplier || ""}","${getCategoryName(t.categoryId)}",${t.amount},${t.status === "paid" ? "Pago" : t.status === "overdue" ? "Vencido" : "Pendente"}`
+    ).join("\n");
+    const blob = new Blob(["\uFEFF" + headers + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `relatorio-financeiro-${MONTH_NAMES[month - 1]}-${year}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado!");
+  };
+
+  return (
+    <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+      {/* Month Selector */}
+      <div className="flex items-center justify-between bg-gray-900/80 border border-gray-800 rounded-xl p-2">
+        <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <p className="text-white font-bold text-sm">{MONTH_NAMES[month - 1]} {year}</p>
+        <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-400">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Export Buttons */}
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={handlePrint}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-all">
+          <Printer className="h-4 w-4" /> Imprimir / PDF
+        </button>
+        <button onClick={handleExportCSV}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm transition-all">
+          <Download className="h-4 w-4" /> Exportar CSV
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl p-4 border bg-emerald-500/10 border-emerald-500/20 text-center">
+          <p className="text-[9px] text-gray-500 uppercase font-bold">Receitas</p>
+          <p className="text-xl font-bold text-emerald-400">{formatCurrency(summary.totalReceivable)}</p>
+        </div>
+        <div className="rounded-xl p-4 border bg-red-500/10 border-red-500/20 text-center">
+          <p className="text-[9px] text-gray-500 uppercase font-bold">Despesas</p>
+          <p className="text-xl font-bold text-red-400">{formatCurrency(summary.totalPayable)}</p>
+        </div>
+      </div>
+      <div className={`rounded-xl p-4 border text-center ${(summary.totalReceivable - summary.totalPayable) >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+        <p className="text-[9px] text-gray-500 uppercase font-bold">Lucro / Prejuízo</p>
+        <p className={`text-2xl font-bold ${(summary.totalReceivable - summary.totalPayable) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          {formatCurrency(summary.totalReceivable - summary.totalPayable)}
+        </p>
+      </div>
+
+      {/* Category Breakdown */}
+      <div className="rounded-xl border border-gray-800 bg-gray-900/60 p-4">
+        <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+          <PieChart className="h-4 w-4 text-purple-400" /> Despesas por Categoria
+        </h3>
+        {categoryBreakdown.length > 0 ? (
+          <div className="space-y-2">
+            {categoryBreakdown.map((c, i) => {
+              const total = c.payable + c.receivable;
+              const maxTotal = Math.max(...categoryBreakdown.map(x => x.payable + x.receivable));
+              const pct = maxTotal > 0 ? ((total / maxTotal) * 100) : 0;
+              return (
+                <div key={i}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-gray-300">{c.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-500">{c.count}x</span>
+                      {c.payable > 0 && <span className="text-red-400">{formatCurrency(c.payable)}</span>}
+                      {c.receivable > 0 && <span className="text-emerald-400">{formatCurrency(c.receivable)}</span>}
+                    </div>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-xs text-center py-4">Sem dados para este mês.</p>
+        )}
+      </div>
+
+      {/* Pós-Venda Section */}
+      <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+        <h3 className="text-sm font-bold text-orange-400 mb-2 flex items-center gap-2">
+          <Wrench className="h-4 w-4" /> Gastos Pós-Venda
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Total Gasto</p>
+            <p className="text-lg font-bold text-orange-400">{formatCurrency(pvMonthTotal.total)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Lançamentos</p>
+            <p className="text-lg font-bold text-orange-400">{pvMonthTotal.count}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Fuel Section */}
+      <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4">
+        <h3 className="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
+          <Fuel className="h-4 w-4" /> Gasolina
+        </h3>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Total</p>
+            <p className="text-lg font-bold text-yellow-400">{formatCurrency(fuelTotal.total)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Litros</p>
+            <p className="text-lg font-bold text-yellow-400">{fuelTotal.liters.toFixed(1)}L</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase">Abastec.</p>
+            <p className="text-lg font-bold text-yellow-400">{fuelTotal.count}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Transaction Table */}
+      <div className="rounded-xl border border-gray-800 bg-gray-900/60 overflow-hidden">
+        <div className="p-3 border-b border-gray-800">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4 text-cyan-400" /> Planilha de Transações
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-800/50">
+                <th className="px-3 py-2 text-left text-gray-400 font-bold">Data</th>
+                <th className="px-3 py-2 text-left text-gray-400 font-bold">Descrição</th>
+                <th className="px-3 py-2 text-right text-gray-400 font-bold">Valor</th>
+                <th className="px-3 py-2 text-center text-gray-400 font-bold">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allTx.sort((a: any, b: any) => a.dueDate - b.dueDate).map((t: any) => (
+                <tr key={t.id} className="border-t border-gray-800/50 hover:bg-gray-800/30">
+                  <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{formatDate(t.dueDate)}</td>
+                  <td className="px-3 py-2 text-white truncate max-w-[150px]">{t.description}</td>
+                  <td className={`px-3 py-2 text-right font-bold whitespace-nowrap ${t.type === "payable" ? "text-red-400" : "text-emerald-400"}`}>
+                    {t.type === "payable" ? "-" : "+"}{formatCurrency(t.amount)}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {t.status === "paid" ? (
+                      <span className="inline-flex items-center gap-0.5 text-emerald-400"><CheckCircle className="h-3 w-3" /></span>
+                    ) : t.status === "overdue" || (t.status === "pending" && t.dueDate < Date.now()) ? (
+                      <span className="inline-flex items-center gap-0.5 text-red-400"><AlertTriangle className="h-3 w-3" /></span>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 text-amber-400"><Clock className="h-3 w-3" /></span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {allTx.length === 0 && (
+            <p className="text-center text-gray-500 text-xs py-6">Sem transações neste mês.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -152,7 +1062,6 @@ function PosVendaTab() {
 
   return (
     <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
-      {/* Contadores */}
       <div className="grid grid-cols-3 gap-2">
         {[
           { key: "aberto", label: "Abertos", count: counts.aberto, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
@@ -166,19 +1075,13 @@ function PosVendaTab() {
         ))}
       </div>
 
-      {/* Busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Buscar por cliente, carro, placa..."
-          className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-orange-500 focus:outline-none"
-        />
+          className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-orange-500 focus:outline-none" />
       </div>
 
-      {/* Lista de chamados */}
       {filtered.length > 0 ? (
         <div className="space-y-2">
           {filtered.map((c: any) => {
@@ -248,289 +1151,6 @@ function PosVendaTab() {
   );
 }
 
-// ===== CONTAS TAB (Exclusivo Financeiro) =====
-function ContasTab() {
-  const { data: categories } = trpc.finCategories.list.useQuery();
-  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery({});
-  const { data: sellerSession } = trpc.sellers.me.useQuery();
-  const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  
-  // Form state
-  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
-  const [txDescription, setTxDescription] = useState("");
-  const [txAmount, setTxAmount] = useState("");
-  const [txDueDate, setTxDueDate] = useState("");
-  const [txSupplier, setTxSupplier] = useState("");
-  const [txNotes, setTxNotes] = useState("");
-  const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
-  const [txNeedsApproval, setTxNeedsApproval] = useState(false);
-  const [txRecurrence, setTxRecurrence] = useState("none");
-  
-  const createTransaction = trpc.finTransactions.create.useMutation({
-    onSuccess: () => { refetch(); setShowForm(false); resetForm(); toast.success("Conta lan\u00e7ada com sucesso!"); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-  
-  const resetForm = () => {
-    setTxType("payable"); setTxDescription(""); setTxAmount("");
-    setTxDueDate(""); setTxSupplier(""); setTxNotes("");
-    setTxCategoryId(null); setTxNeedsApproval(false); setTxRecurrence("none");
-  };
-
-  const allTransactions: any[] = (transactionsData as any)?.items || (Array.isArray(transactionsData) ? transactionsData : []);
-  
-  const filtered = useMemo(() => {
-    let list = allTransactions;
-    const now = Date.now();
-    if (filter === "pending") list = list.filter((t: any) => t.status === "pending" && t.dueDate >= now);
-    else if (filter === "paid") list = list.filter((t: any) => t.status === "paid");
-    else if (filter === "overdue") list = list.filter((t: any) => t.status === "pending" && t.dueDate < now);
-    else if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter((t: any) => t.description?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q));
-    }
-    return list.sort((a: any, b: any) => a.dueDate - b.dueDate);
-  }, [allTransactions, filter, searchQuery]);
-
-  const stats = useMemo(() => {
-    const now = Date.now();
-    const pending = allTransactions.filter((t: any) => t.status === "pending");
-    const paid = allTransactions.filter((t: any) => t.status === "paid");
-    const overdue = pending.filter((t: any) => t.dueDate < now);
-    const needApproval = allTransactions.filter((t: any) => t.approvalStatus === "pending_approval");
-    const totalPending = pending.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    const totalPaid = paid.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    const totalOverdue = overdue.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    return { pending: pending.length, paid: paid.length, overdue: overdue.length, needApproval: needApproval.length, totalPending, totalPaid, totalOverdue };
-  }, [allTransactions]);
-
-  const getCategoryName = (catId: number) => {
-    const cat = (categories || []).find((c: any) => c.id === catId);
-    return cat?.name || "Sem categoria";
-  };
-  
-  const handleAudioResult = (parsed: any) => {
-    if (parsed.description) setTxDescription(parsed.description);
-    if (parsed.amount) setTxAmount(String(parsed.amount));
-    if (parsed.supplier) setTxSupplier(parsed.supplier);
-    if (parsed.notes) setTxNotes(parsed.notes);
-    if (parsed.type === "receivable") setTxType("receivable");
-    if (parsed.dueDate) {
-      try {
-        const d = new Date(parsed.dueDate);
-        setTxDueDate(d.toISOString().split("T")[0]);
-      } catch {}
-    }
-    setShowForm(true);
-    toast.success("Dados preenchidos pelo \u00e1udio!");
-  };
-
-  return (
-    <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <button onClick={() => setFilter(f => f === "overdue" ? "all" : "overdue")} className={`rounded-xl p-2.5 border text-center transition-all bg-red-500/10 border-red-500/20 ${filter === "overdue" ? 'ring-2 ring-red-500/50' : ''}`}>
-          <p className="text-lg font-bold text-red-400">{stats.overdue}</p>
-          <p className="text-[9px] text-gray-500">Vencidas</p>
-        </button>
-        <button onClick={() => setFilter(f => f === "pending" ? "all" : "pending")} className={`rounded-xl p-2.5 border text-center transition-all bg-amber-500/10 border-amber-500/20 ${filter === "pending" ? 'ring-2 ring-amber-500/50' : ''}`}>
-          <p className="text-lg font-bold text-amber-400">{stats.pending}</p>
-          <p className="text-[9px] text-gray-500">Pendentes</p>
-        </button>
-        <button onClick={() => setFilter(f => f === "paid" ? "all" : "paid")} className={`rounded-xl p-2.5 border text-center transition-all bg-emerald-500/10 border-emerald-500/20 ${filter === "paid" ? 'ring-2 ring-emerald-500/50' : ''}`}>
-          <p className="text-lg font-bold text-emerald-400">{stats.paid}</p>
-          <p className="text-[9px] text-gray-500">Pagas</p>
-        </button>
-        <button onClick={() => setFilter(f => f === "approval" ? "all" : "approval")} className={`rounded-xl p-2.5 border text-center transition-all bg-purple-500/10 border-purple-500/20 ${filter === "approval" ? 'ring-2 ring-purple-500/50' : ''}`}>
-          <p className="text-lg font-bold text-purple-400">{stats.needApproval}</p>
-          <p className="text-[9px] text-gray-500">Autorizar</p>
-        </button>
-      </div>
-
-      {/* Bot\u00e3o Nova Conta + Audio */}
-      <div className="space-y-2">
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
-        >
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? "Cancelar" : "Nova Conta"}
-        </button>
-        {!showForm && (
-          <AudioLauncher onResult={handleAudioResult} context="conta_pagar" />
-        )}
-      </div>
-
-      {/* Formul\u00e1rio de nova conta */}
-      {showForm && (
-        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Tipo *</label>
-              <select value={txType} onChange={e => setTxType(e.target.value as any)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
-                <option value="payable">A Pagar</option>
-                <option value="receivable">A Receber</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Categoria</label>
-              <select value={txCategoryId?.toString() || ""} onChange={e => setTxCategoryId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
-                <option value="">Sem categoria</option>
-                {(categories || []).map((c: any) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Descri\u00e7\u00e3o *</label>
-            <Input value={txDescription} onChange={e => setTxDescription(e.target.value)}
-              placeholder="Ex: Boleto energia, Aluguel loja..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Valor (R$) *</label>
-              <Input type="number" step="0.01" value={txAmount} onChange={e => setTxAmount(e.target.value)}
-                placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 uppercase font-bold">Vencimento *</label>
-              <Input type="date" value={txDueDate} onChange={e => setTxDueDate(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Fornecedor</label>
-            <Input value={txSupplier} onChange={e => setTxSupplier(e.target.value)}
-              placeholder="Ex: CEMIG, Imobili\u00e1ria..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Recorr\u00eancia</label>
-            <select value={txRecurrence} onChange={e => setTxRecurrence(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
-              <option value="none">Sem recorr\u00eancia</option>
-              <option value="monthly">Mensal</option>
-              <option value="weekly">Semanal</option>
-              <option value="yearly">Anual</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Observa\u00e7\u00f5es</label>
-            <Input value={txNotes} onChange={e => setTxNotes(e.target.value)}
-              placeholder="Notas adicionais..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
-          </div>
-          
-          {/* Toggle Precisa Autoriza\u00e7\u00e3o */}
-          <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-purple-400" />
-              <div>
-                <p className="text-xs font-bold text-purple-300">Precisa de Autoriza\u00e7\u00e3o</p>
-                <p className="text-[10px] text-gray-500">Envia notifica\u00e7\u00e3o para o gestor aprovar</p>
-              </div>
-            </div>
-            <button type="button" onClick={() => setTxNeedsApproval(!txNeedsApproval)}
-              className={`w-11 h-6 rounded-full transition-all relative ${txNeedsApproval ? 'bg-purple-500' : 'bg-gray-700'}`}>
-              <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all pointer-events-none ${txNeedsApproval ? 'left-5.5' : 'left-0.5'}`} />
-            </button>
-          </div>
-          
-          {/* Audio dentro do form */}
-          <AudioLauncher onResult={handleAudioResult} context={txType === "receivable" ? "conta_receber" : "conta_pagar"} />
-          
-          <Button onClick={() => {
-            if (!txDescription.trim() || !txAmount || !txDueDate) return toast.error("Preencha descri\u00e7\u00e3o, valor e vencimento");
-            createTransaction.mutate({
-              type: txType,
-              description: txDescription,
-              amount: txAmount,
-              dueDate: new Date(txDueDate + "T12:00:00").getTime(),
-              categoryId: txCategoryId,
-              supplier: txSupplier || undefined,
-              notes: txNotes || undefined,
-              recurrence: txRecurrence as any,
-              needsApproval: txNeedsApproval,
-              createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
-            });
-          }} disabled={createTransaction.isPending}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
-            {createTransaction.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Receipt className="h-4 w-4 mr-2" /> Lan\u00e7ar Conta</>}
-          </Button>
-        </div>
-      )}
-
-      {/* Busca */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar por descri\u00e7\u00e3o..."
-          className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none"
-        />
-      </div>
-
-      {/* Lista de transa\u00e7\u00f5es */}
-      {filtered.length > 0 ? (
-        <div className="space-y-2">
-          {filtered.map((t: any) => {
-            const now = Date.now();
-            const isOverdue = t.status === "pending" && t.dueDate < now;
-            const isPaid = t.status === "paid";
-            const isPayable = t.type === "payable";
-            const needsAuth = t.approvalStatus === "pending_approval";
-            const isApproved = t.approvalStatus === "approved";
-            const isRejected = t.approvalStatus === "rejected";
-            return (
-              <div key={t.id} className={`rounded-xl border p-4 transition-all ${
-                needsAuth ? "bg-purple-500/10 border-purple-500/30" :
-                isOverdue ? "bg-red-500/10 border-red-500/30" :
-                isPaid ? "bg-emerald-500/10 border-emerald-500/30" :
-                "bg-gray-900/60 border-gray-800"
-              }`}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      {isPayable ? <TrendingDown className="h-3.5 w-3.5 text-red-400 shrink-0" /> : <TrendingUp className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
-                      <p className="text-sm font-bold text-white truncate">{t.description}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500">
-                      <span className="bg-gray-800 px-1.5 py-0.5 rounded">{getCategoryName(t.categoryId)}</span>
-                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(t.dueDate)}</span>
-                      {t.supplier && <span className="text-gray-400">{t.supplier}</span>}
-                      {isOverdue && <span className="text-red-400 font-bold">VENCIDA</span>}
-                      {isPaid && <span className="text-emerald-400 font-bold flex items-center gap-0.5"><CheckCircle className="h-3 w-3" /> Paga</span>}
-                      {needsAuth && <span className="text-purple-400 font-bold flex items-center gap-0.5"><Shield className="h-3 w-3" /> Aguardando Autoriza\u00e7\u00e3o</span>}
-                      {isApproved && <span className="text-green-400 font-bold flex items-center gap-0.5"><ShieldCheck className="h-3 w-3" /> Autorizada</span>}
-                      {isRejected && <span className="text-red-400 font-bold flex items-center gap-0.5"><ShieldAlert className="h-3 w-3" /> Rejeitada</span>}
-                    </div>
-                    {t.createdByName && <p className="text-[10px] text-gray-600 mt-1">Lan\u00e7ado por: {t.createdByName}</p>}
-                  </div>
-                  <p className={`text-sm font-bold shrink-0 ml-2 ${isPayable ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {isPayable ? '-' : '+'}{formatCurrency(t.amount)}
-                  </p>
-                </div>
-                {t.notes && <p className="text-[11px] text-gray-500 mt-2 line-clamp-1">{t.notes}</p>}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-10 text-center">
-          <Receipt className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Nenhuma conta encontrada.</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 
 // ===== GASOLINA TAB =====
 function GasolinaTab() {
@@ -559,14 +1179,12 @@ function GasolinaTab() {
     setOdometer(""); setGasStation(""); setNotes("");
   };
 
-  // Auto-calculate total
   const calcTotal = () => {
     const l = parseFloat(liters);
     const p = parseFloat(pricePerLiter);
     if (l > 0 && p > 0) setTotalCost((l * p).toFixed(2));
   };
 
-  // Auto-fill vehicle model from plate
   const handlePlateChange = (plate: string) => {
     setVehiclePlate(plate.toUpperCase());
     if (inventory && plate.length >= 7) {
@@ -618,7 +1236,6 @@ function GasolinaTab() {
 
   return (
     <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-xl p-3 border text-center bg-yellow-500/10 border-yellow-500/20">
           <p className="text-xl font-bold text-yellow-400">{stats.count}</p>
@@ -634,16 +1251,12 @@ function GasolinaTab() {
         </div>
       </div>
 
-      {/* Add button */}
-      <button
-        onClick={() => setShowForm(!showForm)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-sm transition-all"
-      >
+      <button onClick={() => setShowForm(!showForm)}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-sm transition-all">
         {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         {showForm ? "Cancelar" : "Novo Abastecimento"}
       </button>
 
-      {/* Form */}
       {showForm && (
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -658,7 +1271,6 @@ function GasolinaTab() {
                 placeholder="Marca / Modelo" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
             </div>
           </div>
-
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-[10px] text-gray-500 uppercase font-bold">Combustível</label>
@@ -681,7 +1293,6 @@ function GasolinaTab() {
                 placeholder="0.00" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] text-gray-500 uppercase font-bold">Total (R$) *</label>
@@ -694,20 +1305,16 @@ function GasolinaTab() {
                 placeholder="Odômetro" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
             </div>
           </div>
-
           <div>
             <label className="text-[10px] text-gray-500 uppercase font-bold">Posto</label>
             <Input value={gasStation} onChange={e => setGasStation(e.target.value)}
               placeholder="Nome do posto" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
           </div>
-
           <div>
             <label className="text-[10px] text-gray-500 uppercase font-bold">Observações</label>
             <Input value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="Ex: Abastecimento para test drive" className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
           </div>
-
-          {/* Audio launcher */}
           <AudioLauncher onResult={(parsed: any) => {
             if (parsed.vehiclePlate) setVehiclePlate(parsed.vehiclePlate);
             if (parsed.vehicleModel) setVehicleModel(parsed.vehicleModel);
@@ -720,7 +1327,6 @@ function GasolinaTab() {
             if (parsed.notes) setNotes(parsed.notes);
             toast.success("Dados preenchidos pelo áudio!");
           }} context="gasolina" />
-
           <Button onClick={handleSubmit} disabled={createFuel.isPending}
             className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold">
             {createFuel.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Fuel className="h-4 w-4 mr-2" /> Registrar Abastecimento</>}
@@ -728,7 +1334,6 @@ function GasolinaTab() {
         </div>
       )}
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
         <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -736,7 +1341,6 @@ function GasolinaTab() {
           className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-yellow-500 focus:outline-none" />
       </div>
 
-      {/* Records list */}
       {filtered.length > 0 ? (
         <div className="space-y-2">
           {filtered.map((r: any) => (
@@ -773,7 +1377,7 @@ function GasolinaTab() {
   );
 }
 
-// ===== AUDIO LAUNCHER (reusable for Contas and Gasolina) =====
+// ===== AUDIO LAUNCHER (reusable) =====
 function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void; context: "conta_pagar" | "conta_receber" | "gasolina" }) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -798,17 +1402,11 @@ function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void;
       const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setProcessing(true);
-
-        // Upload audio first, then parse
         const reader = new FileReader();
         reader.onload = async () => {
           try {
@@ -822,13 +1420,10 @@ function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void;
         };
         reader.readAsDataURL(blob);
       };
-
       mediaRecorder.start();
       setRecording(true);
       toast.info("Gravando... Fale os dados do lançamento.");
-    } catch (err) {
-      toast.error("Não foi possível acessar o microfone.");
-    }
+    } catch { toast.error("Não foi possível acessar o microfone."); }
   };
 
   const stopRecording = () => {
@@ -842,20 +1437,18 @@ function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void;
     <div className="flex items-center gap-2">
       {processing ? (
         <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 w-full">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Processando áudio com IA...
+          <Loader2 className="h-4 w-4 animate-spin" /> Processando áudio com IA...
         </div>
       ) : recording ? (
         <button onClick={stopRecording}
           className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2.5 w-full animate-pulse">
-          <MicOff className="h-4 w-4" />
-          Gravando... Toque para parar
+          <MicOff className="h-4 w-4" /> Gravando... Toque para parar
         </button>
       ) : (
         <button onClick={startRecording}
           className="flex items-center gap-2 text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 w-full hover:bg-gray-700 hover:text-white transition-all">
           <Mic className="h-4 w-4" />
-          {context === "gasolina" ? "Lançar por áudio (ex: 'Abasteci 40 litros no Corolla placa ABC1D23')" : "Lançar conta por áudio"}
+          {context === "gasolina" ? "Lançar por áudio" : "Lançar conta por áudio"}
         </button>
       )}
     </div>

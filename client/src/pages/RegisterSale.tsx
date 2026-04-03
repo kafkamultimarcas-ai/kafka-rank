@@ -125,6 +125,10 @@ export default function RegisterSale() {
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
   const [saleLeadSource, setSaleLeadSource] = useState<string>("");
+  const [saleCustomerName, setSaleCustomerName] = useState("");
+  const [saleCustomerEmail, setSaleCustomerEmail] = useState("");
+  const [saleCustomerCpf, setSaleCustomerCpf] = useState("");
+  const [saleCustomerBirthday, setSaleCustomerBirthday] = useState("");
 
   // F&I fields
   const [feiCustomerName, setFeiCustomerName] = useState("");
@@ -326,6 +330,10 @@ export default function RegisterSale() {
             description: description || undefined,
             leadSource: saleLeadSource as 'lead_loja' | 'lead_vendedor',
             customerPhone: customerPhone || undefined,
+            customerName: saleCustomerName || undefined,
+            customerEmail: saleCustomerEmail || undefined,
+            customerCpf: saleCustomerCpf || undefined,
+            customerBirthday: saleCustomerBirthday || undefined,
           });
           // Mostrar alerta se venda foi vinculada a agendamento SDR
           if ((result as any).linkedSdr) {
@@ -672,13 +680,40 @@ export default function RegisterSale() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-green-400" />
-                    Telefone do comprador
+                    <User className="w-4 h-4 text-blue-400" />
+                    Nome completo do comprador
                   </Label>
-                  <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                    placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
-                  <p className="text-[10px] text-gray-500">Se preencher, o sistema cruza automaticamente com agendamentos (SDR ganha comissão)</p>
+                  <Input value={saleCustomerName} onChange={e => setSaleCustomerName(e.target.value)}
+                    placeholder="Nome completo" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-green-400" />
+                      Telefone
+                    </Label>
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                      placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold">CPF</Label>
+                    <Input value={saleCustomerCpf} onChange={e => setSaleCustomerCpf(e.target.value)}
+                      placeholder="000.000.000-00" maxLength={14} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold">Email</Label>
+                    <Input value={saleCustomerEmail} onChange={e => setSaleCustomerEmail(e.target.value)}
+                      placeholder="email@exemplo.com" type="email" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 font-semibold">Data de Nascimento</Label>
+                    <Input value={saleCustomerBirthday} onChange={e => setSaleCustomerBirthday(e.target.value)}
+                      placeholder="DD/MM/AAAA" maxLength={10} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-500 -mt-1">Telefone cruza com agendamentos (SDR). Aniversário permite disparo automático de parabéns!</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">Valor (R$)</Label>
