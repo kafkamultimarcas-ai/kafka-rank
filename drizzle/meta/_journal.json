@@ -386,6 +386,20 @@
       "when": 1775248585893,
       "tag": "0054_nappy_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "5",
+      "when": 1775253194132,
+      "tag": "0055_serious_nitro",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "5",
+      "when": 1775253434313,
+      "tag": "0056_quick_bloodscream",
+      "breakpoints": true
     }
   ]
 }

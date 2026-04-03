@@ -1827,3 +1827,30 @@
 - [x] Tela de aniversariantes do dia/semana/mês
 - [x] Disparo automático de mensagem de parabéns via WhatsApp
 - [x] Prompt personalizado para mensagem de aniversário Kafka Multimarcas
+
+## Login Independente Admin (Simplificado - Usuário/Senha)
+- [x] Usar tabela admins existente com campos email, phone, mustChangePassword
+- [x] Criar tabela emailVerificationCodes (para uso futuro)
+- [x] Backend: login direto com usuário+senha (sem 2FA, simplificado)
+- [x] Backend: primeiro acesso obriga troca de senha
+- [x] Backend: rota changePassword para admin trocar própria senha
+- [x] Backend: rota resetAdminPassword para SuperAdmin resetar senha de qualquer admin
+- [x] Frontend: tela de login admin simplificada com usuário/senha
+- [x] Frontend: tela de troca de senha obrigatória no primeiro acesso
+- [x] Frontend: painel "Minha Senha" nas Configurações para trocar senha
+- [x] Frontend: botão "Resetar Senha" na lista de admins
+- [x] Frontend: campos email e telefone na criação de admin
+- [x] Admin principal: kafkabr@icloud.com pré-cadastrado
+- [x] Manter compatibilidade com Manus OAuth como opção alternativa
+- [x] Preparar sistema para revenda (login funciona sem Manus)
+- [x] Recuperação de senha: SuperAdmin reseta pelo painel (simples)
+- [x] Primeiro acesso: troca de senha obrigatória
+
+## Auditoria SaaS Multi-Loja
+- [ ] Analisar isolamento de dados entre lojas
+- [ ] Verificar se sistema funciona 100% sem Manus OAuth (login independente)
+- [ ] Identificar e corrigir bugs existentes
+- [ ] Verificar se branding é customizável por loja
+- [ ] Gerar relatório completo de melhorias para implantação
+- [ ] Gerar prompt de melhoria para rodar nova loja sem bugs
+- [ ] Preparar sistema para integração com site de carros

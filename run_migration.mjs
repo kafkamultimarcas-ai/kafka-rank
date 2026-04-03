@@ -4,7 +4,7 @@ import fs from 'fs';
 
 dotenv.config();
 
-const sql = fs.readFileSync('drizzle/0054_nappy_ben_urich.sql', 'utf8');
+const sql = fs.readFileSync('drizzle/0056_quick_bloodscream.sql', 'utf8');
 const statements = sql.split('--> statement-breakpoint').map(s => s.trim()).filter(Boolean);
 
 const conn = await mysql.createConnection(process.env.DATABASE_URL);

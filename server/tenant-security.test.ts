@@ -43,7 +43,7 @@ describe("Multi-Tenant Schema Security", () => {
     }
     
     // Only tenants and superAdmins should NOT have tenantId
-    const allowedWithoutTenant = ["tenants", "superAdmins"];
+    const allowedWithoutTenant = ["tenants", "superAdmins", "emailVerificationCodes"];
     const unexpectedWithout = tablesWithoutTenant.filter(t => !allowedWithoutTenant.includes(t));
     
     expect(unexpectedWithout).toEqual([]);

@@ -10,40 +10,77 @@ import { storagePut } from "../storage";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 
-// ===== ADMIN AUTH (Login próprio) =====
+// ===== ADMIN AUTH (Login direto com usuário + senha) =====
+
 export const adminAuthRouter = router({
   // Auto-login for owner - enters CRM admin without password
   autoLogin: publicProcedure.mutation(async () => {
     const admin = await crmDb.getAdminByUsername("kafka");
     if (!admin || !admin.active) {
-      throw new Error("Conta admin n\u00e3o encontrada");
+      throw new Error("Conta admin não encontrada");
     }
     const token = jwt.sign(
       { adminId: admin.id, role: admin.role, type: "admin_auth" },
       ENV.cookieSecret,
       { expiresIn: "30d" }
     );
-    return { token, admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role } };
+    return { token, admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role, mustChangePassword: false } };
   }),
 
+  // Login direto com usuário + senha
   login: publicProcedure.input(z.object({
     username: z.string().min(1),
     password: z.string().min(1),
   })).mutation(async ({ input }) => {
     const admin = await crmDb.getAdminByUsername(input.username);
     if (!admin || !admin.active) {
-      throw new Error("Usuario ou senha invalidos");
+      throw new Error("Usuário ou senha inválidos");
     }
     const valid = await bcrypt.compare(input.password, admin.passwordHash);
     if (!valid) {
-      throw new Error("Usuario ou senha invalidos");
+      throw new Error("Usuário ou senha inválidos");
     }
+
+    const mustChange = (admin as any).mustChangePassword || false;
+
     const token = jwt.sign(
       { adminId: admin.id, role: admin.role, type: "admin_auth" },
       ENV.cookieSecret,
       { expiresIn: "30d" }
     );
-    return { token, admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role } };
+
+    // Update last access
+    await crmDb.updateAdmin(admin.id, { lastAccess: Date.now() } as any);
+
+    return {
+      token,
+      admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role, mustChangePassword: mustChange },
+    };
+  }),
+
+  // Trocar senha (primeiro acesso ou voluntário)
+  changePassword: publicProcedure.input(z.object({
+    token: z.string(),
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(4),
+  })).mutation(async ({ input }) => {
+    const payload = jwt.verify(input.token, ENV.cookieSecret) as any;
+    if (payload.type !== "admin_auth") throw new Error("Token inválido");
+    const admin = await crmDb.getAdminById(payload.adminId);
+    if (!admin) throw new Error("Conta não encontrada");
+
+    const mustChange = (admin as any).mustChangePassword || false;
+
+    // Se não é primeiro acesso e informou senha atual, validar
+    if (!mustChange && input.currentPassword) {
+      const valid = await bcrypt.compare(input.currentPassword, admin.passwordHash);
+      if (!valid) throw new Error("Senha atual incorreta");
+    }
+
+    const hash = await bcrypt.hash(input.newPassword, 10);
+    await crmDb.updateAdmin(admin.id, { passwordHash: hash, mustChangePassword: false } as any);
+
+    return { success: true };
   }),
 
   me: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {
@@ -52,7 +89,13 @@ export const adminAuthRouter = router({
       if (payload.type !== "admin_auth") return null;
       const admin = await crmDb.getAdminById(payload.adminId);
       if (!admin || !admin.active) return null;
-      return { id: admin.id, name: admin.name, username: admin.username, role: admin.role };
+      return {
+        id: admin.id,
+        name: admin.name,
+        username: admin.username,
+        role: admin.role,
+        mustChangePassword: (admin as any).mustChangePassword || false,
+      };
     } catch {
       return null;
     }
@@ -66,24 +109,55 @@ export const adminAuthRouter = router({
     username: z.string().min(3),
     password: z.string().min(4),
     name: z.string().min(1),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
     role: z.enum(["owner", "admin"]).optional(),
     permissions: z.string().optional(),
+    mustChangePassword: z.boolean().optional(),
   })).mutation(async ({ input }) => {
     const hash = await bcrypt.hash(input.password, 10);
-    const id = await crmDb.createAdmin({ username: input.username, passwordHash: hash, name: input.name, role: input.role, permissions: input.permissions });
+    const id = await crmDb.createAdmin({
+      username: input.username,
+      passwordHash: hash,
+      name: input.name,
+      role: input.role,
+      permissions: input.permissions,
+      email: input.email,
+      phone: input.phone,
+      mustChangePassword: input.mustChangePassword ?? true, // Default: must change on first login
+    } as any);
     return { id };
   }),
 
   update: adminProcedure.input(z.object({
     id: z.number(),
     name: z.string().optional(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
     password: z.string().optional(),
     active: z.boolean().optional(),
+    permissions: z.string().optional(),
   })).mutation(async ({ input }) => {
     const { id, password, ...rest } = input;
     const data: any = { ...rest };
-    if (password) data.passwordHash = await bcrypt.hash(password, 10);
+    if (password) {
+      data.passwordHash = await bcrypt.hash(password, 10);
+      data.mustChangePassword = true; // Force password change after admin resets it
+    }
     await crmDb.updateAdmin(id, data);
+    return { success: true };
+  }),
+
+  // Admin resets another admin's password
+  resetAdminPassword: adminProcedure.input(z.object({
+    adminId: z.number(),
+    newPassword: z.string().min(4),
+  })).mutation(async ({ input }) => {
+    const hash = await bcrypt.hash(input.newPassword, 10);
+    await crmDb.updateAdmin(input.adminId, {
+      passwordHash: hash,
+      mustChangePassword: true, // Force change on next login
+    } as any);
     return { success: true };
   }),
 

@@ -1435,12 +1435,18 @@ function SettingsView() {
   const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
-    name: "", username: "", password: "", role: "admin",
+    name: "", username: "", password: "", email: "", phone: "", role: "admin",
     permissions: {
       vendas: true, pre_vendas: false, consignacao: false, fei: false,
       marketing: false, financeiro: false, estoque: false, configuracoes: false, gerenciar_admins: false,
     }
   });
+  const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [showChangeMyPassword, setShowChangeMyPassword] = useState(false);
+  const [myOldPassword, setMyOldPassword] = useState("");
+  const [myNewPassword, setMyNewPassword] = useState("");
+  const [myConfirmPassword, setMyConfirmPassword] = useState("");
 
   const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
   const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
@@ -1455,8 +1461,24 @@ function SettingsView() {
   const createAdmin = trpc.adminAuth.create.useMutation({
     onSuccess: () => {
       refetch(); setShowAdd(false);
-      setForm({ name: "", username: "", password: "", role: "admin", permissions: { vendas: true, pre_vendas: false, consignacao: false, fei: false, marketing: false, financeiro: false, estoque: false, configuracoes: false, gerenciar_admins: false } });
-      toast.success("Admin criado!");
+      setForm({ name: "", username: "", password: "", email: "", phone: "", role: "admin", permissions: { vendas: true, pre_vendas: false, consignacao: false, fei: false, marketing: false, financeiro: false, estoque: false, configuracoes: false, gerenciar_admins: false } });
+      toast.success("Admin criado com sucesso! Senha temporária definida.");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const resetAdminPassword = trpc.adminAuth.resetAdminPassword.useMutation({
+    onSuccess: () => {
+      refetch(); setResetPasswordId(null); setResetPasswordValue("");
+      toast.success("Senha resetada! O admin precisará trocar no próximo login.");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const changeMyPassword = trpc.adminAuth.changePassword.useMutation({
+    onSuccess: () => {
+      setShowChangeMyPassword(false); setMyOldPassword(""); setMyNewPassword(""); setMyConfirmPassword("");
+      toast.success("Sua senha foi alterada com sucesso!");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -1483,10 +1505,35 @@ function SettingsView() {
                     <p className="text-sm text-foreground font-medium">{a.name}</p>
                     <p className="text-[10px] text-muted-foreground">@{a.username} • {a.role === "owner" ? "Dono" : "Admin"}</p>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded ${a.active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
-                    {a.active ? "Ativo" : "Inativo"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {a.email && <span className="text-[9px] text-muted-foreground">{a.email}</span>}
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${a.active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                      {a.active ? "Ativo" : "Inativo"}
+                    </span>
+                  </div>
                 </div>
+                {/* Reset Password */}
+                {a.role !== "owner" && (
+                  <div className="mt-2">
+                    {resetPasswordId === a.id ? (
+                      <div className="flex gap-2 items-center">
+                        <Input placeholder="Nova senha" type="password" value={resetPasswordValue}
+                          onChange={e => setResetPasswordValue(e.target.value)} className="h-7 text-xs flex-1" />
+                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => {
+                          if (resetPasswordValue.length < 4) { toast.error("Mínimo 4 caracteres"); return; }
+                          resetAdminPassword.mutate({ adminId: a.id, newPassword: resetPasswordValue });
+                        }} disabled={resetAdminPassword.isPending}>
+                          {resetAdminPassword.isPending ? "..." : "Salvar"}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => { setResetPasswordId(null); setResetPasswordValue(""); }}>✕</Button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setResetPasswordId(a.id)} className="text-[10px] text-amber-400 hover:text-amber-300 font-medium">
+                        🔑 Resetar Senha
+                      </button>
+                    )}
+                  </div>
+                )}
                 {a.role !== "owner" && activePerms.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {activePerms.map(p => (
@@ -1506,9 +1553,12 @@ function SettingsView() {
         </Button>
         {showAdd && (
           <div className="mt-3 p-3 rounded-lg bg-accent/30 border border-border space-y-3">
-            <Input placeholder="Nome" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Usuário" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Senha" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Nome completo" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Usuário de login" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Senha temporária (admin troca no 1º acesso)" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Email (opcional)" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Telefone (opcional)" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="h-9 text-sm" />
+            <p className="text-[10px] text-amber-400">⚠️ O admin será obrigado a trocar a senha no primeiro login</p>
 
             {/* Permissions checkboxes */}
             <div>
@@ -1529,10 +1579,41 @@ function SettingsView() {
               if (!form.name || !form.username || !form.password) { toast.error("Preencha todos os campos"); return; }
               createAdmin.mutate({
                 name: form.name, username: form.username, password: form.password,
+                email: form.email || undefined, phone: form.phone || undefined,
                 role: form.role as any, permissions: JSON.stringify(form.permissions),
+                mustChangePassword: true,
               });
             }} disabled={createAdmin.isPending} className="w-full racing-gradient text-white">
               {createAdmin.isPending ? "Criando..." : "Criar Admin"}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Change My Password */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">Minha Senha</h3>
+          <Button size="sm" variant="outline" onClick={() => setShowChangeMyPassword(!showChangeMyPassword)}>
+            🔐 Trocar Senha
+          </Button>
+        </div>
+        {showChangeMyPassword && (
+          <div className="mt-3 space-y-3">
+            <Input placeholder="Nova senha" type="password" value={myNewPassword}
+              onChange={e => setMyNewPassword(e.target.value)} className="h-9 text-sm" />
+            <Input placeholder="Confirmar nova senha" type="password" value={myConfirmPassword}
+              onChange={e => setMyConfirmPassword(e.target.value)} className="h-9 text-sm" />
+            {myConfirmPassword && myNewPassword !== myConfirmPassword && (
+              <p className="text-xs text-red-400">As senhas não coincidem</p>
+            )}
+            <Button size="sm" className="w-full" disabled={changeMyPassword.isPending || myNewPassword.length < 4 || myNewPassword !== myConfirmPassword}
+              onClick={() => {
+                const token = localStorage.getItem("crm_admin_token");
+                if (!token) { toast.error("Faça login novamente"); return; }
+                changeMyPassword.mutate({ token, newPassword: myNewPassword });
+              }}>
+              {changeMyPassword.isPending ? "Salvando..." : "Salvar Nova Senha"}
             </Button>
           </div>
         )}

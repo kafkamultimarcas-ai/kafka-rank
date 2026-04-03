@@ -411,8 +411,12 @@ export const admins = mysqlTable("admins", {
   username: varchar("username", { length: 100 }).notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("admin_phone", { length: 20 }),
+  mustChangePassword: boolean("mustChangePassword").default(false).notNull(),
+  lastAccess: bigint("admin_lastAccess", { mode: "number" }),
   role: mysqlEnum("role", ["owner", "admin"]).default("admin").notNull(),
-  permissions: text("permissions"), // JSON: {vendas:true, pre_vendas:true, consignacao:false, fei:false, marketing:false, financeiro:false, estoque:false, configuracoes:false, gerenciar_admins:false}
+  permissions: text("permissions"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1194,7 +1198,10 @@ export const superAdmins = mysqlTable("super_admins", {
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
-  role: mysqlEnum("super_role", ["owner", "support"]).default("support").notNull(), // owner = dono do SaaS, support = suporte
+  phone: varchar("phone", { length: 20 }),
+  emailVerified: boolean("emailVerified").default(false).notNull(),
+  twoFactorEnabled: boolean("twoFactorEnabled").default(true).notNull(),
+  role: mysqlEnum("super_role", ["owner", "support"]).default("support").notNull(),
   active: boolean("active").default(true).notNull(),
   lastAccess: bigint("lastAccess", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1202,6 +1209,18 @@ export const superAdmins = mysqlTable("super_admins", {
 });
 export type SuperAdmin = typeof superAdmins.$inferSelect;
 export type InsertSuperAdmin = typeof superAdmins.$inferInsert;
+
+// Códigos de verificação por email (2FA)
+export const emailVerificationCodes = mysqlTable("email_verification_codes", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  code: varchar("code", { length: 6 }).notNull(),
+  purpose: varchar("purpose", { length: 50 }).notNull(), // login, register, reset_password
+  expiresAt: bigint("expiresAt", { mode: "number" }).notNull(),
+  used: boolean("used").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmailVerificationCode = typeof emailVerificationCodes.$inferSelect;
 
 
 // Snapshots mensais - grava o estado de cada vendedor ao final de cada mês
