@@ -2075,6 +2075,31 @@ export const appRouter = router({
       await db.deleteGoal(input.id);
       return { success: true };
     }),
+    // Metas pendentes de aceitação para o vendedor logado
+    myPendingGoals: publicProcedure.query(async ({ ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (!privacySellerId) return [];
+      const allGoals = await db.listGoals({});
+      return allGoals.filter((g: any) => g.type === 'individual' && g.sellerId === privacySellerId && !g.accepted);
+    }),
+    // Aceitar meta individual
+    accept: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (!privacySellerId) throw new Error('Apenas colaboradores podem aceitar metas');
+      const allGoals = await db.listGoals({});
+      const goal = allGoals.find((g: any) => g.id === input.id);
+      if (!goal) throw new Error('Meta n\u00e3o encontrada');
+      if (goal.sellerId !== privacySellerId) throw new Error('Esta meta n\u00e3o \u00e9 sua');
+      if (goal.accepted) throw new Error('Meta j\u00e1 aceita');
+      await db.updateGoal(input.id, { accepted: true, acceptedAt: Date.now(), acceptedBy: privacySellerId });
+      // Notificar admin que meta foi aceita
+      const seller = await db.getSellerById(privacySellerId);
+      const sellerName = seller?.nickname || seller?.name || 'Colaborador';
+      try {
+        await notifyOwner({ title: 'Meta Aceita!', content: `${sellerName} aceitou a meta de ${goal.category} (${goal.targetValue} unidades)` });
+      } catch {}
+      return { success: true, message: 'Meta aceita!' };
+    }),
     // Ranking mensal de vendas (separado da campanha)
     monthlyRanking: publicProcedure.input(z.object({
       month: z.number().min(1).max(12),

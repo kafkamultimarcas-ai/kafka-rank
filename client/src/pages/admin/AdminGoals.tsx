@@ -2,17 +2,18 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Target, Plus, Trash2, TrendingUp, DollarSign, Trophy, Banknote, Pencil, Check, X } from "lucide-react";
+import { Target, Plus, Trash2, TrendingUp, DollarSign, Trophy, Banknote, Pencil, Check, X, Flame, Star, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const CATEGORY_OPTIONS = [
-  { value: "vendas", label: "Vendas" },
-  { value: "fei", label: "F&I" },
-  { value: "consignacao", label: "Consignação" },
-  { value: "despachante", label: "Despachante" },
-  { value: "feirao", label: "Feirão" },
-  { value: "pre_vendas", label: "Pré-Vendas" },
+  { value: "vendas", label: "Vendas", personLabel: "Vendedor" },
+  { value: "fei", label: "F&I", personLabel: "Analista F&I" },
+  { value: "consignacao", label: "Consignação", personLabel: "Consignador(a)" },
+  { value: "despachante", label: "Despachante", personLabel: "Despachante" },
+  { value: "feirao", label: "Feirão", personLabel: "Colaborador" },
+  { value: "pre_vendas", label: "Pré-Vendas", personLabel: "Pré-Vendedor" },
 ];
 const CATEGORY_COLORS: Record<string, string> = {
   vendas: "bg-red-500/20 text-red-400",
@@ -43,9 +44,23 @@ export default function AdminGoals() {
   const [bonusValue, setBonusValue] = useState("");
   const [sellerId, setSellerId] = useState("");
 
+  const [showPendingModal, setShowPendingModal] = useState(false);
+
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const utils = trpc.useUtils();
   const { data: goals, isLoading } = trpc.goals.list.useQuery({ month, year });
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+  const { data: pendingGoals } = trpc.goals.myPendingGoals.useQuery(undefined, { enabled: !isAdmin });
+
+  const acceptGoal = trpc.goals.accept.useMutation({
+    onSuccess: () => {
+      toast.success("Meta aceita! Vamos juntos! \uD83D\uDD25");
+      utils.goals.list.invalidate();
+      utils.goals.myPendingGoals.invalidate();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const createGoal = trpc.goals.create.useMutation({
     onSuccess: () => {
@@ -115,6 +130,27 @@ export default function AdminGoals() {
     updateGoal.mutate({ id: goalId, ...updates });
   };
 
+  // Get the dynamic person label based on category
+  const getPersonLabel = (cat: string) => {
+    return CATEGORY_OPTIONS.find(c => c.value === cat)?.personLabel || "Colaborador";
+  };
+
+  // Filter sellers by category/sector
+  const filteredSellers = useMemo(() => {
+    if (!sellers) return [];
+    const categoryToDept: Record<string, string[]> = {
+      vendas: ["vendas"],
+      fei: ["fei"],
+      consignacao: ["consignacao"],
+      despachante: ["despachante"],
+      feirao: ["vendas", "pre_vendas"],
+      pre_vendas: ["pre_vendas"],
+    };
+    const depts = categoryToDept[category];
+    if (!depts) return sellers;
+    return sellers.filter(s => depts.includes(s.department || "vendas"));
+  }, [sellers, category]);
+
   // Generate month tabs - show 6 months: 3 before, current, 2 after
   const monthTabs = useMemo(() => {
     const tabs = [];
@@ -136,10 +172,12 @@ export default function AdminGoals() {
             <Target className="h-6 w-6 text-primary" />
             <h1 className="font-heading font-bold text-2xl text-foreground">Metas</h1>
           </div>
-          <Button onClick={() => setShowForm(!showForm)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nova Meta
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setShowForm(!showForm)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nova Meta
+            </Button>
+          )}
         </div>
 
         {/* Month Tabs */}
@@ -159,8 +197,50 @@ export default function AdminGoals() {
           ))}
         </div>
 
+        {/* Pending Goals Modal for non-admin */}
+        {!isAdmin && pendingGoals && pendingGoals.length > 0 && (
+          <div className="racing-card p-5 border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-orange-500/5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center animate-pulse">
+                <AlertTriangle className="h-6 w-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-lg text-foreground">Novas Metas Para Voce!</h3>
+                <p className="text-sm text-muted-foreground">Aceite suas metas para comecar a competir</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {pendingGoals.map((pg: any) => (
+                <div key={pg.id} className="p-4 rounded-xl bg-card border border-amber-500/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${CATEGORY_COLORS[pg.category] || ""}`}>
+                      {CATEGORY_OPTIONS.find(c => c.value === pg.category)?.label || pg.category}
+                    </span>
+                    <span className="text-sm font-bold text-foreground">Meta: {pg.targetValue}</span>
+                  </div>
+                  {(pg.bonusDescription || pg.bonusValue) && (
+                    <div className="mb-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <p className="text-[10px] text-emerald-400 uppercase font-bold">Premio</p>
+                      {pg.bonusValue && <p className="font-bold text-emerald-400">R$ {Number(pg.bonusValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>}
+                      {pg.bonusDescription && <p className="text-xs text-emerald-300/80">{pg.bonusDescription}</p>}
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => acceptGoal.mutate({ id: pg.id })}
+                    disabled={acceptGoal.isPending}
+                    className="w-full gap-2 racing-gradient text-white"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    {acceptGoal.isPending ? "Aceitando..." : "Aceitar Meta"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Create Form */}
-        {showForm && (
+        {showForm && isAdmin && (
           <div className="racing-card p-6 space-y-4">
             <h3 className="font-heading font-bold text-foreground">Criar Meta para {MONTH_NAMES[month - 1]} {year}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -193,14 +273,14 @@ export default function AdminGoals() {
               </div>
               {type === "individual" && (
                 <div>
-                  <label className="text-sm text-muted-foreground mb-1 block">Vendedor</label>
+                  <label className="text-sm text-muted-foreground mb-1 block">{getPersonLabel(category)}</label>
                   <select
                     value={sellerId}
                     onChange={e => setSellerId(e.target.value)}
                     className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
                   >
-                    <option value="">Selecione...</option>
-                    {sellers?.map(s => (
+                    <option value="">Selecione o {getPersonLabel(category).toLowerCase()}...</option>
+                    {filteredSellers.map(s => (
                       <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
                     ))}
                   </select>
@@ -231,7 +311,7 @@ export default function AdminGoals() {
           <div className="racing-card p-8 text-center">
             <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">Nenhuma meta para {MONTH_NAMES[month - 1]} {year}.</p>
-            <p className="text-sm text-muted-foreground mt-1">Clique em "Nova Meta" para criar.</p>
+            {isAdmin && <p className="text-sm text-muted-foreground mt-1">Clique em "Nova Meta" para criar.</p>}
           </div>
         ) : (
           <div className="space-y-4">
@@ -266,7 +346,9 @@ export default function AdminGoals() {
             {/* Individual Goals */}
             {goals.filter(g => g.type === "individual").length > 0 && (
               <div>
-                <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase">Metas Individuais</h3>
+                <h3 className="font-heading font-bold text-sm text-muted-foreground mb-3 uppercase">
+                  {isAdmin ? "Metas Individuais" : "Sua Meta"}
+                </h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {goals.filter(g => g.type === "individual").map(goal => {
                     const seller = sellers?.find(s => s.id === goal.sellerId);
@@ -302,10 +384,10 @@ export default function AdminGoals() {
 }
 
 // Goal Card Component - visual with prize money display
-function GoalCard({ goal, seller, isEditing, editValue, editTarget, editBonus, editBonusValue,
+function GoalCard({ goal, seller, isAdmin, isEditing, editValue, editTarget, editBonus, editBonusValue,
   setEditValue, setEditTarget, setEditBonus, setEditBonusValue,
   onEdit, onSave, onCancel, onDelete }: {
-  goal: any; seller?: any; isEditing: boolean;
+  goal: any; seller?: any; isAdmin?: boolean; isEditing: boolean;
   editValue: string; editTarget: string; editBonus: string; editBonusValue: string;
   setEditValue: (v: string) => void; setEditTarget: (v: string) => void;
   setEditBonus: (v: string) => void; setEditBonusValue: (v: string) => void;
@@ -335,14 +417,14 @@ function GoalCard({ goal, seller, isEditing, editValue, editTarget, editBonus, e
         </div>
         <div className="flex items-center gap-1">
           {isAchieved && <Trophy className="h-4 w-4 text-emerald-400" />}
-          {!isEditing && (
+          {!isEditing && isAdmin && (
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title="Editar">
               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}>
+          {isAdmin && <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}>
             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-          </Button>
+          </Button>}
         </div>
       </div>
 
@@ -387,6 +469,21 @@ function GoalCard({ goal, seller, isEditing, editValue, editTarget, editBonus, e
             <div className={`h-full rounded-full transition-all ${isAchieved ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${pct}%` }} />
           </div>
         </>
+      )}
+
+      {/* Accepted/Pending Status for individual goals */}
+      {!isEditing && goal.type === 'individual' && (
+        <div className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-lg text-xs font-semibold ${
+          goal.accepted
+            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+            : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
+        }`}>
+          {goal.accepted ? (
+            <><CheckCircle className="h-3.5 w-3.5" /> Meta aceita{goal.acceptedAt ? ` em ${new Date(goal.acceptedAt).toLocaleDateString('pt-BR')}` : ''}</>
+          ) : (
+            <><Clock className="h-3.5 w-3.5 animate-pulse" /> Aguardando aceite do colaborador</>
+          )}
+        </div>
       )}
 
       {/* Prize Display - Visual with money */}

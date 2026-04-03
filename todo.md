@@ -1784,3 +1784,14 @@
 - [x] Frontend: alertas de agendamento feito pela IA
 - [x] Frontend: vendedor vê apenas seus leads/fichas, F&I vê todos
 - [x] Prompt da IA: conversão, agendamento, coleta de dados, simulação, ficha cadastral
+
+## Bugs Abril 2026
+- [x] Fix TOP EQUIPE "Mês Anterior" tab showing "Nenhum dado" - fallback logic works, was transient cache issue
+- [x] Add dynamic label filtering for goals (Vendedor/Consignador based on category)
+- [x] Filter team members by selected department/category in goal creation
+- [x] Add accepted/pending status indicator on individual goal cards
+- [x] Add goal acceptance flow (collaborator accepts meta, admin sees status)
+- [x] Add notification to admin when collaborator accepts goal
+- [x] Add pending goals banner for non-admin users with accept button
+- [x] Backend: myPendingGoals and accept procedures added to goals router
+- [x] Schema: added accepted, acceptedAt, acceptedBy fields to goals table

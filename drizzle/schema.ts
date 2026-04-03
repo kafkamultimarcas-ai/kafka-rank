@@ -356,6 +356,9 @@ export const goals = mysqlTable("goals", {
   bonusDescription: varchar("bonusDescription", { length: 500 }), // ex: "R$ 500 bônus"
   bonusValue: int("bonusValue").default(0), // valor do bônus em centavos
   achieved: boolean("achieved").default(false).notNull(),
+  accepted: boolean("accepted").default(false).notNull(), // meta individual aceita pelo colaborador
+  acceptedAt: bigint("acceptedAt", { mode: "number" }), // timestamp quando aceitou
+  acceptedBy: int("acceptedBy"), // sellerId de quem aceitou
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),

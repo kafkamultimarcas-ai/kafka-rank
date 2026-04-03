@@ -358,6 +358,20 @@
       "when": 1775230770383,
       "tag": "0050_condemned_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "5",
+      "when": 1775245854509,
+      "tag": "0051_public_queen_noir",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "5",
+      "when": 1775245919883,
+      "tag": "0052_colossal_kronos",
+      "breakpoints": true
     }
   ]
 }
