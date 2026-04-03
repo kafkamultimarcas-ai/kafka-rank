@@ -351,6 +351,13 @@
       "when": 1775169312724,
       "tag": "0049_vengeful_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "5",
+      "when": 1775230770383,
+      "tag": "0050_condemned_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

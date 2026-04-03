@@ -17,6 +17,7 @@ import {
   Shuffle, ArrowRightLeft, Timer, Headphones, Target,
   ShieldBan, Lock, Unlock, Slash
 } from "lucide-react";
+import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -446,7 +447,8 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
             const cfg = SOURCE_LABELS_CRM[src] || { label: src, color: "text-gray-400", bg: "bg-gray-500/20" };
             return (
               <button key={src} onClick={() => setFilterSource(filterSource === src ? null : src)}
-                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all ${filterSource === src ? `${cfg.bg} ${cfg.color} border-current` : "bg-accent/50 border-border text-muted-foreground"}`}>
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all flex items-center gap-1.5 ${filterSource === src ? `${cfg.bg} ${cfg.color} border-current` : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <ChannelIcon source={src} size={13} />
                 {cfg.label}
               </button>
             );
@@ -522,7 +524,7 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
 
               {/* Info badges */}
               <div className="flex items-center gap-1.5 flex-wrap mb-2">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${sourceCfg.bg} ${sourceCfg.color}`}>{sourceCfg.label}</span>
+                <ChannelBadge source={lead.source} size={12} />
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-medium">{lead.stage}</span>
                 <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                   <Clock className="w-2.5 h-2.5" /> {crmTimeAgo(lead.lastContactDate || lead.createdAt)}
@@ -595,7 +597,7 @@ function AllLeadsView({ searchQuery, filterDept }: { searchQuery: string; filter
                   </td>
                   <td className="py-2 px-2 text-muted-foreground">{lead.phone || "--"}</td>
                   <td className="py-2 px-2">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${sourceCfg.bg} ${sourceCfg.color}`}>{sourceCfg.label}</span>
+                    <ChannelBadge source={lead.source} size={12} />
                   </td>
                   <td className="py-2 px-2"><span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary">{lead.stage}</span></td>
                   <td className="py-2 px-2"><ScoreIcon className={`w-4 h-4 ${scoreCfg.color}`} /></td>
@@ -1406,7 +1408,10 @@ function MarketingView() {
       <div className="space-y-2">
         {sourceStats.map(s => (
           <div key={s.source} className="flex items-center gap-3">
-            <span className="text-xs text-foreground w-24 shrink-0 capitalize">{s.source.replace("_", " ")}</span>
+            <span className="text-xs text-foreground w-28 shrink-0 flex items-center gap-1.5">
+              <ChannelIcon source={s.source} size={14} />
+              <span className="capitalize truncate">{s.source.replace("_", " ")}</span>
+            </span>
             <div className="flex-1 h-6 bg-accent/50 rounded-full overflow-hidden">
               <div className="h-full bg-primary/40 rounded-full transition-all" style={{ width: `${s.pct}%` }} />
             </div>
@@ -2625,7 +2630,7 @@ function SDRManagementView() {
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                       {lead.phone && <span>{lead.phone}</span>}
                       {lead.vehicleInterest && <span>• {lead.vehicleInterest}</span>}
-                      {lead.source && <span>• {lead.source}</span>}
+                      {lead.source && <span className="flex items-center gap-1">• <ChannelIcon source={lead.source} size={12} showLabel /></span>}
                     </div>
                   </div>
                   {!bulkMode && (

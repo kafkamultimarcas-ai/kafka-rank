@@ -145,6 +145,9 @@ const safeSellerColumns = {
   sellerRole: sellers.sellerRole,
   createdAt: sellers.createdAt,
   updatedAt: sellers.updatedAt,
+  leadReceiveBlocked: sellers.leadReceiveBlocked,
+  leadBanUntil: sellers.leadBanUntil,
+  leadBanReason: sellers.leadBanReason,
 };
 
 export async function listSellers(activeOnly = false) {

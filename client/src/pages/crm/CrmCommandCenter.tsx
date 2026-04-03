@@ -13,6 +13,7 @@ import {
   MessageSquare, Send, X, ChevronDown, FileText, UserPlus, ArrowRightLeft, Paperclip,
   Volume2, Download, Play, File, Square, Handshake, Power, Shuffle, CheckCheck
 } from "lucide-react";
+import { ChannelIcon, ChannelBadge, ChannelIndicator } from "@/components/ChannelIcon";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -418,24 +419,38 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
     <div className="fixed inset-0 z-[90] bg-black/60 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="bg-background w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl border border-border flex flex-col" style={{ maxHeight: "90vh", height: "90vh" }} onClick={e => e.stopPropagation()}>
         {/* Chat header */}
-        <div className="border-b border-border bg-card px-3 py-2.5 rounded-t-2xl shrink-0">
+        <div className="border-b border-border bg-gradient-to-r from-card to-card/90 px-3 py-2.5 rounded-t-2xl shrink-0">
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="p-1 hover:bg-accent rounded-lg">
+            <button onClick={onClose} className="p-1.5 hover:bg-accent rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${scoreCfg.bg} border`}>
-              <scoreCfg.icon className={`w-3.5 h-3.5 ${scoreCfg.color}`} />
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+              lead?.score === 'hot' ? 'bg-red-500/15' : lead?.score === 'cold' ? 'bg-blue-500/15' : 'bg-amber-500/15'
+            }`}>
+              <span className={`text-sm font-bold ${
+                lead?.score === 'hot' ? 'text-red-400' : lead?.score === 'cold' ? 'text-blue-400' : 'text-amber-400'
+              }`}>{(lead?.name || '?').charAt(0).toUpperCase()}</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-foreground truncate">{lead?.name || "..."}</span>
+                <scoreCfg.icon className={`w-3 h-3 shrink-0 ${scoreCfg.color}`} />
               </div>
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                {lead?.source && lead.source !== 'manual' && (
+                  <ChannelIcon source={lead.source} size={12} />
+                )}
                 <span>{lead?.phone}</span>
-                <span>•</span>
-                <span className={scoreCfg.color}>{scoreCfg.label}</span>
-                <span>•</span>
-                <span>{lead?.stage}</span>
+                <span className="text-muted-foreground/30">•</span>
+                <span className={`px-1 py-0.5 rounded text-[9px] font-medium ${
+                  lead?.stage === 'novo' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-primary/10 text-primary'
+                }`}>{lead?.stage}</span>
+                {lead?.vehicleInterest && (
+                  <>
+                    <span className="text-muted-foreground/30">•</span>
+                    <span className="truncate text-muted-foreground/70">{lead.vehicleInterest}</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -906,54 +921,62 @@ export default function CrmCommandCenter() {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header fixo mobile */}
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="p-1.5 hover:bg-accent rounded-lg">
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border/50">
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="p-1.5 hover:bg-accent rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div>
-              <h1 className="text-sm font-bold text-foreground">{isSDR ? 'Meus Leads' : 'Meus Clientes'}</h1>
-              <p className="text-[10px] text-muted-foreground">{sellerSession.nickname || sellerSession.name}</p>
+              <h1 className="text-sm font-bold text-foreground tracking-tight">{isSDR ? 'Meus Leads' : 'Meus Clientes'}</h1>
+              <p className="text-[10px] text-muted-foreground/70">{sellerSession.nickname || sellerSession.name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {pushSupported && !isSubscribed && permission !== "denied" && (
               <button
                 onClick={async () => {
                   const ok = await subscribePush();
                   if (ok) toast.success("Notificações ativadas! Você será avisado de novos leads.");
                 }}
-                className="p-1.5 hover:bg-accent rounded-lg"
+                className="p-2 hover:bg-amber-500/10 rounded-lg transition-colors"
                 title="Ativar notificações de leads"
               >
-                <Bell className="w-5 h-5 text-yellow-500" />
+                <Bell className="w-4.5 h-4.5 text-amber-400" />
               </button>
             )}
-            {isSubscribed && <BellRing className="w-4 h-4 text-emerald-500" />}
+            {isSubscribed && (
+              <div className="p-1.5 rounded-lg bg-emerald-500/10">
+                <BellRing className="w-4 h-4 text-emerald-400" />
+              </div>
+            )}
             {(urgentLeads.length > 0 || warningLeads.length > 0) && (
-              <div className="relative">
+              <div className="relative p-1.5">
                 <Bell className="w-5 h-5 text-red-400 animate-pulse" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
                   {urgentLeads.length + warningLeads.length}
                 </span>
               </div>
             )}
-            <Button size="sm" onClick={() => setShowNewLead(true)} className="racing-gradient text-white h-8 px-3 text-xs">
+            <Button size="sm" onClick={() => setShowNewLead(true)} className="racing-gradient text-white h-8 px-3 text-xs font-semibold shadow-md">
               <Plus className="w-3.5 h-3.5 mr-1" /> Lead
             </Button>
           </div>
         </div>
 
         {/* Tab navigation */}
-        <div className="flex border-b border-border">
+        <div className="flex px-2 gap-1 pb-2">
           {[
             { key: "dashboard" as TabView, label: "Resumo", icon: BarChart3 },
             { key: "leads" as TabView, label: "Clientes", icon: User },
             { key: "pipeline" as TabView, label: "Etapas", icon: Target },
           ].map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-all border-b-2 ${activeTab === tab.key ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                activeTab === tab.key
+                  ? "bg-primary/15 text-primary border border-primary/25 shadow-sm"
+                  : "text-muted-foreground hover:bg-accent/50 border border-transparent"
+              }`}>
               <tab.icon className="w-3.5 h-3.5" />
               {tab.label}
             </button>
@@ -961,61 +984,85 @@ export default function CrmCommandCenter() {
         </div>
       </div>
 
-      {/* URGENT ALERTS - Always visible */}
+      {/* URGENT ALERTS */}
       {urgentLeads.length > 0 && (
-        <div className="mx-3 mt-3 p-3 rounded-xl bg-red-500/15 border-2 border-red-500/50 animate-pulse">
-          <div className="flex items-center gap-2 mb-2">
-            <Timer className="w-5 h-5 text-red-400" />
-            <span className="text-xs font-bold text-red-400 uppercase tracking-wider">
-              URGENTE! {urgentLeads.length} lead(s) sem resposta há 10min+
-            </span>
-          </div>
-          <p className="text-[10px] text-red-300/80 mb-2">Esses leads serão transferidos automaticamente para outro vendedor. Responda AGORA!</p>
-          {urgentLeads.slice(0, 3).map((lead: any) => (
-            <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-red-500/20">
-              <div className="flex-1 min-w-0">
-                <span className="text-xs font-bold text-foreground truncate block">{lead.name}</span>
-                <span className="text-[10px] text-red-300">{minutesSinceCreation(lead.createdAt)}min sem resposta</span>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={() => setChatLeadId(lead.id)} className="p-2 rounded-lg bg-green-500/30 hover:bg-green-500/40 active:scale-95" title="Abrir Chat">
-                  <MessageCircle className="w-4 h-4 text-green-400" />
-                </button>
-                <button onClick={() => handleCall(lead)} className="p-2 rounded-lg bg-blue-500/30 hover:bg-blue-500/40 active:scale-95">
-                  <Phone className="w-4 h-4 text-blue-400" />
-                </button>
+        <div className="mx-3 mt-3 rounded-xl overflow-hidden shadow-lg shadow-red-500/10">
+          <div className="bg-red-500/20 border border-red-500/40 rounded-xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-red-500/25 flex items-center justify-center">
+                  <Timer className="w-4 h-4 text-red-400 animate-pulse" />
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold text-red-400 tracking-wide block">
+                    {urgentLeads.length} lead(s) urgente(s)
+                  </span>
+                  <span className="text-[9px] text-red-300/60">Serão transferidos automaticamente</span>
+                </div>
               </div>
             </div>
-          ))}
+            <div className="space-y-1.5">
+              {urgentLeads.slice(0, 3).map((lead: any) => (
+                <div key={lead.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-red-500/10">
+                  <div className="w-8 h-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-red-400">{(lead.name || '?').charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-bold text-foreground truncate block">{lead.name}</span>
+                    <span className="text-[10px] text-red-300/80">{minutesSinceCreation(lead.createdAt)}min sem resposta</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => setChatLeadId(lead.id)} className="p-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 active:scale-95 transition-all" title="Chat">
+                      <MessageCircle className="w-4 h-4 text-emerald-400" />
+                    </button>
+                    <button onClick={() => handleCall(lead)} className="p-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 active:scale-95 transition-all">
+                      <Phone className="w-4 h-4 text-blue-400" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* WARNING ALERTS - 5min */}
+      {/* WARNING ALERTS */}
       {warningLeads.length > 0 && (
-        <div className="mx-3 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/40">
-          <div className="flex items-center gap-2 mb-2">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-              PRIORIDADE! {warningLeads.length} lead(s) sem resposta há 5min+
-            </span>
-          </div>
-          <p className="text-[10px] text-amber-300/70 mb-1">Conversão cai 80% após 5 minutos. Responda rápido!</p>
-          {warningLeads.slice(0, 3).map((lead: any) => (
-            <div key={lead.id} className="flex items-center justify-between py-1.5 border-t border-amber-500/20">
-              <div className="flex-1 min-w-0">
-                <span className="text-xs font-medium text-foreground truncate block">{lead.name}</span>
-                <span className="text-[10px] text-amber-300">{minutesSinceCreation(lead.createdAt)}min aguardando</span>
+        <div className="mx-3 mt-2 rounded-xl overflow-hidden">
+          <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => setChatLeadId(lead.id)} className="p-1.5 rounded bg-green-500/20 hover:bg-green-500/30 active:scale-95" title="Abrir Chat">
-                  <MessageCircle className="w-3.5 h-3.5 text-green-400" />
-                </button>
-                <button onClick={() => handleCall(lead)} className="p-1.5 rounded bg-blue-500/20 hover:bg-blue-500/30 active:scale-95">
-                  <Phone className="w-3.5 h-3.5 text-blue-400" />
-                </button>
+              <div>
+                <span className="text-[11px] font-bold text-amber-400 block">
+                  {warningLeads.length} lead(s) aguardando 5min+
+                </span>
+                <span className="text-[9px] text-amber-300/50">Conversão cai 80% após 5 minutos</span>
               </div>
             </div>
-          ))}
+            <div className="space-y-1">
+              {warningLeads.slice(0, 3).map((lead: any) => (
+                <div key={lead.id} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-amber-500/5">
+                  <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-amber-400">{(lead.name || '?').charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium text-foreground truncate block">{lead.name}</span>
+                    <span className="text-[10px] text-amber-300/70">{minutesSinceCreation(lead.createdAt)}min</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => setChatLeadId(lead.id)} className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 transition-all" title="Chat">
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    </button>
+                    <button onClick={() => handleCall(lead)} className="p-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 active:scale-95 transition-all">
+                      <Phone className="w-3.5 h-3.5 text-blue-400" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1104,7 +1151,8 @@ export default function CrmCommandCenter() {
               return leads.some((l: any) => l.source === key);
             }).map(([key, cfg]) => (
               <button key={key} onClick={() => setFilterSource(filterSource === key ? null : key)}
-                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all ${filterSource === key ? `${cfg.bg} ${cfg.color} border-current` : "bg-accent/50 border-border text-muted-foreground"}`}>
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all flex items-center gap-1.5 ${filterSource === key ? `${cfg.bg} ${cfg.color} border-current` : "bg-accent/50 border-border text-muted-foreground"}`}>
+                <ChannelIcon source={key} size={13} />
                 {cfg.label}
               </button>
             ))}
@@ -1180,15 +1228,16 @@ export default function CrmCommandCenter() {
       )}
 
       {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border z-50">
-        <div className="flex justify-around py-2">
-          <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
+      <div className="fixed bottom-0 left-0 right-0 bg-background/98 backdrop-blur-xl border-t border-border/40 z-50 safe-area-bottom">
+        <div className="flex justify-around py-1.5 max-w-md mx-auto">
+          <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-lg">
             <User className="w-5 h-5" /><span className="text-[10px]">Minha Área</span>
           </button>
-          <button className="flex flex-col items-center gap-0.5 px-3 py-1 text-primary">
+          <button className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-primary relative">
+            <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-primary rounded-full" />
             <LayoutGrid className="w-5 h-5" /><span className="text-[10px] font-bold">CRM</span>
           </button>
-          <button onClick={() => navigate(`/agendamentos/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
+          <button onClick={() => navigate(`/agendamentos/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-lg">
             <Calendar className="w-5 h-5" /><span className="text-[10px]">Agenda</span>
           </button>
         </div>
@@ -1569,6 +1618,9 @@ function PipelineView({ sellerId, dept, stages, leads, onMoveStage, onView, isSD
                       <div className="flex-1 min-w-0">
                         <span className="text-xs font-medium text-foreground truncate block">{lead.name}</span>
                         <div className="flex items-center gap-1.5">
+                          {lead.source && lead.source !== 'manual' && (
+                            <ChannelIcon source={lead.source} size={12} />
+                          )}
                           {lead.vehicleInterest && <span className="text-[10px] text-muted-foreground">{lead.vehicleInterest}</span>}
                           {isSDR && lead.sellerId > 0 && sellerMap && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400">
@@ -1612,6 +1664,7 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
 }) {
   const [showStages, setShowStages] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const { data: soldCheck } = trpc.crmLeads.checkAlreadySold.useQuery(
     { leadId: lead.id },
     { enabled: !!lead.id, staleTime: 300000, refetchOnWindowFocus: false, refetchOnMount: false }
@@ -1622,168 +1675,238 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
   const isWarning = lead._alertType === "priority";
   const isUnassigned = lead.sellerId === 0;
 
+  // Score color for left accent bar
+  const accentColor = lead.score === 'hot' ? 'bg-red-500' : lead.score === 'cold' ? 'bg-blue-400' : 'bg-amber-400';
+
   return (
-    <div className={`rounded-xl border p-3 transition-all ${isUrgent ? "bg-red-500/10 border-red-500/50 shadow-lg shadow-red-500/10 animate-pulse" : isWarning ? "bg-amber-500/10 border-amber-500/40" : scoreCfg.bg}`}>
-      {/* Urgency badge */}
-      {isUrgent && (
-        <div className="flex items-center gap-1 mb-2 px-2 py-1 rounded-lg bg-red-500/20">
-          <Timer className="w-3 h-3 text-red-400" />
-          <span className="text-[10px] font-bold text-red-400">URGENTE - {minutesSinceCreation(lead.createdAt)}min sem responder!</span>
-        </div>
-      )}
-      {isWarning && (
-        <div className="flex items-center gap-1 mb-2 px-2 py-1 rounded-lg bg-amber-500/20">
-          <Zap className="w-3 h-3 text-amber-400" />
-          <span className="text-[10px] font-bold text-amber-400">ATENÇÃO - {minutesSinceCreation(lead.createdAt)}min esperando resposta</span>
-        </div>
-      )}
+    <div className={`relative rounded-xl overflow-hidden transition-all ${
+      isUrgent ? "shadow-lg shadow-red-500/20 ring-1 ring-red-500/50" :
+      isWarning ? "shadow-md shadow-amber-500/10 ring-1 ring-amber-500/30" :
+      "shadow-sm hover:shadow-md"
+    }`}>
+      {/* Left accent bar - score indicator */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${accentColor}`} />
 
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1 min-w-0" onClick={onView}>
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-foreground truncate">{lead.name}</h3>
-            <ScoreIcon className={`w-3.5 h-3.5 shrink-0 ${scoreCfg.color}`} />
+      <div className={`pl-3 pr-3 py-3 ${
+        isUrgent ? "bg-red-500/8 border border-red-500/30" :
+        isWarning ? "bg-amber-500/8 border border-amber-500/20" :
+        "bg-card/80 border border-border/60"
+      }`}>
+        {/* Urgency banner */}
+        {isUrgent && (
+          <div className="flex items-center gap-2 mb-2.5 px-2.5 py-1.5 rounded-lg bg-red-500/15 border border-red-500/30">
+            <Timer className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+            <span className="text-[11px] font-bold text-red-400 tracking-wide">URGENTE — {minutesSinceCreation(lead.createdAt)}min sem resposta</span>
           </div>
-          {lead.phone && (
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Phone className="w-2.5 h-2.5" /> {lead.phone}
-              <span className="text-[9px] text-muted-foreground/50 ml-1">
-                Chegou: {new Date(lead.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-              </span>
-            </p>
-          )}
-          {lead.vehicleInterest && (
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Car className="w-3 h-3" /> {lead.vehicleInterest}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">{lead.stage}</span>
-            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-              <Clock className="w-2.5 h-2.5" /> {timeAgo(lead.lastContactDate)}
-            </span>
-            {lead.source && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${(SOURCE_LABELS[lead.source]?.bg || 'bg-accent')} ${(SOURCE_LABELS[lead.source]?.color || 'text-muted-foreground')}`}>
-                {SOURCE_LABELS[lead.source]?.label || lead.source}
-              </span>
-            )}
-            {/* JÁ VENDIDO badge */}
-            {soldCheck?.alreadySold && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/30 text-red-400 font-bold border border-red-500/40 flex items-center gap-0.5">
-                <AlertTriangle className="w-2.5 h-2.5" /> JÁ VENDIDO
-              </span>
-            )}
-            {/* SDR: show assignment status */}
-            {isSDR && isUnassigned && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30">
-                NOVO
-              </span>
-            )}
-            {isSDR && !isUnassigned && sellerMap && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/20">
-                → {sellerMap[lead.sellerId] || `#${lead.sellerId}`}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Acknowledged badge */}
-      {lead.acknowledgedAt && (
-        <div className="flex items-center gap-1 mt-1 px-2 py-0.5 rounded-lg bg-green-500/10 border border-green-500/20">
-          <CheckCheck className="w-3 h-3 text-green-400" />
-          <span className="text-[9px] text-green-400 font-medium">Confirmado pelo vendedor</span>
-        </div>
-      )}
-
-      {/* Action buttons */}
-      <div className="flex gap-1.5 mt-2">
-        {/* Acknowledge button - only show if not yet acknowledged */}
-        {!lead.acknowledgedAt && lead.sellerId > 0 && !isSDR && (
-          <AcknowledgeButton leadId={lead.id} sellerId={lead.sellerId} />
         )}
-        <button onClick={onChat}
-          className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 transition-all active:scale-95">
-          <MessageCircle className="w-4 h-4 text-green-400" />
-          <span className="text-[10px] font-medium text-green-400">Chat</span>
-        </button>
-        <button onClick={onWhatsApp}
-          className="flex items-center justify-center p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 transition-all active:scale-95" title="Abrir WhatsApp externo">
-          <ArrowUpRight className="w-4 h-4 text-green-300" />
-        </button>
-        <button onClick={onToggleTemplates}
-          className="flex items-center justify-center p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 transition-all active:scale-95">
-          <MessageSquare className="w-4 h-4 text-green-300" />
-        </button>
-        <button onClick={onCall}
-          className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 transition-all active:scale-95">
-          <Phone className="w-4 h-4 text-blue-400" />
-          <span className="text-[10px] font-medium text-blue-400">Ligar</span>
-        </button>
-        {/* SDR: Assign button */}
-        {isSDR && (
-          <button onClick={() => setShowAssign(!showAssign)}
-            className={`flex items-center justify-center p-2 rounded-lg transition-all active:scale-95 ${showAssign ? "bg-cyan-500/30 border-cyan-500/40" : "bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/30"} border`}>
-            <ArrowRightLeft className="w-4 h-4 text-cyan-400" />
+        {isWarning && (
+          <div className="flex items-center gap-2 mb-2.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px] font-bold text-amber-400">ATENÇÃO — {minutesSinceCreation(lead.createdAt)}min aguardando</span>
+          </div>
+        )}
+
+        {/* Main content row - WhatsApp style */}
+        <div className="flex items-start gap-3" onClick={onView}>
+          {/* Avatar circle with channel indicator */}
+          <div className="relative shrink-0">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
+              lead.score === 'hot' ? 'bg-red-500/15' : lead.score === 'cold' ? 'bg-blue-500/15' : 'bg-amber-500/15'
+            }`}>
+              <span className={`text-base font-bold ${
+                lead.score === 'hot' ? 'text-red-400' : lead.score === 'cold' ? 'text-blue-400' : 'text-amber-400'
+              }`}>{(lead.name || '?').charAt(0).toUpperCase()}</span>
+            </div>
+            {lead.source && lead.source !== 'manual' && (
+              <ChannelIndicator source={lead.source} size={13} />
+            )}
+          </div>
+
+          {/* Lead info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="text-[13px] font-bold text-foreground truncate">{lead.name}</h3>
+                <ScoreIcon className={`w-3.5 h-3.5 shrink-0 ${scoreCfg.color}`} />
+                {soldCheck?.alreadySold && (
+                  <span className="shrink-0 text-[8px] px-1 py-0.5 rounded bg-red-500/30 text-red-400 font-bold">VENDIDO</span>
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground/70 shrink-0 tabular-nums">
+                {timeAgo(lead.lastContactDate || lead.updatedAt)}
+              </span>
+            </div>
+
+            {/* Second line: phone + arrival */}
+            <div className="flex items-center gap-2 mt-0.5">
+              {lead.phone && (
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <Phone className="w-2.5 h-2.5" /> {lead.phone}
+                </span>
+              )}
+              <span className="text-[9px] text-muted-foreground/50">
+                {new Date(lead.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+
+            {/* Third line: vehicle interest */}
+            {lead.vehicleInterest && (
+              <p className="text-[11px] text-muted-foreground/80 flex items-center gap-1 mt-0.5 truncate">
+                <Car className="w-3 h-3 shrink-0" /> {lead.vehicleInterest}
+              </p>
+            )}
+
+            {/* Notes preview */}
+            {lead.notes && (
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate italic">
+                {lead.notes.replace(/^Primeira mensagem:\s*/i, '').substring(0, 80)}
+              </p>
+            )}
+
+            {/* Tags row */}
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-semibold ${
+                lead.stage === 'novo' ? 'bg-emerald-500/15 text-emerald-400' :
+                lead.stage === 'Em Negociacao' || lead.stage === 'Em Negociação' ? 'bg-blue-500/15 text-blue-400' :
+                lead.stage === 'Proposta' ? 'bg-purple-500/15 text-purple-400' :
+                lead.stage === 'Fechamento' ? 'bg-green-500/15 text-green-400' :
+                lead.stage === 'Perdido' ? 'bg-red-500/15 text-red-400' :
+                'bg-primary/10 text-primary'
+              }`}>{lead.stage}</span>
+              {lead.source && (
+                <ChannelBadge source={lead.source} size={11} />
+              )}
+              {isSDR && isUnassigned && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 animate-pulse">
+                  NOVO
+                </span>
+              )}
+              {isSDR && !isUnassigned && sellerMap && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  → {sellerMap[lead.sellerId] || `#${lead.sellerId}`}
+                </span>
+              )}
+              {lead.acknowledgedAt && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-400 flex items-center gap-0.5">
+                  <CheckCheck className="w-2.5 h-2.5" /> OK
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick actions - always visible, compact */}
+        <div className="flex items-center gap-1.5 mt-2.5 ml-14">
+          {/* Acknowledge button */}
+          {!lead.acknowledgedAt && lead.sellerId > 0 && !isSDR && (
+            <AcknowledgeButton leadId={lead.id} sellerId={lead.sellerId} />
+          )}
+          {/* Primary: Chat */}
+          <button onClick={(e) => { e.stopPropagation(); onChat(); }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/25 transition-all active:scale-[0.97]">
+            <MessageCircle className="w-4 h-4 text-emerald-400" />
+            <span className="text-[11px] font-semibold text-emerald-400">Chat</span>
           </button>
-        )}
-        <button onClick={() => setShowStages(!showStages)}
-          className="flex items-center justify-center p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 transition-all active:scale-95">
-          <ChevronRight className={`w-4 h-4 text-purple-400 transition-transform ${showStages ? "rotate-90" : ""}`} />
-        </button>
-        <button onClick={onView}
-          className="flex items-center justify-center p-2 rounded-lg bg-accent/50 hover:bg-accent border border-border transition-all active:scale-95">
-          <Eye className="w-4 h-4 text-muted-foreground" />
-        </button>
-      </div>
+          {/* WhatsApp external */}
+          <button onClick={(e) => { e.stopPropagation(); onWhatsApp(); }}
+            className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 border border-green-500/15 transition-all active:scale-[0.97]" title="WhatsApp">
+            <ArrowUpRight className="w-4 h-4 text-green-400" />
+          </button>
+          {/* Call */}
+          <button onClick={(e) => { e.stopPropagation(); onCall(); }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/25 transition-all active:scale-[0.97]">
+            <Phone className="w-4 h-4 text-blue-400" />
+            <span className="text-[11px] font-semibold text-blue-400">Ligar</span>
+          </button>
+          {/* SDR: Assign */}
+          {isSDR && (
+            <button onClick={(e) => { e.stopPropagation(); setShowAssign(!showAssign); }}
+              className={`p-2 rounded-lg transition-all active:scale-[0.97] border ${
+                showAssign ? "bg-cyan-500/25 border-cyan-500/40" : "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/20"
+              }`}>
+              <ArrowRightLeft className="w-4 h-4 text-cyan-400" />
+            </button>
+          )}
+          {/* More actions */}
+          <button onClick={(e) => { e.stopPropagation(); setShowMore(!showMore); }}
+            className={`p-2 rounded-lg transition-all active:scale-[0.97] border ${
+              showMore ? "bg-accent border-border" : "bg-accent/30 hover:bg-accent/60 border-transparent"
+            }`}>
+            <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showMore ? "rotate-180" : ""}`} />
+          </button>
+        </div>
 
-      {/* SDR: Assign dropdown */}
-      {isSDR && showAssign && vendorSellers && vendorSellers.length > 0 && (
-        <div className="mt-2 p-2 rounded-lg bg-card border border-cyan-500/20 space-y-1">
-          <p className="text-[10px] text-cyan-400 font-medium mb-1 flex items-center gap-1">
-            <ArrowRightLeft className="w-3 h-3" /> Enviar para vendedor:
-          </p>
-          <div className="grid grid-cols-2 gap-1">
-            {vendorSellers.map((s: any) => (
-              <button key={s.id} onClick={() => { if (onAssign) onAssign(s.id); setShowAssign(false); }}
-                className={`text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
-                  lead.sellerId === s.id
-                    ? "bg-cyan-500/20 text-cyan-400 font-bold"
-                    : "hover:bg-accent text-foreground"
-                }`}>
-                <User className="w-3 h-3 shrink-0 text-muted-foreground" />
-                <span className="truncate">{s.nickname || s.name}</span>
+        {/* Expandable actions */}
+        {showMore && (
+          <div className="mt-2 ml-14 space-y-2">
+            {/* Templates */}
+            <div className="flex gap-1.5">
+              <button onClick={(e) => { e.stopPropagation(); onToggleTemplates(); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/50 hover:bg-accent border border-border text-xs text-muted-foreground transition-all">
+                <MessageSquare className="w-3.5 h-3.5" /> Mensagens prontas
               </button>
-            ))}
+              <button onClick={(e) => { e.stopPropagation(); setShowStages(!showStages); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-xs text-purple-400 transition-all">
+                <Target className="w-3.5 h-3.5" /> Mover etapa
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onView(); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/50 hover:bg-accent border border-border text-xs text-muted-foreground transition-all">
+                <Eye className="w-3.5 h-3.5" /> Detalhes
+              </button>
+            </div>
+
+            {/* Stage selector */}
+            {showStages && (
+              <div className="flex flex-wrap gap-1 p-2 rounded-lg bg-card/80 border border-border">
+                {stages.map((s: any) => (
+                  <button key={s.id} onClick={(e) => { e.stopPropagation(); onMoveStage(s.name); setShowStages(false); setShowMore(false); }}
+                    className={`text-[10px] px-2.5 py-1 rounded-full border transition-all ${
+                      lead.stage === s.name ? "bg-primary/20 border-primary/40 text-primary font-bold" : "bg-accent/50 border-border text-muted-foreground hover:bg-accent"
+                    }`}>
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Templates list */}
+            {showTemplates && templates.length > 0 && (
+              <div className="p-2 rounded-lg bg-card/80 border border-border space-y-1">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1">Enviar mensagem pronta:</p>
+                {templates.map((t: any) => (
+                  <button key={t.id} onClick={(e) => { e.stopPropagation(); onTemplateSelect(t.id); }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-accent text-xs text-foreground flex items-center gap-2 transition-colors">
+                    <Send className="w-3 h-3 text-green-400 shrink-0" />
+                    <span className="truncate">{t.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Templates dropdown */}
-      {showTemplates && templates.length > 0 && (
-        <div className="mt-2 p-2 rounded-lg bg-card border border-border space-y-1">
-          <p className="text-[10px] text-muted-foreground font-medium mb-1">Mensagem pronta:</p>
-          {templates.map((t: any) => (
-            <button key={t.id} onClick={() => onTemplateSelect(t.id)}
-              className="w-full text-left px-2 py-1.5 rounded-lg hover:bg-accent text-xs text-foreground flex items-center gap-2 transition-colors">
-              <Send className="w-3 h-3 text-green-400 shrink-0" />
-              <span className="truncate">{t.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Stage selector */}
-      {showStages && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {stages.map((s: any) => (
-            <button key={s.id} onClick={() => { onMoveStage(s.name); setShowStages(false); }}
-              className={`text-[10px] px-2 py-1 rounded-full border transition-all ${lead.stage === s.name ? "bg-primary/30 border-primary/50 text-primary font-bold" : "bg-accent/50 border-border text-muted-foreground hover:bg-accent"}`}>
-              {s.name}
-            </button>
-          ))}
-        </div>
-      )}
+        {/* SDR: Assign dropdown */}
+        {isSDR && showAssign && vendorSellers && vendorSellers.length > 0 && (
+          <div className="mt-2 ml-14 p-2.5 rounded-lg bg-card/90 border border-cyan-500/20 space-y-1">
+            <p className="text-[10px] text-cyan-400 font-medium mb-1.5 flex items-center gap-1">
+              <ArrowRightLeft className="w-3 h-3" /> Enviar para vendedor:
+            </p>
+            <div className="grid grid-cols-2 gap-1">
+              {vendorSellers.map((s: any) => (
+                <button key={s.id} onClick={(e) => { e.stopPropagation(); if (onAssign) onAssign(s.id); setShowAssign(false); }}
+                  className={`text-left px-2.5 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 ${
+                    lead.sellerId === s.id
+                      ? "bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30"
+                      : "hover:bg-accent text-foreground border border-transparent"
+                  }`}>
+                  <User className="w-3 h-3 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{s.nickname || s.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

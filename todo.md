@@ -1751,9 +1751,19 @@
 - [x] Bug: Foto da competição altera foto principal do cadastro - criado campo separado competitionPhotoUrl
 - [x] Bug: Fotos não aparecem nos confrontos Mata-Mata - usando competitionPhotoUrl || photoUrl
 - [x] Bug: Vendedor não consegue logar - login agora busca por username, nome ou nickname (case-insensitive)
-- [ ] Bug: Lead auto-reatribuição em loop infinito (mesmo lead sendo reatribuído a cada 2 min sem parar)
+- [x] Bug: Lead auto-reatribuição em loop infinito (mesmo lead sendo reatribuído a cada 2 min sem parar)
 ## SDR - Melhorias na Distribuição de Leads
 - [x] Tempos de alerta configuráveis pelo admin/gerente (botão "Editar tempos" nas Regras de Alerta)
 - [x] Botão para bloquear vendedor de receber leads (ícone cadeado no Leads por Vendedor)
 - [x] Sistema de castigo/ban: vendedor que não responde lead fica X dias sem receber (1, 3, 7, 14, 30 dias)
 - [x] Opção de inativar vendedor no recebimento de leads sem desativar do sistema (leadReceiveBlocked)
+## CRM - Redesign Visual
+- [x] Melhorar visual do CRM para ficar mais intuitivo e bonito
+- [x] Cards de leads com aparência melhor, mais fácil de visualizar
+- [x] Facilitar navegação e atualização de mensagens/status
+- [x] Interface mais limpa e organizada para uso no celular
+## CRM - Ícones de Canal de Origem
+- [x] Adicionar logos/ícones visuais de cada canal (WhatsApp, Instagram, OLX, Webmotors, Facebook, etc.) nos cards de leads
+- [x] Mostrar ícone do canal no chat inline para identificar origem da conversa
+- [x] Ícones de canal em todas as áreas do CRM (pipeline, detalhes do lead, etc.)
+- [x] Suporte visual para Instagram no CRM com logo identificável

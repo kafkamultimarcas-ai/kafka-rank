@@ -9,6 +9,7 @@ import {
   X, Filter, Users, Zap, TrendingUp, CheckCircle, XCircle, BarChart3,
   Volume2, Download, Play, File, Mic, Square
 } from "lucide-react";
+import { ChannelIcon } from "@/components/ChannelIcon";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -1118,7 +1119,7 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
           )}
           <div>
             <label className="text-[10px] text-muted-foreground uppercase">Origem</label>
-            <p className="text-sm text-foreground">{SOURCE_CFG[lead.source]?.label || lead.source}</p>
+            <p className="text-sm text-foreground flex items-center gap-1.5"><ChannelIcon source={lead.source} size={16} /> {SOURCE_CFG[lead.source]?.label || lead.source}</p>
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground uppercase">Etapa</label>

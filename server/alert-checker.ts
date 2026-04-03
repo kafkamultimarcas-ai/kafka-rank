@@ -221,11 +221,22 @@ async function _checkAlertsInner() {
         }
       }
       
+      // CHECK 5: Prevent infinite loop - if lead was auto-transferred recently, don't transfer again
+      // Give the new seller at least (threshold) minutes to respond before transferring again
+      if (lead.lastAutoTransferAt) {
+        const lastTransferTs = typeof lead.lastAutoTransferAt === 'number' ? lead.lastAutoTransferAt : Number(lead.lastAutoTransferAt);
+        const minutesSinceTransfer = (Date.now() - lastTransferTs) / 60000;
+        if (minutesSinceTransfer < sellerThreshold) {
+          console.log(`[Alert Checker] Lead #${lead.id} foi transferido há ${Math.round(minutesSinceTransfer)}min (threshold: ${sellerThreshold}min) - aguardando novo vendedor responder`);
+          continue;
+        }
+      }
+
       console.log(`[Alert Checker] Lead #${lead.id} (${lead.name}) sem resposta do vendedor #${lead.sellerId} por ${sellerThreshold}+ min. Auto-reatribuindo...`);
       const result = await crmDb.autoReassignLead(lead.id);
       if (result) {
-        // Reset acknowledgedAt for the new seller
-        await crmDb.updateLead(lead.id, { acknowledgedAt: null as any });
+        // Reset acknowledgedAt and set lastAutoTransferAt for the new seller
+        await crmDb.updateLead(lead.id, { acknowledgedAt: null as any, lastAutoTransferAt: Date.now() });
 
         // Notify old seller that lead was taken
         createNotification({

@@ -432,6 +432,7 @@ export const crmLeads = mysqlTable("crm_leads", {
   convertedToSale: boolean("convertedToSale").default(false).notNull(),
   saleValue: int("saleValue").default(0), // valor da venda em centavos (quando convertido)
   acknowledgedAt: bigint("acknowledgedAt", { mode: "number" }), // timestamp quando vendedor confirmou recebimento do lead
+  lastAutoTransferAt: bigint("lastAutoTransferAt", { mode: "number" }), // timestamp da última transferência automática (previne loop infinito)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
