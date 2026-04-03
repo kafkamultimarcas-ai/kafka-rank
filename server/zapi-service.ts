@@ -1,21 +1,82 @@
 import { ENV } from "./_core/env";
+import { getDb } from "./db";
+import { tenants } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
-const ZAPI_BASE = () => `${ENV.zapiApiUrl || "https://api.z-api.io"}/instances/${ENV.zapiInstanceId}/token/${ENV.zapiToken}`;
+// ===== TENANT-AWARE Z-API CREDENTIALS =====
 
-function headers() {
-  const h: Record<string, string> = {
-    "Content-Type": "application/json",
+interface ZapiCredentials {
+  instanceId: string;
+  token: string;
+  clientToken: string;
+  apiUrl: string;
+}
+
+// Cache tenant credentials for 5 minutes
+const credentialsCache = new Map<number, { creds: ZapiCredentials; expiresAt: number }>();
+const CACHE_TTL = 5 * 60 * 1000;
+
+/** Get Z-API credentials for a specific tenant, fallback to global ENV */
+async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials> {
+  // Default global credentials
+  const globalCreds: ZapiCredentials = {
+    instanceId: ENV.zapiInstanceId || "",
+    token: ENV.zapiToken || "",
+    clientToken: ENV.zapiClientToken || "",
+    apiUrl: ENV.zapiApiUrl || "https://api.z-api.io",
   };
-  if (ENV.zapiClientToken) {
-    h["Client-Token"] = ENV.zapiClientToken;
+
+  if (!tenantId || tenantId <= 1) return globalCreds;
+
+  // Check cache
+  const cached = credentialsCache.get(tenantId);
+  if (cached && cached.expiresAt > Date.now()) return cached.creds;
+
+  // Fetch from DB
+  try {
+    const db = await getDb();
+    if (!db) return globalCreds;
+    const [tenant] = await db.select({
+      zapiInstanceId: tenants.zapiInstanceId,
+      zapiToken: tenants.zapiToken,
+      zapiClientToken: tenants.zapiClientToken,
+    }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+
+    if (tenant?.zapiInstanceId && tenant?.zapiToken) {
+      const creds: ZapiCredentials = {
+        instanceId: tenant.zapiInstanceId,
+        token: tenant.zapiToken,
+        clientToken: tenant.zapiClientToken || "",
+        apiUrl: "https://api.z-api.io",
+      };
+      credentialsCache.set(tenantId, { creds, expiresAt: Date.now() + CACHE_TTL });
+      return creds;
+    }
+  } catch (err) {
+    console.warn("[Z-API] Failed to fetch tenant credentials, using global:", err);
   }
+
+  return globalCreds;
+}
+
+function makeBase(creds: ZapiCredentials): string {
+  return `${creds.apiUrl}/instances/${creds.instanceId}/token/${creds.token}`;
+}
+
+function makeHeaders(creds: ZapiCredentials): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (creds.clientToken) h["Client-Token"] = creds.clientToken;
   return h;
 }
 
+// ===== BACKWARD-COMPATIBLE FUNCTIONS (use global credentials by default) =====
+// All functions accept an optional tenantId parameter at the end
+
 /** Check if the Z-API instance is connected */
-export async function getStatus(): Promise<{ connected: boolean; smartphoneConnected: boolean; error?: string }> {
+export async function getStatus(tenantId?: number): Promise<{ connected: boolean; smartphoneConnected: boolean; error?: string }> {
   try {
-    const res = await fetch(`${ZAPI_BASE()}/status`, { headers: headers() });
+    const creds = await getTenantCredentials(tenantId);
+    const res = await fetch(`${makeBase(creds)}/status`, { headers: makeHeaders(creds) });
     if (!res.ok) return { connected: false, smartphoneConnected: false, error: `HTTP ${res.status}` };
     const data = await res.json();
     return { connected: data.connected === true, smartphoneConnected: data.smartphoneConnected === true };
@@ -25,12 +86,13 @@ export async function getStatus(): Promise<{ connected: boolean; smartphoneConne
 }
 
 /** Send a text message */
-export async function sendText(phone: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+export async function sendText(phone: string, message: string, tenantId?: number): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/send-text`, {
+    const res = await fetch(`${makeBase(creds)}/send-text`, {
       method: "POST",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({ phone: normalizedPhone, message }),
     });
     if (!res.ok) {
@@ -45,12 +107,13 @@ export async function sendText(phone: string, message: string): Promise<{ succes
 }
 
 /** Send an image with optional caption */
-export async function sendImage(phone: string, imageUrl: string, caption?: string): Promise<{ success: boolean; error?: string }> {
+export async function sendImage(phone: string, imageUrl: string, caption?: string, tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/send-image`, {
+    const res = await fetch(`${makeBase(creds)}/send-image`, {
       method: "POST",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({ phone: normalizedPhone, image: imageUrl, caption: caption || "" }),
     });
     if (!res.ok) {
@@ -64,12 +127,13 @@ export async function sendImage(phone: string, imageUrl: string, caption?: strin
 }
 
 /** Send a document/file */
-export async function sendDocument(phone: string, documentUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
+export async function sendDocument(phone: string, documentUrl: string, fileName: string, tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/send-document/pdf`, {
+    const res = await fetch(`${makeBase(creds)}/send-document/pdf`, {
       method: "POST",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({ phone: normalizedPhone, document: documentUrl, fileName }),
     });
     if (!res.ok) {
@@ -83,12 +147,13 @@ export async function sendDocument(phone: string, documentUrl: string, fileName:
 }
 
 /** Send an audio message */
-export async function sendAudio(phone: string, audioUrl: string): Promise<{ success: boolean; error?: string }> {
+export async function sendAudio(phone: string, audioUrl: string, tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/send-audio`, {
+    const res = await fetch(`${makeBase(creds)}/send-audio`, {
       method: "POST",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({ phone: normalizedPhone, audio: audioUrl }),
     });
     if (!res.ok) {
@@ -102,12 +167,13 @@ export async function sendAudio(phone: string, audioUrl: string): Promise<{ succ
 }
 
 /** Send a video */
-export async function sendVideo(phone: string, videoUrl: string, caption?: string): Promise<{ success: boolean; error?: string }> {
+export async function sendVideo(phone: string, videoUrl: string, caption?: string, tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/send-video`, {
+    const res = await fetch(`${makeBase(creds)}/send-video`, {
       method: "POST",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({ phone: normalizedPhone, video: videoUrl, caption: caption || "" }),
     });
     if (!res.ok) {
@@ -121,12 +187,13 @@ export async function sendVideo(phone: string, videoUrl: string, caption?: strin
 }
 
 /** Send a link with preview */
-export async function sendLink(phone: string, url: string, title: string, description?: string, imageUrl?: string): Promise<{ success: boolean; error?: string }> {
+export async function sendLink(phone: string, url: string, title: string, description?: string, imageUrl?: string, tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/send-link`, {
+    const res = await fetch(`${makeBase(creds)}/send-link`, {
       method: "POST",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({
         phone: normalizedPhone,
         message: title,
@@ -147,11 +214,12 @@ export async function sendLink(phone: string, url: string, title: string, descri
 }
 
 /** Get all contacts (paginated, fetches all pages) */
-export async function getContacts(maxPages = 20): Promise<any[]> {
+export async function getContacts(maxPages = 20, tenantId?: number): Promise<any[]> {
+  const creds = await getTenantCredentials(tenantId);
   const all: any[] = [];
   for (let page = 1; page <= maxPages; page++) {
     try {
-      const res = await fetch(`${ZAPI_BASE()}/contacts?page=${page}&pageSize=100`, { headers: headers() });
+      const res = await fetch(`${makeBase(creds)}/contacts?page=${page}&pageSize=100`, { headers: makeHeaders(creds) });
       if (!res.ok) break;
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) break;
@@ -165,11 +233,12 @@ export async function getContacts(maxPages = 20): Promise<any[]> {
 }
 
 /** Get all chats (paginated, fetches all pages) */
-export async function getChats(maxPages = 20): Promise<any[]> {
+export async function getChats(maxPages = 20, tenantId?: number): Promise<any[]> {
+  const creds = await getTenantCredentials(tenantId);
   const all: any[] = [];
   for (let page = 1; page <= maxPages; page++) {
     try {
-      const res = await fetch(`${ZAPI_BASE()}/chats?page=${page}&pageSize=100`, { headers: headers() });
+      const res = await fetch(`${makeBase(creds)}/chats?page=${page}&pageSize=100`, { headers: makeHeaders(creds) });
       if (!res.ok) break;
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) break;
@@ -186,12 +255,13 @@ export async function getChats(maxPages = 20): Promise<any[]> {
 export async function sendTextBulk(
   phones: string[],
   message: string,
-  onProgress?: (sent: number, total: number, phone: string, success: boolean) => void
+  onProgress?: (sent: number, total: number, phone: string, success: boolean) => void,
+  tenantId?: number
 ): Promise<{ sent: number; failed: number; errors: { phone: string; error: string }[] }> {
   const result = { sent: 0, failed: 0, errors: [] as { phone: string; error: string }[] };
   for (let i = 0; i < phones.length; i++) {
     const phone = phones[i];
-    const res = await sendText(phone, message);
+    const res = await sendText(phone, message, tenantId);
     if (res.success) {
       result.sent++;
     } else {
@@ -208,10 +278,11 @@ export async function sendTextBulk(
 }
 
 /** Get profile picture */
-export async function getProfilePicture(phone: string): Promise<string | null> {
+export async function getProfilePicture(phone: string, tenantId?: number): Promise<string | null> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     const normalizedPhone = normalizePhone(phone);
-    const res = await fetch(`${ZAPI_BASE()}/profile-picture/${normalizedPhone}`, { headers: headers() });
+    const res = await fetch(`${makeBase(creds)}/profile-picture/${normalizedPhone}`, { headers: makeHeaders(creds) });
     if (!res.ok) return null;
     const data = await res.json();
     return data.link || null;
@@ -229,12 +300,13 @@ function normalizePhone(phone: string): string {
 }
 
 /** Configure webhook URL for receiving messages */
-export async function setWebhook(webhookUrl: string): Promise<{ success: boolean; error?: string }> {
+export async function setWebhook(webhookUrl: string, tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
+    const creds = await getTenantCredentials(tenantId);
     // Z-API uses /update-webhook-received for incoming message webhooks
-    const res = await fetch(`${ZAPI_BASE()}/update-webhook-received`, {
+    const res = await fetch(`${makeBase(creds)}/update-webhook-received`, {
       method: "PUT",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({
         value: webhookUrl,
       }),
@@ -244,7 +316,7 @@ export async function setWebhook(webhookUrl: string): Promise<{ success: boolean
       return { success: false, error: `HTTP ${res.status}: ${err}` };
     }
     // Also enable notifySentByMe so we capture outbound messages sent from the phone
-    await enableNotifySentByMe();
+    await enableNotifySentByMe(tenantId);
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -252,11 +324,12 @@ export async function setWebhook(webhookUrl: string): Promise<{ success: boolean
 }
 
 /** Enable receiving outbound messages (sent by the phone) through the webhook */
-export async function enableNotifySentByMe(): Promise<{ success: boolean; error?: string }> {
+export async function enableNotifySentByMe(tenantId?: number): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${ZAPI_BASE()}/update-notify-sent-by-me`, {
+    const creds = await getTenantCredentials(tenantId);
+    const res = await fetch(`${makeBase(creds)}/update-notify-sent-by-me`, {
       method: "PUT",
-      headers: headers(),
+      headers: makeHeaders(creds),
       body: JSON.stringify({
         notifySentByMe: true,
       }),
@@ -271,5 +344,14 @@ export async function enableNotifySentByMe(): Promise<{ success: boolean; error?
   } catch (err: any) {
     console.log(`[Z-API] enableNotifySentByMe error: ${err.message}`);
     return { success: false, error: err.message };
+  }
+}
+
+/** Clear cached credentials for a tenant (call when tenant Z-API config changes) */
+export function clearCredentialsCache(tenantId?: number): void {
+  if (tenantId) {
+    credentialsCache.delete(tenantId);
+  } else {
+    credentialsCache.clear();
   }
 }

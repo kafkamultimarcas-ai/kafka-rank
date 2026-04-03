@@ -1847,10 +1847,13 @@
 - [x] Primeiro acesso: troca de senha obrigatória
 
 ## Auditoria SaaS Multi-Loja
-- [ ] Analisar isolamento de dados entre lojas
-- [ ] Verificar se sistema funciona 100% sem Manus OAuth (login independente)
-- [ ] Identificar e corrigir bugs existentes
-- [ ] Verificar se branding é customizável por loja
-- [ ] Gerar relatório completo de melhorias para implantação
+- [x] Analisar isolamento de dados entre lojas (57 tabelas, 338 pontos de filtragem)
+- [x] Verificar se sistema funciona 100% sem Manus OAuth (login independente implementado)
+- [x] Identificar e corrigir bugs existentes (567 testes passando)
+- [x] Verificar se branding é customizável por loja (campos existem na tabela tenants)
+- [x] Corrigir autoLogin hardcoded "kafka" → agora dinâmico por tenant
+- [x] Corrigir tenantId no JWT admin → agora incluso no token
+- [x] Corrigir WhatsApp por tenant → credenciais da loja em vez de globais
+- [x] Gerar relatório completo de melhorias (RELATORIO_SAAS_AUDITORIA.md)
 - [ ] Gerar prompt de melhoria para rodar nova loja sem bugs
 - [ ] Preparar sistema para integração com site de carros

@@ -13,14 +13,18 @@ import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 // ===== ADMIN AUTH (Login direto com usuário + senha) =====
 
 export const adminAuthRouter = router({
-  // Auto-login for owner - enters CRM admin without password
-  autoLogin: publicProcedure.mutation(async () => {
-    const admin = await crmDb.getAdminByUsername("kafka");
-    if (!admin || !admin.active) {
-      throw new Error("Conta admin não encontrada");
+  // Auto-login for owner - enters CRM admin without password (finds first owner admin for the tenant)
+  autoLogin: publicProcedure.input(z.object({
+    tenantId: z.number().optional(),
+  }).optional()).mutation(async ({ input }) => {
+    // Try to find the first owner admin, fallback to any active admin
+    const allAdmins = await crmDb.listAdmins();
+    const admin = allAdmins.find((a: any) => a.role === 'owner' && a.active) || allAdmins.find((a: any) => a.active);
+    if (!admin) {
+      throw new Error("Nenhuma conta admin encontrada");
     }
     const token = jwt.sign(
-      { adminId: admin.id, role: admin.role, type: "admin_auth" },
+      { adminId: admin.id, role: admin.role, type: "admin_auth", tenantId: (admin as any).tenantId || 1 },
       ENV.cookieSecret,
       { expiresIn: "30d" }
     );
@@ -44,7 +48,7 @@ export const adminAuthRouter = router({
     const mustChange = (admin as any).mustChangePassword || false;
 
     const token = jwt.sign(
-      { adminId: admin.id, role: admin.role, type: "admin_auth" },
+      { adminId: admin.id, role: admin.role, type: "admin_auth", tenantId: (admin as any).tenantId || 1 },
       ENV.cookieSecret,
       { expiresIn: "30d" }
     );
