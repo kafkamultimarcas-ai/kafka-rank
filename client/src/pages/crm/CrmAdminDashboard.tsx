@@ -1619,6 +1619,9 @@ function SettingsView() {
         )}
       </div>
 
+      {/* Tenant Settings (Dados da Loja + Z-API) */}
+      <TenantSettingsPanel />
+
       {/* AI Mode Configuration */}
       <AiModeConfig />
 
@@ -1825,6 +1828,194 @@ function IntegrationItem({ name, status, description }: { name: string; status: 
       <span className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${status === "ativo" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
         {status}
       </span>
+    </div>
+  );
+}
+
+// ===== TENANT SETTINGS PANEL (Dados da Loja + Z-API) =====
+function TenantSettingsPanel() {
+  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+  const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
+    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const testZapi = trpc.crmPerformance.testZapiConnection.useMutation({
+    onSuccess: (data) => {
+      if (data.success) toast.success(`WhatsApp conectado! ${data.phone ? `Tel: ${data.phone}` : ''}`);
+      else toast.error(data.error || "Falha na conexão");
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const [showZapi, setShowZapi] = useState(false);
+  const [showStore, setShowStore] = useState(false);
+  const [zapiForm, setZapiForm] = useState({ zapiInstanceId: '', zapiToken: '', zapiClientToken: '' });
+  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '', inventoryUrl: '' });
+  const [initialized, setInitialized] = useState(false);
+
+  if (settings && !initialized) {
+    setZapiForm({
+      zapiInstanceId: settings.zapiInstanceId || '',
+      zapiToken: '',
+      zapiClientToken: '',
+    });
+    setStoreForm({
+      name: settings.name || '',
+      phone: settings.phone || '',
+      email: settings.email || '',
+      city: settings.city || '',
+      state: settings.state || '',
+      address: settings.address || '',
+      primaryColor: settings.primaryColor || '#DC2626',
+      secondaryColor: settings.secondaryColor || '#1F2937',
+      inventoryUrl: settings.inventoryUrl || '',
+    });
+    setInitialized(true);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Z-API WhatsApp Configuration */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <button onClick={() => setShowZapi(!showZapi)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${settings?.hasZapi ? 'bg-green-500/20' : 'bg-amber-500/20'}`}>
+              <MessageCircle className={`w-5 h-5 ${settings?.hasZapi ? 'text-green-400' : 'text-amber-400'}`} />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-bold text-foreground">WhatsApp (Z-API)</h3>
+              <p className="text-[10px] text-muted-foreground">
+                {settings?.hasZapi ? 'Credenciais configuradas' : 'Configure suas credenciais Z-API para enviar mensagens'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] px-2 py-0.5 rounded ${settings?.hasZapi ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+              {settings?.hasZapi ? 'Configurado' : 'Pendente'}
+            </span>
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${showZapi ? 'rotate-90' : ''}`} />
+          </div>
+        </button>
+        {showZapi && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-[11px] text-blue-300 leading-relaxed">
+                <strong>Como obter:</strong> Acesse <a href="https://z-api.io" target="_blank" rel="noopener" className="underline">z-api.io</a>, crie uma instância e copie as credenciais abaixo. Cada loja precisa de sua própria instância Z-API.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Instance ID</label>
+              <Input placeholder="Ex: 3C7A1B2D3E4F..." value={zapiForm.zapiInstanceId}
+                onChange={e => setZapiForm({ ...zapiForm, zapiInstanceId: e.target.value })} className="h-9 text-sm font-mono" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Token</label>
+              <Input placeholder={settings?.zapiToken ? '***já configurado*** (deixe vazio para manter)' : 'Cole o token aqui'}
+                value={zapiForm.zapiToken} type="password"
+                onChange={e => setZapiForm({ ...zapiForm, zapiToken: e.target.value })} className="h-9 text-sm font-mono" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Client Token</label>
+              <Input placeholder={settings?.zapiClientToken ? '***já configurado*** (deixe vazio para manter)' : 'Cole o client token aqui'}
+                value={zapiForm.zapiClientToken} type="password"
+                onChange={e => setZapiForm({ ...zapiForm, zapiClientToken: e.target.value })} className="h-9 text-sm font-mono" />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="flex-1" onClick={() => {
+                const updates: any = {};
+                if (zapiForm.zapiInstanceId) updates.zapiInstanceId = zapiForm.zapiInstanceId;
+                if (zapiForm.zapiToken) updates.zapiToken = zapiForm.zapiToken;
+                if (zapiForm.zapiClientToken) updates.zapiClientToken = zapiForm.zapiClientToken;
+                if (Object.keys(updates).length === 0) { toast.error("Preencha pelo menos um campo"); return; }
+                updateSettings.mutate(updates);
+              }} disabled={updateSettings.isPending}>
+                <Save className="w-3.5 h-3.5 mr-1" />
+                {updateSettings.isPending ? 'Salvando...' : 'Salvar Credenciais'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => testZapi.mutate()} disabled={testZapi.isPending || !settings?.hasZapi}>
+                <Zap className="w-3.5 h-3.5 mr-1" />
+                {testZapi.isPending ? 'Testando...' : 'Testar Conexão'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Store Data Configuration */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <button onClick={() => setShowStore(!showStore)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/20">
+              <Settings className="w-5 h-5 text-primary" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-bold text-foreground">Dados da Loja</h3>
+              <p className="text-[10px] text-muted-foreground">Nome, contato, endereço e personalização visual</p>
+            </div>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${showStore ? 'rotate-90' : ''}`} />
+        </button>
+        {showStore && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Nome da Loja</label>
+                <Input value={storeForm.name} onChange={e => setStoreForm({ ...storeForm, name: e.target.value })} className="h-9 text-sm" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Telefone</label>
+                <Input value={storeForm.phone} onChange={e => setStoreForm({ ...storeForm, phone: e.target.value })} className="h-9 text-sm" placeholder="(11) 99999-9999" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Email</label>
+                <Input value={storeForm.email} onChange={e => setStoreForm({ ...storeForm, email: e.target.value })} className="h-9 text-sm" type="email" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Cidade</label>
+                <Input value={storeForm.city} onChange={e => setStoreForm({ ...storeForm, city: e.target.value })} className="h-9 text-sm" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Estado (UF)</label>
+                <Input value={storeForm.state} onChange={e => setStoreForm({ ...storeForm, state: e.target.value })} className="h-9 text-sm" maxLength={2} placeholder="SP" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">URL do Estoque</label>
+                <Input value={storeForm.inventoryUrl} onChange={e => setStoreForm({ ...storeForm, inventoryUrl: e.target.value })} className="h-9 text-sm" placeholder="https://seusite.com.br/estoque" />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Endereço Completo</label>
+              <Input value={storeForm.address} onChange={e => setStoreForm({ ...storeForm, address: e.target.value })} className="h-9 text-sm" placeholder="Rua, Número, Bairro" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Cor Principal</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={storeForm.primaryColor} onChange={e => setStoreForm({ ...storeForm, primaryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <Input value={storeForm.primaryColor} onChange={e => setStoreForm({ ...storeForm, primaryColor: e.target.value })} className="h-9 text-sm font-mono flex-1" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Cor Secundária</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={storeForm.secondaryColor} onChange={e => setStoreForm({ ...storeForm, secondaryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <Input value={storeForm.secondaryColor} onChange={e => setStoreForm({ ...storeForm, secondaryColor: e.target.value })} className="h-9 text-sm font-mono flex-1" />
+                </div>
+              </div>
+            </div>
+            <Button size="sm" className="w-full" onClick={() => {
+              const updates: any = {};
+              for (const [k, v] of Object.entries(storeForm)) {
+                if (v) updates[k] = v;
+              }
+              updateSettings.mutate(updates);
+            }} disabled={updateSettings.isPending}>
+              <Save className="w-3.5 h-3.5 mr-1" />
+              {updateSettings.isPending ? 'Salvando...' : 'Salvar Dados da Loja'}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

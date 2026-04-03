@@ -1583,4 +1583,96 @@ export const crmPerformanceRouter = router({
       return { score: 0, analysis: text, strengths: [], improvements: [], tips: [] };
     }
   }),
+
+  // ===== TENANT SETTINGS (Configurações da Loja) =====
+  getTenantSettings: adminProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return null;
+    const { getCurrentTenantId } = await import("../tenantDb");
+    const tenantId = getCurrentTenantId();
+    const { tenants } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await dbConn.select().from(tenants).where(eq(tenants.id, tenantId));
+    if (!rows.length) return null;
+    const t = rows[0];
+    return {
+      name: t.name,
+      phone: t.phone,
+      email: t.email,
+      city: t.city,
+      state: t.state,
+      address: t.address,
+      primaryColor: t.primaryColor,
+      secondaryColor: t.secondaryColor,
+      logoUrl: t.logoUrl,
+      inventoryUrl: t.inventoryUrl,
+      zapiInstanceId: t.zapiInstanceId || '',
+      zapiToken: t.zapiToken ? '***configurado***' : '',
+      zapiClientToken: t.zapiClientToken ? '***configurado***' : '',
+      hasZapi: !!(t.zapiInstanceId && t.zapiToken && t.zapiClientToken),
+    };
+  }),
+
+  updateTenantSettings: adminProcedure.input(z.object({
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    address: z.string().optional(),
+    primaryColor: z.string().optional(),
+    secondaryColor: z.string().optional(),
+    logoUrl: z.string().optional(),
+    inventoryUrl: z.string().optional(),
+    zapiInstanceId: z.string().optional(),
+    zapiToken: z.string().optional(),
+    zapiClientToken: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB indisponível");
+    const { getCurrentTenantId } = await import("../tenantDb");
+    const tenantId = getCurrentTenantId();
+    const { tenants } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const cleanUpdates: Record<string, any> = {};
+    for (const [k, v] of Object.entries(input)) {
+      if (v !== undefined && v !== '') cleanUpdates[k] = v;
+    }
+    if (Object.keys(cleanUpdates).length > 0) {
+      await dbConn.update(tenants).set(cleanUpdates).where(eq(tenants.id, tenantId));
+    }
+    return { success: true };
+  }),
+
+  testZapiConnection: adminProcedure.mutation(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB indisponível");
+    const { getCurrentTenantId } = await import("../tenantDb");
+    const tenantId = getCurrentTenantId();
+    const { tenants } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await dbConn.select().from(tenants).where(eq(tenants.id, tenantId));
+    if (!rows.length) throw new Error("Loja não encontrada");
+    const t = rows[0];
+    if (!t.zapiInstanceId || !t.zapiToken || !t.zapiClientToken) {
+      return { success: false, error: "Credenciais Z-API não configuradas" };
+    }
+    try {
+      const url = `https://api.z-api.io/instances/${t.zapiInstanceId}/token/${t.zapiToken}/status`;
+      const resp = await fetch(url, {
+        headers: { 'Client-Token': t.zapiClientToken },
+      });
+      const data = await resp.json() as any;
+      if (data.connected || data.smartphoneConnected) {
+        return { success: true, status: 'Conectado', phone: data.phone || '' };
+      }
+      return { success: false, error: `Status: ${data.statusReason || 'Desconectado'}` };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }),
 });

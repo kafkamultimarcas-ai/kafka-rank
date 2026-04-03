@@ -1857,3 +1857,9 @@
 - [x] Gerar relatório completo de melhorias (RELATORIO_SAAS_AUDITORIA.md)
 - [ ] Gerar prompt de melhoria para rodar nova loja sem bugs
 - [ ] Preparar sistema para integração com site de carros
+
+## Fluxo Nova Loja + Prompt de Melhoria
+- [ ] Testar fluxo completo: criar tenant → criar admin → login → verificar isolamento
+- [x] Implementar painel de configuração Z-API por tenant no CRM Admin
+- [ ] Gerar prompt de melhoria completo para implantação de nova loja sem bugs
+- [ ] Preparar sistema para integração com site de carros
