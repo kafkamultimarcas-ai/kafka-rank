@@ -3040,12 +3040,12 @@ function AIAttendantView() {
   });
 
   const [localPrompt, setLocalPrompt] = useState("");
-  const [localMaxMsg, setLocalMaxMsg] = useState(30);
+  const [localMaxMsg, setLocalMaxMsg] = useState(0);
 
   useEffect(() => {
     if (config) {
       setLocalPrompt(config.attendantPrompt || "");
-      setLocalMaxMsg(config.attendantMaxMessages || 30);
+      setLocalMaxMsg(config.attendantMaxMessages ?? 0);
     }
   }, [config]);
 
@@ -3172,18 +3172,41 @@ function AIAttendantView() {
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-primary" /> Limite de Mensagens por Lead
         </h3>
-        <div className="flex items-center gap-4">
-          <input
-            type="range" min={5} max={100} value={localMaxMsg}
-            onChange={e => setLocalMaxMsg(Number(e.target.value))}
-            className="flex-1 accent-primary"
-          />
-          <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
-          <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
-            <Save className="w-3 h-3 mr-1" /> Salvar
-          </Button>
+        <div className="flex items-center gap-3 mb-2">
+          <button
+            onClick={() => { setLocalMaxMsg(0); setConfig.mutate({ attendantMaxMessages: 0 }); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+          >
+            Ilimitado
+          </button>
+          {[10, 30, 50].map(n => (
+            <button key={n}
+              onClick={() => { setLocalMaxMsg(n); setConfig.mutate({ attendantMaxMessages: n }); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === n ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+            >
+              {n} msgs
+            </button>
+          ))}
         </div>
-        <p className="text-[10px] text-muted-foreground">Após esse número de mensagens, a IA para de responder e o lead precisa de atendimento humano.</p>
+        {localMaxMsg > 0 && (
+          <div className="flex items-center gap-4">
+            <input
+              type="range" min={5} max={100} value={localMaxMsg}
+              onChange={e => setLocalMaxMsg(Number(e.target.value))}
+              className="flex-1 accent-primary"
+            />
+            <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
+            <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
+              <Save className="w-3 h-3 mr-1" /> Salvar
+            </Button>
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground">
+          {localMaxMsg === 0 
+            ? 'A IA responde quantas mensagens forem necessárias até converter o lead.'
+            : `Após ${localMaxMsg} mensagens, a IA para e o lead precisa de atendimento humano.`
+          }
+        </p>
       </div>
 
       {/* Custom Prompt */}

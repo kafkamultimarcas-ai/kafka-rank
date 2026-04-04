@@ -1875,3 +1875,20 @@
 - [x] BUG FIX: Queries CAST(createdAt AS CHAR) ineficientes (substituído por gte/lt com Date)
 - [x] BUG FIX: Frontend sem retry em queries (adicionado retry:2, staleTime:30s, refetchOnWindowFocus:false)
 - [x] Rodar testes e verificar correções (586 testes passando)
+
+## Melhorias IA Atendimento Automático - Abril 2026
+- [x] IA deve continuar respondendo sem limite fixo (0 = ilimitado)
+- [x] IA deve perguntar de onde o cliente é antes de passar endereço/localização
+- [x] Configurar endereço da loja: Rua Santa Catarina, 1318 - Joinville/SC
+- [x] Para clientes de Joinville: passar só endereço; para clientes de fora: passar endereço completo com cidade
+- [x] Tornar limite de mensagens da IA flexível/configurável ou ilimitado (botões: Ilimitado, 10, 30, 50)
+- [x] Melhorar prompt da IA para ser mais inteligente no fluxo de atendimento
+- [x] Reescrever prompt da IA como SDR pré-vendas profissional
+- [x] Mensagens curtas (1-2 frases máx), humanizadas e carismáticas
+- [x] Qualificação assertiva com perguntas certas na hora certa (fluxo de 9 etapas)
+- [x] Enviar foto do carro do estoque quando identificar interesse (sendPhoto=true)
+- [x] Agendar presencial (Joinville) ou videochamada (cliente de fora)
+- [x] Filtrar e medir interesse do cliente via etapas (greeting > qualifying > presenting > scheduling)
+- [x] Coletar dados para simulação de forma natural (1 dado por vez)
+- [x] storeAddress/storeCity carregados da tabela tenants
+- [x] customerCity e wantsVideoCall nos dados extraídos

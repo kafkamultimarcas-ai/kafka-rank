@@ -29,13 +29,15 @@ interface AttendantConfig {
   attendantAutoFicha: boolean;
   attendantAutoDistribute: boolean;
   attendantTankPromo: boolean;
-  attendantMaxMessages: number;
+  attendantMaxMessages: number; // 0 = unlimited
   personality: string;
   workingHoursStart: number;
   workingHoursEnd: number;
   workingHoursEnabled: boolean;
   aiMode: string;
   feiraoConfig: string | null;
+  storeAddress: string | null;
+  storeCity: string | null;
 }
 
 interface CollectedData {
@@ -59,7 +61,9 @@ interface CollectedData {
   wantsFicha?: boolean;
   scheduledDate?: string;
   scheduledTime?: string;
-  conversationStage?: string; // greeting, qualifying, collecting_data, scheduling, ficha, closing
+  customerCity?: string; // cidade do cliente
+  wantsVideoCall?: boolean; // cliente de fora quer videochamada
+  conversationStage?: string; // greeting, qualifying, presenting, collecting_data, scheduling, ficha, closing
 }
 
 // ===== CONFIGURATION =====
@@ -72,7 +76,7 @@ export async function getAttendantConfig(): Promise<AttendantConfig | null> {
     const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
     if (rows && rows.length > 0) {
       const r = rows[0];
-      return {
+      const cfg: AttendantConfig = {
         attendantEnabled: !!r.attendantEnabled,
         attendantMode: r.attendantMode || 'off_hours',
         attendantPrompt: r.attendantPrompt || null,
@@ -82,14 +86,29 @@ export async function getAttendantConfig(): Promise<AttendantConfig | null> {
         attendantAutoFicha: r.attendantAutoFicha !== undefined ? !!r.attendantAutoFicha : true,
         attendantAutoDistribute: r.attendantAutoDistribute !== undefined ? !!r.attendantAutoDistribute : true,
         attendantTankPromo: r.attendantTankPromo !== undefined ? !!r.attendantTankPromo : true,
-        attendantMaxMessages: r.attendantMaxMessages || 30,
+        attendantMaxMessages: r.attendantMaxMessages ?? 0, // 0 = unlimited
         personality: r.personality || 'amigavel',
         workingHoursStart: r.workingHoursStart ?? 8,
         workingHoursEnd: r.workingHoursEnd ?? 20,
         workingHoursEnabled: !!r.workingHoursEnabled,
         aiMode: r.aiMode || 'normal',
         feiraoConfig: r.feiraoConfig || null,
+        storeAddress: null,
+        storeCity: null,
       };
+      // Load store address from tenants table
+      try {
+        const { getCurrentTenantId } = await import("./tenantDb");
+        const tid = getCurrentTenantId();
+        const tenantResult = await dbConn!.execute(sql`SELECT name, address, city, phone FROM tenants WHERE id = ${tid} LIMIT 1`);
+        const tRaw = tenantResult as any;
+        const tRows = Array.isArray(tRaw?.[0]) ? tRaw[0] : tRaw;
+        if (tRows?.[0]) {
+          cfg.storeAddress = tRows[0].address || null;
+          cfg.storeCity = tRows[0].city || null;
+        }
+      } catch { /* ignore - use defaults */ }
+      return cfg;
     }
     return null;
   } catch (e) {
@@ -250,16 +269,11 @@ function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData:
   const firstName = (lead.name || '').split(' ')[0] || 'amigo';
   
   const personalityMap: Record<string, string> = {
-    amigavel: 'Seja amigável, simpático e informal. Use linguagem natural como se fosse um amigo ajudando.',
-    profissional: 'Seja profissional, educado e direto ao ponto. Transmita confiança e competência.',
-    agressivo: 'Seja persuasivo e crie urgência. Foque em escassez, oportunidade única e benefícios exclusivos.',
+    amigavel: 'Carismática, simpática e acolhedora. Fala como uma amiga que entende de carros e quer ajudar de verdade.',
+    profissional: 'Confiante, direta e competente. Transmite autoridade sem ser fria.',
+    agressivo: 'Persuasiva e criativa. Cria urgência real com escassez e oportunidade.',
   };
 
-  // Determine what data is still missing
-  const missingData: string[] = [];
-  if (!collectedData.customerName) missingData.push('nome completo');
-  if (!collectedData.customerPhone) missingData.push('telefone');
-  
   // For ficha/simulation
   const fichaFields: string[] = [];
   if (collectedData.wantsFicha || collectedData.wantsSimulation) {
@@ -286,11 +300,15 @@ function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData:
 
   // Tank promo
   const tankPromo = config.attendantTankPromo 
-    ? '\n- PROMOÇÃO ESPECIAL: Se o cliente agendar uma visita e fechar negócio, GANHA UM TANQUE CHEIO! Mencione isso naturalmente quando for oportuno.'
+    ? '\nPROMOÇÃO: Cliente que agendar visita e fechar = TANQUE CHEIO de presente! Use isso como gatilho quando for oportuno.'
     : '';
 
   // Custom prompt
-  const customInstr = config.attendantPrompt ? `\n\nINSTRUÇÕES ADICIONAIS DO GERENTE:\n${config.attendantPrompt}` : '';
+  const customInstr = config.attendantPrompt ? `\n\nINSTRUÇÕES DO GERENTE:\n${config.attendantPrompt}` : '';
+
+  // Store location context
+  const storeAddr = config.storeAddress || 'Rua Santa Catarina, 1318';
+  const storeCity = config.storeCity || 'Joinville';
 
   // Stage-specific instructions
   let stageInstr = '';
@@ -298,73 +316,100 @@ function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData:
   
   if (stage === 'greeting' || stage === 'qualifying') {
     stageInstr = `
-ETAPA ATUAL: Qualificação inicial
-- Descubra o que o cliente procura (tipo de veículo, faixa de preço)
-- Pergunte se tem veículo na troca
-- Seja natural, não faça todas as perguntas de uma vez`;
+ETAPA: QUALIFICAÇÃO
+- Cumprimente rápido e já pergunte o que procura
+- Identifique: tipo de veículo, faixa de preço, se tem troca
+- UMA pergunta por vez, nunca duas
+- Se o cliente já disse o carro, avance para apresentar`;
+  } else if (stage === 'presenting') {
+    stageInstr = `
+ETAPA: APRESENTAÇÃO DO VEÍCULO
+- Destaque os pontos fortes do veículo que o cliente quer
+- Se tiver no estoque, diga que vai mandar foto (sendPhoto=true)
+- Pergunte se quer financiar ou pagar à vista
+- Meça o interesse: se está decidido ou só pesquisando`;
   } else if (stage === 'collecting_data') {
     stageInstr = `
-ETAPA ATUAL: Coleta de dados para ficha de crédito
-- O cliente quer fazer ficha/simulação de financiamento
-- Colete os dados que faltam de forma natural, UM POR VEZ
-- Dados faltando: ${fichaFields.join(', ') || 'nenhum - dados completos!'}
-- Quando tiver todos os dados, informe que a ficha foi enviada para análise`;
+ETAPA: COLETA DE DADOS
+- O cliente quer simulação/ficha de crédito
+- Peça UM dado por vez, de forma natural
+- Dados faltando: ${fichaFields.join(', ') || 'COMPLETO - avise que foi enviado!'}
+- Quando completo, avise que a ficha foi para análise`;
   } else if (stage === 'scheduling') {
     stageInstr = `
-ETAPA ATUAL: Agendamento de visita
-- Sugira horários disponíveis (seg-sáb, 8h-18h)
-- Confirme data e horário com o cliente
-- Mencione o benefício do tanque cheio (se aplicável)`;
+ETAPA: AGENDAMENTO
+- Se cliente é de ${storeCity}: agende visita presencial
+- Se cliente é de fora: ofereça VIDEOCHAMADA com vendedor
+- Horários: seg-sáb, 8h-18h
+- Confirme data e horário`;
   } else if (stage === 'ficha') {
     stageInstr = `
-ETAPA ATUAL: Ficha enviada para análise
-- Informe que a ficha está em análise pela equipe F&I
-- Sugira agendar uma visita enquanto aguarda
-- Mantenha o cliente engajado`;
+ETAPA: FICHA EM ANÁLISE
+- Ficha está com a equipe F&I
+- Sugira agendar visita enquanto aguarda
+- Mantenha engajado sem ser insistente`;
+  } else if (stage === 'closing') {
+    stageInstr = `
+ETAPA: FECHAMENTO
+- Agendamento confirmado, reforce data/horário
+- Passe o endereço se for presencial
+- Se videochamada, confirme que vendedor vai ligar`;
   }
 
-  return `Você é a assistente virtual da KAFKA Multimarcas, uma loja de veículos multimarcas.
-Você está atendendo pelo WhatsApp de forma HUMANIZADA - o cliente NÃO deve perceber que é uma IA.
+  return `Você é a SDR (pré-vendas) da KAFKA Multimarcas. Atende pelo WhatsApp como se fosse uma PESSOA REAL.
+
+SEU PAPEL: Qualificar leads, filtrar interesse, coletar dados e AGENDAR (presencial ou videochamada).
 
 PERSONALIDADE: ${personalityMap[config.personality] || personalityMap.amigavel}
 
-REGRAS FUNDAMENTAIS:
-- Responda SEMPRE em português brasileiro natural
-- Máximo 2-3 frases por mensagem (como uma pessoa real no WhatsApp)
-- NÃO use formatação markdown, asteriscos ou negrito
-- Use no máximo 1 emoji por mensagem
-- NUNCA invente preços, dados ou informações que não tem
-- Seja conversacional, pergunte UMA coisa por vez
-- SEMPRE tente direcionar para agendamento presencial na loja
-- A melhor proposta SEMPRE é na loja presencialmente
-- Se o cliente perguntar preço, diga que o melhor valor é presencialmente${tankPromo}
+REGRAS DE OURO:
+- MENSAGENS CURTAS: máximo 1-2 frases. Como gente de verdade no WhatsApp
+- ZERO formatação: sem markdown, sem asteriscos, sem negrito, sem listas
+- Máximo 1 emoji por mensagem (e nem sempre precisa)
+- UMA pergunta por vez, NUNCA duas
+- Seja carismática e objetiva ao mesmo tempo
+- NUNCA invente preço, dado ou informação
+- Quando o cliente perguntar preço: "a melhor condição é presencialmente, vamos agendar?"
+- Quando o cliente pedir localização/endereço: PRIMEIRO pergunte de qual cidade ele é${tankPromo}
+
+FLUXO DE QUALIFICAÇÃO (siga essa ordem):
+1. Cumprimentar e perguntar o que procura
+2. Entender o veículo de interesse
+3. Mandar foto do carro se tiver no estoque (sendPhoto=true)
+4. Perguntar se tem troca
+5. Perguntar forma de pagamento (financiamento/à vista)
+6. Se financiamento: coletar dados para simulação
+7. Perguntar de onde o cliente é (cidade)
+8. Se é de ${storeCity}: agendar visita presencial
+9. Se é de FORA: oferecer videochamada com vendedor para apresentar o carro
+
+LOCALIZAÇÃO DA LOJA:
+- Endereço: ${storeAddr} - ${storeCity}/SC
+- Se cliente é de ${storeCity}: passe só o endereço
+- Se cliente é de fora: passe endereço + cidade + ofereça videochamada
+- SEMPRE pergunte de onde o cliente é ANTES de passar endereço
 
 SOBRE A LOJA:
-- Nome: KAFKA Multimarcas
-- Segmento: Venda de veículos seminovos e usados multimarcas
-- Oferece: Financiamento, troca, consignação
-- Horário: Segunda a Sábado, 8h às 18h
+- KAFKA Multimarcas - veículos seminovos e usados
+- Financiamento, troca, consignação
+- Seg a Sáb, 8h às 18h
 
-DADOS JÁ COLETADOS DO CLIENTE:
+DADOS DO CLIENTE:
 - Nome: ${collectedData.customerName || firstName || 'não informado'}
-- Telefone: ${collectedData.customerPhone || lead.phone || 'não informado'}
+- Cidade: ${collectedData.customerCity || 'não perguntou ainda'}
 - CPF: ${collectedData.customerCpf || 'não informado'}
-- Veículo de interesse: ${collectedData.vehicleInterest || lead.vehicleInterest || 'não informado'}
+- Veículo: ${collectedData.vehicleInterest || lead.vehicleInterest || 'não informado'}
 - Entrada: ${collectedData.downPayment ? 'R$ ' + collectedData.downPayment.toLocaleString('pt-BR') : 'não informado'}
-- Veículo na troca: ${collectedData.tradeInVehicle || 'não informado'}
+- Troca: ${collectedData.tradeInVehicle || 'não informado'}
 - Renda: ${collectedData.customerIncome ? 'R$ ' + collectedData.customerIncome.toLocaleString('pt-BR') : 'não informado'}
 ${stageInstr}
 ${vehicleContext}
 ${feiraoCtx}
 ${customInstr}
 
-OBJETIVO PRINCIPAL: Converter o lead em visita presencial na loja. Colete informações naturalmente durante a conversa.
-
-IMPORTANTE - RESPONDA COM JSON:
-Você DEVE responder SEMPRE no formato JSON abaixo. O campo "message" é a resposta para o cliente. Os outros campos são dados extraídos da conversa.
-
+RESPONDA SEMPRE EM JSON:
 {
-  "message": "sua resposta aqui",
+  "message": "sua resposta curta aqui",
   "extracted": {
     "customerName": null,
     "customerCpf": null,
@@ -374,6 +419,7 @@ Você DEVE responder SEMPRE no formato JSON abaixo. O campo "message" é a respo
     "customerEmploymentTime": null,
     "customerEmail": null,
     "customerAddress": null,
+    "customerCity": null,
     "vehicleInterest": null,
     "downPayment": null,
     "tradeInVehicle": null,
@@ -381,16 +427,23 @@ Você DEVE responder SEMPRE no formato JSON abaixo. O campo "message" é a respo
     "tradeInKm": null,
     "wantsSimulation": false,
     "wantsFicha": false,
+    "wantsVideoCall": false,
     "scheduledDate": null,
     "scheduledTime": null
   },
+  "sendPhoto": false,
   "nextStage": "${stage}"
 }
 
-Preencha os campos "extracted" APENAS quando o cliente fornecer a informação na mensagem atual. Use null para dados não fornecidos.
-O "nextStage" deve ser: "greeting", "qualifying", "collecting_data", "scheduling", "ficha" ou "closing".
+CAMPOS:
+- "message": resposta CURTA pro cliente (1-2 frases no máximo)
+- "extracted": preencha APENAS dados que o cliente informou AGORA. null = não informou
+- "sendPhoto": true se deve enviar foto do veículo de interesse ao cliente
+- "wantsVideoCall": true se cliente de fora quer ver o carro por vídeo
+- "customerCity": cidade do cliente quando ele informar
+- "nextStage": greeting, qualifying, presenting, collecting_data, scheduling, ficha, closing
 
-HISTÓRICO DA CONVERSA:
+HISTÓRICO:
 ${chatHistory}`;
 }
 
@@ -423,7 +476,7 @@ export async function handleAttendantMessage(
     const msgRaw = msgCountResult as any;
     const msgRows = Array.isArray(msgRaw?.[0]) ? msgRaw[0] : msgRaw;
     const aiMsgCount = Number(msgRows?.[0]?.cnt || 0);
-    if (aiMsgCount >= config.attendantMaxMessages) {
+    if (config.attendantMaxMessages > 0 && aiMsgCount >= config.attendantMaxMessages) {
       console.log(`[AI Attendant] Lead #${leadId} reached max AI messages (${config.attendantMaxMessages}), skipping`);
       return { sent: false };
     }
@@ -472,7 +525,7 @@ export async function handleAttendantMessage(
           schema: {
             type: "object",
             properties: {
-              message: { type: "string", description: "Resposta para o cliente" },
+              message: { type: "string", description: "Resposta curta para o cliente (1-2 frases)" },
               extracted: {
                 type: "object",
                 properties: {
@@ -484,6 +537,7 @@ export async function handleAttendantMessage(
                   customerEmploymentTime: { type: ["string", "null"] },
                   customerEmail: { type: ["string", "null"] },
                   customerAddress: { type: ["string", "null"] },
+                  customerCity: { type: ["string", "null"] },
                   vehicleInterest: { type: ["string", "null"] },
                   downPayment: { type: ["number", "null"] },
                   tradeInVehicle: { type: ["string", "null"] },
@@ -491,15 +545,17 @@ export async function handleAttendantMessage(
                   tradeInKm: { type: ["number", "null"] },
                   wantsSimulation: { type: "boolean" },
                   wantsFicha: { type: "boolean" },
+                  wantsVideoCall: { type: "boolean" },
                   scheduledDate: { type: ["string", "null"] },
                   scheduledTime: { type: ["string", "null"] },
                 },
-                required: ["customerName", "customerCpf", "customerBirthDate", "customerIncome", "customerEmployer", "customerEmploymentTime", "customerEmail", "customerAddress", "vehicleInterest", "downPayment", "tradeInVehicle", "tradeInPlate", "tradeInKm", "wantsSimulation", "wantsFicha", "scheduledDate", "scheduledTime"],
+                required: ["customerName", "customerCpf", "customerBirthDate", "customerIncome", "customerEmployer", "customerEmploymentTime", "customerEmail", "customerAddress", "customerCity", "vehicleInterest", "downPayment", "tradeInVehicle", "tradeInPlate", "tradeInKm", "wantsSimulation", "wantsFicha", "wantsVideoCall", "scheduledDate", "scheduledTime"],
                 additionalProperties: false,
               },
+              sendPhoto: { type: "boolean", description: "Whether to send vehicle photo" },
               nextStage: { type: "string", description: "Next conversation stage" },
             },
-            required: ["message", "extracted", "nextStage"],
+            required: ["message", "extracted", "sendPhoto", "nextStage"],
             additionalProperties: false,
           },
         },
@@ -540,6 +596,8 @@ export async function handleAttendantMessage(
     if (extracted.tradeInKm) updatedData.tradeInKm = extracted.tradeInKm;
     if (extracted.wantsSimulation) updatedData.wantsSimulation = true;
     if (extracted.wantsFicha) updatedData.wantsFicha = true;
+    if (extracted.wantsVideoCall) updatedData.wantsVideoCall = true;
+    if (extracted.customerCity) updatedData.customerCity = extracted.customerCity;
     if (extracted.scheduledDate) updatedData.scheduledDate = extracted.scheduledDate;
     if (extracted.scheduledTime) updatedData.scheduledTime = extracted.scheduledTime;
     updatedData.conversationStage = parsed.nextStage || 'qualifying';
@@ -627,6 +685,50 @@ export async function handleAttendantMessage(
         timestamp: Date.now(),
       });
       console.log(`[AI Attendant] Sent to lead #${leadId}: ${responseText.substring(0, 60)}...`);
+
+      // 4. Send vehicle photo if AI requested it
+      if (parsed.sendPhoto) {
+        const vSearch = updatedData.vehicleInterest || lead.vehicleInterest;
+        if (vSearch) {
+          try {
+            const searchTerm = `%${vSearch}%`;
+            const matchedVehicles = await dbConn.select().from(inventoryVehicles)
+              .where(and(
+                eq(inventoryVehicles.status, "available"),
+                or(like(inventoryVehicles.model, searchTerm), like(inventoryVehicles.brand, searchTerm))
+              )).limit(1);
+            if (matchedVehicles.length > 0) {
+              const v = matchedVehicles[0];
+              // Try photos array first, then photoUrl
+              let photoToSend = v.photoUrl;
+              if (v.photos) {
+                try {
+                  const photosArr = JSON.parse(v.photos);
+                  if (Array.isArray(photosArr) && photosArr.length > 0) {
+                    photoToSend = photosArr[0];
+                  }
+                } catch { /* use photoUrl */ }
+              }
+              if (photoToSend) {
+                const caption = `${v.brand} ${v.model} ${v.year || ''} - ${v.km?.toLocaleString('pt-BR') || '0'} km`;
+                const imgResult = await zapi.sendImage(phone, photoToSend, caption);
+                if (imgResult.success) {
+                  await crmDb.createMessage({
+                    leadId, phone, direction: "outbound", messageType: "image",
+                    content: caption, mediaUrl: photoToSend, senderName: "IA Kafka",
+                    sentBy: null, zapiMessageId: null, timestamp: Date.now(),
+                  });
+                  console.log(`[AI Attendant] Sent photo of ${v.brand} ${v.model} to lead #${leadId}`);
+                  action = action ? action + ',photo_sent' : 'photo_sent';
+                }
+              }
+            }
+          } catch (photoErr: any) {
+            console.error(`[AI Attendant] Error sending photo:`, photoErr.message);
+          }
+        }
+      }
+
       return { sent: true, message: responseText, action };
     }
 

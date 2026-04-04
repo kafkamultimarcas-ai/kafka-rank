@@ -1279,7 +1279,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
       attendantEnabled: false, attendantMode: 'off_hours', attendantPrompt: '',
       attendantSchedule: null as string | null, attendantCollectData: true, attendantAutoSchedule: true,
       attendantAutoFicha: true, attendantAutoDistribute: true, attendantTankPromo: true,
-      attendantMaxMessages: 30,
+      attendantMaxMessages: 0, // 0 = ilimitado
     };
     if (!dbConn) return defaults;
     try {
@@ -1299,7 +1299,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
           attendantAutoFicha: r.attendantAutoFicha !== undefined ? !!r.attendantAutoFicha : true,
           attendantAutoDistribute: r.attendantAutoDistribute !== undefined ? !!r.attendantAutoDistribute : true,
           attendantTankPromo: r.attendantTankPromo !== undefined ? !!r.attendantTankPromo : true,
-          attendantMaxMessages: r.attendantMaxMessages || 30,
+          attendantMaxMessages: r.attendantMaxMessages ?? 0, // 0 = ilimitado
         };
       }
       return defaults;
@@ -1316,7 +1316,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     attendantAutoFicha: z.boolean().optional(),
     attendantAutoDistribute: z.boolean().optional(),
     attendantTankPromo: z.boolean().optional(),
-    attendantMaxMessages: z.number().min(1).max(100).optional(),
+    attendantMaxMessages: z.number().min(0).max(999).optional(), // 0 = ilimitado
   })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
