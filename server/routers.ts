@@ -2741,15 +2741,15 @@ Adapte o formato conforme o assunto, mas sempre inclua:
             const dbConn = await db.getDbInstance();
             if (dbConn) {
               const { feiRecords, sdrRecords } = await import('../drizzle/schema');
-              const { and: andOp, eq: eqOp, sql: sqlOp } = await import('drizzle-orm');
+              const { and: andOp, eq: eqOp, sql: sqlOp, gte: gteOp, lt: ltOp } = await import('drizzle-orm');
               const feiRows = await dbConn.select({ sellerId: feiRecords.sellerId, cnt: sqlOp`COUNT(*)`.as('cnt') })
                 .from(feiRecords)
-                .where(andOp(eqOp(feiRecords.status, 'approved'), sqlOp`CAST(${feiRecords.createdAt} AS CHAR) >= ${startStr}`, sqlOp`CAST(${feiRecords.createdAt} AS CHAR) < ${endStr}`))
+                .where(andOp(eqOp(feiRecords.status, 'approved'), gteOp(feiRecords.createdAt, new Date(startStr)), ltOp(feiRecords.createdAt, new Date(endStr))))
                 .groupBy(feiRecords.sellerId);
               for (const row of feiRows) feiMap.set(row.sellerId, Number(row.cnt));
               const sdrRows = await dbConn.select({ sellerId: sdrRecords.sellerId, cnt: sqlOp`COUNT(*)`.as('cnt') })
                 .from(sdrRecords)
-                .where(andOp(eqOp(sdrRecords.status, 'approved'), eqOp(sdrRecords.type, 'agendamento'), sqlOp`CAST(${sdrRecords.createdAt} AS CHAR) >= ${startStr}`, sqlOp`CAST(${sdrRecords.createdAt} AS CHAR) < ${endStr}`))
+                .where(andOp(eqOp(sdrRecords.status, 'approved'), eqOp(sdrRecords.type, 'agendamento'), gteOp(sdrRecords.createdAt, new Date(startStr)), ltOp(sdrRecords.createdAt, new Date(endStr))))
                 .groupBy(sdrRecords.sellerId);
               for (const row of sdrRows) agendMap.set(row.sellerId, Number(row.cnt));
             }

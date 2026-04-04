@@ -1,4 +1,4 @@
-import { getDb } from "./db";
+import { getDb, withRetry } from "./db";
 import { inventoryVehicles, inventorySyncLogs } from "../drizzle/schema";
 import { eq, and, ne, notInArray } from "drizzle-orm";
 
@@ -204,26 +204,26 @@ export async function syncInventory(): Promise<{
         lastSyncedAt: Date.now(),
       };
 
-      const existing = await db
+      const existing = await withRetry(() => db
         .select()
         .from(inventoryVehicles)
         .where(eq(inventoryVehicles.externalId, externalId))
-        .limit(1);
+        .limit(1));
 
       if (existing.length > 0) {
         // Only update if not manually marked as sold
         if (existing[0].status !== "sold") {
-          await db
+          await withRetry(() => db
             .update(inventoryVehicles)
             .set(vehicleData)
-            .where(eq(inventoryVehicles.externalId, externalId));
+            .where(eq(inventoryVehicles.externalId, externalId)));
           updated++;
         }
       } else {
-        await db.insert(inventoryVehicles).values({
+        await withRetry(() => db.insert(inventoryVehicles).values({
           ...vehicleData,
           status: "available",
-        });
+        }));
         added++;
       }
     }

@@ -1106,8 +1106,8 @@ export async function listVehiclesCompleted7Days(month?: number, year?: number) 
     const endMonth = month === 12 ? 1 : month + 1;
     const endYear = month === 12 ? year + 1 : year;
     const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
-    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) >= ${startStr}`);
-    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) < ${endStr}`);
+    conditions.push(gte(consignmentRecords.createdAt, new Date(startStr)));
+    conditions.push(lt(consignmentRecords.createdAt, new Date(endStr)));
   }
   return db.select().from(consignmentRecords)
     .where(and(...conditions))
@@ -1127,8 +1127,8 @@ export async function listVehiclesExited(month?: number, year?: number) {
     const endMonth = month === 12 ? 1 : month + 1;
     const endYear = month === 12 ? year + 1 : year;
     const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
-    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) >= ${startStr}`);
-    conditions.push(sql`CAST(${consignmentRecords.createdAt} AS CHAR) < ${endStr}`);
+    conditions.push(gte(consignmentRecords.createdAt, new Date(startStr)));
+    conditions.push(lt(consignmentRecords.createdAt, new Date(endStr)));
   }
   return db.select().from(consignmentRecords)
     .where(and(...conditions))
@@ -1656,8 +1656,8 @@ export async function getMonthlyRanking(month: number, year: number, category?: 
     .where(and(
       eq(sales.tenantId, getCurrentTenantId()),
       eq(sales.status, 'approved'),
-      sql`CAST(${sales.createdAt} AS CHAR) >= ${startStr}`,
-      sql`CAST(${sales.createdAt} AS CHAR) < ${endStr}`,
+      gte(sales.createdAt, new Date(startStr)),
+      lt(sales.createdAt, new Date(endStr)),
     ));
   
   // Agrupar por vendedor
@@ -1718,8 +1718,8 @@ export async function getAppointmentRanking(month: number, year: number) {
     .where(and(
       eq(sdrRecords.type, 'agendamento'),
       eq(sdrRecords.status, 'approved'),
-      sql`CAST(${sdrRecords.createdAt} AS CHAR) >= ${startStr}`,
-      sql`CAST(${sdrRecords.createdAt} AS CHAR) < ${endStr}`,
+      gte(sdrRecords.createdAt, new Date(startStr)),
+      lt(sdrRecords.createdAt, new Date(endStr)),
     ));
   
   // Agrupar por vendedor: total agendados e total comparecidos

@@ -227,10 +227,25 @@ async function _checkAlertsInner() {
         const lastTransferTs = typeof lead.lastAutoTransferAt === 'number' ? lead.lastAutoTransferAt : Number(lead.lastAutoTransferAt);
         const minutesSinceTransfer = (Date.now() - lastTransferTs) / 60000;
         if (minutesSinceTransfer < sellerThreshold) {
-          console.log(`[Alert Checker] Lead #${lead.id} foi transferido há ${Math.round(minutesSinceTransfer)}min (threshold: ${sellerThreshold}min) - aguardando novo vendedor responder`);
+          // Only log once per cycle to avoid spam
           continue;
         }
       }
+
+      // CHECK 6: Limit max auto-transfers per lead (prevent infinite ping-pong)
+      // Count how many auto-transfer activities this lead has
+      const MAX_AUTO_TRANSFERS = 3;
+      try {
+        const activities = await crmDb.listActivitiesByLead(lead.id);
+        const autoTransferCount = activities.filter((a: any) => 
+          a.description?.includes('transferido automaticamente') || a.description?.includes('atribuído automaticamente')
+        ).length;
+        if (autoTransferCount >= MAX_AUTO_TRANSFERS) {
+          // Lead has been transferred too many times - stop transferring and archive
+          console.log(`[Alert Checker] Lead #${lead.id} já foi transferido ${autoTransferCount}x (max: ${MAX_AUTO_TRANSFERS}) - parando transferências automáticas`);
+          continue;
+        }
+      } catch { /* ignore count errors */ }
 
       console.log(`[Alert Checker] Lead #${lead.id} (${lead.name}) sem resposta do vendedor #${lead.sellerId} por ${sellerThreshold}+ min. Auto-reatribuindo...`);
       const result = await crmDb.autoReassignLead(lead.id);

@@ -1863,3 +1863,15 @@
 - [x] Implementar painel de configuração Z-API por tenant no CRM Admin
 - [ ] Gerar prompt de melhoria completo para implantação de nova loja sem bugs
 - [ ] Preparar sistema para integração com site de carros
+
+## Auditoria e Correção de Bugs - Abril 2026
+- [x] Auditar logs de erros do servidor (devserver.log)
+- [x] Auditar erros de console do browser (browserConsole.log)
+- [x] Auditar erros de rede (networkRequests.log)
+- [x] Verificar erros TypeScript (0 erros)
+- [x] Identificar e catalogar todos os bugs
+- [x] BUG FIX: Leads pingando infinitamente entre vendedores (limite max 3 transferências automáticas)
+- [x] BUG FIX: ECONNRESET no inventory-scraper (adicionado withRetry)
+- [x] BUG FIX: Queries CAST(createdAt AS CHAR) ineficientes (substituído por gte/lt com Date)
+- [x] BUG FIX: Frontend sem retry em queries (adicionado retry:2, staleTime:30s, refetchOnWindowFocus:false)
+- [x] Rodar testes e verificar correções (586 testes passando)
