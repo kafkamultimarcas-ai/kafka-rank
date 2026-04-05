@@ -1967,3 +1967,10 @@
 - [x] BUG CRITICO: IA mandando "Navegantes/SC" em vez de "Joinville/SC" - endereço correto: Rua Santa Catarina, 1318 - Bairro Floresta - Joinville/SC
 - [x] BUG: IA usando emoji (😊😉) - deveria ser ZERO emoji
 - [x] MELHORIA: IA corrigiu endereço quando cliente perguntou, mas não deveria ter errado antes
+
+### Calibração do Prompt IA SDR (05/04)
+- [x] Implementar novo prompt SDR padrão Kafka completo no ai-attendant.ts
+- [x] IA enviar fotos proativamente quando identificar interesse do cliente
+- [x] IA usar gatilho de curiosidade: "temos novidades que ainda nao estao no site"
+- [x] IA perguntar o que cliente procura se nao gostar das opcoes enviadas
+- [x] IA analisar fluxo da conversa e saber hora certa de agir com msg correta
