@@ -449,6 +449,10 @@ export const crmLeads = mysqlTable("crm_leads", {
   saleValue: int("saleValue").default(0), // valor da venda em centavos (quando convertido)
   acknowledgedAt: bigint("acknowledgedAt", { mode: "number" }), // timestamp quando vendedor confirmou recebimento do lead
   lastAutoTransferAt: bigint("lastAutoTransferAt", { mode: "number" }), // timestamp da última transferência automática (previne loop infinito)
+  aiHandled: boolean("aiHandled").default(false), // se a IA já atendeu este lead
+  aiDataCollected: text("aiDataCollected"), // JSON com dados coletados pela IA (CPF, entrada, renda, etc.)
+  aiCreditAppId: int("aiCreditAppId"), // ID da ficha de crédito criada pela IA
+  aiAppointmentId: int("aiAppointmentId"), // ID do agendamento criado pela IA
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),

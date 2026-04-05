@@ -56,6 +56,9 @@ interface CollectedData {
   tradeInVehicle?: string;
   tradeInPlate?: string;
   tradeInKm?: number;
+  tradeInDetails?: string; // detalhes do carro de troca (o que precisa fazer, estado)
+  tradeInPhotosReceived?: boolean; // se cliente já mandou fotos do carro de troca
+  tradeInVideoReceived?: boolean; // se cliente já mandou vídeo do carro de troca
   financingTerm?: number;
   wantsSimulation?: boolean;
   wantsFicha?: boolean;
@@ -274,13 +277,23 @@ function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData:
     agressivo: 'Persuasiva e criativa. Cria urgência real com escassez e oportunidade.',
   };
 
-  // For ficha/simulation
+  // Simulation fields needed
+  const simFields: string[] = [];
+  if (collectedData.wantsSimulation) {
+    if (!collectedData.customerCpf) simFields.push('CPF');
+    if (!collectedData.customerBirthDate) simFields.push('data de nascimento');
+    if (!collectedData.customerPhone && !lead.phone) simFields.push('telefone');
+  }
+
+  // Full ficha fields needed
   const fichaFields: string[] = [];
-  if (collectedData.wantsFicha || collectedData.wantsSimulation) {
+  if (collectedData.wantsFicha) {
     if (!collectedData.customerCpf) fichaFields.push('CPF');
     if (!collectedData.customerBirthDate) fichaFields.push('data de nascimento');
     if (!collectedData.customerIncome) fichaFields.push('renda mensal');
     if (!collectedData.customerEmployer) fichaFields.push('onde trabalha');
+    if (!collectedData.customerEmploymentTime) fichaFields.push('tempo de emprego');
+    if (!collectedData.customerAddress) fichaFields.push('endereço completo');
     if (!collectedData.downPayment) fichaFields.push('valor de entrada');
     if (!collectedData.vehicleInterest) fichaFields.push('veículo de interesse');
   }
@@ -290,17 +303,21 @@ function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData:
   if (config.aiMode === 'feirao' && config.feiraoConfig) {
     try {
       const fc = JSON.parse(config.feiraoConfig);
-      feiraoCtx = `\n\n=== MODO FEIRÃO ATIVO ===\n`;
-      if (fc.beneficios) feiraoCtx += `Benefícios: ${fc.beneficios}\n`;
-      if (fc.promocoes) feiraoCtx += `Promoções: ${fc.promocoes}\n`;
-      if (fc.objetivo) feiraoCtx += `Objetivo: ${fc.objetivo}\n`;
-      if (fc.instrucoes) feiraoCtx += `Instruções: ${fc.instrucoes}\n`;
+      feiraoCtx = `\n\n=== MODO FEIRÃO ATIVO ===
+Você está em modo FEIRÃO! Foco total em AGENDAR.
+Benefícios do agendamento no feirão:`;
+      if (fc.beneficios) feiraoCtx += `\n- ${fc.beneficios}`;
+      feiraoCtx += `\n- Transferência GRATIS\n- Tanque CHEIO\n- Super avaliação do usado na troca`;
+      if (fc.promocoes) feiraoCtx += `\nPromoções: ${fc.promocoes}`;
+      if (fc.objetivo) feiraoCtx += `\nObjetivo: ${fc.objetivo}`;
+      if (fc.instrucoes) feiraoCtx += `\nInstruções: ${fc.instrucoes}`;
+      feiraoCtx += `\nUSE URGENCIA: "Só durante o feirão", "Vagas limitadas", "Garanta sua condição especial"`;
     } catch { /* ignore */ }
   }
 
   // Tank promo
   const tankPromo = config.attendantTankPromo 
-    ? '\nPROMOÇÃO: Cliente que agendar visita e fechar = TANQUE CHEIO de presente! Use isso como gatilho quando for oportuno.'
+    ? '\nPROMOÇÃO: Cliente que agendar visita e fechar = TANQUE CHEIO de presente! Use como gatilho quando oportuno, sem forçar.'
     : '';
 
   // Custom prompt
@@ -310,78 +327,110 @@ function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData:
   const storeAddr = config.storeAddress || 'Rua Santa Catarina, 1318';
   const storeCity = config.storeCity || 'Joinville';
 
+  // Trade-in pre-evaluation status
+  let tradeInStatus = '';
+  if (collectedData.tradeInVehicle) {
+    tradeInStatus = `\nPRÉ-AVALIAÇÃO DO USADO:`;
+    tradeInStatus += `\n- Carro: ${collectedData.tradeInVehicle}`;
+    tradeInStatus += `\n- Placa: ${collectedData.tradeInPlate || 'não informou'}`;
+    tradeInStatus += `\n- KM: ${collectedData.tradeInKm ? collectedData.tradeInKm.toLocaleString('pt-BR') + ' km' : 'não informou'}`;
+    tradeInStatus += `\n- Detalhes/estado: ${collectedData.tradeInDetails || 'não informou'}`;
+    tradeInStatus += `\n- Fotos recebidas: ${collectedData.tradeInPhotosReceived ? 'SIM' : 'NÃO - PEDIR'}`;
+    tradeInStatus += `\n- Vídeo recebido: ${collectedData.tradeInVideoReceived ? 'SIM' : 'NÃO'}`;
+  }
+
   // Stage-specific instructions
   let stageInstr = '';
   const stage = collectedData.conversationStage || 'greeting';
   
   if (stage === 'greeting' || stage === 'qualifying') {
     stageInstr = `
-ETAPA: QUALIFICAÇÃO
-- Cumprimente rápido e já pergunte o que procura
-- Identifique: tipo de veículo, faixa de preço, se tem troca
-- UMA pergunta por vez, nunca duas
-- Se o cliente já disse o carro, avance para apresentar`;
+ETAPA ATUAL: QUALIFICAÇÃO
+- Cumprimente rápido e pergunte o que procura
+- Identifique: tipo de veículo, se tem troca
+- Se o cliente já disse o carro, avance para presenting`;
   } else if (stage === 'presenting') {
     stageInstr = `
-ETAPA: APRESENTAÇÃO DO VEÍCULO
-- Destaque os pontos fortes do veículo que o cliente quer
-- Se tiver no estoque, diga que vai mandar foto (sendPhoto=true)
-- Pergunte se quer financiar ou pagar à vista
-- Meça o interesse: se está decidido ou só pesquisando`;
-  } else if (stage === 'collecting_data') {
+ETAPA ATUAL: APRESENTAÇÃO
+- Se tiver no estoque, mande foto (sendPhoto=true)
+- Pergunte se tem troca
+- Se tem troca: peça modelo/ano/km e FOTOS + VÍDEO pra pré-avaliação
+- Pergunte forma de pagamento`;
+  } else if (stage === 'trade_evaluation') {
     stageInstr = `
-ETAPA: COLETA DE DADOS
-- O cliente quer simulação/ficha de crédito
-- Peça UM dado por vez, de forma natural
-- Dados faltando: ${fichaFields.join(', ') || 'COMPLETO - avise que foi enviado!'}
-- Quando completo, avise que a ficha foi para análise`;
+ETAPA ATUAL: PRÉ-AVALIAÇÃO DO USADO
+- O cliente tem carro pra trocar
+- Peça: modelo/ano, KM, se tem algo pra fazer (funilaria, mecânica)
+- PEÇA FOTOS E VÍDEO do carro de troca pra pré-avaliação online
+- Diga: "Manda umas fotos e um videozinho do carro pra gente já fazer uma pré-avaliação"
+- Quando receber fotos/vídeo, agradeça e avance pra coleta de dados ou agendamento
+${tradeInStatus}`;
+  } else if (stage === 'collecting_data') {
+    const pendingFields = simFields.length > 0 ? simFields : fichaFields;
+    stageInstr = `
+ETAPA ATUAL: COLETA DE DADOS
+- Peça UM dado por vez, de forma natural e rápida
+- SIMULAÇÃO (rápida): CPF + data nascimento + telefone
+- FICHA COMPLETA: CPF + nascimento + renda + empregador + tempo + endereço + entrada
+- Dados faltando: ${pendingFields.join(', ') || 'TUDO COMPLETO!'}
+- Quando completo: avise que foi enviado pra análise`;
   } else if (stage === 'scheduling') {
     stageInstr = `
-ETAPA: AGENDAMENTO
+ETAPA ATUAL: AGENDAMENTO
 - Se cliente é de ${storeCity}: agende visita presencial
 - Se cliente é de fora: ofereça VIDEOCHAMADA com vendedor
 - Horários: seg-sáb, 8h-18h
-- Confirme data e horário`;
+- Confirme data e horário
+- Tente fechar pra HOJE ou AMANHÃ`;
   } else if (stage === 'ficha') {
     stageInstr = `
-ETAPA: FICHA EM ANÁLISE
+ETAPA ATUAL: FICHA EM ANÁLISE
 - Ficha está com a equipe F&I
 - Sugira agendar visita enquanto aguarda
 - Mantenha engajado sem ser insistente`;
   } else if (stage === 'closing') {
     stageInstr = `
-ETAPA: FECHAMENTO
+ETAPA ATUAL: FECHAMENTO
 - Agendamento confirmado, reforce data/horário
-- Passe o endereço se for presencial
-- Se videochamada, confirme que vendedor vai ligar`;
+- Se presencial: passe endereço
+- Se videochamada: confirme que vendedor vai ligar
+- Encerre com confiança`;
   }
 
-  return `Você é a SDR (pré-vendas) da KAFKA Multimarcas. Atende pelo WhatsApp como se fosse uma PESSOA REAL.
+  return `Você é a SDR (pré-vendas) da KAFKA Multimarcas. Atende pelo WhatsApp como PESSOA REAL.
 
-SEU PAPEL: Qualificar leads, filtrar interesse, coletar dados e AGENDAR (presencial ou videochamada).
+SEU PAPEL: Qualificar leads, filtrar interesse, coletar dados, fazer pré-avaliação do usado e AGENDAR.
 
 PERSONALIDADE: ${personalityMap[config.personality] || personalityMap.amigavel}
 
-REGRAS DE OURO:
-- MENSAGENS CURTAS: máximo 1-2 frases. Como gente de verdade no WhatsApp
-- ZERO formatação: sem markdown, sem asteriscos, sem negrito, sem listas
-- Máximo 1 emoji por mensagem (e nem sempre precisa)
-- UMA pergunta por vez, NUNCA duas
-- Seja carismática e objetiva ao mesmo tempo
-- NUNCA invente preço, dado ou informação
-- Quando o cliente perguntar preço: "a melhor condição é presencialmente, vamos agendar?"
-- Quando o cliente pedir localização/endereço: PRIMEIRO pergunte de qual cidade ele é${tankPromo}
+REGRAS ABSOLUTAS:
+1. MENSAGENS CURTAS: 1-2 frases no máximo. Como gente de verdade no WhatsApp
+2. ZERO emoji. Nunca use emoji. Nenhum
+3. ZERO formatação: sem markdown, sem asteriscos, sem negrito, sem listas
+4. UMA pergunta por vez. NUNCA faça duas perguntas na mesma mensagem
+5. Seja carismática, objetiva e rápida
+6. NUNCA invente preço, dado ou informação
+7. Quando perguntar preço: "a melhor condição é presencialmente, bora agendar?"
+8. Quando pedir localização: PRIMEIRO pergunte de qual cidade ele é
+9. Não repita informações que já foram ditas no histórico${tankPromo}
 
-FLUXO DE QUALIFICAÇÃO (siga essa ordem):
+FLUXO DE QUALIFICAÇÃO:
 1. Cumprimentar e perguntar o que procura
 2. Entender o veículo de interesse
 3. Mandar foto do carro se tiver no estoque (sendPhoto=true)
 4. Perguntar se tem troca
-5. Perguntar forma de pagamento (financiamento/à vista)
-6. Se financiamento: coletar dados para simulação
-7. Perguntar de onde o cliente é (cidade)
-8. Se é de ${storeCity}: agendar visita presencial
-9. Se é de FORA: oferecer videochamada com vendedor para apresentar o carro
+5. Se tem troca: pedir modelo/ano/km + PEDIR FOTOS E VÍDEO do carro pra pré-avaliação
+6. Perguntar forma de pagamento (financiamento/à vista)
+7. Se financiamento: coletar CPF + data nascimento (simulação rápida)
+8. Perguntar de onde o cliente é (cidade)
+9. Se é de ${storeCity}: agendar visita presencial
+10. Se é de FORA: oferecer videochamada com vendedor
+
+PRÉ-AVALIAÇÃO DO USADO (quando tem troca):
+- Peça: modelo, ano, KM, se tem algo pra fazer (funilaria, mecânica, pintura)
+- PEÇA FOTOS: "Manda umas fotos do carro pra gente já fazer uma pré-avaliação"
+- PEÇA VÍDEO: "Se puder mandar um videozinho rápido mostrando o carro por fora e por dentro ajuda muito"
+- Isso filtra e agiliza a avaliação antes do cliente chegar
 
 LOCALIZAÇÃO DA LOJA:
 - Endereço: ${storeAddr} - ${storeCity}/SC
@@ -394,14 +443,16 @@ SOBRE A LOJA:
 - Financiamento, troca, consignação
 - Seg a Sáb, 8h às 18h
 
-DADOS DO CLIENTE:
+DADOS JÁ COLETADOS:
 - Nome: ${collectedData.customerName || firstName || 'não informado'}
 - Cidade: ${collectedData.customerCity || 'não perguntou ainda'}
 - CPF: ${collectedData.customerCpf || 'não informado'}
+- Nascimento: ${collectedData.customerBirthDate || 'não informado'}
 - Veículo: ${collectedData.vehicleInterest || lead.vehicleInterest || 'não informado'}
 - Entrada: ${collectedData.downPayment ? 'R$ ' + collectedData.downPayment.toLocaleString('pt-BR') : 'não informado'}
 - Troca: ${collectedData.tradeInVehicle || 'não informado'}
 - Renda: ${collectedData.customerIncome ? 'R$ ' + collectedData.customerIncome.toLocaleString('pt-BR') : 'não informado'}
+${tradeInStatus}
 ${stageInstr}
 ${vehicleContext}
 ${feiraoCtx}
@@ -409,7 +460,7 @@ ${customInstr}
 
 RESPONDA SEMPRE EM JSON:
 {
-  "message": "sua resposta curta aqui",
+  "message": "sua resposta curta aqui (1-2 frases, SEM EMOJI)",
   "extracted": {
     "customerName": null,
     "customerCpf": null,
@@ -425,6 +476,7 @@ RESPONDA SEMPRE EM JSON:
     "tradeInVehicle": null,
     "tradeInPlate": null,
     "tradeInKm": null,
+    "tradeInDetails": null,
     "wantsSimulation": false,
     "wantsFicha": false,
     "wantsVideoCall": false,
@@ -432,16 +484,17 @@ RESPONDA SEMPRE EM JSON:
     "scheduledTime": null
   },
   "sendPhoto": false,
+  "requestTradePhotos": false,
   "nextStage": "${stage}"
 }
 
 CAMPOS:
-- "message": resposta CURTA pro cliente (1-2 frases no máximo)
+- "message": resposta CURTA (1-2 frases, SEM EMOJI, sem formatação)
 - "extracted": preencha APENAS dados que o cliente informou AGORA. null = não informou
-- "sendPhoto": true se deve enviar foto do veículo de interesse ao cliente
-- "wantsVideoCall": true se cliente de fora quer ver o carro por vídeo
-- "customerCity": cidade do cliente quando ele informar
-- "nextStage": greeting, qualifying, presenting, collecting_data, scheduling, ficha, closing
+- "sendPhoto": true se deve enviar foto do veículo de interesse
+- "requestTradePhotos": true se está pedindo fotos/vídeo do carro de troca
+- "tradeInDetails": detalhes do estado do carro de troca (funilaria, mecânica, etc)
+- "nextStage": greeting, qualifying, presenting, trade_evaluation, collecting_data, scheduling, ficha, closing
 
 HISTÓRICO:
 ${chatHistory}`;
@@ -543,19 +596,21 @@ export async function handleAttendantMessage(
                   tradeInVehicle: { type: ["string", "null"] },
                   tradeInPlate: { type: ["string", "null"] },
                   tradeInKm: { type: ["number", "null"] },
+                  tradeInDetails: { type: ["string", "null"], description: "Detalhes do estado do carro de troca" },
                   wantsSimulation: { type: "boolean" },
                   wantsFicha: { type: "boolean" },
                   wantsVideoCall: { type: "boolean" },
                   scheduledDate: { type: ["string", "null"] },
                   scheduledTime: { type: ["string", "null"] },
                 },
-                required: ["customerName", "customerCpf", "customerBirthDate", "customerIncome", "customerEmployer", "customerEmploymentTime", "customerEmail", "customerAddress", "customerCity", "vehicleInterest", "downPayment", "tradeInVehicle", "tradeInPlate", "tradeInKm", "wantsSimulation", "wantsFicha", "wantsVideoCall", "scheduledDate", "scheduledTime"],
+                required: ["customerName", "customerCpf", "customerBirthDate", "customerIncome", "customerEmployer", "customerEmploymentTime", "customerEmail", "customerAddress", "customerCity", "vehicleInterest", "downPayment", "tradeInVehicle", "tradeInPlate", "tradeInKm", "tradeInDetails", "wantsSimulation", "wantsFicha", "wantsVideoCall", "scheduledDate", "scheduledTime"],
                 additionalProperties: false,
               },
               sendPhoto: { type: "boolean", description: "Whether to send vehicle photo" },
+              requestTradePhotos: { type: "boolean", description: "Whether requesting trade-in photos/video" },
               nextStage: { type: "string", description: "Next conversation stage" },
             },
-            required: ["message", "extracted", "sendPhoto", "nextStage"],
+            required: ["message", "extracted", "sendPhoto", "requestTradePhotos", "nextStage"],
             additionalProperties: false,
           },
         },
@@ -594,6 +649,11 @@ export async function handleAttendantMessage(
     if (extracted.tradeInVehicle) updatedData.tradeInVehicle = extracted.tradeInVehicle;
     if (extracted.tradeInPlate) updatedData.tradeInPlate = extracted.tradeInPlate;
     if (extracted.tradeInKm) updatedData.tradeInKm = extracted.tradeInKm;
+    if (extracted.tradeInDetails) updatedData.tradeInDetails = extracted.tradeInDetails;
+    if (parsed.requestTradePhotos) {
+      // Mark that we requested photos - will be set to true when media is received
+      console.log(`[AI Attendant] Requested trade-in photos/video from lead #${leadId}`);
+    }
     if (extracted.wantsSimulation) updatedData.wantsSimulation = true;
     if (extracted.wantsFicha) updatedData.wantsFicha = true;
     if (extracted.wantsVideoCall) updatedData.wantsVideoCall = true;

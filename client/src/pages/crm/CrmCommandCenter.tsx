@@ -1796,6 +1796,18 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
                   <CheckCheck className="w-2.5 h-2.5" /> OK
                 </span>
               )}
+              {lead.aiHandled && lead.aiDataCollected && (() => {
+                try {
+                  const d = JSON.parse(lead.aiDataCollected);
+                  const hasData = d.customerCpf || d.downPayment || d.customerBirthDate;
+                  if (!hasData) return null;
+                  return (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/25 flex items-center gap-0.5 font-medium">
+                      <Zap className="w-2.5 h-2.5" /> Dados IA
+                    </span>
+                  );
+                } catch { return null; }
+              })()}
             </div>
           </div>
         </div>
@@ -2052,8 +2064,14 @@ function AcknowledgeButton({ leadId, sellerId }: { leadId: number; sellerId: num
 
 // ===== SELLER FICHAS VIEW =====
 function SellerFichasView({ sellerId }: { sellerId: number }) {
-  const { data: applications } = trpc.crmAi.listCreditApplications.useQuery({ sellerId });
+  const { data: applications, refetch } = trpc.crmAi.listCreditApplications.useQuery({ sellerId });
+  const { data: leadsWithAiData } = trpc.crmAi.listLeadsWithAiData.useQuery({ sellerId });
+  const updateApp = trpc.crmAi.updateCreditApplication.useMutation({ onSuccess: () => { refetch(); toast.success('Ficha atualizada!'); } });
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
+  const [notes, setNotes] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'fichas' | 'simulacao'>('fichas');
+  const [, navigate] = useLocation();
 
   const statusColors: Record<string, string> = {
     pending: "text-amber-400 bg-amber-500/10 border-amber-500/30",
@@ -2063,84 +2081,217 @@ function SellerFichasView({ sellerId }: { sellerId: number }) {
     cancelled: "text-muted-foreground bg-muted border-border",
   };
   const statusLabels: Record<string, string> = {
-    pending: "Pendente", analyzing: "Em Análise", approved: "Aprovada",
+    pending: "Pendente", analyzing: "Em Analise", approved: "Aprovada",
     rejected: "Rejeitada", cancelled: "Cancelada",
   };
 
-  if (!applications || applications.length === 0) {
-    return (
-      <div className="text-center py-12 px-4">
-        <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground">Nenhuma ficha de crédito nos seus leads</p>
-        <p className="text-[10px] text-muted-foreground/50 mt-1">Fichas criadas pela IA aparecerão aqui</p>
-      </div>
-    );
-  }
+  const fichasCount = applications?.length || 0;
+  const leadsCount = leadsWithAiData?.length || 0;
 
   return (
     <div className="space-y-3 px-3 pb-20">
-      <div className="flex items-center gap-2 mb-2">
-        <CreditCard className="w-4 h-4 text-amber-400" />
-        <h3 className="text-sm font-bold text-foreground">Fichas de Crédito</h3>
-        <span className="text-[10px] text-muted-foreground">({applications.length})</span>
+      {/* Sub-tabs: Fichas vs Dados Simulacao */}
+      <div className="flex gap-1 p-1 bg-muted/30 rounded-lg">
+        <button onClick={() => setActiveTab('fichas')}
+          className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-colors ${activeTab === 'fichas' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+          <CreditCard className="w-3.5 h-3.5 inline mr-1" />Fichas ({fichasCount})
+        </button>
+        <button onClick={() => setActiveTab('simulacao')}
+          className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-colors ${activeTab === 'simulacao' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+          <Zap className="w-3.5 h-3.5 inline mr-1" />Dados IA ({leadsCount})
+        </button>
       </div>
 
-      {applications.map((app: any) => (
-        <div key={app.id} className="rounded-xl border border-border bg-card overflow-hidden">
-          <button
-            onClick={() => setExpandedId(expandedId === app.id ? null : app.id)}
-            className="w-full p-3 flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${statusColors[app.status] || ''}`}>
-                {app.status === 'approved' ? '✓' : app.status === 'rejected' ? '✗' : '⏳'}
-              </div>
-              <div className="text-left">
-                <div className="text-sm font-medium text-foreground">{app.customerName || app.leadName || 'Sem nome'}</div>
-                <div className="text-[10px] text-muted-foreground">{app.vehicleInterest || 'Veículo não informado'}</div>
-              </div>
+      {/* FICHAS TAB */}
+      {activeTab === 'fichas' && (
+        <>
+          {fichasCount === 0 ? (
+            <div className="text-center py-12 px-4">
+              <CreditCard className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">Nenhuma ficha de credito</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-1">Fichas criadas pela IA aparecerao aqui</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusColors[app.status] || ''}`}>
-                {statusLabels[app.status] || app.status}
-              </span>
-              <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === app.id ? 'rotate-90' : ''}`} />
-            </div>
-          </button>
-
-          {expandedId === app.id && (
-            <div className="border-t border-border p-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "CPF", value: app.customerCpf },
-                  { label: "Renda", value: app.customerIncome ? `R$ ${Number(app.customerIncome).toLocaleString('pt-BR')}` : null },
-                  { label: "Entrada", value: app.downPayment ? `R$ ${Number(app.downPayment).toLocaleString('pt-BR')}` : null },
-                  { label: "Veículo Troca", value: app.tradeInVehicle },
-                  { label: "KM Troca", value: app.tradeInKm ? `${Number(app.tradeInKm).toLocaleString('pt-BR')} km` : null },
-                  { label: "Prazo", value: app.financingTerm ? `${app.financingTerm} meses` : null },
-                  { label: "Criado", value: app.createdAt ? new Date(Number(app.createdAt)).toLocaleString('pt-BR') : null },
-                ].filter(f => f.value).map(f => (
-                  <div key={f.label}>
-                    <div className="text-[10px] text-muted-foreground">{f.label}</div>
-                    <div className="text-xs font-medium text-foreground">{f.value}</div>
+          ) : (
+            applications?.map((app: any) => (
+              <div key={app.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                <button onClick={() => { setExpandedId(expandedId === app.id ? null : app.id); setNotes(app.feiNotes || ''); }}
+                  className="w-full p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${statusColors[app.status] || ''}`}>
+                      {app.status === 'approved' ? <CheckCircle className="w-4 h-4" /> : app.status === 'rejected' ? <X className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-foreground">{app.customerName || app.leadName || 'Sem nome'}</div>
+                      <div className="text-[10px] text-muted-foreground">{app.vehicleInterest || 'Veiculo nao informado'}</div>
+                    </div>
                   </div>
-                ))}
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${statusColors[app.status] || ''}`}>
+                      {statusLabels[app.status] || app.status}
+                    </span>
+                    <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === app.id ? 'rotate-90' : ''}`} />
+                  </div>
+                </button>
+                {expandedId === app.id && (
+                  <div className="border-t border-border p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: "CPF", value: app.customerCpf },
+                        { label: "Nascimento", value: app.customerBirthDate },
+                        { label: "Telefone", value: app.customerPhone || app.leadPhone },
+                        { label: "Renda", value: app.customerIncome ? `R$ ${Number(app.customerIncome).toLocaleString('pt-BR')}` : null },
+                        { label: "Entrada", value: app.downPayment ? `R$ ${Number(app.downPayment).toLocaleString('pt-BR')}` : null },
+                        { label: "Empregador", value: app.customerEmployer },
+                        { label: "Veiculo Troca", value: app.tradeInVehicle },
+                        { label: "KM Troca", value: app.tradeInKm ? `${Number(app.tradeInKm).toLocaleString('pt-BR')} km` : null },
+                        { label: "Prazo", value: app.financingTerm ? `${app.financingTerm} meses` : null },
+                        { label: "Banco", value: app.bankPreference },
+                        { label: "Origem", value: app.leadSource },
+                        { label: "Criado", value: app.createdAt ? new Date(Number(app.createdAt)).toLocaleString('pt-BR') : null },
+                      ].filter(f => f.value).map(f => (
+                        <div key={f.label}>
+                          <div className="text-[10px] text-muted-foreground">{f.label}</div>
+                          <div className="text-xs font-medium text-foreground">{f.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {app.feiNotes && (
+                      <div className="p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                        <div className="text-[10px] text-blue-400 font-medium">Obs F&I:</div>
+                        <div className="text-xs text-foreground">{app.feiNotes}</div>
+                      </div>
+                    )}
+                    {/* Seller can add notes and work on approval */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-medium text-muted-foreground">Suas observacoes</label>
+                      <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                        placeholder="Adicionar observacoes..."
+                        className="w-full h-16 p-2 rounded-lg bg-background border border-border text-xs text-foreground resize-none" />
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {app.status === 'pending' && (
+                        <Button size="sm" variant="outline" className="text-blue-400 border-blue-500/30 text-[11px]"
+                          onClick={() => updateApp.mutate({ id: app.id, status: 'analyzing', feiNotes: notes || undefined })}>
+                          <Eye className="w-3 h-3 mr-1" /> Iniciar Analise
+                        </Button>
+                      )}
+                      {(app.status === 'pending' || app.status === 'analyzing') && (
+                        <>
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-[11px]"
+                            onClick={() => updateApp.mutate({ id: app.id, status: 'approved', feiNotes: notes || undefined })}>
+                            <CheckCircle className="w-3 h-3 mr-1" /> Aprovar
+                          </Button>
+                          <Button size="sm" variant="destructive" className="text-[11px]"
+                            onClick={() => updateApp.mutate({ id: app.id, status: 'rejected', feiNotes: notes || undefined })}>
+                            <X className="w-3 h-3 mr-1" /> Rejeitar
+                          </Button>
+                        </>
+                      )}
+                      {notes !== (app.feiNotes || '') && (
+                        <Button size="sm" variant="outline" className="text-[11px]"
+                          onClick={() => updateApp.mutate({ id: app.id, feiNotes: notes })}>
+                          Salvar Obs
+                        </Button>
+                      )}
+                    </div>
+                    {app.aiCollected && (
+                      <div className="flex items-center gap-1 text-[10px] text-purple-400">
+                        <Zap className="w-3 h-3" /> Dados coletados pela IA
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {app.feiNotes && (
-                <div className="p-2 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="text-[10px] text-primary font-medium">Observação F&I:</div>
-                  <div className="text-xs text-foreground">{app.feiNotes}</div>
-                </div>
-              )}
-              {app.aiCollected && (
-                <div className="flex items-center gap-1 text-[10px] text-purple-400">
-                  <Zap className="w-3 h-3" /> Dados coletados automaticamente pela IA
-                </div>
-              )}
-            </div>
+            ))
           )}
-        </div>
-      ))}
+        </>
+      )}
+
+      {/* DADOS IA TAB - Leads com dados de simulacao coletados */}
+      {activeTab === 'simulacao' && (
+        <>
+          {leadsCount === 0 ? (
+            <div className="text-center py-12 px-4">
+              <Zap className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">Nenhum lead com dados coletados</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-1">Quando a IA coletar CPF, entrada, etc. aparecera aqui</p>
+            </div>
+          ) : (
+            leadsWithAiData?.map((lead: any) => {
+              const ai = lead.aiData || {};
+              const hasCpf = !!ai.cpf;
+              const hasBirth = !!ai.birthDate;
+              const hasIncome = !!ai.monthlyIncome;
+              const readyToSimulate = hasCpf && hasBirth;
+              return (
+                <div key={lead.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                  <button onClick={() => setExpandedLeadId(expandedLeadId === lead.id ? null : lead.id)}
+                    className="w-full p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
+                        readyToSimulate ? 'text-green-400 bg-green-500/10 border border-green-500/30' : 'text-amber-400 bg-amber-500/10 border border-amber-500/30'
+                      }`}>
+                        {readyToSimulate ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-sm font-medium text-foreground">{lead.name || 'Sem nome'}</div>
+                        <div className="text-[10px] text-muted-foreground">{lead.vehicleInterest || ai.vehicleInterest || 'Veiculo nao informado'}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                        readyToSimulate ? 'text-green-400 bg-green-500/10 border-green-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                      }`}>
+                        {readyToSimulate ? 'Pronto p/ Simular' : 'Coletando...'}
+                      </span>
+                      <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedLeadId === lead.id ? 'rotate-90' : ''}`} />
+                    </div>
+                  </button>
+                  {expandedLeadId === lead.id && (
+                    <div className="border-t border-border p-3 space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { label: "CPF", value: ai.cpf },
+                          { label: "Nascimento", value: ai.birthDate },
+                          { label: "Telefone", value: lead.phone },
+                          { label: "Renda", value: ai.monthlyIncome ? `R$ ${ai.monthlyIncome}` : null },
+                          { label: "Entrada", value: ai.downPayment ? `R$ ${ai.downPayment}` : null },
+                          { label: "Forma Pgto", value: ai.paymentMethod },
+                          { label: "Troca", value: ai.hasTradeIn ? 'Sim' : ai.hasTradeIn === false ? 'Nao' : null },
+                          { label: "Veiculo Troca", value: ai.tradeInVehicle },
+                          { label: "KM Troca", value: ai.tradeInKm },
+                          { label: "Cidade", value: ai.customerCity },
+                          { label: "Empregador", value: ai.employer },
+                          { label: "Origem", value: lead.source },
+                        ].filter(f => f.value != null).map(f => (
+                          <div key={f.label}>
+                            <div className="text-[10px] text-muted-foreground">{f.label}</div>
+                            <div className="text-xs font-medium text-foreground">{String(f.value)}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {ai.tradeInDetails && (
+                        <div className="p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                          <div className="text-[10px] text-amber-400 font-medium">Pre-Avaliacao Troca:</div>
+                          <div className="text-xs text-foreground">{ai.tradeInDetails}</div>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="text-[11px]" onClick={() => navigate(`/crm/lead/${lead.id}`)}>
+                          <Eye className="w-3 h-3 mr-1" /> Ver Lead
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-purple-400">
+                        <Zap className="w-3 h-3" /> Dados coletados pela IA automaticamente
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </>
+      )}
     </div>
   );
 }

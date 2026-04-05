@@ -3253,13 +3253,17 @@ function AIAttendantView() {
 // ===== CREDIT APPLICATIONS VIEW (Fichas de Crédito) =====
 function CreditApplicationsView() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [viewTab, setViewTab] = useState<'fichas' | 'dados_ia'>('fichas');
   const { data: applications, refetch } = trpc.crmAi.listCreditApplications.useQuery({ status: statusFilter as any });
+  const { data: leadsWithAiData } = trpc.crmAi.listLeadsWithAiData.useQuery();
   const updateApp = trpc.crmAi.updateCreditApplication.useMutation({
     onSuccess: () => { refetch(); toast.success("Ficha atualizada!"); },
     onError: (e: any) => toast.error(e.message),
   });
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
+  const [, navigate] = useLocation();
 
   const statusColors: Record<string, string> = {
     pending: "text-amber-400 bg-amber-500/10",
@@ -3282,12 +3286,25 @@ function CreditApplicationsView() {
             <CreditCard className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-foreground">Fichas de Crédito</h2>
-            <p className="text-xs text-muted-foreground">Fila de aprovação - F&I</p>
+            <h2 className="text-lg font-bold text-foreground">Fichas & Simulações</h2>
+            <p className="text-xs text-muted-foreground">Fila de aprovação de crédito + dados coletados pela IA</p>
           </div>
         </div>
       </div>
 
+      {/* Main Tabs */}
+      <div className="flex gap-1 p-1 bg-muted/30 rounded-lg">
+        <button onClick={() => setViewTab('fichas')}
+          className={`flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-colors ${viewTab === 'fichas' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+          <CreditCard className="w-4 h-4 inline mr-2" />Fichas de Crédito ({applications?.length || 0})
+        </button>
+        <button onClick={() => setViewTab('dados_ia')}
+          className={`flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-colors ${viewTab === 'dados_ia' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+          <Zap className="w-4 h-4 inline mr-2" />Dados para Simulação ({leadsWithAiData?.length || 0})
+        </button>
+      </div>
+
+      {viewTab === 'fichas' && (<>
       {/* Status Filter Tabs */}
       <div className="flex gap-2 flex-wrap">
         {['pending', 'analyzing', 'approved', 'rejected', 'all'].map(status => (
@@ -3295,9 +3312,6 @@ function CreditApplicationsView() {
             onClick={() => setStatusFilter(status)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${statusFilter === status ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-muted-foreground hover:text-foreground'}`}>
             {status === 'all' ? 'Todas' : statusLabels[status] || status}
-            {status === 'pending' && applications && statusFilter === 'pending' && (
-              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-400 text-[10px]">{applications.length}</span>
-            )}
           </button>
         ))}
       </div>
@@ -3325,6 +3339,7 @@ function CreditApplicationsView() {
                     <div className="text-sm font-bold text-foreground">{app.customerName || app.leadName || 'Sem nome'}</div>
                     <div className="text-[10px] text-muted-foreground">
                       {app.vehicleInterest || 'Veículo não informado'} • {app.customerCpf || 'CPF não informado'}
+                      {app.sellerName && <span className="ml-2 text-blue-400">Vendedor: {app.sellerName}</span>}
                     </div>
                   </div>
                 </div>
@@ -3374,6 +3389,13 @@ function CreditApplicationsView() {
                     />
                   </div>
 
+                  {/* Seller info */}
+                  {app.sellerName && (
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                      <Users className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs text-blue-400 font-medium">Vendedor: {app.sellerName}</span>
+                    </div>
+                  )}
                   {/* Action Buttons */}
                   <div className="flex gap-2 flex-wrap">
                     {app.status === 'pending' && (
@@ -3400,6 +3422,92 @@ function CreditApplicationsView() {
             </div>
           ))}
         </div>
+      )}
+      </>)}
+
+      {/* DADOS IA TAB */}
+      {viewTab === 'dados_ia' && (
+        <>
+          {(leadsWithAiData?.length || 0) === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Zap className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhum lead com dados coletados pela IA</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-2">Quando a IA coletar CPF, entrada, nascimento, etc. aparecerá aqui</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {leadsWithAiData?.map((lead: any) => {
+                const ai = lead.aiData || {};
+                const hasCpf = !!ai.cpf;
+                const hasBirth = !!ai.birthDate;
+                const readyToSimulate = hasCpf && hasBirth;
+                return (
+                  <div key={lead.id} className="rounded-xl border border-border bg-card overflow-hidden">
+                    <button onClick={() => setExpandedLeadId(expandedLeadId === lead.id ? null : lead.id)}
+                      className="w-full p-4 flex items-center justify-between hover:bg-accent/30 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${readyToSimulate ? 'text-green-400 bg-green-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                          {readyToSimulate ? <CheckCircle className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                        </div>
+                        <div className="text-left">
+                          <div className="text-sm font-bold text-foreground">{lead.name || 'Sem nome'}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {lead.vehicleInterest || ai.vehicleInterest || 'Veículo não informado'}
+                            {lead.sellerName && <span className="ml-2 text-blue-400">Vendedor: {lead.sellerName}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${readyToSimulate ? 'text-green-400 bg-green-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
+                          {readyToSimulate ? 'Pronto p/ Simular' : 'Coletando...'}
+                        </span>
+                        <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedLeadId === lead.id ? 'rotate-90' : ''}`} />
+                      </div>
+                    </button>
+                    {expandedLeadId === lead.id && (
+                      <div className="border-t border-border p-4 space-y-4">
+                        {lead.sellerName && (
+                          <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                            <Users className="w-4 h-4 text-blue-400" />
+                            <span className="text-xs text-blue-400 font-medium">Vendedor: {lead.sellerName}</span>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          <DetailField label="CPF" value={ai.cpf} />
+                          <DetailField label="Nascimento" value={ai.birthDate} />
+                          <DetailField label="Telefone" value={lead.phone} />
+                          <DetailField label="Renda" value={ai.monthlyIncome ? `R$ ${ai.monthlyIncome}` : null} />
+                          <DetailField label="Entrada" value={ai.downPayment ? `R$ ${ai.downPayment}` : null} />
+                          <DetailField label="Forma Pgto" value={ai.paymentMethod} />
+                          <DetailField label="Troca" value={ai.hasTradeIn ? 'Sim' : ai.hasTradeIn === false ? 'Não' : null} />
+                          <DetailField label="Veículo Troca" value={ai.tradeInVehicle} />
+                          <DetailField label="KM Troca" value={ai.tradeInKm} />
+                          <DetailField label="Cidade" value={ai.customerCity} />
+                          <DetailField label="Empregador" value={ai.employer} />
+                          <DetailField label="Origem" value={lead.source} />
+                        </div>
+                        {ai.tradeInDetails && (
+                          <div className="p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                            <div className="text-[10px] text-amber-400 font-medium">Pré-Avaliação Troca:</div>
+                            <div className="text-xs text-foreground">{ai.tradeInDetails}</div>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/crm/lead/${lead.id}`)}>
+                            <Eye className="w-3 h-3 mr-1" /> Ver Lead Completo
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-purple-400">
+                          <Zap className="w-3 h-3" /> Dados coletados automaticamente pela IA
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

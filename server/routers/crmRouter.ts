@@ -1356,7 +1356,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
       if (input?.sellerId) {
         whereExtra += ` AND ca.sellerId = ${input.sellerId}`;
       }
-      const result = await dbConn.execute(sql`SELECT ca.*, cl.name as leadName, cl.phone as leadPhone, cl.source as leadSource FROM credit_applications ca LEFT JOIN crm_leads cl ON ca.leadId = cl.id WHERE 1=1 ${sql.raw(whereExtra)} ORDER BY ca.createdAt DESC`);
+      const result = await dbConn.execute(sql`SELECT ca.*, cl.name as leadName, cl.phone as leadPhone, cl.source as leadSource, s.name as sellerName, s.photoUrl as sellerPhoto FROM credit_applications ca LEFT JOIN crm_leads cl ON ca.leadId = cl.id LEFT JOIN sellers s ON ca.sellerId = s.id WHERE 1=1 ${sql.raw(whereExtra)} ORDER BY ca.createdAt DESC`);
       const rawRows = result as any;
       const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       return (rows || []).map((r: any) => ({
@@ -1370,6 +1370,33 @@ ${chatHistory || '(Primeira mensagem)'}`;
       }));
     } catch (e: any) {
       console.error('[CreditApp] Error listing:', e.message);
+      return [];
+    }
+  }),
+
+  // List leads with AI collected simulation data (not yet a full ficha)
+  listLeadsWithAiData: publicProcedure.input(z.object({
+    sellerId: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql } = await import("drizzle-orm");
+    try {
+      let whereExtra = '';
+      if (input?.sellerId) {
+        whereExtra += ` AND cl.sellerId = ${input.sellerId}`;
+      }
+      const result = await dbConn.execute(sql`SELECT cl.id, cl.name, cl.phone, cl.email, cl.vehicleInterest, cl.source, cl.stage, cl.score, cl.sellerId, cl.aiHandled, cl.aiDataCollected, cl.createdAt, cl.lastContactDate, s.name as sellerName, s.photoUrl as sellerPhoto FROM crm_leads cl LEFT JOIN sellers s ON cl.sellerId = s.id WHERE cl.aiDataCollected IS NOT NULL AND cl.aiDataCollected != '{}' AND cl.aiDataCollected != 'null' ${sql.raw(whereExtra)} ORDER BY cl.lastContactDate DESC`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      return (rows || []).map((r: any) => {
+        let parsed = {};
+        try { parsed = JSON.parse(r.aiDataCollected || '{}'); } catch {}
+        return { ...r, aiData: parsed };
+      });
+    } catch (e: any) {
+      console.error('[LeadsAiData] Error:', e.message);
       return [];
     }
   }),

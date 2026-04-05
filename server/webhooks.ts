@@ -253,6 +253,26 @@ function releaseAiLock(leadId: number): void {
   aiReplyLocks.delete(leadId);
 }
 
+// Debounce AI replies - wait for client to finish typing before responding
+// This prevents the AI from sending 2 replies when client sends 2 quick messages
+const aiDebounceTimers = new Map<number, NodeJS.Timeout>();
+const AI_DEBOUNCE_MS = 3000; // Wait 3 seconds after last message before AI responds
+
+function debounceAiReply(leadId: number, callback: () => void): void {
+  // Clear any existing timer for this lead
+  const existing = aiDebounceTimers.get(leadId);
+  if (existing) {
+    clearTimeout(existing);
+    console.log(`[AI Debounce] Reset timer for lead #${leadId} - client still typing`);
+  }
+  // Set new timer
+  const timer = setTimeout(() => {
+    aiDebounceTimers.delete(leadId);
+    callback();
+  }, AI_DEBOUNCE_MS);
+  aiDebounceTimers.set(leadId, timer);
+}
+
 export function registerWebhookRoutes(app: Express) {
   // ===== HEALTH CHECK =====
   app.get("/api/webhooks/health", (_req: Request, res: Response) => {
@@ -1043,11 +1063,14 @@ export function registerWebhookRoutes(app: Express) {
           // AI Auto-reply: check if enabled for this lead (only for inbound text messages)
           if (!fromMe && messageText && messageType === "text") {
             const leadIdForAi = existingLeads[0].id;
+            // Use debounce to wait for client to finish typing (prevents 2 replies for 2 quick messages)
+            debounceAiReply(leadIdForAi, () => {
             // Acquire lock to prevent duplicate AI replies for same lead
             if (!acquireAiLock(leadIdForAi)) {
               // Lock already held - another AI reply is in progress for this lead
               console.log(`[AI Auto-Reply] Skipping - lock active for lead #${leadIdForAi}`);
-            } else {
+              return;
+            }
             (async () => {
               try {
                 const dbConn = await getDb();
@@ -1058,7 +1081,11 @@ export function registerWebhookRoutes(app: Express) {
                   const { handleAttendantMessage, getAttendantConfig, isAttendantActive } = await import("./ai-attendant");
                   const attendantCfg = await getAttendantConfig();
                   if (attendantCfg && attendantCfg.attendantEnabled && isAttendantActive(attendantCfg)) {
-                    const result = await handleAttendantMessage(leadIdForAi, messageText, phone);
+                    // Get the latest message from this lead (in case multiple arrived during debounce)
+                    const latestMsgs = await crmDb.listMessagesByLead(leadIdForAi, 3);
+                    const latestInbound = latestMsgs.filter(m => m.direction === 'inbound').pop();
+                    const msgToProcess = latestInbound?.content || messageText;
+                    const result = await handleAttendantMessage(leadIdForAi, msgToProcess, phone);
                     if (result.sent) {
                       console.log(`[AI Attendant] Handled lead #${leadIdForAi}, action: ${result.action || 'reply'}`);
                       releaseAiLock(leadIdForAi);
@@ -1174,7 +1201,7 @@ export function registerWebhookRoutes(app: Express) {
                 releaseAiLock(leadIdForAi);
               }
             })();
-            } // end acquireAiLock else
+            }); // end debounceAiReply callback
           }
 
           res.json({ success: true, action: "message_saved", leadId: existingLeads[0].id });

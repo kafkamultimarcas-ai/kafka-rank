@@ -1892,3 +1892,43 @@
 - [x] Coletar dados para simulação de forma natural (1 dado por vez)
 - [x] storeAddress/storeCity carregados da tabela tenants
 - [x] customerCity e wantsVideoCall nos dados extraídos
+
+## Configuração e Teste IA ao Vivo - Abril 2026
+- [x] Verificar e configurar endereço da loja no banco (Rua Santa Catarina, 1318 - Joinville) ✔
+- [x] Testar atendimento da IA ao vivo com mensagem simulada ✔ (2 testes passaram)
+- [x] Configurar prompt personalizado com instruções específicas ✔
+
+## Dados Coletados pela IA - Visibilidade - Abril 2026
+- [x] Verificar onde os dados coletados pela IA ficam salvos (CPF, entrada, forma pagamento)
+- [x] Criar visualização dos dados coletados no painel do lead (ficha do cliente)
+- [x] Tornar dados visíveis para vendedor e admin no CRM
+- [x] Corrigir IA enviando 2 mensagens seguidas (debounce 3s implementado)
+- [x] Remover emoji da IA (proibido no prompt)
+- [x] Separar fluxo: simulação rápida (CPF+tel+nascimento) → vendedor / ficha completa → F&I
+- [x] Mostrar dados coletados pela IA no detalhe do lead (vendedor vê)
+- [x] F&I vê fichas completas na aba Fichas de Crédito
+- [x] Rota getById retornar aiDataCollected para frontend (schema Drizzle atualizado)
+- [x] Corrigir IA enviando 2 mensagens seguidas (debounce)
+- [x] Remover emoji das respostas da IA (proibido no prompt)
+
+## Melhorias IA + Modo Feirão + Pré-Avaliação - Abril 2026
+- [x] IA pedir foto/vídeo do carro de troca para pré-avaliação online
+- [x] IA coletar KM, detalhes do veículo de troca, o que precisa fazer
+- [x] IA sem emoji nas mensagens (proibido no prompt)
+- [x] IA não mandar 2 mensagens seguidas (debounce 3s)
+- [x] Modo Feirão já existia no admin (toggle Normal/Feirão com benefícios)
+- [x] Modo Feirão: agendamento garante transferência + tanque cheio + super avaliação
+- [x] Seção "Dados para Simulação" no detalhe do lead (CPF, nascimento, entrada)
+- [x] Badge "Dados IA" no card do lead quando tem dados coletados
+- [x] Dados de pré-avaliação do usado (fotos recebidas, km, detalhes, tradeInDetails)
+
+## Area Fichas & Simulacoes - Abril 2026
+- [x] Criar rota backend listLeadsWithAiData para listar leads com dados coletados pela IA
+- [x] Criar painel Fichas & Simulacoes com 2 abas (Fichas de Credito + Dados para Simulacao)
+- [x] Mostrar vendedor responsavel em cada ficha e lead
+- [x] Filtros por status na aba de fichas (Pendente, Analisando, Aprovada, Rejeitada, Todas)
+- [x] Acesso para admin/F&I (ve tudo) e vendedor (ve seus leads + pode aprovar)
+- [x] Integrado na navegacao do CRM (aba Fichas no admin e vendedor)
+- [x] Status visual: Pronto p/ Simular (verde) vs Coletando (amarelo)
+- [x] Botoes de acao: Iniciar Analise, Aprovar, Rejeitar + campo observacoes
+- [x] 0 erros TypeScript, 586 testes passando
