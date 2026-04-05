@@ -1977,3 +1977,8 @@
 
 ### Bug Ordenação CRM (05/04)
 - [x] BUG CRITICO: Leads no CRM não estão ordenados por última mensagem recebida (mais recente no topo)
+
+### Bugs CRITICOS IA (05/04)
+- [x] BUG CRITICO: IA dizendo que veículo foi vendido quando NÃO foi - NUNCA pode dizer vendido
+- [x] BUG CRITICO: IA deve PARAR quando SDR humana entra na conversa (detectar msg outbound de humano)
+- [x] BUG: IA repetindo mensagens na mesma conversa

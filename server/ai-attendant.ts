@@ -629,6 +629,9 @@ Voce deve ANALISAR o momento da conversa e agir com a mensagem CERTA na hora CER
 11. Quando perguntar preco: "a melhor condicao e presencialmente, bora agendar?"
 12. Quando pedir localizacao: PRIMEIRO pergunte de qual cidade ele e
 13. NUNCA use a palavra "emoji" na resposta
+14. NUNCA diga que um veiculo foi VENDIDO. Voce NAO sabe se foi vendido ou nao. Se o veiculo nao esta no estoque, diga: "vou verificar a disponibilidade desse modelo e ja te retorno". NUNCA use as palavras "vendido", "ja foi vendido", "nao temos mais". SEMPRE diga que vai VERIFICAR.
+15. NUNCA repita a mesma mensagem ou uma mensagem muito parecida com algo que voce ja enviou. Leia o historico e VARIE suas respostas. Se voce ja disse algo, diga de forma DIFERENTE ou avance para o proximo passo.
+16. Se voce nao encontrar o veiculo no estoque, NAO invente que foi vendido. Diga: "vou confirmar com a equipe se esse modelo ta disponivel, um momento"
 
 === REGRA CRITICA: MEMORIA ===
 VOCE TEM MEMORIA PERFEITA. Analise o HISTORICO abaixo com cuidado.
@@ -770,6 +773,38 @@ export async function handleAttendantMessage(
     // Get lead info
     const lead = await crmDb.getLeadById(leadId);
     if (!lead) return { sent: false };
+
+    // === CHECK IF HUMAN SDR ENTERED THE CONVERSATION ===
+    // If any outbound message was sent by a HUMAN (not IA Kafka), the IA must STOP immediately
+    // Human messages are identified by:
+    // 1. sentBy is set (CRM-sent messages have sellerId in sentBy)
+    // 2. senderName is NOT 'IA Kafka' AND NOT null (WhatsApp-sent by human from phone)
+    // 3. fromMe webhook messages that weren't sent by IA
+    const recentOutbound = await dbConn.execute(
+      sql`SELECT senderName, sentBy, timestamp FROM crm_messages 
+          WHERE leadId = ${leadId} AND direction = 'outbound' 
+          ORDER BY timestamp DESC LIMIT 10`
+    );
+    const outboundRaw = recentOutbound as any;
+    const outboundRows = Array.isArray(outboundRaw?.[0]) ? outboundRaw[0] : outboundRaw;
+    if (outboundRows && outboundRows.length > 0) {
+      for (const msg of outboundRows) {
+        const sName = (msg.senderName || '').toString().trim();
+        const sByVal = msg.sentBy;
+        const isAiMessage = sName === 'IA Kafka' || sName === 'IA' || sName === 'Bot';
+        
+        // Case 1: Message sent via CRM by a human seller (sentBy has sellerId, senderName is null)
+        if (sByVal && !isAiMessage) {
+          console.log(`[AI Attendant] Human seller (ID: ${sByVal}) is handling lead #${leadId} via CRM, IA stopping`);
+          return { sent: false, action: 'human_handling' };
+        }
+        // Case 2: Message sent from WhatsApp phone directly (senderName has human name)
+        if (sName && !isAiMessage && !sByVal) {
+          console.log(`[AI Attendant] Human "${sName}" is handling lead #${leadId} via WhatsApp, IA stopping`);
+          return { sent: false, action: 'human_handling' };
+        }
+      }
+    }
 
     // Check message count limit
     const msgCountResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_messages WHERE leadId = ${leadId} AND direction = 'outbound' AND senderName = 'IA Kafka'`);
@@ -1011,6 +1046,30 @@ export async function handleAttendantMessage(
           }
         } catch (e) {
           console.error("[AI Attendant] Error distributing:", e);
+        }
+      }
+    }
+
+    // === DUPLICATE MESSAGE CHECK ===
+    // Check if we already sent a very similar message recently (prevents repetition)
+    const recentAiMsgs = await dbConn.execute(
+      sql`SELECT content FROM crm_messages WHERE leadId = ${leadId} AND direction = 'outbound' AND senderName = 'IA Kafka' ORDER BY timestamp DESC LIMIT 5`
+    );
+    const recentAiRaw = recentAiMsgs as any;
+    const recentAiRows = Array.isArray(recentAiRaw?.[0]) ? recentAiRaw[0] : recentAiRaw;
+    if (recentAiRows && recentAiRows.length > 0) {
+      for (const prevMsg of recentAiRows) {
+        const prevContent = (prevMsg.content || '').toLowerCase().trim();
+        const newContent = responseText.toLowerCase().trim();
+        // Exact match or very similar (>80% overlap)
+        if (prevContent === newContent) {
+          console.log(`[AI Attendant] BLOCKED duplicate message for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
+          return { sent: false, action: 'duplicate_blocked' };
+        }
+        // Check if the core content is the same (first 50 chars match)
+        if (prevContent.length > 20 && newContent.length > 20 && prevContent.substring(0, 50) === newContent.substring(0, 50)) {
+          console.log(`[AI Attendant] BLOCKED similar message for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
+          return { sent: false, action: 'similar_blocked' };
         }
       }
     }
