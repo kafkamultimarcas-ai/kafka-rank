@@ -1982,3 +1982,14 @@
 - [x] BUG CRITICO: IA dizendo que veículo foi vendido quando NÃO foi - NUNCA pode dizer vendido
 - [x] BUG CRITICO: IA deve PARAR quando SDR humana entra na conversa (detectar msg outbound de humano)
 - [x] BUG: IA repetindo mensagens na mesma conversa
+
+### Mega Melhoria IA SDR (05/04 - Round 2)
+- [x] BUG CRITICO: IA AINDA dizendo "vendido" - adicionar filtro HARD que bloqueia msg com "vendido"
+- [x] MELHORIA: Quando IA não sabe responder → transferir para consultor humano
+- [x] MELHORIA: Quebra de objeções (7 objeções comuns com respostas prontas)
+- [x] MELHORIA: Perguntas pressuposicionais (assumem que cliente vai avançar)
+- [x] MELHORIA: 7 gatilhos mentais completos (prova social, autoridade, reciprocidade, aversão à perda)
+- [x] MELHORIA: Adaptação por perfil comportamental (apressado, analítico, emocional, indeciso)
+- [x] MELHORIA: Tratamento de áudio/mídia recebida
+- [x] MELHORIA: Aprovação de crédito como gatilho de conversão
+- [x] MELHORIA: Veículo pode estar em preparação - nunca dizer vendido, dizer que vai verificar
