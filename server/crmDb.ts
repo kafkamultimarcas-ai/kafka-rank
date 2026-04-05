@@ -106,7 +106,45 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
   if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
   if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), where)).orderBy(desc(crmLeads.updatedAt));
+  const tid = getCurrentTenantId();
+  // Fetch leads with last message preview via subquery
+  const leads = await db.select({
+    id: crmLeads.id,
+    sellerId: crmLeads.sellerId,
+    department: crmLeads.department,
+    name: crmLeads.name,
+    phone: crmLeads.phone,
+    email: crmLeads.email,
+    vehicleInterest: crmLeads.vehicleInterest,
+    vehiclePlate: crmLeads.vehiclePlate,
+    source: crmLeads.source,
+    stage: crmLeads.stage,
+    score: crmLeads.score,
+    cpf: crmLeads.cpf,
+    birthday: crmLeads.birthday,
+    notes: crmLeads.notes,
+    nextContactDate: crmLeads.nextContactDate,
+    lastContactDate: crmLeads.lastContactDate,
+    archived: crmLeads.archived,
+    convertedToSale: crmLeads.convertedToSale,
+    saleValue: crmLeads.saleValue,
+    acknowledgedAt: crmLeads.acknowledgedAt,
+    lastAutoTransferAt: crmLeads.lastAutoTransferAt,
+    aiHandled: crmLeads.aiHandled,
+    aiDataCollected: crmLeads.aiDataCollected,
+    aiCreditAppId: crmLeads.aiCreditAppId,
+    aiAppointmentId: crmLeads.aiAppointmentId,
+    createdAt: crmLeads.createdAt,
+    updatedAt: crmLeads.updatedAt,
+    tenantId: crmLeads.tenantId,
+    lastMessageContent: sql<string | null>`(SELECT content FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
+    lastMessageDirection: sql<string | null>`(SELECT direction FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
+    lastMessageTimestamp: sql<number | null>`(SELECT timestamp FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
+    lastMessageType: sql<string | null>`(SELECT messageType FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
+    lastMessageSender: sql<string | null>`(SELECT senderName FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
+    unreadCount: sql<number>`(SELECT COUNT(*) FROM crm_messages WHERE crm_messages.leadId = crm_leads.id AND crm_messages.direction = 'inbound' AND crm_messages.timestamp > COALESCE(crm_leads.acknowledgedAt, crm_leads.lastAutoTransferAt, 0))`,
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, tid), where)).orderBy(desc(crmLeads.updatedAt));
+  return leads;
 }
 
 export async function updateLead(id: number, data: Partial<InsertCrmLead>) {

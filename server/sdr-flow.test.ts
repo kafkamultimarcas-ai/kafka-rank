@@ -84,7 +84,7 @@ describe("SDR Lead Distribution Flow", () => {
     expect(typeof crmDb.getAdminById).toBe("function");
   });
 
-  it("webhook should NOT auto-assign WhatsApp leads (SDR flow)", async () => {
+  it("webhook should auto-assign WhatsApp leads and trigger AI", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const webhooksSource = fs.readFileSync(
@@ -95,8 +95,9 @@ describe("SDR Lead Distribution Flow", () => {
       webhooksSource.indexOf('app.post("/api/webhooks/whatsapp"'),
       webhooksSource.indexOf('// ===== SIG WEB SYNC =====')
     );
-    expect(whatsappSection).not.toContain("autoAssignLead(leadId");
-    expect(whatsappSection).toContain("SDR Flow");
+    // WhatsApp leads are now auto-assigned to SDRs and AI responds to first message
+    expect(whatsappSection).toContain("autoAssignLead(leadId");
+    expect(whatsappSection).toContain("handleAttendantMessage");
     expect(whatsappSection).toContain("sellerId: 0");
   });
 

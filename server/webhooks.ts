@@ -256,7 +256,7 @@ function releaseAiLock(leadId: number): void {
 // Debounce AI replies - wait for client to finish typing before responding
 // This prevents the AI from sending 2 replies when client sends 2 quick messages
 const aiDebounceTimers = new Map<number, NodeJS.Timeout>();
-const AI_DEBOUNCE_MS = 3000; // Wait 3 seconds after last message before AI responds
+const AI_DEBOUNCE_MS = 5000; // Wait 5 seconds after last message before AI responds
 
 function debounceAiReply(leadId: number, callback: () => void): void {
   // Clear any existing timer for this lead
@@ -1031,37 +1031,11 @@ export function registerWebhookRoutes(app: Express) {
             }
           }
 
-          // Auto-classify lead temperature based on inbound message engagement
-          // Only UPGRADE temperature (cold->warm->hot), NEVER downgrade
-          // Manual score changes by sellers/admins are preserved
-          if (!fromMe) {
-            try {
-              const dbConn = await getDb();
-              if (dbConn) {
-                const [countResult] = await dbConn.select({ cnt: sql<number>`COUNT(*)` })
-                  .from(crmMessages).where(and(
-                    eq(crmMessages.leadId, existingLeads[0].id),
-                    eq(crmMessages.direction, "inbound")
-                  ));
-                const inboundCount = Number(countResult?.cnt || 0);
-                const currentScore = existingLeads[0].score;
-                let newScore = currentScore;
-                // Only upgrade: 4+ msgs cold->warm, 9+ msgs warm->hot
-                if (inboundCount >= 9 && currentScore !== "hot") newScore = "hot";
-                else if (inboundCount >= 4 && currentScore === "cold") newScore = "warm";
-                // Never downgrade - if seller manually set to hot/warm, keep it
-                if (newScore !== currentScore) {
-                  await crmDb.updateLead(existingLeads[0].id, { score: newScore as any });
-                  console.log(`[Lead Score] Lead #${existingLeads[0].id} auto-upgraded: ${currentScore} -> ${newScore} (${inboundCount} inbound msgs)`);
-                }
-              }
-            } catch (scoreErr) {
-              // Silently fail score check
-            }
-          }
+          // Lead temperature is now analyzed by AI in ai-attendant.ts (analyzeLeadTemperature)
+          // No more simple message-count-based classification
 
-          // AI Auto-reply: check if enabled for this lead (only for inbound text messages)
-          if (!fromMe && messageText && messageType === "text") {
+          // AI Auto-reply: check if enabled for this lead (for ALL inbound messages including audio, image, etc.)
+          if (!fromMe && (messageText || messageType !== "text")) {
             const leadIdForAi = existingLeads[0].id;
             // Use debounce to wait for client to finish typing (prevents 2 replies for 2 quick messages)
             debounceAiReply(leadIdForAi, () => {
@@ -1101,7 +1075,13 @@ export function registerWebhookRoutes(app: Express) {
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
                 const aiRaw = aiResult as any;
                 const aiRows = Array.isArray(aiRaw?.[0]) ? aiRaw[0] : aiRaw;
-                if (!aiRows || aiRows.length === 0 || !aiRows[0].enabled) return;
+                // If no per-lead setting exists, default to ENABLED (attendant already checked above)
+                // Only skip if explicitly disabled (enabled = false/0)
+                if (aiRows && aiRows.length > 0 && !aiRows[0].enabled) {
+                  console.log(`[AI Auto-Reply] Per-lead AI disabled for lead #${existingLeads[0].id}, skipping`);
+                  releaseAiLock(leadIdForAi);
+                  return;
+                }
 
                 // Load global config for working hours, limits, personality (but NOT as master switch)
                 const globalCheck = await dbConn.execute(sql`SELECT autoReplyEnabled, workingHoursEnabled, workingHoursStart, workingHoursEnd, maxMessagesEnabled, maxMessagesPerLead, personality FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
@@ -1243,8 +1223,28 @@ export function registerWebhookRoutes(app: Express) {
           zapiMessageId: body.messageId || body.ids?.messageId || null,
           timestamp: typeof timestamp === 'string' ? new Date(timestamp).getTime() : (timestamp > 9999999999 ? timestamp : timestamp * 1000),
         });
-        // SDR Flow: leads from WhatsApp stay unassigned (sellerId=0) for SDRs to qualify and distribute
-        res.json({ success: true, action: "lead_created", leadId, assignedTo: null, note: "Lead aguardando distribui\u00e7\u00e3o pela pr\u00e9-vendas (SDR)" });
+        // Auto-assign new WhatsApp leads
+        const assignment = await autoAssignLead(leadId, dept);
+
+        // Trigger AI auto-reply for new leads (first message)
+        (async () => {
+          try {
+            const { handleAttendantMessage, getAttendantConfig, isAttendantActive } = await import("./ai-attendant");
+            const attendantCfg = await getAttendantConfig();
+            if (attendantCfg && attendantCfg.attendantEnabled && isAttendantActive(attendantCfg)) {
+              // Wait a moment for the lead to be fully created
+              await new Promise(r => setTimeout(r, 2000));
+              const result = await handleAttendantMessage(leadId, messageText || '', phone);
+              if (result.sent) {
+                console.log(`[AI Attendant] Handled NEW lead #${leadId}, action: ${result.action || 'reply'}`);
+              }
+            }
+          } catch (err: any) {
+            console.error(`[AI Attendant] Error on new lead #${leadId}:`, err.message);
+          }
+        })();
+
+        res.json({ success: true, action: "lead_created", leadId, assignedTo: assignment.sellerName || null, note: "Lead criado e distribu\u00eddo" });
         return;
       }
 

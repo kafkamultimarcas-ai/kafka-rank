@@ -1932,3 +1932,38 @@
 - [x] Status visual: Pronto p/ Simular (verde) vs Coletando (amarelo)
 - [x] Botoes de acao: Iniciar Analise, Aprovar, Rejeitar + campo observacoes
 - [x] 0 erros TypeScript, 586 testes passando
+
+## Produto 100% Comercial - Abril 2026
+
+### Bugs IA (URGENTE - prints do cliente)
+- [ ] BUG: IA repetindo mesma pergunta várias vezes (ano do carro 4x, forma pagamento 2x)
+- [ ] BUG: IA mandando 2 mensagens de uma vez (SUV + SEDAN ao mesmo tempo)
+- [ ] BUG: IA não envia fotos do estoque quando cliente pede (diz que vai mandar mas não manda)
+- [ ] BUG: IA não lembra dados já coletados na conversa (perde memória)
+- [ ] MELHORIA: IA enviar fotos automaticamente quando cliente diz tipo + faixa de preço
+- [ ] MELHORIA: IA buscar veículos com margem de preço (+30% acima da faixa pedida)
+- [ ] MELHORIA: IA precisa de memória melhor - nunca repetir pergunta já respondida
+
+### Melhorias para 100% Comercial
+- [ ] Onboarding guiado (wizard) para novas lojas configurarem tudo
+- [ ] Relatórios gerenciais (conversão leads→agendamentos→vendas)
+- [ ] Histórico/log de conversas da IA para auditoria
+- [ ] Notificações para dono da loja (leads não atendidos, fichas pendentes)
+- [ ] Controle de assinatura/plano (SaaS)
+- [ ] Landing page de apresentação do produto
+- [ ] Documentação/manual do sistema
+- [ ] Testes com cenários reais validados
+
+### Bugs e Melhorias CRM (feedback 05/04)
+- [x] BUG: IA não responde algumas mensagens (não aparece no WhatsApp) - corrigido: default para enabled + AI na primeira msg
+- [x] BUG: Mensagens CRM não chegam em tempo real (devem atualizar igual WhatsApp) - polling reduzido para 3s
+- [x] MELHORIA: Termômetro de leads inteligente (IA analisa conversa para classificar quente/morno/frio)
+- [x] MELHORIA: Redesign visual do CRM - cards mais modernos e atrativos
+- [x] MELHORIA: Número do telefone em destaque nos cards de leads
+- [x] MELHORIA: Visual mais organizado, fácil e moderno no CRM
+- [x] MELHORIA: Ordenação por última mensagem (mais recente no topo, igual WhatsApp)
+
+### URGENTE - Endereço errado (05/04)
+- [x] BUG CRITICO: IA mandando "Navegantes/SC" em vez de "Joinville/SC" - endereço correto: Rua Santa Catarina, 1318 - Bairro Floresta - Joinville/SC
+- [x] BUG: IA usando emoji (😊😉) - deveria ser ZERO emoji
+- [x] MELHORIA: IA corrigiu endereço quando cliente perguntou, mas não deveria ter errado antes

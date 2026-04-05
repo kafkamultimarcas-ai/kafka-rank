@@ -209,7 +209,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   value={form.city}
                   onChange={(e) => setForm({ ...form, city: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
-                  placeholder="Navegantes"
+                  placeholder="Joinville"
                 />
               </div>
               <div>

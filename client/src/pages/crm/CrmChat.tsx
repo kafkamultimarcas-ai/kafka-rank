@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import {
   Send, ArrowLeft, Phone, MessageCircle, Clock, Flame, Thermometer, Snowflake,
   User, Bot, Star, AlertTriangle, ChevronDown, Image, Paperclip, Search,
   X, Filter, Users, Zap, TrendingUp, CheckCircle, XCircle, BarChart3,
-  Volume2, Download, Play, File, Mic, Square
+  Volume2, Download, Play, File, Mic, Square, Copy, Check, Eye
 } from "lucide-react";
 import { ChannelIcon } from "@/components/ChannelIcon";
 
@@ -97,6 +97,12 @@ interface Lead {
   createdAt: Date | string;
   notes: string | null;
   archived: boolean;
+  lastMessageContent?: string | null;
+  lastMessageDirection?: string | null;
+  lastMessageTimestamp?: number | null;
+  lastMessageType?: string | null;
+  lastMessageSender?: string | null;
+  unreadCount?: number;
 }
 
 interface Message {
@@ -141,10 +147,52 @@ function formatDate(ts: number) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+function formatPhoneDisplay(phone: string | null) {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 13) {
+    // 5547999999999 -> (47) 99999-9999
+    return `(${digits.slice(2,4)}) ${digits.slice(4,9)}-${digits.slice(9)}`;
+  }
+  if (digits.length === 12) {
+    // 554799999999 -> (47) 9999-9999
+    return `(${digits.slice(2,4)}) ${digits.slice(4,8)}-${digits.slice(8)}`;
+  }
+  if (digits.length === 11) {
+    return `(${digits.slice(0,2)}) ${digits.slice(2,7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0,2)}) ${digits.slice(2,6)}-${digits.slice(6)}`;
+  }
+  return phone;
+}
+
+function getLastMsgPreview(lead: any): string {
+  if (lead.lastMessageType && lead.lastMessageType !== "text") {
+    const typeMap: Record<string, string> = {
+      image: "Foto",
+      audio: "Audio",
+      ptt: "Audio",
+      video: "Video",
+      document: "Documento",
+      sticker: "Figurinha",
+      location: "Localizacao",
+      contact: "Contato",
+    };
+    return typeMap[lead.lastMessageType] || "Midia";
+  }
+  if (lead.lastMessageContent && lead.lastMessageContent !== "NULL") {
+    return lead.lastMessageContent.substring(0, 60);
+  }
+  if (lead.vehicleInterest) return lead.vehicleInterest;
+  if (lead.notes) return lead.notes.replace(/^Primeira mensagem:\s*/i, '').substring(0, 50);
+  return "Novo lead";
+}
+
 const SCORE_CFG = {
-  hot: { label: "Quente", icon: Flame, color: "text-red-400", bg: "bg-red-500/20", border: "border-red-500/30" },
-  warm: { label: "Morno", icon: Thermometer, color: "text-amber-400", bg: "bg-amber-500/20", border: "border-amber-500/30" },
-  cold: { label: "Frio", icon: Snowflake, color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/30" },
+  hot: { label: "Quente", icon: Flame, color: "text-orange-400", bg: "bg-gradient-to-br from-orange-500/20 to-red-500/20", border: "border-orange-500/40", dot: "bg-orange-500", glow: "shadow-orange-500/20" },
+  warm: { label: "Morno", icon: Thermometer, color: "text-amber-400", bg: "bg-gradient-to-br from-amber-500/15 to-yellow-500/15", border: "border-amber-500/30", dot: "bg-amber-500", glow: "shadow-amber-500/20" },
+  cold: { label: "Frio", icon: Snowflake, color: "text-blue-400", bg: "bg-gradient-to-br from-blue-500/15 to-cyan-500/15", border: "border-blue-500/30", dot: "bg-blue-500", glow: "shadow-blue-500/20" },
 };
 
 const SOURCE_CFG: Record<string, { label: string; color: string }> = {
@@ -174,7 +222,7 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
   return (
     <div className="h-[calc(100vh-60px)] flex bg-background overflow-hidden">
       {/* Left panel - Lead list */}
-      <div className={`w-full md:w-96 md:min-w-[360px] border-r border-border flex flex-col bg-card ${showMobileChat ? "hidden md:flex" : "flex"}`}>
+      <div className={`w-full md:w-[400px] md:min-w-[380px] border-r border-border/50 flex flex-col bg-card/50 backdrop-blur ${showMobileChat ? "hidden md:flex" : "flex"}`}>
         <LeadList
           sellerId={sellerId}
           isSdr={isSdr}
@@ -199,7 +247,7 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
   );
 }
 
-// ===== LEAD LIST =====
+// ===== LEAD LIST - REDESIGNED =====
 function LeadList({
   sellerId, isSdr, selectedLeadId, onSelectLead, searchQuery, setSearchQuery, filterScore, setFilterScore
 }: {
@@ -212,31 +260,30 @@ function LeadList({
   filterScore: string | null;
   setFilterScore: (s: string | null) => void;
 }) {
-  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 5000 });
+  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 3000 });
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
     { query: searchQuery },
     { enabled: searchQuery.length >= 2 }
   );
   const { data: sellers } = trpc.sellers.list.useQuery();
-  const { data: alerts } = trpc.crmPerformance.getAlerts.useQuery({ thresholdMinutes: 5 }, { refetchInterval: 60000 });
+  const { data: alerts } = trpc.crmPerformance.getAlerts.useQuery({ thresholdMinutes: 5 }, { refetchInterval: 30000 });
 
   const sellerMap = useMemo(() => {
     if (!sellers) return {} as Record<number, string>;
     return sellers.reduce((acc: Record<number, string>, s: any) => { acc[s.id] = s.nickname || s.name; return acc; }, {});
   }, [sellers]);
 
-  // Color map for sellers - each seller gets a unique color badge
   const SELLER_COLORS = [
-    "bg-cyan-500/15 text-cyan-400",
-    "bg-violet-500/15 text-violet-400",
-    "bg-pink-500/15 text-pink-400",
-    "bg-teal-500/15 text-teal-400",
-    "bg-orange-500/15 text-orange-400",
-    "bg-lime-500/15 text-lime-400",
-    "bg-sky-500/15 text-sky-400",
-    "bg-rose-500/15 text-rose-400",
-    "bg-indigo-500/15 text-indigo-400",
-    "bg-emerald-500/15 text-emerald-400",
+    "bg-cyan-500/15 text-cyan-300 border-cyan-500/20",
+    "bg-violet-500/15 text-violet-300 border-violet-500/20",
+    "bg-pink-500/15 text-pink-300 border-pink-500/20",
+    "bg-teal-500/15 text-teal-300 border-teal-500/20",
+    "bg-orange-500/15 text-orange-300 border-orange-500/20",
+    "bg-lime-500/15 text-lime-300 border-lime-500/20",
+    "bg-sky-500/15 text-sky-300 border-sky-500/20",
+    "bg-rose-500/15 text-rose-300 border-rose-500/20",
+    "bg-indigo-500/15 text-indigo-300 border-indigo-500/20",
+    "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
   ];
   const sellerColorMap = useMemo(() => {
     if (!sellers) return {} as Record<number, string>;
@@ -251,22 +298,19 @@ function LeadList({
   const leads = useMemo(() => {
     let base = searchQuery.length >= 2 ? searchResults : allLeads;
     if (!base) return [];
-    // Filter by seller if not SDR/admin
     if (sellerId && !isSdr) {
       base = base.filter((l: any) => l.sellerId === sellerId);
     }
-    // Filter by score
     if (filterScore) {
       base = base.filter((l: any) => l.score === filterScore);
     }
-    // Sort: alerts first, then by most recent activity (lastContactDate > updatedAt > createdAt)
+    // Sort: alerts first, then by most recent message timestamp (WhatsApp style)
     return [...base].sort((a: any, b: any) => {
       const aAlert = alertLeadIds.has(a.id) ? 1 : 0;
       const bAlert = alertLeadIds.has(b.id) ? 1 : 0;
       if (aAlert !== bAlert) return bAlert - aAlert;
-      // Use lastContactDate if available, otherwise updatedAt, otherwise createdAt
-      const aTime = a.lastContactDate || new Date(a.updatedAt || a.createdAt).getTime();
-      const bTime = b.lastContactDate || new Date(b.updatedAt || b.createdAt).getTime();
+      const aTime = a.lastMessageTimestamp || a.lastContactDate || new Date(a.updatedAt || a.createdAt).getTime();
+      const bTime = b.lastMessageTimestamp || b.lastContactDate || new Date(b.updatedAt || b.createdAt).getTime();
       return bTime - aTime;
     });
   }, [allLeads, searchResults, searchQuery, sellerId, isSdr, filterScore, alertLeadIds]);
@@ -286,62 +330,71 @@ function LeadList({
   return (
     <>
       {/* Header */}
-      <div className="p-3 border-b border-border space-y-2">
+      <div className="px-4 pt-4 pb-3 space-y-3">
+        {/* Title row */}
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-green-400" />
-            Leads
-            {alerts && alerts.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold animate-pulse">
-                {alerts.length}
-              </span>
-            )}
-          </h2>
-          <span className="text-xs text-muted-foreground">{stats.total} total</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
+              <MessageCircle className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground leading-tight">Conversas</h2>
+              <p className="text-[10px] text-muted-foreground">{stats.total} leads ativos</p>
+            </div>
+          </div>
+          {alerts && alerts.length > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-[10px] font-bold text-red-400">{alerts.length} urgentes</span>
+            </div>
+          )}
         </div>
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
           <Input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nome ou telefone..."
-            className="pl-9 h-9 text-sm bg-accent/30"
+            placeholder="Buscar nome, telefone..."
+            className="pl-9 h-10 text-sm bg-accent/20 border-border/50 rounded-xl focus:bg-accent/40 transition-colors"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X className="w-4 h-4 text-muted-foreground" />
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-accent">
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
           )}
         </div>
 
-        {/* Score filter chips */}
-        <div className="flex gap-1.5">
+        {/* Score filter chips - pill style */}
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
           <button onClick={() => setFilterScore(null)}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium border transition-all ${!filterScore ? "bg-primary/20 border-primary/40 text-primary" : "bg-accent/30 border-border text-muted-foreground"}`}>
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap ${!filterScore ? "bg-primary/15 border-primary/40 text-primary shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
             Todos ({stats.total})
           </button>
           <button onClick={() => setFilterScore(filterScore === "hot" ? null : "hot")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium border transition-all ${filterScore === "hot" ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-accent/30 border-border text-muted-foreground"}`}>
-            <span className="flex items-center gap-0.5"><Flame className="w-3 h-3" />{stats.hot}</span>
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1 ${filterScore === "hot" ? "bg-orange-500/15 border-orange-500/40 text-orange-400 shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
+            <Flame className="w-3 h-3" /> {stats.hot}
           </button>
           <button onClick={() => setFilterScore(filterScore === "warm" ? null : "warm")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium border transition-all ${filterScore === "warm" ? "bg-amber-500/20 border-amber-500/40 text-amber-400" : "bg-accent/30 border-border text-muted-foreground"}`}>
-            <span className="flex items-center gap-0.5"><Thermometer className="w-3 h-3" />{stats.warm}</span>
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1 ${filterScore === "warm" ? "bg-amber-500/15 border-amber-500/40 text-amber-400 shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
+            <Thermometer className="w-3 h-3" /> {stats.warm}
           </button>
           <button onClick={() => setFilterScore(filterScore === "cold" ? null : "cold")}
-            className={`px-2 py-1 rounded-full text-[10px] font-medium border transition-all ${filterScore === "cold" ? "bg-blue-500/20 border-blue-500/40 text-blue-400" : "bg-accent/30 border-border text-muted-foreground"}`}>
-            <span className="flex items-center gap-0.5"><Snowflake className="w-3 h-3" />{stats.cold}</span>
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1 ${filterScore === "cold" ? "bg-blue-500/15 border-blue-500/40 text-blue-400 shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
+            <Snowflake className="w-3 h-3" /> {stats.cold}
           </button>
           {stats.unassigned > 0 && (
-            <button onClick={() => setFilterScore(null)}
-              className="px-2 py-1 rounded-full text-[10px] font-medium border bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse">
+            <div className="px-3 py-1.5 rounded-xl text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 whitespace-nowrap flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               {stats.unassigned} novos
-            </button>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
 
       {/* Lead list */}
       <div className="flex-1 overflow-y-auto">
@@ -351,98 +404,140 @@ function LeadList({
           const isAlert = alertLeadIds.has(lead.id);
           const isSelected = lead.id === selectedLeadId;
           const sellerName = lead.sellerId > 0 ? sellerMap[lead.sellerId] : null;
+          const hasUnread = (lead.unreadCount || 0) > 0;
+          const lastMsgPreview = getLastMsgPreview(lead);
+          const lastMsgTime = lead.lastMessageTimestamp || lead.lastContactDate;
+          const isInbound = lead.lastMessageDirection === "inbound";
 
           return (
             <button
               key={lead.id}
               onClick={() => onSelectLead(lead.id)}
-              className={`w-full text-left px-3 py-3 border-b border-border/50 transition-all hover:bg-accent/50 ${
-                isSelected ? "bg-primary/10 border-l-2 border-l-primary" : ""
-              } ${isAlert ? "bg-red-500/5" : ""}`}
+              className={`w-full text-left px-4 py-3 transition-all relative group ${
+                isSelected 
+                  ? "bg-primary/8" 
+                  : isAlert 
+                    ? "bg-red-500/5 hover:bg-red-500/8" 
+                    : "hover:bg-accent/30"
+              }`}
             >
+              {/* Selected indicator */}
+              {isSelected && (
+                <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-primary" />
+              )}
+
               <div className="flex items-start gap-3">
-                {/* Avatar */}
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${scoreCfg.bg} ${scoreCfg.border} border`}>
-                  <ScoreIcon className={`w-5 h-5 ${scoreCfg.color}`} />
+                {/* Avatar with score indicator */}
+                <div className="relative shrink-0">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${scoreCfg.bg} border ${scoreCfg.border} shadow-lg ${scoreCfg.glow}`}>
+                    <span className="text-lg font-bold text-foreground/80">
+                      {lead.name?.charAt(0)?.toUpperCase() || "?"}
+                    </span>
+                  </div>
+                  {/* Score dot */}
+                  <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ${scoreCfg.dot} border-2 border-card flex items-center justify-center`}>
+                    <ScoreIcon className="w-2.5 h-2.5 text-white" />
+                  </div>
+                  {/* Alert pulse */}
+                  {isAlert && (
+                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-card animate-pulse" />
+                  )}
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-foreground truncate">{lead.name}</span>
-                    <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                      {timeAgo(lead.lastContactDate || lead.createdAt)}
+                  {/* Row 1: Name + Time */}
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <span className={`text-[13px] font-semibold truncate ${hasUnread ? "text-foreground" : "text-foreground/80"}`}>
+                      {lead.name}
+                    </span>
+                    <span className={`text-[10px] shrink-0 ${hasUnread ? "text-green-400 font-semibold" : "text-muted-foreground/60"}`}>
+                      {timeAgo(lastMsgTime || lead.createdAt)}
                     </span>
                   </div>
 
+                  {/* Row 2: Phone number - HIGHLIGHTED */}
                   {lead.phone && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground/70 truncate">
-                        {lead.phone}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground/50">
-                        Chegou: {new Date(lead.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Phone className="w-3 h-3 text-green-500/70 shrink-0" />
+                      <span className="text-[12px] font-mono text-green-400/90 tracking-wide">
+                        {formatPhoneDisplay(lead.phone)}
                       </span>
                     </div>
                   )}
-                  {!lead.phone && (
-                    <span className="text-[9px] text-muted-foreground/50 block">
-                      Chegou: {new Date(lead.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  )}
 
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {lead.vehicleInterest && (
-                      <span className="text-[11px] text-muted-foreground truncate flex-1">
-                        {lead.vehicleInterest}
+                  {/* Row 3: Last message preview */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      {lead.lastMessageDirection === "outbound" && (
+                        <span className="text-[10px] text-blue-400 shrink-0">
+                          {lead.lastMessageSender === "IA Kafka" ? "IA:" : "Voce:"}
+                        </span>
+                      )}
+                      <span className={`text-[11px] truncate ${hasUnread ? "text-foreground/70 font-medium" : "text-muted-foreground/60"}`}>
+                        {lastMsgPreview}
                       </span>
-                    )}
-                    {!lead.vehicleInterest && lead.notes && (
-                      <span className="text-[11px] text-muted-foreground truncate flex-1">
-                        {lead.notes.replace(/^Primeira mensagem:\s*/i, '').substring(0, 50)}
+                    </div>
+                    {/* Unread badge */}
+                    {hasUnread && (
+                      <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-green-500/30">
+                        {lead.unreadCount > 99 ? "99+" : lead.unreadCount}
                       </span>
-                    )}
-                    {!lead.vehicleInterest && !lead.notes && (
-                      <span className="text-[11px] text-muted-foreground/50 flex-1">Novo lead</span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 mt-1">
+                  {/* Row 4: Tags */}
+                  <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                    {/* Alert tag */}
                     {isAlert && (() => {
                       const mins = Math.floor((Date.now() - (lead.lastContactDate || new Date(lead.createdAt).getTime() || Date.now())) / 60000);
-                      const threshold = lead.sellerId > 0 ? 10 : 5;
-                      const remaining = Math.max(0, threshold - mins);
                       return (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold flex items-center gap-0.5 animate-pulse">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 font-bold flex items-center gap-0.5 border border-red-500/20">
                           <AlertTriangle className="w-2.5 h-2.5" />
-                          {remaining > 0 ? `${remaining}min restante` : `${mins}min sem resposta`}
+                          {mins}min
                         </span>
                       );
                     })()}
+                    {/* New lead tag */}
                     {!sellerName && lead.sellerId === 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/20">
                         Novo
                       </span>
                     )}
+                    {/* Seller tag */}
                     {sellerName && (
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${sellerColorMap[lead.sellerId] || 'bg-cyan-500/15 text-cyan-400'}`}>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-md border font-medium ${sellerColorMap[lead.sellerId] || 'bg-cyan-500/15 text-cyan-300 border-cyan-500/20'}`}>
                         {sellerName}
                       </span>
                     )}
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${scoreCfg.bg} ${scoreCfg.color}`}>
-                      {scoreCfg.label}
+                    {/* Source tag */}
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-accent/40 text-muted-foreground/70 border border-border/30 flex items-center gap-0.5">
+                      <ChannelIcon source={lead.source} size={10} />
+                      {SOURCE_CFG[lead.source]?.label || lead.source}
                     </span>
+                    {/* Vehicle interest */}
+                    {lead.vehicleInterest && !lastMsgPreview.includes(lead.vehicleInterest) && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary/80 border border-primary/20 truncate max-w-[120px]">
+                        {lead.vehicleInterest}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Bottom divider */}
+              <div className="absolute bottom-0 left-16 right-4 h-px bg-border/30" />
             </button>
           );
         })}
 
         {leads.length === 0 && (
-          <div className="text-center py-12">
-            <MessageCircle className="w-10 h-10 text-muted-foreground/20 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Nenhum lead encontrado</p>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 rounded-2xl bg-accent/30 flex items-center justify-center mx-auto mb-3">
+              <MessageCircle className="w-8 h-8 text-muted-foreground/20" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">Nenhum lead encontrado</p>
+            <p className="text-xs text-muted-foreground/50 mt-1">Tente ajustar os filtros</p>
           </div>
         )}
       </div>
@@ -473,7 +568,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
   const { data: lead } = trpc.crmLeads.getById.useQuery({ id: leadId });
   const { data: messages, refetch: refetchMessages } = trpc.crmChat.getMessages.useQuery(
     { leadId },
-    { refetchInterval: 5000 }
+    { refetchInterval: 3000 }
   );
   const { data: sellers } = trpc.sellers.list.useQuery();
 
@@ -491,7 +586,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
   });
   const { data: autoReplyData, refetch: refetchAutoReply } = trpc.crmAi.getAutoReply.useQuery({ leadId });
   const setAutoReplyMut = trpc.crmAi.setAutoReply.useMutation({
-    onSuccess: () => { toast.success("Configura\u00e7\u00e3o salva!"); refetchAutoReply(); },
+    onSuccess: () => { toast.success("Configuração salva!"); refetchAutoReply(); },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const handleAiSuggest = (customPrompt?: string) => {
@@ -557,12 +652,11 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
     setUploading(true);
     setShowAttach(false);
     try {
-      // Convert file to base64
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onload = () => {
           const result = reader.result as string;
-          resolve(result.split(",")[1]); // Remove data:...;base64, prefix
+          resolve(result.split(",")[1]);
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
@@ -712,48 +806,52 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
 
   return (
     <>
-      {/* Chat header */}
-      <div className="border-b border-border bg-card px-3 py-2.5">
+      {/* Chat header - redesigned */}
+      <div className="border-b border-border/50 bg-card/80 backdrop-blur px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1 hover:bg-accent rounded-lg">
+          <button onClick={onBack} className="p-1.5 hover:bg-accent rounded-xl md:hidden">
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${scoreCfg.bg} ${scoreCfg.border} border`}>
-            <ScoreIcon className={`w-4 h-4 ${scoreCfg.color}`} />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${scoreCfg.bg} border ${scoreCfg.border}`}>
+            <span className="text-base font-bold text-foreground/80">{lead.name?.charAt(0)?.toUpperCase()}</span>
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-foreground truncate">{lead.name}</span>
-              {lead.vehicleInterest && (
-                <span className="text-[10px] text-muted-foreground hidden sm:inline">• {lead.vehicleInterest}</span>
-              )}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-md ${scoreCfg.bg} ${scoreCfg.color} border ${scoreCfg.border} font-semibold`}>
+                {scoreCfg.label}
+              </span>
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <span>{lead.phone}</span>
-              <span>•</span>
-              <span className={scoreCfg.color}>{scoreCfg.label}</span>
-              <span>•</span>
-              <span>{lead.stage}</span>
+            <div className="flex items-center gap-2 text-[11px]">
+              {lead.phone && (
+                <span className="font-mono text-green-400/80">{formatPhoneDisplay(lead.phone)}</span>
+              )}
+              {lead.vehicleInterest && (
+                <>
+                  <span className="text-muted-foreground/30">|</span>
+                  <span className="text-muted-foreground/60 truncate">{lead.vehicleInterest}</span>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {lead.phone && (
               <>
                 <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
-                  className="p-2 rounded-lg hover:bg-green-500/10 text-green-400 transition-all" title="Abrir WhatsApp">
+                  className="p-2 rounded-xl hover:bg-green-500/10 text-green-400 transition-all" title="Abrir WhatsApp">
                   <MessageCircle className="w-5 h-5" />
                 </a>
                 <a href={`tel:${lead.phone}`}
-                  className="p-2 rounded-lg hover:bg-blue-500/10 text-blue-400 transition-all" title="Ligar">
+                  className="p-2 rounded-xl hover:bg-blue-500/10 text-blue-400 transition-all" title="Ligar">
                   <Phone className="w-5 h-5" />
                 </a>
               </>
             )}
             <button onClick={() => setShowInfo(!showInfo)}
-              className={`p-2 rounded-lg transition-all ${showInfo ? "bg-primary/10 text-primary" : "hover:bg-accent text-muted-foreground"}`}>
+              className={`p-2 rounded-xl transition-all ${showInfo ? "bg-primary/10 text-primary" : "hover:bg-accent text-muted-foreground"}`}>
               <User className="w-5 h-5" />
             </button>
           </div>
@@ -766,7 +864,6 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
           <div className="flex-1 overflow-y-auto px-1 py-3 space-y-1" style={{ backgroundColor: "#0b141a", backgroundImage: "url('data:image/svg+xml,%3Csvg width=\'200\' height=\'200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cdefs%3E%3Cpattern id=\'p\' width=\'40\' height=\'40\' patternUnits=\'userSpaceOnUse\'%3E%3Cpath d=\'M20 5 L20 8 M5 20 L8 20 M32 20 L35 20 M20 32 L20 35\' stroke=\'%23ffffff\' stroke-width=\'0.3\' opacity=\'0.04\'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width=\'200\' height=\'200\' fill=\'url(%23p)\'/%3E%3C/svg%3E')" }}>
             {groupedMessages.map((group, gi) => (
               <div key={gi}>
-                {/* Date separator */}
                 <div className="flex items-center justify-center my-3">
                   <span className="text-[10px] text-gray-400 bg-[#182229] px-3 py-1 rounded-lg shadow-sm">
                     {group.date}
@@ -782,7 +879,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     }`}>
                       {msg.direction === "outbound" && (
                         <p className="text-[10px] font-semibold mb-1" style={{color: msg.senderName === "IA Kafka" ? "#a78bfa" : "#34d399"}}>
-                          {msg.sentBy ? (sellerMap[msg.sentBy] || "Voc\u00ea") : (msg.senderName === "IA Kafka" ? "\u26a1 IA Kafka" : "\ud83d\udce4 Vendedor")}
+                          {msg.sentBy ? (sellerMap[msg.sentBy] || "Você") : (msg.senderName === "IA Kafka" ? "IA Kafka" : "Vendedor")}
                         </p>
                       )}
                       {msg.direction === "inbound" && (
@@ -797,16 +894,16 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                         <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                       ) : !msg.mediaUrl && msg.messageType !== "text" ? (
                         <p className="text-[12px] italic opacity-60">
-                          {msg.messageType === "ptt" || msg.messageType === "audio" ? "🎤 Mensagem de voz" :
+                          {msg.messageType === "ptt" || msg.messageType === "audio" ? "Mensagem de voz" :
                            msg.messageType === "sticker" ? "Figurinha" :
-                           msg.messageType === "location" ? "📍 Localização" :
-                           msg.messageType === "contact" ? "👤 Contato compartilhado" :
-                           msg.messageType === "poll" ? "📊 Enquete" :
-                           msg.messageType === "product" ? "🛒 Produto" :
-                           msg.messageType === "order" ? "📦 Pedido" :
-                           msg.messageType === "document" ? "📄 Documento" :
-                           msg.messageType === "image" ? "📷 Imagem" :
-                           msg.messageType === "video" ? "🎥 Vídeo" :
+                           msg.messageType === "location" ? "Localizacao" :
+                           msg.messageType === "contact" ? "Contato compartilhado" :
+                           msg.messageType === "poll" ? "Enquete" :
+                           msg.messageType === "product" ? "Produto" :
+                           msg.messageType === "order" ? "Pedido" :
+                           msg.messageType === "document" ? "Documento" :
+                           msg.messageType === "image" ? "Imagem" :
+                           msg.messageType === "video" ? "Video" :
                            null}
                         </p>
                       ) : null}
@@ -816,7 +913,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                           {formatTime(msg.timestamp)}
                         </span>
                         {msg.direction === "outbound" && (
-                          <span className="text-[10px] opacity-60">\u2713\u2713</span>
+                          <span className="text-[10px] opacity-60">{"\u2713\u2713"}</span>
                         )}
                       </div>
                     </div>
@@ -840,7 +937,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
           {showVehicles && (
             <div className="border-t border-border bg-card/95 backdrop-blur max-h-[300px] overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-                <span className="text-xs font-bold text-foreground">🚗 Mandar Carro do Estoque</span>
+                <span className="text-xs font-bold text-foreground">Mandar Carro do Estoque</span>
                 <button onClick={() => setShowVehicles(false)} className="p-1 hover:bg-accent rounded"><X className="w-4 h-4" /></button>
               </div>
               <div className="px-3 py-2">
@@ -854,25 +951,25 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     {v.photoUrl ? (
                       <img src={v.photoUrl} alt="" className="w-12 h-9 rounded object-cover" />
                     ) : (
-                      <div className="w-12 h-9 rounded bg-accent/50 flex items-center justify-center text-muted-foreground text-[10px]">🚗</div>
+                      <div className="w-12 h-9 rounded bg-accent/50 flex items-center justify-center text-muted-foreground text-[10px]">Auto</div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground truncate">{v.brand} {v.model}</p>
-                      <p className="text-[10px] text-muted-foreground">{v.year} • {v.mileage?.toLocaleString("pt-BR")} km • R$ {(v.price / 100).toLocaleString("pt-BR")}</p>
+                      <p className="text-[10px] text-muted-foreground">{v.year} - {v.mileage?.toLocaleString("pt-BR")} km - R$ {(v.price / 100).toLocaleString("pt-BR")}</p>
                     </div>
                   </button>
                 ))}
-                {filteredVehicles.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum veículo disponível</p>}
+                {filteredVehicles.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum veiculo disponivel</p>}
               </div>
             </div>
           )}
 
-          {/* AI Auto-reply toggle - above input */}
-          <div className="border-t border-border bg-card/95 flex items-center justify-between px-3 py-1.5">
+          {/* AI Auto-reply toggle */}
+          <div className="border-t border-border/50 bg-card/80 backdrop-blur flex items-center justify-between px-4 py-2">
             <div className="flex items-center gap-2">
-              <Zap className={`w-3.5 h-3.5 ${autoReplyData?.enabled ? 'text-green-400' : 'text-gray-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${autoReplyData?.enabled ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`} />
               <span className={`text-xs font-medium ${autoReplyData?.enabled ? 'text-green-400' : 'text-gray-500'}`}>
-                {autoReplyData?.enabled ? '⚡ IA Ativada' : 'IA Desativada'}
+                {autoReplyData?.enabled ? 'IA Ativada' : 'IA Desativada'}
               </span>
             </div>
             <button
@@ -893,7 +990,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
           </div>
 
           {/* Message input */}
-          <div className="border-t border-border bg-card p-3">
+          <div className="border-t border-border/50 bg-card/80 backdrop-blur p-3">
             {uploading && (
               <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -904,14 +1001,14 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
               {/* Attachment menu */}
               <div className="relative">
                 <button onClick={() => { setShowAttach(!showAttach); setShowVehicles(false); }}
-                  className="h-[42px] w-[42px] rounded-full flex items-center justify-center hover:bg-accent text-muted-foreground transition-all shrink-0">
+                  className="h-[42px] w-[42px] rounded-xl flex items-center justify-center hover:bg-accent text-muted-foreground transition-all shrink-0">
                   <Paperclip className="w-5 h-5" />
                 </button>
                 {showAttach && (
                   <div className="absolute bottom-12 left-0 bg-popover border border-border rounded-xl shadow-xl p-2 min-w-[160px] z-50">
                     <button onClick={() => { imageInputRef.current?.click(); setShowAttach(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-foreground">
-                      <Image className="w-4 h-4 text-blue-400" /> Foto / Vídeo
+                      <Image className="w-4 h-4 text-blue-400" /> Foto / Video
                     </button>
                     <button onClick={() => { fileInputRef.current?.click(); setShowAttach(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-foreground">
@@ -919,7 +1016,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     </button>
                     <button onClick={() => { setShowVehicles(true); setShowAttach(false); }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-sm text-foreground">
-                      <span className="text-base">🚗</span> Veículo do Estoque
+                      <TrendingUp className="w-4 h-4 text-green-400" /> Veiculo do Estoque
                     </button>
                   </div>
                 )}
@@ -929,7 +1026,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
               <input ref={fileInputRef} type="file" accept="*/*" className="hidden" onChange={handleFileSelect} />
 
               {isRecording ? (
-                <div className="flex-1 flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-2">
+                <div className="flex-1 flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2">
                   <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                   <span className="text-sm font-mono text-red-400">{formatRecTime(recordingTime)}</span>
                   <span className="text-xs text-muted-foreground">Gravando...</span>
@@ -937,7 +1034,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     <button onClick={cancelRecording} className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-red-500/20 text-red-400" title="Cancelar">
                       <X className="w-4 h-4" />
                     </button>
-                    <button onClick={stopRecording} className="h-8 w-8 rounded-full flex items-center justify-center bg-green-600 hover:bg-green-700 text-white" title="Enviar áudio">
+                    <button onClick={stopRecording} className="h-8 w-8 rounded-full flex items-center justify-center bg-green-600 hover:bg-green-700 text-white" title="Enviar audio">
                       <Send className="w-4 h-4" />
                     </button>
                   </div>
@@ -947,8 +1044,8 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                   <button
                     onClick={() => handleAiSuggest()}
                     disabled={aiSuggest.isPending}
-                    className="h-[42px] w-[42px] rounded-full bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 flex items-center justify-center shrink-0 transition-all shadow-lg shadow-purple-500/20"
-                    title="Sugestão da IA"
+                    className="h-[42px] w-[42px] rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 flex items-center justify-center shrink-0 transition-all shadow-lg shadow-purple-500/20"
+                    title="Sugestao da IA"
                   >
                     {aiSuggest.isPending ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -963,7 +1060,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                       onKeyDown={handleKeyDown}
                       placeholder="Digite uma mensagem..."
                       rows={1}
-                      className="w-full bg-accent/30 border border-border rounded-2xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full bg-accent/20 border border-border/50 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-accent/30 transition-colors"
                       style={{ minHeight: 42, maxHeight: 120 }}
                     />
                   </div>
@@ -971,15 +1068,15 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     <Button
                       onClick={handleSend}
                       disabled={sendMessage.isPending}
-                      className="h-[42px] w-[42px] rounded-full bg-green-600 hover:bg-green-700 p-0 shrink-0"
+                      className="h-[42px] w-[42px] rounded-xl bg-green-600 hover:bg-green-700 p-0 shrink-0"
                     >
                       <Send className="w-5 h-5 text-white" />
                     </Button>
                   ) : (
                     <button
                       onClick={startRecording}
-                      className="h-[42px] w-[42px] rounded-full bg-green-600 hover:bg-green-700 flex items-center justify-center shrink-0 transition-all"
-                      title="Gravar áudio"
+                      className="h-[42px] w-[42px] rounded-xl bg-green-600 hover:bg-green-700 flex items-center justify-center shrink-0 transition-all"
+                      title="Gravar audio"
                     >
                       <Mic className="w-5 h-5 text-white" />
                     </button>
@@ -995,12 +1092,12 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowAiSuggestion(false)}>
             <div className="bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
               <div className="flex items-center gap-3 p-4 border-b border-border">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
                   <Zap className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">Assistente IA de Vendas</h3>
-                  <p className="text-xs text-muted-foreground">Sugestão de resposta para o cliente</p>
+                  <p className="text-xs text-muted-foreground">Sugestao de resposta para o cliente</p>
                 </div>
                 <button onClick={() => setShowAiSuggestion(false)} className="ml-auto p-1 hover:bg-accent rounded">
                   <X className="w-5 h-5" />
@@ -1010,7 +1107,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                 {aiSuggest.isPending ? (
                   <div className="flex flex-col items-center gap-3 py-8">
                     <div className="w-10 h-10 border-3 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-                    <p className="text-sm text-muted-foreground">Analisando conversa e gerando sugestão...</p>
+                    <p className="text-sm text-muted-foreground">Analisando conversa e gerando sugestao...</p>
                   </div>
                 ) : aiSuggestion ? (
                   <div className="space-y-3">
@@ -1026,7 +1123,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                       </Button>
                     </div>
                     <div className="border-t border-border pt-3">
-                      <p className="text-xs text-muted-foreground mb-2">Pedir algo específico:</p>
+                      <p className="text-xs text-muted-foreground mb-2">Pedir algo especifico:</p>
                       <div className="flex gap-2">
                         <input
                           value={aiCustomPrompt}
@@ -1040,7 +1137,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                         </Button>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mt-2">
-                        {["Quebrar objeção de preço", "Agendar visita", "Oferecer financiamento", "Criar urgência"].map(p => (
+                        {["Quebrar objecao de preco", "Agendar visita", "Oferecer financiamento", "Criar urgencia"].map(p => (
                           <button key={p} onClick={() => handleAiSuggest(p)} className="text-xs bg-accent hover:bg-accent/80 px-2.5 py-1 rounded-full text-muted-foreground hover:text-foreground transition-colors">
                             {p}
                           </button>
@@ -1081,6 +1178,7 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
 }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
   const analyzeConversation = trpc.crmPerformance.analyzeConversation.useMutation({
     onSuccess: (data) => { setAnalysis(data); setAnalyzing(false); },
@@ -1092,52 +1190,70 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
     analyzeConversation.mutate({ leadId: lead.id });
   };
 
+  const copyPhone = () => {
+    if (lead.phone) {
+      navigator.clipboard.writeText(lead.phone);
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+      toast.success("Telefone copiado!");
+    }
+  };
+
   return (
-    <div className="w-72 border-l border-border bg-card overflow-y-auto hidden lg:block">
+    <div className="w-80 border-l border-border/50 bg-card/50 backdrop-blur overflow-y-auto hidden lg:block">
       <div className="p-4 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-foreground">Info do Cliente</h3>
-          <button onClick={onClose} className="p-1 hover:bg-accent rounded"><X className="w-4 h-4 text-muted-foreground" /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-accent rounded-xl"><X className="w-4 h-4 text-muted-foreground" /></button>
         </div>
 
-        {/* Lead info */}
-        <div className="space-y-3">
+        {/* Lead info card */}
+        <div className="rounded-xl bg-accent/20 border border-border/30 p-4 space-y-3">
           <div>
-            <label className="text-[10px] text-muted-foreground uppercase">Nome</label>
-            <p className="text-sm text-foreground font-medium">{lead.name}</p>
+            <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Nome</label>
+            <p className="text-sm text-foreground font-semibold">{lead.name}</p>
           </div>
           <div>
-            <label className="text-[10px] text-muted-foreground uppercase">Telefone</label>
-            <p className="text-sm text-foreground">{lead.phone || "—"}</p>
+            <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Telefone</label>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-sm font-mono text-green-400 font-semibold">{formatPhoneDisplay(lead.phone) || "—"}</p>
+              {lead.phone && (
+                <button onClick={copyPhone} className="p-1 rounded-md hover:bg-accent transition-colors" title="Copiar">
+                  {copiedPhone ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground/50" />}
+                </button>
+              )}
+            </div>
           </div>
           {lead.vehicleInterest && (
             <div>
-              <label className="text-[10px] text-muted-foreground uppercase">Veículo</label>
+              <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Veiculo de Interesse</label>
               <p className="text-sm text-foreground">{lead.vehicleInterest}</p>
             </div>
           )}
-          <div>
-            <label className="text-[10px] text-muted-foreground uppercase">Origem</label>
-            <p className="text-sm text-foreground flex items-center gap-1.5"><ChannelIcon source={lead.source} size={16} /> {SOURCE_CFG[lead.source]?.label || lead.source}</p>
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground uppercase">Etapa</label>
-            <p className="text-sm text-foreground">{lead.stage}</p>
+          <div className="flex gap-4">
+            <div>
+              <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Origem</label>
+              <p className="text-sm text-foreground flex items-center gap-1.5"><ChannelIcon source={lead.source} size={14} /> {SOURCE_CFG[lead.source]?.label || lead.source}</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Etapa</label>
+              <p className="text-sm text-foreground">{lead.stage}</p>
+            </div>
           </div>
         </div>
 
-        {/* Score buttons */}
+        {/* Score buttons - redesigned */}
         <div>
-          <label className="text-[10px] text-muted-foreground uppercase mb-1.5 block">Temperatura</label>
+          <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 block">Temperatura do Lead</label>
           <div className="flex gap-1.5">
             {(["hot", "warm", "cold"] as const).map(s => {
               const cfg = SCORE_CFG[s];
               const Icon = cfg.icon;
               return (
                 <button key={s} onClick={() => onUpdateScore(s)}
-                  className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all ${
-                    lead.score === s ? `${cfg.bg} ${cfg.border} ${cfg.color}` : "bg-accent/30 border-border text-muted-foreground hover:bg-accent"
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    lead.score === s ? `${cfg.bg} ${cfg.border} ${cfg.color} shadow-lg ${cfg.glow}` : "bg-accent/20 border-border/30 text-muted-foreground/60 hover:bg-accent/40"
                   }`}>
                   <Icon className="w-3.5 h-3.5" /> {cfg.label}
                 </button>
@@ -1148,11 +1264,11 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
 
         {/* Assign seller */}
         <div>
-          <label className="text-[10px] text-muted-foreground uppercase mb-1.5 block">Vendedor</label>
+          <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 block">Vendedor Responsavel</label>
           <select
             value={lead.sellerId || ""}
             onChange={e => { const v = parseInt(e.target.value); if (v) onAssign(v); }}
-            className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-xs text-foreground"
+            className="w-full bg-accent/20 border border-border/30 rounded-xl px-3 py-2.5 text-xs text-foreground focus:ring-2 focus:ring-primary/30 outline-none"
           >
             <option value="0">Sem vendedor</option>
             {sellers?.filter((s: any) => s.department === "vendas" && s.active).map((s: any) => (
@@ -1162,21 +1278,21 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
         </div>
 
         {/* AI Analysis */}
-        <div className="border-t border-border pt-3">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-              <Bot className="w-3 h-3" /> Análise IA
+        <div className="border-t border-border/30 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-[10px] text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1">
+              <Bot className="w-3 h-3" /> Analise IA
             </label>
-            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={handleAnalyze} disabled={analyzing}>
+            <Button size="sm" variant="outline" className="h-7 text-[10px] rounded-lg" onClick={handleAnalyze} disabled={analyzing}>
               {analyzing ? "Analisando..." : "Analisar"}
             </Button>
           </div>
 
           {analysis && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {/* Score circle */}
-              <div className="flex items-center gap-3">
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center border-2 ${
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-accent/20 border border-border/30">
+                <div className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 ${
                   analysis.score >= 7 ? "border-green-500 bg-green-500/10" :
                   analysis.score >= 4 ? "border-amber-500 bg-amber-500/10" :
                   "border-red-500 bg-red-500/10"
@@ -1199,7 +1315,7 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
                     <CheckCircle className="w-3 h-3" /> Pontos fortes
                   </p>
                   {analysis.strengths.map((s: string, i: number) => (
-                    <p key={i} className="text-[10px] text-muted-foreground pl-4">• {s}</p>
+                    <p key={i} className="text-[10px] text-muted-foreground pl-4">- {s}</p>
                   ))}
                 </div>
               )}
@@ -1211,7 +1327,7 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
                     <AlertTriangle className="w-3 h-3" /> Melhorar
                   </p>
                   {analysis.improvements.map((s: string, i: number) => (
-                    <p key={i} className="text-[10px] text-muted-foreground pl-4">• {s}</p>
+                    <p key={i} className="text-[10px] text-muted-foreground pl-4">- {s}</p>
                   ))}
                 </div>
               )}
@@ -1223,7 +1339,7 @@ function LeadInfoSidebar({ lead, sellers, sellerMap, onAssign, onUpdateScore, on
                     <Star className="w-3 h-3" /> Dicas
                   </p>
                   {analysis.tips.map((s: string, i: number) => (
-                    <p key={i} className="text-[10px] text-muted-foreground pl-4">• {s}</p>
+                    <p key={i} className="text-[10px] text-muted-foreground pl-4">- {s}</p>
                   ))}
                 </div>
               )}
@@ -1240,12 +1356,12 @@ function EmptyChat() {
   return (
     <div className="flex-1 flex items-center justify-center bg-background">
       <div className="text-center">
-        <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-4">
           <MessageCircle className="w-10 h-10 text-green-500/40" />
         </div>
         <h3 className="text-lg font-bold text-foreground mb-1">CRM WhatsApp</h3>
         <p className="text-sm text-muted-foreground max-w-xs">
-          Selecione um lead para ver o histórico de conversas e enviar mensagens
+          Selecione um lead para ver o historico de conversas e enviar mensagens
         </p>
       </div>
     </div>
@@ -1268,12 +1384,12 @@ export function PerformanceDashboard() {
       {/* Alert banner */}
       {alerts && alerts.length > 0 && (
         <div className="rounded-xl border-2 border-red-500/40 bg-red-500/5 p-3 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center animate-pulse">
+          <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center animate-pulse">
             <AlertTriangle className="w-5 h-5 text-red-400" />
           </div>
           <div>
             <p className="text-sm font-bold text-red-400">{alerts.length} leads sem resposta</p>
-            <p className="text-[10px] text-red-400/70">Leads aguardando resposta há mais de 5 minutos</p>
+            <p className="text-[10px] text-red-400/70">Leads aguardando resposta ha mais de 5 minutos</p>
           </div>
         </div>
       )}
@@ -1281,14 +1397,13 @@ export function PerformanceDashboard() {
       {/* Seller cards */}
       <div className="grid gap-3 sm:grid-cols-2">
         {stats.map((s: any) => (
-          <div key={s.sellerId} className="rounded-xl border border-border bg-card p-4">
+          <div key={s.sellerId} className="rounded-xl border border-border/50 bg-card/50 p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-bold text-foreground">{s.sellerName}</p>
                 <p className="text-[10px] text-muted-foreground">{s.department === "pre_vendas" ? "SDR" : "Vendedor"}</p>
               </div>
-              {/* Score badge */}
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center border-2 ${
                 s.conversionRate >= 30 ? "border-green-500 bg-green-500/10" :
                 s.conversionRate >= 15 ? "border-amber-500 bg-amber-500/10" :
                 "border-red-500 bg-red-500/10"
