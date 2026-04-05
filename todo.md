@@ -1974,3 +1974,6 @@
 - [x] IA usar gatilho de curiosidade: "temos novidades que ainda nao estao no site"
 - [x] IA perguntar o que cliente procura se nao gostar das opcoes enviadas
 - [x] IA analisar fluxo da conversa e saber hora certa de agir com msg correta
+
+### Bug Ordenação CRM (05/04)
+- [x] BUG CRITICO: Leads no CRM não estão ordenados por última mensagem recebida (mais recente no topo)

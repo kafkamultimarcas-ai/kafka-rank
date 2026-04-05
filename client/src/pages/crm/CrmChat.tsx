@@ -304,14 +304,12 @@ function LeadList({
     if (filterScore) {
       base = base.filter((l: any) => l.score === filterScore);
     }
-    // Sort: alerts first, then by most recent message timestamp (WhatsApp style)
+    // Sort: ALWAYS by most recent message timestamp DESC (WhatsApp style)
+    // Leads with newest messages go to the top, no exceptions
     return [...base].sort((a: any, b: any) => {
-      const aAlert = alertLeadIds.has(a.id) ? 1 : 0;
-      const bAlert = alertLeadIds.has(b.id) ? 1 : 0;
-      if (aAlert !== bAlert) return bAlert - aAlert;
-      const aTime = a.lastMessageTimestamp || a.lastContactDate || new Date(a.updatedAt || a.createdAt).getTime();
-      const bTime = b.lastMessageTimestamp || b.lastContactDate || new Date(b.updatedAt || b.createdAt).getTime();
-      return bTime - aTime;
+      const aTime = a.lastMessageTimestamp || a.updatedAt || a.createdAt || 0;
+      const bTime = b.lastMessageTimestamp || b.updatedAt || b.createdAt || 0;
+      return Number(bTime) - Number(aTime);
     });
   }, [allLeads, searchResults, searchQuery, sellerId, isSdr, filterScore, alertLeadIds]);
 

@@ -143,7 +143,10 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
     lastMessageType: sql<string | null>`(SELECT messageType FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
     lastMessageSender: sql<string | null>`(SELECT senderName FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
     unreadCount: sql<number>`(SELECT COUNT(*) FROM crm_messages WHERE crm_messages.leadId = crm_leads.id AND crm_messages.direction = 'inbound' AND crm_messages.timestamp > COALESCE(crm_leads.acknowledgedAt, crm_leads.lastAutoTransferAt, 0))`,
-  }).from(crmLeads).where(and(eq(crmLeads.tenantId, tid), where)).orderBy(desc(crmLeads.updatedAt));
+  }).from(crmLeads).where(and(eq(crmLeads.tenantId, tid), where)).orderBy(
+    sql`(SELECT timestamp FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1) DESC`,
+    desc(crmLeads.updatedAt)
+  );
   return leads;
 }
 
