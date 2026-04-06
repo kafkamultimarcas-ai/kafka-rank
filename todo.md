@@ -2028,3 +2028,13 @@
 - [x] Resetar TODAS as senhas dos vendedores no banco - botão "Resetar Todas as Senhas" adicionado no admin
 - [x] Forçar primeiro acesso novamente para todos os vendedores cadastrados
 - [x] Garantir que cada vendedor só acessa seus próprios dados - verificação JWT dupla + clear cookie em token inválido
+
+### Alertas Financeiros - Contas Vencendo (06/04)
+- [x] Backend: query de contas vencendo hoje, amanhã e atrasadas (getFinancialAlerts)
+- [x] Backend: endpoint de alertas financeiros com contadores (finTransactions.alerts)
+- [x] Notificação automática para contas vencendo hoje (sendAlertNotification + notifyOwner)
+- [x] UI: banner/painel de alertas visuais no topo do módulo financeiro (DashboardTab reescrito)
+- [x] UI: badge com contador de alertas no menu financeiro (MinhaArea FinanceiroStatsCards)
+- [x] UI: cards coloridos (vermelho=atrasada, amarelo=vence hoje, laranja=vence amanhã, verde=semana)
+- [x] UI: botão de enviar notificação manual + expandível com detalhes por categoria
+- [x] Testes: 7 testes de alertas financeiros (634 testes total)

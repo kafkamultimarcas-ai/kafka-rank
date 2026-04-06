@@ -77,30 +77,53 @@ function StatusBadge({ status }: { status: string }) {
 
 function FinanceiroStatsCards() {
   const { data: dashboard } = trpc.finTransactions.dashboard.useQuery({});
-  const overdueCount = dashboard?.overdue || 0;
+  const { data: alerts } = trpc.finTransactions.alerts.useQuery(undefined, { refetchInterval: 60000 });
+  const s = alerts?.summary || { overdueCount: 0, dueTodayCount: 0, dueTomorrowCount: 0 };
   const totalPayable = dashboard?.totalPayable || 0;
   const totalReceivable = dashboard?.totalReceivable || 0;
+  const urgentCount = s.overdueCount + s.dueTodayCount;
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 text-center">
-        <AlertCircle className="w-4 h-4 text-red-400 mx-auto mb-1" />
-        <p className="text-xl font-black text-red-400">{overdueCount}</p>
-        <p className="text-[10px] text-red-400/70">Vencidas</p>
-      </div>
-      <div className="bg-orange-950/40 border border-orange-500/30 rounded-xl p-3 text-center">
-        <Banknote className="w-4 h-4 text-orange-400 mx-auto mb-1" />
-        <p className="text-lg font-black text-orange-400">
-          {totalPayable > 0 ? `${(totalPayable / 1000).toFixed(0)}k` : '0'}
-        </p>
-        <p className="text-[10px] text-orange-400/70">A Pagar (mês)</p>
-      </div>
-      <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 text-center">
-        <DollarSign className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-        <p className="text-lg font-black text-emerald-400">
-          {totalReceivable > 0 ? `${(totalReceivable / 1000).toFixed(0)}k` : '0'}
-        </p>
-        <p className="text-[10px] text-emerald-400/70">A Receber (mês)</p>
+    <div className="space-y-2">
+      {/* Alert banner if there are urgent items */}
+      {urgentCount > 0 && (
+        <div className="bg-gradient-to-r from-red-950/60 to-orange-950/40 border border-red-500/40 rounded-xl p-2.5 flex items-center gap-2">
+          <div className="relative">
+            <AlertCircle className="w-5 h-5 text-red-400" />
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">{urgentCount}</span>
+          </div>
+          <div className="flex-1">
+            <p className="text-[11px] text-red-300 font-bold">
+              {s.overdueCount > 0 && `${s.overdueCount} atrasada(s)`}
+              {s.overdueCount > 0 && s.dueTodayCount > 0 && ' + '}
+              {s.dueTodayCount > 0 && `${s.dueTodayCount} vence hoje`}
+            </p>
+          </div>
+          {s.dueTomorrowCount > 0 && (
+            <span className="text-[10px] text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">{s.dueTomorrowCount} amanhã</span>
+          )}
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-2">
+        <div className={`rounded-xl p-3 text-center ${urgentCount > 0 ? 'bg-red-950/60 border-2 border-red-500/50' : 'bg-red-950/40 border border-red-500/30'}`}>
+          <AlertCircle className="w-4 h-4 text-red-400 mx-auto mb-1" />
+          <p className="text-xl font-black text-red-400">{urgentCount}</p>
+          <p className="text-[10px] text-red-400/70">Atenção</p>
+        </div>
+        <div className="bg-orange-950/40 border border-orange-500/30 rounded-xl p-3 text-center">
+          <Banknote className="w-4 h-4 text-orange-400 mx-auto mb-1" />
+          <p className="text-lg font-black text-orange-400">
+            {totalPayable > 0 ? `${(totalPayable / 1000).toFixed(0)}k` : '0'}
+          </p>
+          <p className="text-[10px] text-orange-400/70">A Pagar (mês)</p>
+        </div>
+        <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 text-center">
+          <DollarSign className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+          <p className="text-lg font-black text-emerald-400">
+            {totalReceivable > 0 ? `${(totalReceivable / 1000).toFixed(0)}k` : '0'}
+          </p>
+          <p className="text-[10px] text-emerald-400/70">A Receber (mês)</p>
+        </div>
       </div>
     </div>
   );

@@ -307,6 +307,67 @@ export async function getFuelDashboard(month?: number, year?: number) {
   };
 }
 
+// ===== FINANCIAL ALERTS =====
+
+export async function getFinancialAlerts() {
+  const db = await getDb();
+  if (!db) return { overdue: [], dueToday: [], dueTomorrow: [], dueThisWeek: [], summary: { overdueCount: 0, overdueTotal: 0, dueTodayCount: 0, dueTodayTotal: 0, dueTomorrowCount: 0, dueTomorrowTotal: 0, dueWeekCount: 0, dueWeekTotal: 0 } };
+  
+  const now = new Date();
+  // Start of today (midnight)
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  // End of today (23:59:59)
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+  // Start of tomorrow
+  const startOfTomorrow = endOfToday + 1;
+  // End of tomorrow
+  const endOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 23, 59, 59, 999).getTime();
+  // End of this week (7 days from today)
+  const endOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59, 999).getTime();
+  
+  const tid = getCurrentTenantId();
+  const notPaid = or(eq(finTransactions.status, "pending"), eq(finTransactions.status, "overdue"));
+  
+  // Overdue: vencimento antes de hoje e não paga
+  const overdue = await db.select().from(finTransactions)
+    .where(and(eq(finTransactions.tenantId, tid), notPaid, lte(finTransactions.dueDate, startOfToday - 1)))
+    .orderBy(asc(finTransactions.dueDate));
+  
+  // Due today: vencimento é hoje
+  const dueToday = await db.select().from(finTransactions)
+    .where(and(eq(finTransactions.tenantId, tid), notPaid, gte(finTransactions.dueDate, startOfToday), lte(finTransactions.dueDate, endOfToday)))
+    .orderBy(asc(finTransactions.dueDate));
+  
+  // Due tomorrow: vencimento é amanhã
+  const dueTomorrow = await db.select().from(finTransactions)
+    .where(and(eq(finTransactions.tenantId, tid), notPaid, gte(finTransactions.dueDate, startOfTomorrow), lte(finTransactions.dueDate, endOfTomorrow)))
+    .orderBy(asc(finTransactions.dueDate));
+  
+  // Due this week: vencimento nos próximos 7 dias (excluindo hoje e amanhã)
+  const dueThisWeek = await db.select().from(finTransactions)
+    .where(and(eq(finTransactions.tenantId, tid), notPaid, gte(finTransactions.dueDate, endOfTomorrow + 1), lte(finTransactions.dueDate, endOfWeek)))
+    .orderBy(asc(finTransactions.dueDate));
+  
+  const sumAmounts = (items: any[]) => items.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+  
+  return {
+    overdue,
+    dueToday,
+    dueTomorrow,
+    dueThisWeek,
+    summary: {
+      overdueCount: overdue.length,
+      overdueTotal: sumAmounts(overdue),
+      dueTodayCount: dueToday.length,
+      dueTodayTotal: sumAmounts(dueToday),
+      dueTomorrowCount: dueTomorrow.length,
+      dueTomorrowTotal: sumAmounts(dueTomorrow),
+      dueWeekCount: dueThisWeek.length,
+      dueWeekTotal: sumAmounts(dueThisWeek),
+    },
+  };
+}
+
 // Auto-update overdue status
 export async function autoUpdateOverdueStatus() {
   const db = await getDb();

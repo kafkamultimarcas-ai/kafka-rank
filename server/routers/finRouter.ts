@@ -6,7 +6,7 @@ import {
   listFinTransactions, getFinTransaction, createFinTransaction,
   updateFinTransaction, deleteFinTransaction, markAsPaid,
   getFinDashboard, parseDocumentWithLLM,
-  getOverdueTransactions, getUpcomingDueTransactions,
+  getOverdueTransactions, getUpcomingDueTransactions, getFinancialAlerts,
   listFuelRecords, createFuelRecord, updateFuelRecord, deleteFuelRecord, getFuelDashboard,
 } from "../finDb";
 import { invokeLLM } from "../_core/llm";
@@ -161,6 +161,56 @@ export const finTransactionsRouter = router({
     days: z.number().default(3),
   }).optional()).query(async ({ input }) => {
     return getUpcomingDueTransactions(input?.days || 3);
+  }),
+
+  // ===== FINANCIAL ALERTS (vencendo hoje, amanhã, atrasadas) =====
+  alerts: publicProcedure.query(async () => {
+    return getFinancialAlerts();
+  }),
+
+  // Send alert notification for due bills
+  sendAlertNotification: publicProcedure.mutation(async () => {
+    const alerts = await getFinancialAlerts();
+    const { summary } = alerts;
+    const parts: string[] = [];
+    
+    if (summary.overdueCount > 0) {
+      const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.overdueTotal);
+      parts.push(`\u26a0\ufe0f ${summary.overdueCount} conta(s) ATRASADA(S) - Total: ${amt}`);
+    }
+    if (summary.dueTodayCount > 0) {
+      const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.dueTodayTotal);
+      parts.push(`\ud83d\udfe1 ${summary.dueTodayCount} conta(s) VENCE HOJE - Total: ${amt}`);
+    }
+    if (summary.dueTomorrowCount > 0) {
+      const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.dueTomorrowTotal);
+      parts.push(`\ud83d\udfe0 ${summary.dueTomorrowCount} conta(s) vence AMANH\u00c3 - Total: ${amt}`);
+    }
+    if (summary.dueWeekCount > 0) {
+      const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(summary.dueWeekTotal);
+      parts.push(`\ud83d\udfe2 ${summary.dueWeekCount} conta(s) vence esta SEMANA - Total: ${amt}`);
+    }
+    
+    if (parts.length === 0) {
+      return { sent: false, message: "Nenhuma conta pendente" };
+    }
+    
+    // List details of today's and overdue bills
+    const detailLines: string[] = [];
+    for (const t of [...alerts.overdue.slice(0, 5), ...alerts.dueToday.slice(0, 5)]) {
+      const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(t.amount));
+      const date = new Date(t.dueDate).toLocaleDateString("pt-BR");
+      detailLines.push(`  \u2022 ${t.description}${t.supplier ? ` (${t.supplier})` : ''} - ${amt} - Venc: ${date}`);
+    }
+    
+    const content = parts.join("\n") + (detailLines.length > 0 ? "\n\nDetalhes:\n" + detailLines.join("\n") : "");
+    
+    await notifyOwner({
+      title: "\ud83d\udcb0 Alerta Financeiro - Contas Vencendo",
+      content,
+    }).catch(() => {});
+    
+    return { sent: true, message: content, summary };
   }),
   
   // OCR: scan document with camera

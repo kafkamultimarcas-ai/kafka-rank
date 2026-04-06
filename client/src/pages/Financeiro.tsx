@@ -126,10 +126,18 @@ function DashboardTab() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const { data: dashboard } = trpc.finTransactions.dashboard.useQuery({ month, year });
-  const { data: overdue } = trpc.finTransactions.overdue.useQuery();
-  const { data: upcoming } = trpc.finTransactions.upcomingDue.useQuery({ days: 7 });
+  const { data: alerts } = trpc.finTransactions.alerts.useQuery(undefined, { refetchInterval: 60000 });
   const { data: fuelDash } = trpc.fuel.dashboard.useQuery({ month, year });
   const { data: pvGastos } = trpc.pvGastos.list.useQuery({ chamadoId: 0 });
+  const sendNotification = trpc.finTransactions.sendAlertNotification.useMutation({
+    onSuccess: (data) => {
+      if (data.sent) toast.success("Notificação de alerta enviada!");
+      else toast.info("Nenhuma conta pendente para notificar");
+    },
+    onError: () => toast.error("Erro ao enviar notificação"),
+  });
+  const [dismissedAlerts, setDismissedAlerts] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear(year - 1); }
@@ -150,8 +158,162 @@ function DashboardTab() {
     }).reduce((s: number, g: any) => s + Number(g.valor || 0), 0);
   }, [pvGastos, month, year]);
 
+  const s = alerts?.summary || { overdueCount: 0, overdueTotal: 0, dueTodayCount: 0, dueTodayTotal: 0, dueTomorrowCount: 0, dueTomorrowTotal: 0, dueWeekCount: 0, dueWeekTotal: 0 };
+  const totalAlerts = s.overdueCount + s.dueTodayCount + s.dueTomorrowCount;
+
+  const toggleSection = (section: string) => {
+    setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  const getDaysOverdue = (dueDate: number) => {
+    const diff = Date.now() - dueDate;
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  };
+
   return (
     <div className="container max-w-lg mx-auto px-4 py-4 space-y-4">
+
+      {/* ========== ALERTAS FINANCEIROS ========== */}
+      {totalAlerts > 0 && !dismissedAlerts && (
+        <div className="rounded-2xl border-2 border-red-500/50 bg-gradient-to-br from-red-950/60 via-red-900/30 to-orange-950/40 p-4 relative overflow-hidden">
+          {/* Pulse animation background */}
+          <div className="absolute inset-0 bg-red-500/5 animate-pulse pointer-events-none" />
+          
+          <div className="relative">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <AlertTriangle className="h-6 w-6 text-red-400" />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                    {totalAlerts}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-bold text-red-400 text-sm">ALERTAS FINANCEIROS</p>
+                  <p className="text-[10px] text-gray-400">{totalAlerts} conta(s) precisam de atenção</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => sendNotification.mutate()}
+                  disabled={sendNotification.isPending}
+                  className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors"
+                  title="Enviar notificação"
+                >
+                  {sendNotification.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                </button>
+                <button
+                  onClick={() => setDismissedAlerts(true)}
+                  className="p-1.5 rounded-lg hover:bg-gray-800 text-gray-500"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Alert Summary Cards */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {s.overdueCount > 0 && (
+                <button onClick={() => toggleSection('overdue')} className={`rounded-xl p-2.5 border text-center transition-all ${expandedSection === 'overdue' ? 'bg-red-500/20 border-red-500/50 ring-1 ring-red-500/30' : 'bg-red-500/10 border-red-500/20 hover:bg-red-500/15'}`}>
+                  <div className="text-lg font-bold text-red-400">{s.overdueCount}</div>
+                  <div className="text-[9px] text-red-300/80 font-bold uppercase">Atrasadas</div>
+                  <div className="text-[10px] text-red-400/70 font-bold mt-0.5">{formatCurrency(s.overdueTotal)}</div>
+                </button>
+              )}
+              {s.dueTodayCount > 0 && (
+                <button onClick={() => toggleSection('today')} className={`rounded-xl p-2.5 border text-center transition-all ${expandedSection === 'today' ? 'bg-yellow-500/20 border-yellow-500/50 ring-1 ring-yellow-500/30' : 'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/15'}`}>
+                  <div className="text-lg font-bold text-yellow-400">{s.dueTodayCount}</div>
+                  <div className="text-[9px] text-yellow-300/80 font-bold uppercase">Vence Hoje</div>
+                  <div className="text-[10px] text-yellow-400/70 font-bold mt-0.5">{formatCurrency(s.dueTodayTotal)}</div>
+                </button>
+              )}
+              {s.dueTomorrowCount > 0 && (
+                <button onClick={() => toggleSection('tomorrow')} className={`rounded-xl p-2.5 border text-center transition-all ${expandedSection === 'tomorrow' ? 'bg-orange-500/20 border-orange-500/50 ring-1 ring-orange-500/30' : 'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15'}`}>
+                  <div className="text-lg font-bold text-orange-400">{s.dueTomorrowCount}</div>
+                  <div className="text-[9px] text-orange-300/80 font-bold uppercase">Amanhã</div>
+                  <div className="text-[10px] text-orange-400/70 font-bold mt-0.5">{formatCurrency(s.dueTomorrowTotal)}</div>
+                </button>
+              )}
+            </div>
+
+            {/* Expanded Details */}
+            {expandedSection === 'overdue' && alerts?.overdue && alerts.overdue.length > 0 && (
+              <div className="rounded-xl bg-red-950/40 border border-red-500/20 p-3 space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-[10px] text-red-300 font-bold uppercase tracking-wider">Contas Atrasadas</p>
+                {alerts.overdue.map((t: any) => (
+                  <div key={t.id} className="flex items-center justify-between text-xs bg-red-500/10 rounded-lg p-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-200 font-medium truncate">{t.description}</p>
+                      <p className="text-[10px] text-red-300/70">
+                        {t.supplier && `${t.supplier} • `}Venceu {formatDate(t.dueDate)} ({getDaysOverdue(t.dueDate)} dias)
+                      </p>
+                    </div>
+                    <span className="text-red-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {expandedSection === 'today' && alerts?.dueToday && alerts.dueToday.length > 0 && (
+              <div className="rounded-xl bg-yellow-950/40 border border-yellow-500/20 p-3 space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-[10px] text-yellow-300 font-bold uppercase tracking-wider">Vencem Hoje</p>
+                {alerts.dueToday.map((t: any) => (
+                  <div key={t.id} className="flex items-center justify-between text-xs bg-yellow-500/10 rounded-lg p-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-200 font-medium truncate">{t.description}</p>
+                      <p className="text-[10px] text-yellow-300/70">
+                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : 'A Receber'}
+                      </p>
+                    </div>
+                    <span className="text-yellow-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {expandedSection === 'tomorrow' && alerts?.dueTomorrow && alerts.dueTomorrow.length > 0 && (
+              <div className="rounded-xl bg-orange-950/40 border border-orange-500/20 p-3 space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-[10px] text-orange-300 font-bold uppercase tracking-wider">Vencem Amanhã</p>
+                {alerts.dueTomorrow.map((t: any) => (
+                  <div key={t.id} className="flex items-center justify-between text-xs bg-orange-500/10 rounded-lg p-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-gray-200 font-medium truncate">{t.description}</p>
+                      <p className="text-[10px] text-orange-300/70">
+                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : 'A Receber'}
+                      </p>
+                    </div>
+                    <span className="text-orange-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Week preview (always visible if there are items) */}
+            {s.dueWeekCount > 0 && (
+              <div className="mt-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-emerald-400" />
+                  <span className="text-[11px] text-emerald-300"><b>{s.dueWeekCount}</b> conta(s) vence esta semana</span>
+                </div>
+                <span className="text-[11px] text-emerald-400 font-bold">{formatCurrency(s.dueWeekTotal)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Dismissed alerts - small reminder bar */}
+      {totalAlerts > 0 && dismissedAlerts && (
+        <button
+          onClick={() => setDismissedAlerts(false)}
+          className="w-full rounded-xl bg-red-500/10 border border-red-500/20 p-2 flex items-center justify-center gap-2 hover:bg-red-500/15 transition-colors"
+        >
+          <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+          <span className="text-[11px] text-red-300 font-medium">{totalAlerts} alerta(s) pendente(s) — toque para ver</span>
+        </button>
+      )}
+
       {/* Month Selector */}
       <div className="flex items-center justify-between bg-gray-900/80 border border-gray-800 rounded-xl p-3">
         <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400">
@@ -190,8 +352,8 @@ function DashboardTab() {
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-xl p-3 border text-center bg-red-500/10 border-red-500/20">
           <AlertTriangle className="h-5 w-5 text-red-400 mx-auto mb-1" />
-          <p className="text-xl font-bold text-red-400">{d.overdue}</p>
-          <p className="text-[9px] text-gray-500">Vencidas</p>
+          <p className="text-xl font-bold text-red-400">{s.overdueCount + s.dueTodayCount}</p>
+          <p className="text-[9px] text-gray-500">Vencidas/Hoje</p>
         </div>
         <div className="rounded-xl p-3 border text-center bg-orange-500/10 border-orange-500/20">
           <Wrench className="h-5 w-5 text-orange-400 mx-auto mb-1" />
@@ -204,46 +366,6 @@ function DashboardTab() {
           <p className="text-[9px] text-gray-500">Gasolina</p>
         </div>
       </div>
-
-      {/* Overdue Alert */}
-      {overdue && overdue.length > 0 && (
-        <div className="rounded-xl border-2 border-red-500/40 bg-red-500/10 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="h-5 w-5 text-red-400" />
-            <p className="font-bold text-red-400 text-sm">Contas Vencidas ({overdue.length})</p>
-          </div>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {overdue.slice(0, 5).map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between text-xs">
-                <span className="text-gray-300 truncate flex-1">{t.description}</span>
-                <span className="text-red-400 font-bold ml-2">{formatCurrency(t.amount)}</span>
-              </div>
-            ))}
-            {overdue.length > 5 && <p className="text-[10px] text-gray-500 text-center">+{overdue.length - 5} mais...</p>}
-          </div>
-        </div>
-      )}
-
-      {/* Upcoming Due */}
-      {upcoming && upcoming.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Clock className="h-5 w-5 text-amber-400" />
-            <p className="font-bold text-amber-400 text-sm">Vencendo em Breve ({upcoming.length})</p>
-          </div>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {upcoming.slice(0, 5).map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between text-xs">
-                <span className="text-gray-300 truncate flex-1">{t.description}</span>
-                <div className="flex items-center gap-2 ml-2">
-                  <span className="text-gray-500">{formatDate(t.dueDate)}</span>
-                  <span className="text-amber-400 font-bold">{formatCurrency(t.amount)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
