@@ -826,6 +826,80 @@ async function disableAiForLead(dbConn: any, leadId: number): Promise<void> {
   }
 }
 
+// ===== AI CONVERSATION LOGGING =====
+async function logAiConversation(
+  leadId: number,
+  stopReason: string,
+  extras: {
+    leadName?: string;
+    leadPhone?: string;
+    aiMsgCount?: number;
+    clientMsgCount?: number;
+    messageLimit?: number;
+    leadTemperature?: string;
+    conversationStage?: string;
+    collectedData?: CollectedData;
+    action?: string;
+    assignedSellerId?: number;
+  } = {}
+): Promise<void> {
+  try {
+    const dbConn = await getDb();
+    if (!dbConn) return;
+    
+    const data = extras.collectedData || {};
+    
+    // Count collected fields
+    let fieldsCollected = 0;
+    if (data.customerName) fieldsCollected++;
+    if (data.customerCpf) fieldsCollected++;
+    if (data.vehicleInterest) fieldsCollected++;
+    if (data.tradeInVehicle) fieldsCollected++;
+    if (data.paymentMethod) fieldsCollected++;
+    if (data.customerCity) fieldsCollected++;
+    if (data.scheduledDate) fieldsCollected++;
+    if (data.customerEmail) fieldsCollected++;
+    if (data.customerBirthDate) fieldsCollected++;
+    if (data.customerIncome) fieldsCollected++;
+    if (data.tradeInKm) fieldsCollected++;
+    if (data.customerAddress) fieldsCollected++;
+    
+    // Count photos sent
+    const photosSent = (data.sentVehicleIds || []).length;
+    
+    // Calculate timing
+    const now = Date.now();
+    const firstMsgAt = extras.aiMsgCount && extras.aiMsgCount > 0 ? now - ((extras.aiMsgCount || 1) * 30000) : now; // rough estimate
+    const durationSec = Math.round((now - firstMsgAt) / 1000);
+    
+    // Parse action string for boolean flags
+    const actionStr = extras.action || '';
+    
+    await dbConn.execute(sql`INSERT INTO ai_conversation_logs 
+      (leadId, leadName, leadPhone, totalAiMessages, totalClientMessages, messageLimit,
+       stopReason, leadTemperature, conversationStage,
+       collectedName, collectedCpf, collectedVehicleInterest, collectedTradeIn,
+       collectedPaymentMethod, collectedCity, collectedSchedule, totalFieldsCollected,
+       photosSent, fichaCreated, appointmentCreated, distributedToSeller, assignedSellerId,
+       firstMessageAt, lastMessageAt, durationSeconds)
+      VALUES (
+        ${leadId}, ${extras.leadName || null}, ${extras.leadPhone || null},
+        ${extras.aiMsgCount || 0}, ${extras.clientMsgCount || 0}, ${extras.messageLimit || 5},
+        ${stopReason}, ${extras.leadTemperature || null}, ${extras.conversationStage || null},
+        ${data.customerName ? 1 : 0}, ${data.customerCpf ? 1 : 0}, ${data.vehicleInterest ? 1 : 0},
+        ${data.tradeInVehicle ? 1 : 0}, ${data.paymentMethod ? 1 : 0}, ${data.customerCity ? 1 : 0},
+        ${data.scheduledDate ? 1 : 0}, ${fieldsCollected},
+        ${photosSent}, ${actionStr.includes('ficha_created') ? 1 : 0},
+        ${actionStr.includes('appointment_created') ? 1 : 0}, ${actionStr.includes('distributed') ? 1 : 0},
+        ${extras.assignedSellerId || null},
+        ${firstMsgAt}, ${now}, ${durationSec}
+      )`);
+    console.log(`[AI Log] Logged conversation for lead #${leadId}: reason=${stopReason}, msgs=${extras.aiMsgCount}, fields=${fieldsCollected}`);
+  } catch (e: any) {
+    console.error(`[AI Log] Error logging conversation for lead #${leadId}:`, e.message);
+  }
+}
+
 // ===== MAIN HANDLER =====
 export async function handleAttendantMessage(
   leadId: number,
@@ -856,6 +930,7 @@ export async function handleAttendantMessage(
       const aiSettingRows = Array.isArray(aiSettingRaw?.[0]) ? aiSettingRaw[0] : aiSettingRaw;
       if (aiSettingRows && aiSettingRows.length > 0 && !aiSettingRows[0].enabled) {
         console.log(`[AI Attendant] AI explicitly disabled for lead #${leadId}, skipping`);
+        // Don't log here - this is a repeat check, conversation was already logged when disabled
         return { sent: false, action: 'ai_disabled' };
       }
     } catch { /* continue */ }
@@ -883,14 +958,17 @@ export async function handleAttendantMessage(
         // Case 1: Message sent via CRM by a human seller (sentBy has sellerId)
         if (sByVal && !isAiMessage) {
           console.log(`[AI Attendant] Human seller (ID: ${sByVal}) is handling lead #${leadId} via CRM, IA stopping PERMANENTLY`);
-          // PERMANENTLY disable AI for this lead
           await disableAiForLead(dbConn, leadId);
+          const collDataHT1 = await getCollectedData(leadId);
+          await logAiConversation(leadId, 'human_takeover_crm', { leadName: lead.name, leadPhone: phone, aiMsgCount: 0, messageLimit: 5, collectedData: collDataHT1, leadTemperature: collDataHT1.leadTemperature, conversationStage: collDataHT1.conversationStage });
           return { sent: false, action: 'human_handling' };
         }
         // Case 2: Message sent from WhatsApp phone directly by a human (has senderName that's not AI)
         if (sName && !isAiMessage && !sByVal) {
           console.log(`[AI Attendant] Human "${sName}" is handling lead #${leadId} via WhatsApp, IA stopping PERMANENTLY`);
           await disableAiForLead(dbConn, leadId);
+          const collDataHT2 = await getCollectedData(leadId);
+          await logAiConversation(leadId, 'human_takeover_whatsapp', { leadName: lead.name, leadPhone: phone, aiMsgCount: 0, messageLimit: 5, collectedData: collDataHT2, leadTemperature: collDataHT2.leadTemperature, conversationStage: collDataHT2.conversationStage });
           return { sent: false, action: 'human_handling' };
         }
         // Case 3: fromMe message from webhook with NO senderName and NO sentBy
@@ -906,6 +984,8 @@ export async function handleAttendantMessage(
           if (!isKnownAiMsg && content && content.length > 5) {
             console.log(`[AI Attendant] Possible human message (fromMe, no sender) for lead #${leadId}: "${content.substring(0, 40)}...", IA stopping`);
             await disableAiForLead(dbConn, leadId);
+            const collDataHT3 = await getCollectedData(leadId);
+            await logAiConversation(leadId, 'human_takeover_fromme', { leadName: lead.name, leadPhone: phone, aiMsgCount: 0, messageLimit: 5, collectedData: collDataHT3, leadTemperature: collDataHT3.leadTemperature, conversationStage: collDataHT3.conversationStage });
             return { sent: false, action: 'human_handling' };
           }
         }
@@ -942,6 +1022,9 @@ export async function handleAttendantMessage(
         await disableAiForLead(dbConn, leadId);
         console.log(`[AI Attendant] Lead #${leadId} transferred to human, AI disabled`);
       }
+      // Log the conversation when limit reached
+      const collDataLimit = await getCollectedData(leadId);
+      await logAiConversation(leadId, 'limit_reached', { leadName: lead.name, leadPhone: phone, aiMsgCount: aiMsgCount + 1, messageLimit: hardLimit, collectedData: collDataLimit, leadTemperature: collDataLimit.leadTemperature, conversationStage: collDataLimit.conversationStage });
       return { sent: true, message: transferMsg, action: 'transfer_limit_reached' };
     }
     
@@ -949,6 +1032,8 @@ export async function handleAttendantMessage(
     if (aiMsgCount >= hardLimit) {
       console.log(`[AI Attendant] Lead #${leadId} PAST message limit (${aiMsgCount}/${hardLimit}), AI stopped`);
       await disableAiForLead(dbConn, leadId);
+      const collDataExceeded = await getCollectedData(leadId);
+      await logAiConversation(leadId, 'limit_exceeded', { leadName: lead.name, leadPhone: phone, aiMsgCount, messageLimit: hardLimit, collectedData: collDataExceeded, leadTemperature: collDataExceeded.leadTemperature, conversationStage: collDataExceeded.conversationStage });
       return { sent: false, action: 'limit_exceeded' };
     }
 
@@ -1272,6 +1357,7 @@ export async function handleAttendantMessage(
         console.log(`[AI Attendant] Lead #${leadId} transferred to human seller, AI DISABLED`);
         // Save updated data before returning
         await saveCollectedData(leadId, updatedData);
+        await logAiConversation(leadId, 'transfer_to_seller', { leadName: lead.name, leadPhone: phone, aiMsgCount: aiMsgCount + 1, messageLimit: hardLimit, collectedData: updatedData, leadTemperature: parsed.leadTemperature, conversationStage: 'transfer_to_seller', action });
         return { sent: true, message: responseText, action: 'transfer_to_seller' };
       }
 

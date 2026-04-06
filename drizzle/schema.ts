@@ -1269,3 +1269,46 @@ export const competitionSnapshots = mysqlTable("competition_snapshots", {
 });
 export type CompetitionSnapshot = typeof competitionSnapshots.$inferSelect;
 export type InsertCompetitionSnapshot = typeof competitionSnapshots.$inferInsert;
+
+
+// ===== AI CONVERSATION LOGS (MÉTRICAS DA IA) =====
+
+// Log de cada conversa da IA com um lead (registra métricas ao final)
+export const aiConversationLogs = mysqlTable("ai_conversation_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  leadName: varchar("leadName", { length: 255 }),
+  leadPhone: varchar("leadPhone", { length: 20 }),
+  // Métricas da conversa
+  totalAiMessages: int("totalAiMessages").default(0).notNull(), // total de msgs enviadas pela IA
+  totalClientMessages: int("totalClientMessages").default(0).notNull(), // total de msgs do cliente
+  messageLimit: int("messageLimit").default(5).notNull(), // limite configurado na época
+  // Resultado
+  stopReason: varchar("stopReason", { length: 50 }).notNull(), // limit_reached, transfer_to_seller, human_takeover, ai_disabled, duplicate_blocked, error
+  leadTemperature: varchar("leadTemperature", { length: 20 }), // hot, warm, cold
+  conversationStage: varchar("conversationStage", { length: 50 }), // qualifying, trade_evaluation, collecting_data, scheduling, closing, transfer_to_seller
+  // Dados coletados (resumo)
+  collectedName: boolean("collectedName").default(false).notNull(),
+  collectedCpf: boolean("collectedCpf").default(false).notNull(),
+  collectedVehicleInterest: boolean("collectedVehicleInterest").default(false).notNull(),
+  collectedTradeIn: boolean("collectedTradeIn").default(false).notNull(),
+  collectedPaymentMethod: boolean("collectedPaymentMethod").default(false).notNull(),
+  collectedCity: boolean("collectedCity").default(false).notNull(),
+  collectedSchedule: boolean("collectedSchedule").default(false).notNull(),
+  totalFieldsCollected: int("totalFieldsCollected").default(0).notNull(), // quantos campos foram coletados
+  // Ações realizadas
+  photosSent: int("photosSent").default(0).notNull(), // quantas fotos foram enviadas
+  fichaCreated: boolean("fichaCreated").default(false).notNull(),
+  appointmentCreated: boolean("appointmentCreated").default(false).notNull(),
+  distributedToSeller: boolean("distributedToSeller").default(false).notNull(),
+  assignedSellerId: int("assignedSellerId"), // vendedor que recebeu o lead
+  // Timing
+  firstMessageAt: bigint("firstMessageAt", { mode: "number" }), // timestamp da primeira msg da IA
+  lastMessageAt: bigint("lastMessageAt", { mode: "number" }), // timestamp da última msg da IA
+  durationSeconds: int("durationSeconds").default(0), // duração total da conversa em segundos
+  // Timestamps
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+export type AiConversationLog = typeof aiConversationLogs.$inferSelect;
+export type InsertAiConversationLog = typeof aiConversationLogs.$inferInsert;

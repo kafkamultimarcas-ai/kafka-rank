@@ -1703,3 +1703,230 @@ export const crmPerformanceRouter = router({
     }
   }),
 });
+
+// ===== AI METRICS DASHBOARD =====
+export const aiMetricsRouter = router({
+  // Get AI conversation logs with pagination and filters
+  getConversationLogs: publicProcedure.input(z.object({
+    page: z.number().min(1).default(1),
+    limit: z.number().min(1).max(100).default(20),
+    stopReason: z.string().optional(),
+    temperature: z.string().optional(),
+    dateFrom: z.number().optional(), // timestamp
+    dateTo: z.number().optional(), // timestamp
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { logs: [], total: 0 };
+    const { sql } = await import("drizzle-orm");
+    try {
+      const page = input?.page || 1;
+      const limit = input?.limit || 20;
+      const offset = (page - 1) * limit;
+      
+      let whereExtra = '';
+      if (input?.stopReason) whereExtra += ` AND stopReason = '${input.stopReason}'`;
+      if (input?.temperature) whereExtra += ` AND leadTemperature = '${input.temperature}'`;
+      if (input?.dateFrom) whereExtra += ` AND UNIX_TIMESTAMP(createdAt) * 1000 >= ${input.dateFrom}`;
+      if (input?.dateTo) whereExtra += ` AND UNIX_TIMESTAMP(createdAt) * 1000 <= ${input.dateTo}`;
+      
+      const countResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM ai_conversation_logs WHERE 1=1 ${sql.raw(whereExtra)}`);
+      const countRaw = countResult as any;
+      const countRows = Array.isArray(countRaw?.[0]) ? countRaw[0] : countRaw;
+      const total = Number(countRows?.[0]?.cnt || 0);
+      
+      const result = await dbConn.execute(sql`SELECT * FROM ai_conversation_logs WHERE 1=1 ${sql.raw(whereExtra)} ORDER BY createdAt DESC LIMIT ${limit} OFFSET ${offset}`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      
+      return { logs: rows || [], total };
+    } catch (e: any) {
+      console.error('[AI Metrics] Error listing logs:', e.message);
+      return { logs: [], total: 0 };
+    }
+  }),
+
+  // Get aggregated AI metrics (summary dashboard)
+  getDashboardMetrics: publicProcedure.input(z.object({
+    period: z.enum(['today', 'week', 'month', 'all']).default('month'),
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    const defaults = {
+      totalConversations: 0,
+      avgMessagesPerConversation: 0,
+      avgFieldsCollected: 0,
+      stopReasonBreakdown: {} as Record<string, number>,
+      temperatureBreakdown: {} as Record<string, number>,
+      conversionRate: 0, // % of leads that became hot
+      qualificationRate: 0, // % of leads with 3+ fields collected
+      totalPhotosSent: 0,
+      totalFichasCreated: 0,
+      totalAppointmentsCreated: 0,
+      totalDistributed: 0,
+      topCollectedFields: {} as Record<string, number>,
+      avgDurationSeconds: 0,
+    };
+    if (!dbConn) return defaults;
+    const { sql } = await import("drizzle-orm");
+    try {
+      let dateFilter = '';
+      const now = new Date();
+      if (input?.period === 'today') {
+        const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+        dateFilter = ` AND createdAt >= '${todayStart.toISOString().slice(0, 19).replace('T', ' ')}'`;
+      } else if (input?.period === 'week') {
+        const weekAgo = new Date(now.getTime() - 7 * 86400000);
+        dateFilter = ` AND createdAt >= '${weekAgo.toISOString().slice(0, 19).replace('T', ' ')}'`;
+      } else if (input?.period === 'month') {
+        const monthAgo = new Date(now.getTime() - 30 * 86400000);
+        dateFilter = ` AND createdAt >= '${monthAgo.toISOString().slice(0, 19).replace('T', ' ')}'`;
+      }
+      
+      // Main aggregation
+      const mainResult = await dbConn.execute(sql`SELECT 
+        COUNT(*) as total,
+        AVG(totalAiMessages) as avgMsgs,
+        AVG(totalFieldsCollected) as avgFields,
+        SUM(photosSent) as totalPhotos,
+        SUM(CASE WHEN fichaCreated = 1 THEN 1 ELSE 0 END) as totalFichas,
+        SUM(CASE WHEN appointmentCreated = 1 THEN 1 ELSE 0 END) as totalAppointments,
+        SUM(CASE WHEN distributedToSeller = 1 THEN 1 ELSE 0 END) as totalDistributed,
+        SUM(CASE WHEN leadTemperature = 'hot' THEN 1 ELSE 0 END) as hotLeads,
+        SUM(CASE WHEN totalFieldsCollected >= 3 THEN 1 ELSE 0 END) as qualifiedLeads,
+        AVG(durationSeconds) as avgDuration,
+        SUM(CASE WHEN collectedName = 1 THEN 1 ELSE 0 END) as fName,
+        SUM(CASE WHEN collectedCpf = 1 THEN 1 ELSE 0 END) as fCpf,
+        SUM(CASE WHEN collectedVehicleInterest = 1 THEN 1 ELSE 0 END) as fVehicle,
+        SUM(CASE WHEN collectedTradeIn = 1 THEN 1 ELSE 0 END) as fTradeIn,
+        SUM(CASE WHEN collectedPaymentMethod = 1 THEN 1 ELSE 0 END) as fPayment,
+        SUM(CASE WHEN collectedCity = 1 THEN 1 ELSE 0 END) as fCity,
+        SUM(CASE WHEN collectedSchedule = 1 THEN 1 ELSE 0 END) as fSchedule
+      FROM ai_conversation_logs WHERE 1=1 ${sql.raw(dateFilter)}`);
+      const mainRaw = mainResult as any;
+      const mainRows = Array.isArray(mainRaw?.[0]) ? mainRaw[0] : mainRaw;
+      const m = mainRows?.[0] || {};
+      
+      // Stop reason breakdown
+      const reasonResult = await dbConn.execute(sql`SELECT stopReason, COUNT(*) as cnt FROM ai_conversation_logs WHERE 1=1 ${sql.raw(dateFilter)} GROUP BY stopReason ORDER BY cnt DESC`);
+      const reasonRaw = reasonResult as any;
+      const reasonRows = Array.isArray(reasonRaw?.[0]) ? reasonRaw[0] : reasonRaw;
+      const stopReasonBreakdown: Record<string, number> = {};
+      for (const r of (reasonRows || [])) {
+        stopReasonBreakdown[r.stopReason] = Number(r.cnt);
+      }
+      
+      // Temperature breakdown
+      const tempResult = await dbConn.execute(sql`SELECT leadTemperature, COUNT(*) as cnt FROM ai_conversation_logs WHERE leadTemperature IS NOT NULL ${sql.raw(dateFilter)} GROUP BY leadTemperature ORDER BY cnt DESC`);
+      const tempRaw = tempResult as any;
+      const tempRows = Array.isArray(tempRaw?.[0]) ? tempRaw[0] : tempRaw;
+      const temperatureBreakdown: Record<string, number> = {};
+      for (const r of (tempRows || [])) {
+        temperatureBreakdown[r.leadTemperature] = Number(r.cnt);
+      }
+      
+      const total = Number(m.total || 0);
+      
+      return {
+        totalConversations: total,
+        avgMessagesPerConversation: Number(Number(m.avgMsgs || 0).toFixed(1)),
+        avgFieldsCollected: Number(Number(m.avgFields || 0).toFixed(1)),
+        stopReasonBreakdown,
+        temperatureBreakdown,
+        conversionRate: total > 0 ? Number(((Number(m.hotLeads || 0) / total) * 100).toFixed(1)) : 0,
+        qualificationRate: total > 0 ? Number(((Number(m.qualifiedLeads || 0) / total) * 100).toFixed(1)) : 0,
+        totalPhotosSent: Number(m.totalPhotos || 0),
+        totalFichasCreated: Number(m.totalFichas || 0),
+        totalAppointmentsCreated: Number(m.totalAppointments || 0),
+        totalDistributed: Number(m.totalDistributed || 0),
+        topCollectedFields: {
+          'Nome': Number(m.fName || 0),
+          'CPF': Number(m.fCpf || 0),
+          'Veículo': Number(m.fVehicle || 0),
+          'Troca': Number(m.fTradeIn || 0),
+          'Pagamento': Number(m.fPayment || 0),
+          'Cidade': Number(m.fCity || 0),
+          'Agendamento': Number(m.fSchedule || 0),
+        },
+        avgDurationSeconds: Number(Number(m.avgDuration || 0).toFixed(0)),
+      };
+    } catch (e: any) {
+      console.error('[AI Metrics] Error getting dashboard:', e.message);
+      return defaults;
+    }
+  }),
+
+  // Get daily trend data for charts
+  getDailyTrend: publicProcedure.input(z.object({
+    days: z.number().min(1).max(90).default(30),
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql } = await import("drizzle-orm");
+    try {
+      const days = input?.days || 30;
+      const startDate = new Date(Date.now() - days * 86400000);
+      const result = await dbConn.execute(sql`SELECT 
+        DATE(createdAt) as day,
+        COUNT(*) as conversations,
+        AVG(totalAiMessages) as avgMessages,
+        AVG(totalFieldsCollected) as avgFields,
+        SUM(CASE WHEN leadTemperature = 'hot' THEN 1 ELSE 0 END) as hotLeads,
+        SUM(CASE WHEN leadTemperature = 'warm' THEN 1 ELSE 0 END) as warmLeads,
+        SUM(CASE WHEN leadTemperature = 'cold' THEN 1 ELSE 0 END) as coldLeads,
+        SUM(CASE WHEN stopReason = 'limit_reached' THEN 1 ELSE 0 END) as limitReached,
+        SUM(CASE WHEN stopReason LIKE 'human_takeover%' THEN 1 ELSE 0 END) as humanTakeover,
+        SUM(CASE WHEN stopReason = 'transfer_to_seller' THEN 1 ELSE 0 END) as transferred
+      FROM ai_conversation_logs 
+      WHERE createdAt >= ${startDate.toISOString().slice(0, 19).replace('T', ' ')}
+      GROUP BY DATE(createdAt) 
+      ORDER BY day ASC`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      return (rows || []).map((r: any) => ({
+        day: r.day,
+        conversations: Number(r.conversations || 0),
+        avgMessages: Number(Number(r.avgMessages || 0).toFixed(1)),
+        avgFields: Number(Number(r.avgFields || 0).toFixed(1)),
+        hotLeads: Number(r.hotLeads || 0),
+        warmLeads: Number(r.warmLeads || 0),
+        coldLeads: Number(r.coldLeads || 0),
+        limitReached: Number(r.limitReached || 0),
+        humanTakeover: Number(r.humanTakeover || 0),
+        transferred: Number(r.transferred || 0),
+      }));
+    } catch (e: any) {
+      console.error('[AI Metrics] Error getting daily trend:', e.message);
+      return [];
+    }
+  }),
+
+  // Re-enable AI for a specific lead (admin action)
+  reenableAiForLead: protectedProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    await dbConn.execute(sql`INSERT INTO crm_ai_settings (leadId, enabled) VALUES (${input.leadId}, 1) ON DUPLICATE KEY UPDATE enabled = 1`);
+    return { success: true };
+  }),
+
+  // Reset AI message count for a lead (admin action - deletes AI outbound messages count)
+  resetAiMessageCount: protectedProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    // Re-enable AI and clear the collected data conversation stage
+    await dbConn.execute(sql`INSERT INTO crm_ai_settings (leadId, enabled) VALUES (${input.leadId}, 1) ON DUPLICATE KEY UPDATE enabled = 1`);
+    // Reset the AI message counter by updating senderName of old AI messages
+    // (We don't delete messages, just rename them so they don't count against the limit)
+    await dbConn.execute(sql`UPDATE crm_messages SET senderName = 'IA Kafka (Reset)' WHERE leadId = ${input.leadId} AND direction = 'outbound' AND senderName = 'IA Kafka'`);
+    return { success: true };
+  }),
+});

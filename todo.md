@@ -2010,3 +2010,13 @@
 - [x] MELHORIA: Limite HARD de 5 mensagens da IA por lead - depois transfere para consultor (com msg automática de transferência)
 - [x] MELHORIA: Pesquisar melhores práticas de IA SDR automotiva no mercado (Salesforce, Retell AI, Fullpath, Impel AI)
 - [x] MELHORIA: Criar relatório de melhoria com prompt otimizado baseado em pesquisa (relatório completo gerado)
+
+### Melhorias Avançadas IA SDR - Dashboard e Métricas (06/04)
+- [x] Criar tabela ai_conversation_logs para registrar cada interação da IA (motivo parada, dados coletados, msgs enviadas)
+- [x] Implementar logging automático no ai-attendant.ts (salvar métricas ao final de cada conversa)
+- [x] Criar endpoints de métricas: taxa qualificação, tempo médio, motivo parada, msgs por conversa
+- [x] Dashboard de métricas da IA na área de gerência (gráficos e KPIs)
+- [x] Tornar limite de mensagens configurável pelo painel admin (attendantMaxMessages)
+- [x] Adicionar filtros por período no dashboard de métricas
+- [x] Ações admin: reativar IA para lead e resetar contador de mensagens
+- [x] Testes para os novos endpoints de métricas (12 testes)

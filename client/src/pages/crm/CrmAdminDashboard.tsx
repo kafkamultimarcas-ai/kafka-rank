@@ -38,7 +38,7 @@ const DEPT_COLORS: Record<string, string> = {
   financeiro: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
 };
 
-type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas";
+type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas" | "ai_metrics";
 
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
@@ -77,7 +77,8 @@ export default function CrmAdminDashboard() {
     { key: "campaigns" as const, icon: Megaphone, label: "Campanhas" },
     { key: "marketing" as const, icon: BarChart3, label: "Marketing" },
     { key: "attendant" as const, icon: Bot, label: "IA Atendente" },
-    { key: "fichas" as const, icon: CreditCard, label: "Fichas de Cr\u00e9dito" },
+    { key: "ai_metrics" as const, icon: BarChart3, label: "Métricas IA" },
+    { key: "fichas" as const, icon: CreditCard, label: "Fichas de Crédito" },
     { key: "sdr" as const, icon: Headphones, label: "Painel SDR" },
     { key: "settings" as const, icon: Settings, label: "Ajustes" },
   ];
@@ -190,6 +191,7 @@ export default function CrmAdminDashboard() {
           {activeView === "pipeline" && <AdminPipelineView />}
           {activeView === "sdr" && <SDRManagementView />}
           {activeView === "attendant" && <AIAttendantView />}
+          {activeView === "ai_metrics" && <AIMetricsDashboard />}
           {activeView === "fichas" && <CreditApplicationsView />}
         </div>
       </main>
@@ -3167,44 +3169,60 @@ function AIAttendantView() {
         </div>
       </div>
 
-      {/* Max Messages */}
+      {/* Max Messages - HARD LIMIT */}
       <div className="p-5 rounded-xl bg-card border border-border space-y-4">
         <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-primary" /> Limite de Mensagens por Lead
         </h3>
-        <div className="flex items-center gap-3 mb-2">
-          <button
-            onClick={() => { setLocalMaxMsg(0); setConfig.mutate({ attendantMaxMessages: 0 }); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
-          >
-            Ilimitado
-          </button>
-          {[10, 30, 50].map(n => (
-            <button key={n}
-              onClick={() => { setLocalMaxMsg(n); setConfig.mutate({ attendantMaxMessages: n }); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === n ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
-            >
-              {n} msgs
-            </button>
-          ))}
-        </div>
-        {localMaxMsg > 0 && (
-          <div className="flex items-center gap-4">
-            <input
-              type="range" min={5} max={100} value={localMaxMsg}
-              onChange={e => setLocalMaxMsg(Number(e.target.value))}
-              className="flex-1 accent-primary"
-            />
-            <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
-            <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
-              <Save className="w-3 h-3 mr-1" /> Salvar
-            </Button>
+        
+        {/* HARD limit info */}
+        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-center gap-2 mb-1">
+            <Shield className="w-4 h-4 text-amber-400" />
+            <span className="text-xs font-bold text-amber-400">Limite HARD Ativo: 5 mensagens</span>
           </div>
-        )}
+          <p className="text-[10px] text-muted-foreground">
+            A IA envia no máximo 5 mensagens por lead. Na 5ª mensagem, transfere automaticamente para um consultor humano e desabilita a IA para aquele lead.
+          </p>
+        </div>
+
+        {/* Configurable soft limit */}
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">Limite configurável (sobrescreve o HARD de 5 se for menor):</p>
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              onClick={() => { setLocalMaxMsg(0); setConfig.mutate({ attendantMaxMessages: 0 }); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+            >
+              Padrão (5 msgs)
+            </button>
+            {[3, 5, 7, 10].map(n => (
+              <button key={n}
+                onClick={() => { setLocalMaxMsg(n); setConfig.mutate({ attendantMaxMessages: n }); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === n ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+              >
+                {n} msgs
+              </button>
+            ))}
+          </div>
+          {localMaxMsg > 0 && (
+            <div className="flex items-center gap-4">
+              <input
+                type="range" min={3} max={20} value={localMaxMsg}
+                onChange={e => setLocalMaxMsg(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
+              <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
+                <Save className="w-3 h-3 mr-1" /> Salvar
+              </Button>
+            </div>
+          )}
+        </div>
         <p className="text-[10px] text-muted-foreground">
           {localMaxMsg === 0 
-            ? 'A IA responde quantas mensagens forem necessárias até converter o lead.'
-            : `Após ${localMaxMsg} mensagens, a IA para e o lead precisa de atendimento humano.`
+            ? 'Usando limite padrão HARD de 5 mensagens. Na 5ª msg a IA transfere automaticamente.'
+            : `Após ${localMaxMsg} mensagens, a IA transfere para consultor e desabilita automaticamente.`
           }
         </p>
       </div>
@@ -3518,6 +3536,349 @@ function DetailField({ label, value }: { label: string; value: any }) {
     <div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="text-xs font-medium text-foreground">{value || <span className="text-muted-foreground/50">—</span>}</div>
+    </div>
+  );
+}
+
+
+// ===== AI METRICS DASHBOARD =====
+function AIMetricsDashboard() {
+  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('month');
+  const [logPage, setLogPage] = useState(1);
+  const [logFilter, setLogFilter] = useState<string>('');
+  const [tempFilter, setTempFilter] = useState<string>('');
+  
+  const { data: metrics } = trpc.aiMetrics.getDashboardMetrics.useQuery({ period }, { refetchInterval: 30000 });
+  const { data: trend } = trpc.aiMetrics.getDailyTrend.useQuery({ days: period === 'today' ? 1 : period === 'week' ? 7 : 30 });
+  const { data: logsData } = trpc.aiMetrics.getConversationLogs.useQuery({ 
+    page: logPage, limit: 15,
+    stopReason: logFilter || undefined,
+    temperature: tempFilter || undefined,
+  }, { refetchInterval: 30000 });
+  
+  const reenableAi = trpc.aiMetrics.reenableAiForLead.useMutation({
+    onSuccess: () => toast.success("IA reativada para este lead!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const resetCount = trpc.aiMetrics.resetAiMessageCount.useMutation({
+    onSuccess: () => toast.success("Contador de mensagens resetado!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const stopReasonLabels: Record<string, { label: string; color: string; icon: any }> = {
+    'limit_reached': { label: 'Limite Atingido', color: 'text-amber-400', icon: Timer },
+    'limit_exceeded': { label: 'Limite Excedido', color: 'text-amber-500', icon: Timer },
+    'transfer_to_seller': { label: 'Transferido p/ Vendedor', color: 'text-blue-400', icon: ArrowRightLeft },
+    'human_takeover_crm': { label: 'Humano via CRM', color: 'text-green-400', icon: Users },
+    'human_takeover_whatsapp': { label: 'Humano via WhatsApp', color: 'text-green-500', icon: Phone },
+    'human_takeover_fromme': { label: 'Humano (fromMe)', color: 'text-green-600', icon: Send },
+    'ai_disabled': { label: 'IA Desabilitada', color: 'text-red-400', icon: Power },
+    'duplicate_blocked': { label: 'Duplicata Bloqueada', color: 'text-orange-400', icon: Shield },
+    'error': { label: 'Erro', color: 'text-red-500', icon: AlertTriangle },
+  };
+
+  const tempLabels: Record<string, { label: string; color: string; icon: any }> = {
+    'hot': { label: 'Quente', color: 'text-red-400', icon: Flame },
+    'warm': { label: 'Morno', color: 'text-amber-400', icon: Thermometer },
+    'cold': { label: 'Frio', color: 'text-blue-400', icon: Snowflake },
+  };
+
+  return (
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+            <BarChart3 className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Métricas da IA Atendente</h2>
+            <p className="text-xs text-muted-foreground">Análise de performance e resultados da IA SDR</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {(['today', 'week', 'month', 'all'] as const).map(p => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${period === p ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+              {p === 'today' ? 'Hoje' : p === 'week' ? '7 dias' : p === 'month' ? '30 dias' : 'Tudo'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      {metrics && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="p-4 rounded-xl bg-card border border-border">
+            <div className="text-3xl font-bold text-foreground">{metrics.totalConversations}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Total Conversas</div>
+          </div>
+          <div className="p-4 rounded-xl bg-card border border-border">
+            <div className="text-3xl font-bold text-primary">{metrics.avgMessagesPerConversation}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Msgs/Conversa (Média)</div>
+          </div>
+          <div className="p-4 rounded-xl bg-card border border-border">
+            <div className="text-3xl font-bold text-amber-400">{metrics.avgFieldsCollected}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Dados Coletados (Média)</div>
+          </div>
+          <div className="p-4 rounded-xl bg-card border border-border">
+            <div className="text-3xl font-bold text-red-400">{metrics.conversionRate}%</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Leads Quentes</div>
+          </div>
+          <div className="p-4 rounded-xl bg-card border border-border">
+            <div className="text-3xl font-bold text-green-400">{metrics.qualificationRate}%</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Taxa Qualificação (3+ dados)</div>
+          </div>
+          <div className="p-4 rounded-xl bg-card border border-border">
+            <div className="text-3xl font-bold text-blue-400">{metrics.avgDurationSeconds > 60 ? `${Math.round(metrics.avgDurationSeconds / 60)}m` : `${metrics.avgDurationSeconds}s`}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">Duração Média</div>
+          </div>
+        </div>
+      )}
+
+      {/* Stop Reason + Temperature Breakdown */}
+      {metrics && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Stop Reason Breakdown */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Target className="w-4 h-4 text-primary" /> Motivo de Parada
+            </h3>
+            <div className="space-y-2">
+              {Object.entries(metrics.stopReasonBreakdown).map(([reason, count]) => {
+                const info = stopReasonLabels[reason] || { label: reason, color: 'text-muted-foreground', icon: AlertTriangle };
+                const pct = metrics.totalConversations > 0 ? Math.round((count / metrics.totalConversations) * 100) : 0;
+                return (
+                  <div key={reason} className="flex items-center gap-3">
+                    <info.icon className={`w-4 h-4 ${info.color} shrink-0`} />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-foreground">{info.label}</span>
+                        <span className="text-xs text-muted-foreground">{count} ({pct}%)</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full bg-primary/60`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {Object.keys(metrics.stopReasonBreakdown).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">Nenhum dado ainda</p>
+              )}
+            </div>
+          </div>
+
+          {/* Temperature Breakdown */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Thermometer className="w-4 h-4 text-primary" /> Temperatura dos Leads
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(metrics.temperatureBreakdown).map(([temp, count]) => {
+                const info = tempLabels[temp] || { label: temp, color: 'text-muted-foreground', icon: Thermometer };
+                const pct = metrics.totalConversations > 0 ? Math.round((count / metrics.totalConversations) * 100) : 0;
+                return (
+                  <div key={temp} className="flex items-center gap-3">
+                    <info.icon className={`w-5 h-5 ${info.color} shrink-0`} />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold text-foreground">{info.label}</span>
+                        <span className="text-sm font-bold text-foreground">{count} ({pct}%)</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full ${temp === 'hot' ? 'bg-red-500' : temp === 'warm' ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {Object.keys(metrics.temperatureBreakdown).length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">Nenhum dado ainda</p>
+              )}
+            </div>
+
+            {/* Actions Summary */}
+            <div className="pt-3 border-t border-border grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-purple-400" />
+                <div>
+                  <div className="text-lg font-bold text-foreground">{metrics.totalPhotosSent}</div>
+                  <div className="text-[10px] text-muted-foreground">Fotos Enviadas</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-amber-400" />
+                <div>
+                  <div className="text-lg font-bold text-foreground">{metrics.totalFichasCreated}</div>
+                  <div className="text-[10px] text-muted-foreground">Fichas Criadas</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-400" />
+                <div>
+                  <div className="text-lg font-bold text-foreground">{metrics.totalAppointmentsCreated}</div>
+                  <div className="text-[10px] text-muted-foreground">Agendamentos</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Shuffle className="w-4 h-4 text-green-400" />
+                <div>
+                  <div className="text-lg font-bold text-foreground">{metrics.totalDistributed}</div>
+                  <div className="text-[10px] text-muted-foreground">Distribuídos</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Collected Fields Breakdown */}
+      {metrics && Object.keys(metrics.topCollectedFields).length > 0 && (
+        <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" /> Dados Coletados pela IA
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {Object.entries(metrics.topCollectedFields).map(([field, count]) => {
+              const pct = metrics.totalConversations > 0 ? Math.round((count / metrics.totalConversations) * 100) : 0;
+              return (
+                <div key={field} className="text-center p-3 rounded-lg bg-background/50 border border-border/50">
+                  <div className="text-2xl font-bold text-foreground">{pct}%</div>
+                  <div className="text-[10px] text-muted-foreground">{field}</div>
+                  <div className="text-[9px] text-muted-foreground/70">{count} leads</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Conversation Logs Table */}
+      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-primary" /> Log de Conversas da IA
+          </h3>
+          <div className="flex gap-2">
+            <select value={logFilter} onChange={e => { setLogFilter(e.target.value); setLogPage(1); }}
+              className="px-2 py-1 rounded-lg bg-background border border-border text-xs text-foreground">
+              <option value="">Todos motivos</option>
+              <option value="limit_reached">Limite Atingido</option>
+              <option value="transfer_to_seller">Transferido</option>
+              <option value="human_takeover_crm">Humano CRM</option>
+              <option value="human_takeover_whatsapp">Humano WhatsApp</option>
+              <option value="human_takeover_fromme">Humano fromMe</option>
+            </select>
+            <select value={tempFilter} onChange={e => { setTempFilter(e.target.value); setLogPage(1); }}
+              className="px-2 py-1 rounded-lg bg-background border border-border text-xs text-foreground">
+              <option value="">Todas temperaturas</option>
+              <option value="hot">Quente</option>
+              <option value="warm">Morno</option>
+              <option value="cold">Frio</option>
+            </select>
+          </div>
+        </div>
+
+        {logsData && logsData.logs.length > 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Lead</th>
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Msgs IA</th>
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Dados</th>
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Temp.</th>
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Motivo Parada</th>
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Data</th>
+                    <th className="text-left py-2 px-2 text-muted-foreground font-medium">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logsData.logs.map((log: any) => {
+                    const reasonInfo = stopReasonLabels[log.stopReason] || { label: log.stopReason, color: 'text-muted-foreground', icon: AlertTriangle };
+                    const tempInfo = tempLabels[log.leadTemperature] || { label: log.leadTemperature || '—', color: 'text-muted-foreground', icon: Thermometer };
+                    return (
+                      <tr key={log.id} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="py-2 px-2">
+                          <div className="font-medium text-foreground">{log.leadName || `Lead #${log.leadId}`}</div>
+                          <div className="text-[10px] text-muted-foreground">{log.leadPhone}</div>
+                        </td>
+                        <td className="py-2 px-2">
+                          <span className="font-bold text-foreground">{log.totalAiMessages}</span>
+                          <span className="text-muted-foreground">/{log.messageLimit}</span>
+                        </td>
+                        <td className="py-2 px-2">
+                          <span className={`font-bold ${log.totalFieldsCollected >= 3 ? 'text-green-400' : log.totalFieldsCollected >= 1 ? 'text-amber-400' : 'text-red-400'}`}>
+                            {log.totalFieldsCollected}
+                          </span>
+                          <span className="text-muted-foreground">/12</span>
+                        </td>
+                        <td className="py-2 px-2">
+                          <span className={`flex items-center gap-1 ${tempInfo.color}`}>
+                            <tempInfo.icon className="w-3 h-3" />
+                            {tempInfo.label}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2">
+                          <span className={`flex items-center gap-1 ${reasonInfo.color}`}>
+                            <reasonInfo.icon className="w-3 h-3" />
+                            {reasonInfo.label}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 text-muted-foreground">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td className="py-2 px-2">
+                          <div className="flex gap-1">
+                            <button onClick={() => reenableAi.mutate({ leadId: log.leadId })}
+                              title="Reativar IA para este lead"
+                              className="p-1 rounded hover:bg-green-500/20 text-green-400 transition-colors">
+                              <Unlock className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => resetCount.mutate({ leadId: log.leadId })}
+                              title="Resetar contador de mensagens"
+                              className="p-1 rounded hover:bg-blue-500/20 text-blue-400 transition-colors">
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {logsData.total > 15 && (
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-muted-foreground">
+                  Mostrando {((logPage - 1) * 15) + 1}-{Math.min(logPage * 15, logsData.total)} de {logsData.total}
+                </span>
+                <div className="flex gap-2">
+                  <button onClick={() => setLogPage(p => Math.max(1, p - 1))} disabled={logPage <= 1}
+                    className="px-3 py-1 rounded-lg text-xs bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50">
+                    <ChevronLeft className="w-3 h-3" />
+                  </button>
+                  <span className="px-3 py-1 text-xs text-foreground">{logPage}</span>
+                  <button onClick={() => setLogPage(p => p + 1)} disabled={logPage * 15 >= logsData.total}
+                    className="px-3 py-1 rounded-lg text-xs bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50">
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <Bot className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">Nenhuma conversa registrada ainda</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Os logs aparecem automaticamente quando a IA atende leads</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
