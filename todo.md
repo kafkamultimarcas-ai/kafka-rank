@@ -2058,3 +2058,13 @@
 - [x] MELHORIA: IA para de responder após qualificação completa (5 msgs HARD limit)
 - [x] MELHORIA: Prompt reescrito para análise contextual inteligente
 - [x] MELHORIA: IA detecta assunto (compra, pós-venda, dúvida, reclamação) antes de responder
+
+### Centralizar Configs IA + Roles + Toggles (06/04)
+- [x] Centralizar TODAS as configurações da IA na aba "IA Atendente" (horário, feirão, disparo, controle)
+- [x] Mover configs de "Ajustes > Modo da IA" e "Controle da IA" para a aba IA Atendente
+- [x] Adicionar configuração de horário de funcionamento da IA (hora início/fim)
+- [x] Trazer Modo Feirão para dentro da aba IA Atendente
+- [x] Trazer Disparo de Mensagens para dentro da aba IA Atendente
+- [x] BUG: SDR aparece como "Admin" — SDR tem permissões extras mas NÃO é admin (agora mostra "SDR" baseado nas permissões)
+- [x] BUG: Não consegue desativar vendedor (Tissiane) — botão sem toggle de desativar (toggle adicionado)
+- [x] MELHORIA: Todos os botões do sistema devem ter 2 sentidos (ativar/desativar)

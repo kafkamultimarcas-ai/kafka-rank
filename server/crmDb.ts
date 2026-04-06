@@ -48,7 +48,7 @@ export async function createAdmin(data: { username: string; passwordHash: string
 export async function listAdmins() {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: admins.id, username: admins.username, name: admins.name, role: admins.role, active: admins.active, permissions: admins.permissions, createdAt: admins.createdAt }).from(admins).where(eq(admins.tenantId, getCurrentTenantId())).orderBy(desc(admins.createdAt));
+  return db.select({ id: admins.id, username: admins.username, name: admins.name, email: admins.email, role: admins.role, active: admins.active, permissions: admins.permissions, createdAt: admins.createdAt }).from(admins).where(eq(admins.tenantId, getCurrentTenantId())).orderBy(desc(admins.createdAt));
 }
 
 export async function updateAdmin(id: number, data: Partial<{ name: string; passwordHash: string; active: boolean; role: "owner" | "admin"; permissions: string }>) {

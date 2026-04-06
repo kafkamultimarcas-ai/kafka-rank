@@ -1433,6 +1433,19 @@ function MarketingView() {
 }
 
 // ===== SETTINGS VIEW (with permissions) =====
+function getAdminRoleLabel(admin: any): { label: string; color: string } {
+  if (admin.role === 'owner') return { label: 'Dono', color: 'bg-amber-500/20 text-amber-400 border-amber-500/20' };
+  // Check permissions to determine specific role
+  let perms: Record<string, boolean> = {};
+  try { perms = JSON.parse(admin.permissions || '{}'); } catch {}
+  const activeKeys = Object.entries(perms).filter(([, v]) => v).map(([k]) => k);
+  if (activeKeys.length === 1 && activeKeys[0] === 'pre_vendas') return { label: 'SDR', color: 'bg-purple-500/20 text-purple-400 border-purple-500/20' };
+  if (activeKeys.length === 1 && activeKeys[0] === 'fei') return { label: 'F&I', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/20' };
+  if (activeKeys.length === 1 && activeKeys[0] === 'financeiro') return { label: 'Financeiro', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' };
+  if (activeKeys.length === 1 && activeKeys[0] === 'marketing') return { label: 'Marketing', color: 'bg-pink-500/20 text-pink-400 border-pink-500/20' };
+  return { label: 'Admin', color: 'bg-blue-500/20 text-blue-400 border-blue-500/20' };
+}
+
 function SettingsView() {
   const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
   const [showAdd, setShowAdd] = useState(false);
@@ -1458,6 +1471,14 @@ function SettingsView() {
   const configureWebhook = trpc.whatsapp.configureWebhook.useMutation({
     onSuccess: () => toast.success("Webhook configurado com sucesso!"),
     onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggleAdmin = trpc.adminAuth.update.useMutation({
+    onSuccess: (_, vars) => {
+      refetch();
+      toast.success(vars.active ? 'Usuário ativado!' : 'Usuário desativado!');
+    },
+    onError: (e: any) => toast.error('Erro: ' + e.message),
   });
 
   const createAdmin = trpc.adminAuth.create.useMutation({
@@ -1500,15 +1521,25 @@ function SettingsView() {
             let perms: Record<string, boolean> = {};
             try { perms = JSON.parse(a.permissions || "{}"); } catch {}
             const activePerms = Object.entries(perms).filter(([, v]) => v).map(([k]) => PERM_LABELS[k] || k);
+            const roleInfo = getAdminRoleLabel(a);
             return (
-              <div key={a.id} className="p-3 rounded-lg bg-accent/50 border border-border">
+              <div key={a.id} className={`p-3 rounded-lg bg-accent/50 border border-border ${!a.active ? 'opacity-60' : ''}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div>
                     <p className="text-sm text-foreground font-medium">{a.name}</p>
-                    <p className="text-[10px] text-muted-foreground">@{a.username} • {a.role === "owner" ? "Dono" : "Admin"}</p>
+                    <p className="text-[10px] text-muted-foreground">@{a.username} • <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${roleInfo.color}`}>{roleInfo.label}</span></p>
                   </div>
                   <div className="flex items-center gap-2">
                     {a.email && <span className="text-[9px] text-muted-foreground">{a.email}</span>}
+                    {a.role !== 'owner' && (
+                      <button
+                        onClick={() => { toggleAdmin.mutate({ id: a.id, active: !a.active }); }}
+                        className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${a.active ? 'bg-green-500' : 'bg-muted-foreground/30'}`}
+                        title={a.active ? 'Desativar' : 'Ativar'}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${a.active ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                    )}
                     <span className={`text-[10px] px-2 py-0.5 rounded ${a.active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
                       {a.active ? "Ativo" : "Inativo"}
                     </span>
@@ -1627,12 +1658,6 @@ function SettingsView() {
       {/* Tenant Settings (Dados da Loja + Z-API) */}
       <TenantSettingsPanel />
 
-      {/* AI Mode Configuration */}
-      <AiModeConfig />
-
-      {/* Advanced AI Configuration */}
-      <AdvancedAiConfig />
-
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-2">Integrações</h3>
         <div className="space-y-2">
@@ -1706,173 +1731,7 @@ function ResetAllPasswordsSection() {
   );
 }
 
-function AiModeConfig() {
-  const { data: config, refetch } = trpc.crmAi.getGlobalAiConfig.useQuery();
-  const setConfig = trpc.crmAi.setGlobalAiConfig.useMutation({
-    onSuccess: () => { toast.success("Configuração de IA salva!"); refetch(); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-  const [mode, setMode] = useState<'normal' | 'feirao'>('normal');
-  const [feiraoForm, setFeiraoForm] = useState({
-    beneficios: '', promocoes: '', objetivo: '', instrucoes: '',
-  });
-  const [normalForm, setNormalForm] = useState({ instrucoes: '' });
-  const [initialized, setInitialized] = useState(false);
-
-  // Load config when data arrives
-  if (config && !initialized) {
-    setMode(config.aiMode as 'normal' | 'feirao');
-    if (config.feiraoConfig) {
-      setFeiraoForm({
-        beneficios: config.feiraoConfig.beneficios || '',
-        promocoes: config.feiraoConfig.promocoes || '',
-        objetivo: config.feiraoConfig.objetivo || '',
-        instrucoes: config.feiraoConfig.instrucoes || '',
-      });
-    }
-    if (config.normalConfig) {
-      setNormalForm({ instrucoes: config.normalConfig.instrucoes || '' });
-    }
-    setInitialized(true);
-  }
-
-  const handleSave = () => {
-    setConfig.mutate({
-      aiMode: mode,
-      feiraoConfig: mode === 'feirao' ? feiraoForm : undefined,
-      normalConfig: mode === 'normal' ? normalForm : undefined,
-    });
-  };
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
-          <Zap className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-bold text-foreground">Modo da IA</h3>
-          <p className="text-[10px] text-muted-foreground">Configure como a IA responde automaticamente</p>
-        </div>
-      </div>
-
-      {/* Mode selector */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setMode('normal')}
-          className={`flex-1 p-3 rounded-xl border-2 transition-all text-left ${
-            mode === 'normal'
-              ? 'border-primary bg-primary/10'
-              : 'border-border bg-accent/30 hover:bg-accent/50'
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <MessageCircle className={`w-4 h-4 ${mode === 'normal' ? 'text-primary' : 'text-muted-foreground'}`} />
-            <span className={`text-sm font-bold ${mode === 'normal' ? 'text-primary' : 'text-foreground'}`}>Normal</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground">Respostas padrão de vendas, foco em agendamento e conversão</p>
-        </button>
-        <button
-          onClick={() => setMode('feirao')}
-          className={`flex-1 p-3 rounded-xl border-2 transition-all text-left ${
-            mode === 'feirao'
-              ? 'border-amber-500 bg-amber-500/10'
-              : 'border-border bg-accent/30 hover:bg-accent/50'
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className={`w-4 h-4 ${mode === 'feirao' ? 'text-amber-500' : 'text-muted-foreground'}`} />
-            <span className={`text-sm font-bold ${mode === 'feirao' ? 'text-amber-500' : 'text-foreground'}`}>Feirão</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground">Modo evento especial com promoções e urgência</p>
-        </button>
-      </div>
-
-      {/* Mode-specific config */}
-      {mode === 'normal' && (
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-foreground mb-1 block">Instruções extras para a IA (opcional)</label>
-            <textarea
-              value={normalForm.instrucoes}
-              onChange={e => setNormalForm({ instrucoes: e.target.value })}
-              placeholder="Ex: Sempre mencione que temos financiamento facilitado. Foque em agendar visitas presenciais."
-              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-              rows={3}
-            />
-          </div>
-        </div>
-      )}
-
-      {mode === 'feirao' && (
-        <div className="space-y-3">
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-            <p className="text-xs text-amber-400 font-medium">🔥 Modo Feirão: A IA vai focar em promover o evento, mencionar benefícios e criar urgência para agendar visitas!</p>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground mb-1 block">Benefícios do Feirão *</label>
-            <textarea
-              value={feiraoForm.beneficios}
-              onChange={e => setFeiraoForm({ ...feiraoForm, beneficios: e.target.value })}
-              placeholder="Ex: Entrada facilitada, taxa 0% no primeiro ano, bônus de R$2.000 na troca"
-              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-              rows={2}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground mb-1 block">Promoções Específicas</label>
-            <textarea
-              value={feiraoForm.promocoes}
-              onChange={e => setFeiraoForm({ ...feiraoForm, promocoes: e.target.value })}
-              placeholder="Ex: HB20 a partir de R$49.900, Onix com IPVA grátis, SUVs com 15% de desconto"
-              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-              rows={2}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground mb-1 block">Objetivo Principal</label>
-            <textarea
-              value={feiraoForm.objetivo}
-              onChange={e => setFeiraoForm({ ...feiraoForm, objetivo: e.target.value })}
-              placeholder="Ex: Agendar o máximo de visitas para sábado dia 15/03"
-              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-              rows={2}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground mb-1 block">Instruções Adicionais</label>
-            <textarea
-              value={feiraoForm.instrucoes}
-              onChange={e => setFeiraoForm({ ...feiraoForm, instrucoes: e.target.value })}
-              placeholder="Ex: Mencionar que as condições são válidas apenas durante o feirão. Criar senso de urgência."
-              className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-              rows={2}
-            />
-          </div>
-        </div>
-      )}
-
-      <Button
-        onClick={handleSave}
-        disabled={setConfig.isPending}
-        className="w-full mt-4 racing-gradient text-white font-bold"
-      >
-        {setConfig.isPending ? "Salvando..." : `Salvar Modo ${mode === 'feirao' ? 'Feirão' : 'Normal'}`}
-      </Button>
-
-      {/* Current status */}
-      {config && (
-        <div className="mt-3 p-2 rounded-lg bg-accent/30 border border-border">
-          <p className="text-[10px] text-muted-foreground text-center">
-            Modo atual: <span className={`font-bold ${config.aiMode === 'feirao' ? 'text-amber-400' : 'text-primary'}`}>
-              {config.aiMode === 'feirao' ? '🔥 Feirão' : '💬 Normal'}
-            </span>
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
+// AiModeConfig removed - now integrated into AIAttendantView
 
 function IntegrationItem({ name, status, description }: { name: string; status: string; description: string }) {
   return (
@@ -2076,268 +1935,7 @@ function TenantSettingsPanel() {
   );
 }
 
-// ===== ADVANCED AI CONFIGURATION =====
-function AdvancedAiConfig() {
-  const { data: config, refetch } = trpc.crmAi.getGlobalAiConfig.useQuery();
-  const { data: stats, refetch: refetchStats } = trpc.crmAi.getInactiveDispatchStats.useQuery();
-  const setAdvanced = trpc.crmAi.setAdvancedAiConfig.useMutation({
-    onSuccess: () => { toast.success("Configuração avançada salva!"); refetch(); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-  const triggerDispatch = trpc.crmAi.triggerInactiveDispatch.useMutation({
-    onSuccess: (data) => { toast.success(`Disparo concluído: ${data.sent} enviados, ${data.skipped} ignorados`); refetchStats(); },
-    onError: (e: any) => toast.error("Erro no disparo: " + e.message),
-  });
-
-  const [autoReply, setAutoReply] = useState(false);
-  const [workingHoursEnabled, setWorkingHoursEnabled] = useState(false);
-  const [workingHoursStart, setWorkingHoursStart] = useState(8);
-  const [workingHoursEnd, setWorkingHoursEnd] = useState(20);
-  const [maxMsgEnabled, setMaxMsgEnabled] = useState(false);
-  const [maxMsgPerLead, setMaxMsgPerLead] = useState(10);
-  const [personality, setPersonality] = useState('amigavel');
-  const [inactiveEnabled, setInactiveEnabled] = useState(false);
-  const [inactiveHours, setInactiveHours] = useState(1);
-  const [inactiveMsg, setInactiveMsg] = useState('');
-  const [inactiveMaxPerDay, setInactiveMaxPerDay] = useState(1);
-  const [initialized, setInitialized] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  if (config && !initialized) {
-    setAutoReply(config.autoReplyEnabled);
-    setWorkingHoursEnabled(config.workingHoursEnabled);
-    setWorkingHoursStart(config.workingHoursStart);
-    setWorkingHoursEnd(config.workingHoursEnd);
-    setMaxMsgEnabled(config.maxMessagesEnabled);
-    setMaxMsgPerLead(config.maxMessagesPerLead);
-    setPersonality(config.personality);
-    setInactiveEnabled(config.inactiveDispatchEnabled);
-    setInactiveHours(config.inactiveDispatchHours);
-    setInactiveMsg(config.inactiveDispatchMessage);
-    setInactiveMaxPerDay(config.inactiveDispatchMaxPerDay);
-    setInitialized(true);
-  }
-
-  const handleSave = () => {
-    setAdvanced.mutate({
-      autoReplyEnabled: autoReply,
-      workingHoursEnabled,
-      workingHoursStart,
-      workingHoursEnd,
-      maxMessagesEnabled: maxMsgEnabled,
-      maxMessagesPerLead: maxMsgPerLead,
-      personality: personality as 'amigavel' | 'profissional' | 'agressivo',
-      inactiveDispatchEnabled: inactiveEnabled,
-      inactiveDispatchHours: inactiveHours,
-      inactiveDispatchMessage: inactiveMsg,
-      inactiveDispatchMaxPerDay: inactiveMaxPerDay,
-    });
-  };
-
-  const Toggle = ({ checked, onChange, label, desc }: { checked: boolean; onChange: (v: boolean) => void; label: string; desc?: string }) => (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border">
-      <div className="flex-1 mr-3">
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        {desc && <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>}
-      </div>
-      <button
-        onClick={() => onChange(!checked)}
-        className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${checked ? 'bg-green-500' : 'bg-muted'}`}
-      >
-        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
-      </button>
-    </div>
-  );
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-          <Bot className="w-4 h-4 text-white" />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-sm font-bold text-foreground">Controle da IA</h3>
-          <p className="text-[10px] text-muted-foreground">Ative/desative e configure o comportamento</p>
-        </div>
-        <button onClick={() => setShowAdvanced(!showAdvanced)} className="text-xs text-primary underline">
-          {showAdvanced ? 'Menos' : 'Avançado'}
-        </button>
-      </div>
-
-      {/* Main toggle - always visible */}
-      <div className="space-y-2">
-        <Toggle
-          checked={autoReply}
-          onChange={setAutoReply}
-          label="IA Responder Sozinha"
-          desc="Quando LIGADO, a IA responde automaticamente os leads que tiverem IA ativada individualmente"
-        />
-
-        {/* Status indicator */}
-        <div className={`p-2 rounded-lg border text-center text-xs font-bold ${autoReply ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-          {autoReply ? <><Power className="w-3 h-3 inline mr-1" /> IA ATIVA - respondendo leads automaticamente</> : <><Power className="w-3 h-3 inline mr-1" /> IA DESATIVADA - nenhuma resposta automática</>}
-        </div>
-      </div>
-
-      {showAdvanced && (
-        <div className="mt-4 space-y-3 border-t border-border pt-4">
-          {/* Personality */}
-          <div>
-            <label className="text-xs font-medium text-foreground mb-2 block">Personalidade da IA</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: 'amigavel', label: 'Amigável', icon: '😊', desc: 'Informal e simpática' },
-                { key: 'profissional', label: 'Profissional', icon: '👔', desc: 'Educada e direta' },
-                { key: 'agressivo', label: 'Agressivo', icon: '🔥', desc: 'Persuasiva e urgente' },
-              ].map(p => (
-                <button
-                  key={p.key}
-                  onClick={() => setPersonality(p.key)}
-                  className={`p-2 rounded-lg border-2 text-center transition-all ${
-                    personality === p.key
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-accent/30 hover:bg-accent/50'
-                  }`}
-                >
-                  <span className="text-lg">{p.icon}</span>
-                  <p className={`text-[11px] font-bold mt-1 ${personality === p.key ? 'text-primary' : 'text-foreground'}`}>{p.label}</p>
-                  <p className="text-[9px] text-muted-foreground">{p.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Working Hours */}
-          <Toggle
-            checked={workingHoursEnabled}
-            onChange={setWorkingHoursEnabled}
-            label="Horário de Funcionamento"
-            desc="IA só responde dentro do horário definido"
-          />
-          {workingHoursEnabled && (
-            <div className="flex items-center gap-2 px-3">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <select value={workingHoursStart} onChange={e => setWorkingHoursStart(Number(e.target.value))} className="bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground">
-                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}
-              </select>
-              <span className="text-xs text-muted-foreground">até</span>
-              <select value={workingHoursEnd} onChange={e => setWorkingHoursEnd(Number(e.target.value))} className="bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground">
-                {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}
-              </select>
-            </div>
-          )}
-
-          {/* Message Limit */}
-          <Toggle
-            checked={maxMsgEnabled}
-            onChange={setMaxMsgEnabled}
-            label="Limite de Mensagens por Lead"
-            desc="Limita quantas mensagens a IA pode enviar para cada lead"
-          />
-          {maxMsgEnabled && (
-            <div className="flex items-center gap-2 px-3">
-              <MessageCircle className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Máximo:</span>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={maxMsgPerLead}
-                onChange={e => setMaxMsgPerLead(Number(e.target.value))}
-                className="w-16 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center"
-              />
-              <span className="text-xs text-muted-foreground">mensagens</span>
-            </div>
-          )}
-
-          {/* Inactive Dispatch */}
-          <div className="border-t border-border pt-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Send className="w-4 h-4 text-amber-400" />
-              <h4 className="text-xs font-bold text-foreground">Disparo para Inativos</h4>
-            </div>
-            <Toggle
-              checked={inactiveEnabled}
-              onChange={setInactiveEnabled}
-              label="Reativar Clientes Inativos"
-              desc="Envia mensagem para leads que não responderam há X horas"
-            />
-            {inactiveEnabled && (
-              <div className="mt-2 space-y-2 px-1">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Após</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={72}
-                    value={inactiveHours}
-                    onChange={e => setInactiveHours(Number(e.target.value))}
-                    className="w-14 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center"
-                  />
-                  <span className="text-xs text-muted-foreground">horas sem resposta</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Máx.</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    value={inactiveMaxPerDay}
-                    onChange={e => setInactiveMaxPerDay(Number(e.target.value))}
-                    className="w-14 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center"
-                  />
-                  <span className="text-xs text-muted-foreground">disparo(s) por dia/lead</span>
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground mb-1 block">Mensagem personalizada (opcional - se vazio, IA gera automaticamente)</label>
-                  <textarea
-                    value={inactiveMsg}
-                    onChange={e => setInactiveMsg(e.target.value)}
-                    placeholder="Oi {nome}! Ainda tem interesse no {veiculo}? Posso te ajudar com algo?"
-                    className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    rows={2}
-                  />
-                  <p className="text-[9px] text-muted-foreground mt-1">Use {'{nome}'}, {'{veiculo}'}, {'{nome_completo}'} como variáveis</p>
-                </div>
-                {stats && (
-                  <div className="p-2 rounded-lg bg-accent/30 border border-border">
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>Enviados hoje: <strong className="text-foreground">{stats.todayCount}</strong></span>
-                      <span>Total: <strong className="text-foreground">{stats.totalCount}</strong></span>
-                    </div>
-                    {stats.lastRun && (
-                      <p className="text-[9px] text-muted-foreground mt-1">Último disparo: {new Date(stats.lastRun).toLocaleString('pt-BR')}</p>
-                    )}
-                  </div>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full text-xs gap-1"
-                  onClick={() => triggerDispatch.mutate()}
-                  disabled={triggerDispatch.isPending}
-                >
-                  <Send className="w-3 h-3" />
-                  {triggerDispatch.isPending ? 'Disparando...' : 'Disparar Agora (Manual)'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <Button
-        onClick={handleSave}
-        disabled={setAdvanced.isPending}
-        className="w-full mt-4 racing-gradient text-white font-bold"
-      >
-        {setAdvanced.isPending ? 'Salvando...' : 'Salvar Configurações da IA'}
-      </Button>
-    </div>
-  );
-}
+// AdvancedAiConfig removed - now integrated into AIAttendantView
 
 // ===== ADMIN PIPELINE VIEW =====
 function AdminPipelineView() {
@@ -3086,7 +2684,7 @@ function SDRManagementView() {
 }
 
 
-// ===== AI ATTENDANT VIEW =====
+// ===== AI ATTENDANT VIEW (UNIFIED - all AI config in one place) =====
 function AIAttendantView() {
   const { data: config, refetch: refetchConfig } = trpc.crmAi.getAttendantConfig.useQuery();
   const { data: stats } = trpc.crmAi.getAttendantStats.useQuery(undefined, { refetchInterval: 15000 });
@@ -3095,8 +2693,43 @@ function AIAttendantView() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  // Global AI config (mode, feirao, advanced)
+  const { data: globalConfig, refetch: refetchGlobal } = trpc.crmAi.getGlobalAiConfig.useQuery();
+  const { data: dispatchStats, refetch: refetchDispatchStats } = trpc.crmAi.getInactiveDispatchStats.useQuery();
+  const setGlobalConfig = trpc.crmAi.setGlobalAiConfig.useMutation({
+    onSuccess: () => { toast.success("Modo da IA salvo!"); refetchGlobal(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const setAdvanced = trpc.crmAi.setAdvancedAiConfig.useMutation({
+    onSuccess: () => { toast.success("Configuração avançada salva!"); refetchGlobal(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const triggerDispatch = trpc.crmAi.triggerInactiveDispatch.useMutation({
+    onSuccess: (data) => { toast.success(`Disparo concluído: ${data.sent} enviados, ${data.skipped} ignorados`); refetchDispatchStats(); },
+    onError: (e: any) => toast.error("Erro no disparo: " + e.message),
+  });
+
   const [localPrompt, setLocalPrompt] = useState("");
   const [localMaxMsg, setLocalMaxMsg] = useState(0);
+  const [activeTab, setActiveTab] = useState<'geral' | 'modo' | 'horario' | 'disparo' | 'instrucoes'>('geral');
+
+  // Feirao state
+  const [aiMode, setAiMode] = useState<'normal' | 'feirao'>('normal');
+  const [feiraoForm, setFeiraoForm] = useState({ beneficios: '', promocoes: '', objetivo: '', instrucoes: '' });
+  const [normalForm, setNormalForm] = useState({ instrucoes: '' });
+
+  // Advanced state
+  const [workingHoursEnabled, setWorkingHoursEnabled] = useState(false);
+  const [workingHoursStart, setWorkingHoursStart] = useState(8);
+  const [workingHoursEnd, setWorkingHoursEnd] = useState(20);
+  const [maxMsgEnabled, setMaxMsgEnabled] = useState(false);
+  const [maxMsgPerLead, setMaxMsgPerLead] = useState(10);
+  const [personality, setPersonality] = useState('amigavel');
+  const [inactiveEnabled, setInactiveEnabled] = useState(false);
+  const [inactiveHours, setInactiveHours] = useState(1);
+  const [inactiveMsg, setInactiveMsg] = useState('');
+  const [inactiveMaxPerDay, setInactiveMaxPerDay] = useState(1);
+  const [globalInitialized, setGlobalInitialized] = useState(false);
 
   useEffect(() => {
     if (config) {
@@ -3105,9 +2738,75 @@ function AIAttendantView() {
     }
   }, [config]);
 
+  // Init global config
+  if (globalConfig && !globalInitialized) {
+    setAiMode(globalConfig.aiMode as 'normal' | 'feirao');
+    if (globalConfig.feiraoConfig) {
+      setFeiraoForm({
+        beneficios: globalConfig.feiraoConfig.beneficios || '',
+        promocoes: globalConfig.feiraoConfig.promocoes || '',
+        objetivo: globalConfig.feiraoConfig.objetivo || '',
+        instrucoes: globalConfig.feiraoConfig.instrucoes || '',
+      });
+    }
+    if (globalConfig.normalConfig) {
+      setNormalForm({ instrucoes: globalConfig.normalConfig.instrucoes || '' });
+    }
+    setWorkingHoursEnabled(globalConfig.workingHoursEnabled);
+    setWorkingHoursStart(globalConfig.workingHoursStart);
+    setWorkingHoursEnd(globalConfig.workingHoursEnd);
+    setMaxMsgEnabled(globalConfig.maxMessagesEnabled);
+    setMaxMsgPerLead(globalConfig.maxMessagesPerLead);
+    setPersonality(globalConfig.personality);
+    setInactiveEnabled(globalConfig.inactiveDispatchEnabled);
+    setInactiveHours(globalConfig.inactiveDispatchHours);
+    setInactiveMsg(globalConfig.inactiveDispatchMessage);
+    setInactiveMaxPerDay(globalConfig.inactiveDispatchMaxPerDay);
+    setGlobalInitialized(true);
+  }
+
   if (!config) return <div className="text-center text-muted-foreground py-8">Carregando...</div>;
 
   const isActive = config.attendantEnabled;
+
+  const AIToggle = ({ checked, onChange, label, desc }: { checked: boolean; onChange: (v: boolean) => void; label: string; desc?: string }) => (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border">
+      <div className="flex-1 mr-3">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {desc && <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>}
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${checked ? 'bg-green-500' : 'bg-muted'}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  );
+
+  const handleSaveAdvanced = () => {
+    setAdvanced.mutate({
+      autoReplyEnabled: isActive,
+      workingHoursEnabled,
+      workingHoursStart,
+      workingHoursEnd,
+      maxMessagesEnabled: maxMsgEnabled,
+      maxMessagesPerLead: maxMsgPerLead,
+      personality: personality as 'amigavel' | 'profissional' | 'agressivo',
+      inactiveDispatchEnabled: inactiveEnabled,
+      inactiveDispatchHours: inactiveHours,
+      inactiveDispatchMessage: inactiveMsg,
+      inactiveDispatchMaxPerDay: inactiveMaxPerDay,
+    });
+  };
+
+  const tabs = [
+    { key: 'geral' as const, label: 'Geral', icon: Bot },
+    { key: 'modo' as const, label: 'Modo / Feirão', icon: Flame },
+    { key: 'horario' as const, label: 'Horário e Limites', icon: Clock },
+    { key: 'disparo' as const, label: 'Disparo de Msgs', icon: Send },
+    { key: 'instrucoes' as const, label: 'Instruções', icon: Edit },
+  ];
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -3120,7 +2819,7 @@ function AIAttendantView() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-foreground">IA Atendente Automática</h2>
-              <p className="text-xs text-muted-foreground">Atendimento humanizado por IA quando a loja está fechada</p>
+              <p className="text-xs text-muted-foreground">Todas as configurações da IA em um único lugar</p>
             </div>
           </div>
           <button
@@ -3131,11 +2830,17 @@ function AIAttendantView() {
           </button>
         </div>
 
-        {isActive && (
+        {isActive ? (
           <div className="flex items-center gap-2 text-sm">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
             <span className="text-green-400 font-medium">IA Ativa</span>
             <span className="text-muted-foreground">— Respondendo clientes automaticamente</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-sm">
+            <Power className="w-4 h-4 text-red-400" />
+            <span className="text-red-400 font-medium">IA Desativada</span>
+            <span className="text-muted-foreground">— Nenhuma resposta automática</span>
           </div>
         )}
       </div>
@@ -3166,158 +2871,435 @@ function AIAttendantView() {
         </div>
       )}
 
-      {/* Mode Selection */}
-      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Clock className="w-4 h-4 text-primary" /> Modo de Funcionamento
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            { value: 'off_hours', label: 'Fora do Horário', desc: 'Ativa quando a loja fecha', icon: '🌙' },
-            { value: 'always', label: 'Sempre Ativa', desc: 'Responde 24 horas', icon: '⚡' },
-            { value: 'holidays', label: 'Feriados/Especial', desc: 'Apenas em datas específicas', icon: '📅' },
-          ].map(mode => (
-            <button key={mode.value}
-              onClick={() => setConfig.mutate({ attendantMode: mode.value as any })}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${config.attendantMode === mode.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}>
-              <div className="text-xl mb-1">{mode.icon}</div>
-              <div className="text-sm font-bold text-foreground">{mode.label}</div>
-              <div className="text-[10px] text-muted-foreground">{mode.desc}</div>
-            </button>
-          ))}
-        </div>
+      {/* Sub-tabs for all AI config */}
+      <div className="flex gap-1 p-1 rounded-xl bg-card border border-border overflow-x-auto">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+              activeTab === tab.key
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            <tab.icon className="w-3.5 h-3.5" />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Features Toggles */}
-      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Zap className="w-4 h-4 text-primary" /> Funcionalidades Automáticas
-        </h3>
-        <div className="space-y-3">
-          {[
-            { key: 'attendantCollectData', label: 'Coletar Dados do Cliente', desc: 'Nome, CPF, renda, endereço automaticamente', icon: FileText },
-            { key: 'attendantAutoSchedule', label: 'Agendar Visitas', desc: 'Marca agendamento na loja automaticamente', icon: Calendar },
-            { key: 'attendantAutoFicha', label: 'Enviar Ficha para F&I', desc: 'Cria ficha de crédito automática quando cliente quer financiar', icon: CreditCard },
-            { key: 'attendantAutoDistribute', label: 'Distribuir para Vendedor', desc: 'Distribui o lead para vendedor disponível', icon: Shuffle },
-            { key: 'attendantTankPromo', label: 'Promoção Tanque Cheio', desc: 'Menciona tanque cheio ao agendar visita', icon: Zap },
-          ].map(feature => {
-            const isOn = (config as any)[feature.key];
-            return (
-              <div key={feature.key} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/50">
-                <div className="flex items-center gap-3">
-                  <feature.icon className={`w-4 h-4 ${isOn ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <div>
-                    <div className="text-sm font-medium text-foreground">{feature.label}</div>
-                    <div className="text-[10px] text-muted-foreground">{feature.desc}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setConfig.mutate({ [feature.key]: !isOn } as any)}
-                  className={`relative w-11 h-6 rounded-full transition-all ${isOn ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-                >
-                  <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+      {/* ===== TAB: GERAL ===== */}
+      {activeTab === 'geral' && (
+        <>
+          {/* Mode Selection */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" /> Modo de Funcionamento
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { value: 'off_hours', label: 'Fora do Horário', desc: 'Ativa quando a loja fecha', icon: '🌙' },
+                { value: 'always', label: 'Sempre Ativa', desc: 'Responde 24 horas', icon: '⚡' },
+                { value: 'holidays', label: 'Feriados/Especial', desc: 'Apenas em datas específicas', icon: '📅' },
+              ].map(mode => (
+                <button key={mode.value}
+                  onClick={() => setConfig.mutate({ attendantMode: mode.value as any })}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${config.attendantMode === mode.value ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}>
+                  <div className="text-xl mb-1">{mode.icon}</div>
+                  <div className="text-sm font-bold text-foreground">{mode.label}</div>
+                  <div className="text-[10px] text-muted-foreground">{mode.desc}</div>
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Features Toggles */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" /> Funcionalidades Automáticas
+            </h3>
+            <div className="space-y-3">
+              {[
+                { key: 'attendantCollectData', label: 'Coletar Dados do Cliente', desc: 'Nome, CPF, renda, endereço automaticamente', icon: FileText },
+                { key: 'attendantAutoSchedule', label: 'Agendar Visitas', desc: 'Marca agendamento na loja automaticamente', icon: Calendar },
+                { key: 'attendantAutoFicha', label: 'Enviar Ficha para F&I', desc: 'Cria ficha de crédito automática quando cliente quer financiar', icon: CreditCard },
+                { key: 'attendantAutoDistribute', label: 'Distribuir para Vendedor', desc: 'Distribui o lead para vendedor disponível', icon: Shuffle },
+                { key: 'attendantTankPromo', label: 'Promoção Tanque Cheio', desc: 'Menciona tanque cheio ao agendar visita', icon: Zap },
+              ].map(feature => {
+                const isOn = (config as any)[feature.key];
+                return (
+                  <div key={feature.key} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-border/50">
+                    <div className="flex items-center gap-3">
+                      <feature.icon className={`w-4 h-4 ${isOn ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <div>
+                        <div className="text-sm font-medium text-foreground">{feature.label}</div>
+                        <div className="text-[10px] text-muted-foreground">{feature.desc}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setConfig.mutate({ [feature.key]: !isOn } as any)}
+                      className={`relative w-11 h-6 rounded-full transition-all ${isOn ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                    >
+                      <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isOn ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Personality */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-primary" /> Personalidade da IA
+            </h3>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { key: 'amigavel', label: 'Amigável', icon: '😊', desc: 'Informal e simpática' },
+                { key: 'profissional', label: 'Profissional', icon: '👔', desc: 'Educada e direta' },
+                { key: 'agressivo', label: 'Agressivo', icon: '🔥', desc: 'Persuasiva e urgente' },
+              ].map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => { setPersonality(p.key); handleSaveAdvanced(); }}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    personality === p.key
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-accent/30 hover:bg-accent/50'
+                  }`}
+                >
+                  <span className="text-2xl">{p.icon}</span>
+                  <p className={`text-sm font-bold mt-1 ${personality === p.key ? 'text-primary' : 'text-foreground'}`}>{p.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{p.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Max Messages - HARD LIMIT */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Shield className="w-4 h-4 text-primary" /> Limite de Mensagens por Lead
+            </h3>
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-center gap-2 mb-1">
+                <Shield className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-amber-400">Limite HARD Ativo: 5 mensagens</span>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Max Messages - HARD LIMIT */}
-      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <MessageCircle className="w-4 h-4 text-primary" /> Limite de Mensagens por Lead
-        </h3>
-        
-        {/* HARD limit info */}
-        <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400">Limite HARD Ativo: 5 mensagens</span>
+              <p className="text-[10px] text-muted-foreground">
+                A IA envia no máximo 5 mensagens por lead. Na 5ª mensagem, transfere automaticamente para um consultor humano.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">Limite configurável (sobrescreve o HARD de 5 se for menor):</p>
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <button
+                  onClick={() => { setLocalMaxMsg(0); setConfig.mutate({ attendantMaxMessages: 0 }); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+                >
+                  Padrão (5 msgs)
+                </button>
+                {[3, 5, 7, 10].map(n => (
+                  <button key={n}
+                    onClick={() => { setLocalMaxMsg(n); setConfig.mutate({ attendantMaxMessages: n }); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === n ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+                  >
+                    {n} msgs
+                  </button>
+                ))}
+              </div>
+              {localMaxMsg > 0 && (
+                <div className="flex items-center gap-4">
+                  <input type="range" min={3} max={20} value={localMaxMsg}
+                    onChange={e => setLocalMaxMsg(Number(e.target.value))}
+                    className="flex-1 accent-primary" />
+                  <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
+                  <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
+                    <Save className="w-3 h-3 mr-1" /> Salvar
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">
-            A IA envia no máximo 5 mensagens por lead. Na 5ª mensagem, transfere automaticamente para um consultor humano e desabilita a IA para aquele lead.
-          </p>
-        </div>
+        </>
+      )}
 
-        {/* Configurable soft limit */}
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Limite configurável (sobrescreve o HARD de 5 se for menor):</p>
-          <div className="flex items-center gap-3 mb-2">
+      {/* ===== TAB: MODO / FEIRÃO ===== */}
+      {activeTab === 'modo' && (
+        <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Flame className="w-4 h-4 text-amber-400" /> Modo da IA (Normal / Feirão)
+          </h3>
+          <p className="text-xs text-muted-foreground">Escolha o modo de operação da IA. No modo Feirão, a IA foca em promover o evento com urgência.</p>
+
+          <div className="flex gap-3">
             <button
-              onClick={() => { setLocalMaxMsg(0); setConfig.mutate({ attendantMaxMessages: 0 }); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
+              onClick={() => setAiMode('normal')}
+              className={`flex-1 p-4 rounded-xl border-2 transition-all text-left ${
+                aiMode === 'normal' ? 'border-primary bg-primary/10' : 'border-border bg-accent/30 hover:bg-accent/50'
+              }`}
             >
-              Padrão (5 msgs)
+              <div className="flex items-center gap-2 mb-1">
+                <MessageCircle className={`w-5 h-5 ${aiMode === 'normal' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-bold ${aiMode === 'normal' ? 'text-primary' : 'text-foreground'}`}>Normal</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Respostas padrão de vendas, foco em agendamento e conversão</p>
             </button>
-            {[3, 5, 7, 10].map(n => (
-              <button key={n}
-                onClick={() => { setLocalMaxMsg(n); setConfig.mutate({ attendantMaxMessages: n }); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${localMaxMsg === n ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-muted text-muted-foreground border border-border hover:border-primary/30'}`}
-              >
-                {n} msgs
-              </button>
-            ))}
+            <button
+              onClick={() => setAiMode('feirao')}
+              className={`flex-1 p-4 rounded-xl border-2 transition-all text-left ${
+                aiMode === 'feirao' ? 'border-amber-500 bg-amber-500/10' : 'border-border bg-accent/30 hover:bg-accent/50'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Flame className={`w-5 h-5 ${aiMode === 'feirao' ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-bold ${aiMode === 'feirao' ? 'text-amber-500' : 'text-foreground'}`}>Feirão</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Modo evento especial com promoções e urgência</p>
+            </button>
           </div>
-          {localMaxMsg > 0 && (
-            <div className="flex items-center gap-4">
-              <input
-                type="range" min={3} max={20} value={localMaxMsg}
-                onChange={e => setLocalMaxMsg(Number(e.target.value))}
-                className="flex-1 accent-primary"
-              />
-              <span className="text-lg font-bold text-foreground w-12 text-center">{localMaxMsg}</span>
-              <Button size="sm" onClick={() => setConfig.mutate({ attendantMaxMessages: localMaxMsg })}>
-                <Save className="w-3 h-3 mr-1" /> Salvar
-              </Button>
+
+          {aiMode === 'normal' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-foreground mb-1 block">Instruções extras para modo Normal (opcional)</label>
+                <textarea
+                  value={normalForm.instrucoes}
+                  onChange={e => setNormalForm({ instrucoes: e.target.value })}
+                  placeholder="Ex: Sempre mencione que temos financiamento facilitado. Foque em agendar visitas presenciais."
+                  className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          {aiMode === 'feirao' && (
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <p className="text-xs text-amber-400 font-medium">Modo Feirão: A IA vai focar em promover o evento, mencionar benefícios e criar urgência para agendar visitas!</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground mb-1 block">Benefícios do Feirão *</label>
+                <textarea value={feiraoForm.beneficios} onChange={e => setFeiraoForm({ ...feiraoForm, beneficios: e.target.value })}
+                  placeholder="Ex: Entrada facilitada, taxa 0% no primeiro ano, bônus de R$2.000 na troca"
+                  className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30" rows={2} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground mb-1 block">Promoções Específicas</label>
+                <textarea value={feiraoForm.promocoes} onChange={e => setFeiraoForm({ ...feiraoForm, promocoes: e.target.value })}
+                  placeholder="Ex: HB20 a partir de R$49.900, Onix com IPVA grátis, SUVs com 15% de desconto"
+                  className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30" rows={2} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground mb-1 block">Objetivo Principal</label>
+                <textarea value={feiraoForm.objetivo} onChange={e => setFeiraoForm({ ...feiraoForm, objetivo: e.target.value })}
+                  placeholder="Ex: Agendar o máximo de visitas para sábado dia 15/03"
+                  className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30" rows={2} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-foreground mb-1 block">Instruções Adicionais</label>
+                <textarea value={feiraoForm.instrucoes} onChange={e => setFeiraoForm({ ...feiraoForm, instrucoes: e.target.value })}
+                  placeholder="Ex: Mencionar que as condições são válidas apenas durante o feirão."
+                  className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-amber-500/30" rows={2} />
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={() => setGlobalConfig.mutate({
+              aiMode: aiMode,
+              feiraoConfig: aiMode === 'feirao' ? feiraoForm : undefined,
+              normalConfig: aiMode === 'normal' ? normalForm : undefined,
+            })}
+            disabled={setGlobalConfig.isPending}
+            className="w-full racing-gradient text-white font-bold"
+          >
+            {setGlobalConfig.isPending ? 'Salvando...' : `Salvar Modo ${aiMode === 'feirao' ? 'Feirão' : 'Normal'}`}
+          </Button>
+
+          {globalConfig && (
+            <div className="p-2 rounded-lg bg-accent/30 border border-border">
+              <p className="text-[10px] text-muted-foreground text-center">
+                Modo atual: <span className={`font-bold ${globalConfig.aiMode === 'feirao' ? 'text-amber-400' : 'text-primary'}`}>
+                  {globalConfig.aiMode === 'feirao' ? 'Feirão' : 'Normal'}
+                </span>
+              </p>
             </div>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground">
-          {localMaxMsg === 0 
-            ? 'Usando limite padrão HARD de 5 mensagens. Na 5ª msg a IA transfere automaticamente.'
-            : `Após ${localMaxMsg} mensagens, a IA transfere para consultor e desabilita automaticamente.`
-          }
-        </p>
-      </div>
+      )}
 
-      {/* Custom Prompt */}
-      <div className="p-5 rounded-xl bg-card border border-border space-y-4">
-        <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Edit className="w-4 h-4 text-primary" /> Instruções Personalizadas
-        </h3>
-        <p className="text-xs text-muted-foreground">Adicione instruções extras para a IA. Ex: "Não mencione preços", "Foque em SUVs", "Mencione a promoção de Páscoa".</p>
-        <textarea
-          value={localPrompt}
-          onChange={e => setLocalPrompt(e.target.value)}
-          placeholder="Ex: Estamos com promoção especial de Páscoa, mencione isso nas conversas..."
-          className="w-full h-32 p-3 rounded-lg bg-background border border-border text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
-        <Button onClick={() => setConfig.mutate({ attendantPrompt: localPrompt })}>
-          <Save className="w-3 h-3 mr-1" /> Salvar Instruções
-        </Button>
-      </div>
+      {/* ===== TAB: HORÁRIO E LIMITES ===== */}
+      {activeTab === 'horario' && (
+        <div className="space-y-4">
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" /> Horário de Funcionamento da IA
+            </h3>
+            <AIToggle
+              checked={workingHoursEnabled}
+              onChange={setWorkingHoursEnabled}
+              label="Horário de Funcionamento"
+              desc="IA só responde dentro do horário definido"
+            />
+            {workingHoursEnabled && (
+              <div className="flex items-center gap-2 px-3">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <select value={workingHoursStart} onChange={e => setWorkingHoursStart(Number(e.target.value))} className="bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground">
+                  {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}
+                </select>
+                <span className="text-xs text-muted-foreground">até</span>
+                <select value={workingHoursEnd} onChange={e => setWorkingHoursEnd(Number(e.target.value))} className="bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground">
+                  {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}
+                </select>
+              </div>
+            )}
+          </div>
 
-      {/* How it works */}
-      <div className="p-5 rounded-xl bg-card border border-border space-y-3">
-        <h3 className="text-sm font-bold text-foreground">Como Funciona</h3>
-        <div className="space-y-2">
-          {[
-            { step: "1", text: "Cliente manda mensagem no WhatsApp fora do horário" },
-            { step: "2", text: "IA responde de forma humanizada, como um vendedor real" },
-            { step: "3", text: "IA coleta dados: nome, CPF, renda, veículo de interesse" },
-            { step: "4", text: "Se cliente quer financiar, IA cria ficha de crédito automática" },
-            { step: "5", text: "IA agenda visita presencial e menciona promoção do tanque cheio" },
-            { step: "6", text: "Lead é distribuído para vendedor com alerta de agendamento" },
-            { step: "7", text: "Ficha vai para fila de aprovação do F&I automaticamente" },
-          ].map(item => (
-            <div key={item.step} className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{item.step}</div>
-              <p className="text-xs text-muted-foreground">{item.text}</p>
-            </div>
-          ))}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-primary" /> Limite de Mensagens (Global)
+            </h3>
+            <AIToggle
+              checked={maxMsgEnabled}
+              onChange={setMaxMsgEnabled}
+              label="Limite de Mensagens por Lead"
+              desc="Limita quantas mensagens a IA pode enviar para cada lead"
+            />
+            {maxMsgEnabled && (
+              <div className="flex items-center gap-2 px-3">
+                <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Máximo:</span>
+                <input type="number" min={1} max={100} value={maxMsgPerLead}
+                  onChange={e => setMaxMsgPerLead(Number(e.target.value))}
+                  className="w-16 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center" />
+                <span className="text-xs text-muted-foreground">mensagens</span>
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={handleSaveAdvanced}
+            disabled={setAdvanced.isPending}
+            className="w-full racing-gradient text-white font-bold"
+          >
+            {setAdvanced.isPending ? 'Salvando...' : 'Salvar Horário e Limites'}
+          </Button>
         </div>
-      </div>
+      )}
+
+      {/* ===== TAB: DISPARO DE MSGS ===== */}
+      {activeTab === 'disparo' && (
+        <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Send className="w-4 h-4 text-amber-400" /> Disparo para Clientes Inativos
+          </h3>
+          <p className="text-xs text-muted-foreground">Configure o disparo automático de mensagens para leads que pararam de responder.</p>
+
+          <AIToggle
+            checked={inactiveEnabled}
+            onChange={setInactiveEnabled}
+            label="Reativar Clientes Inativos"
+            desc="Envia mensagem para leads que não responderam há X horas"
+          />
+
+          {inactiveEnabled && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Após</span>
+                <input type="number" min={1} max={72} value={inactiveHours}
+                  onChange={e => setInactiveHours(Number(e.target.value))}
+                  className="w-14 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center" />
+                <span className="text-xs text-muted-foreground">horas sem resposta</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Máx.</span>
+                <input type="number" min={1} max={5} value={inactiveMaxPerDay}
+                  onChange={e => setInactiveMaxPerDay(Number(e.target.value))}
+                  className="w-14 bg-accent/30 border border-border rounded px-2 py-1 text-sm text-foreground text-center" />
+                <span className="text-xs text-muted-foreground">disparo(s) por dia/lead</span>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Mensagem personalizada (opcional - se vazio, IA gera automaticamente)</label>
+                <textarea value={inactiveMsg} onChange={e => setInactiveMsg(e.target.value)}
+                  placeholder="Oi {nome}! Ainda tem interesse no {veiculo}? Posso te ajudar com algo?"
+                  className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" rows={2} />
+                <p className="text-[9px] text-muted-foreground mt-1">Use {'{nome}'}, {'{veiculo}'}, {'{nome_completo}'} como variáveis</p>
+              </div>
+              {dispatchStats && (
+                <div className="p-2 rounded-lg bg-accent/30 border border-border">
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>Enviados hoje: <strong className="text-foreground">{dispatchStats.todayCount}</strong></span>
+                    <span>Total: <strong className="text-foreground">{dispatchStats.totalCount}</strong></span>
+                  </div>
+                  {dispatchStats.lastRun && (
+                    <p className="text-[9px] text-muted-foreground mt-1">Último disparo: {new Date(dispatchStats.lastRun).toLocaleString('pt-BR')}</p>
+                  )}
+                </div>
+              )}
+              <Button size="sm" variant="outline" className="w-full text-xs gap-1"
+                onClick={() => triggerDispatch.mutate()} disabled={triggerDispatch.isPending}>
+                <Send className="w-3 h-3" />
+                {triggerDispatch.isPending ? 'Disparando...' : 'Disparar Agora (Manual)'}
+              </Button>
+            </div>
+          )}
+
+          <Button
+            onClick={handleSaveAdvanced}
+            disabled={setAdvanced.isPending}
+            className="w-full racing-gradient text-white font-bold"
+          >
+            {setAdvanced.isPending ? 'Salvando...' : 'Salvar Configurações de Disparo'}
+          </Button>
+        </div>
+      )}
+
+      {/* ===== TAB: INSTRUÇÕES ===== */}
+      {activeTab === 'instrucoes' && (
+        <>
+          <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Edit className="w-4 h-4 text-primary" /> Instruções Personalizadas
+            </h3>
+            <p className="text-xs text-muted-foreground">Adicione instruções extras para a IA. Ex: "Não mencione preços", "Foque em SUVs", "Mencione a promoção de Páscoa".</p>
+            <textarea
+              value={localPrompt}
+              onChange={e => setLocalPrompt(e.target.value)}
+              placeholder="Ex: Estamos com promoção especial de Páscoa, mencione isso nas conversas..."
+              className="w-full h-32 p-3 rounded-lg bg-background border border-border text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+            <Button onClick={() => setConfig.mutate({ attendantPrompt: localPrompt })}>
+              <Save className="w-3 h-3 mr-1" /> Salvar Instruções
+            </Button>
+          </div>
+
+          {/* How it works */}
+          <div className="p-5 rounded-xl bg-card border border-border space-y-3">
+            <h3 className="text-sm font-bold text-foreground">Como Funciona</h3>
+            <div className="space-y-2">
+              {[
+                { step: "1", text: "Cliente manda mensagem no WhatsApp fora do horário" },
+                { step: "2", text: "IA responde de forma humanizada, como um vendedor real" },
+                { step: "3", text: "IA coleta dados: nome, CPF, renda, veículo de interesse" },
+                { step: "4", text: "Se cliente quer financiar, IA cria ficha de crédito automática" },
+                { step: "5", text: "IA agenda visita presencial e menciona promoção do tanque cheio" },
+                { step: "6", text: "Lead é distribuído para vendedor com alerta de agendamento" },
+                { step: "7", text: "Ficha vai para fila de aprovação do F&I automaticamente" },
+              ].map(item => (
+                <div key={item.step} className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{item.step}</div>
+                  <p className="text-xs text-muted-foreground">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
