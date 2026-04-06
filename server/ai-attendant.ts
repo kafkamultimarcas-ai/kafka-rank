@@ -75,6 +75,7 @@ interface CollectedData {
   lastQuestionAsked?: string; // track what we last asked to avoid repeating
   questionsAsked?: string[]; // history of all questions asked
   leadTemperature?: string; // hot, warm, cold - AI-analyzed
+  sentVehicleIds?: number[]; // IDs of vehicles whose photos were already sent - NEVER send again
 }
 
 // ===== CONFIGURATION =====
@@ -671,16 +672,48 @@ Identifique o perfil do cliente pelo TOM das mensagens e adapte:
 16. Se voce NAO SABE responder algo (tecnico, financeiro complexo, negociacao), TRANSFIRA para o consultor: "Essa parte quem pode te dar a melhor resposta e nosso consultor, vou te encaminhar". Use nextStage="transfer_to_seller"
 17. NUNCA use as palavras: vendido, esgotado, acabou, nao temos, indisponivel. SEMPRE use: verificar, confirmar, checar com a equipe
 
-=== REGRA CRITICA: MEMORIA ===
-VOCE TEM MEMORIA PERFEITA. Analise o HISTORICO abaixo com cuidado.
-- NUNCA repita uma pergunta que ja foi respondida no historico
-- NUNCA peca um dado que ja esta na lista "DADOS JA COLETADOS"
-- Se o cliente ja disse o ano do carro, NAO pergunte de novo
-- Se o cliente ja disse a forma de pagamento, NAO pergunte de novo
-- Se o cliente ja disse a cidade, NAO pergunte de novo
-- Se voce ja perguntou algo e o cliente respondeu, AVANCE para o proximo passo
-- Referencie dados anteriores: "Voce mencionou que quer um [carro], certo?"
-${questionsCtx}
+=== REGRA CRITICA: MEMORIA (MAIS IMPORTANTE DE TODAS) ===
+VOCE TEM MEMORIA PERFEITA. Analise o HISTORICO abaixo com EXTREMO cuidado.
+
+REGRA DE OURO: Se o cliente RESPONDER uma pergunta, o dado esta COLETADO. AVANCE para o proximo passo.
+Exemplos de dados que o cliente pode enviar SEM contexto (numeros soltos):
+- Numero grande (ex: "245.000", "92 mil") = QUILOMETRAGEM do carro de troca
+- Numero medio (ex: "35.000", "50 mil") = pode ser PRECO ou QUILOMETRAGEM (analise contexto)
+- Numero pequeno (ex: "2019", "2020") = ANO do carro
+- "Nao tem nada" / "ta bom" / "otimo estado" = ESTADO DO CARRO (tradeInDetails)
+- Foto/video recebido = tradeInPhotosReceived/tradeInVideoReceived = true
+
+REGRA ANTI-REPETICAO ABSOLUTA:
+- Se voce JA PERGUNTOU algo e o cliente JA RESPONDEU, NUNCA pergunte de novo
+- Se o cliente diz "ja te mandei", "ja falei", "ja disse" = VOCE ESTA REPETINDO! PARE e avance
+- LIMITE: Se voce perceber que ja perguntou a mesma coisa 2 vezes, PARE IMEDIATAMENTE e diga:
+  "Perfeito, ja tenho todas as informacoes. Vou encaminhar pra um dos nossos consultores te atender"
+  E use nextStage="transfer_to_seller"
+- NUNCA peca quilometragem se o cliente ja mandou um numero que pode ser km
+- NUNCA peca detalhes do carro se o cliente ja descreveu o estado
+
+DADOS JA COLETADOS (NUNCA PERGUNTE DE NOVO!):
+${alreadyCollected.length > 0 ? alreadyCollected.join('\n') : 'Nenhum dado coletado ainda'}
+
+PERGUNTAS JA FEITAS (NUNCA REPITA!):
+${questionsAsked.length > 0 ? questionsAsked.map((q: string, i: number) => `${i+1}. ${q}`).join('\n') : 'Nenhuma ainda'}
+
+=== REGRA CRITICA: FINALIZACAO AUTOMATICA ===
+Quando o lead esta QUALIFICADO (tem dados suficientes), FINALIZE e transfira:
+Lead qualificado = tem pelo menos 3 destes:
+- Sabe o que quer (veiculo de interesse)
+- Tem ou nao troca (informou)
+- Forma de pagamento (informou)
+- Cidade (informou)
+- Agendamento (marcou)
+Quando qualificado, diga:
+"Perfeito, ja tenho tudo organizado. Vou encaminhar pro nosso consultor que vai te atender com tudo pronto"
+E use nextStage="transfer_to_seller"
+
+Se o cliente demonstrar IRRITACAO ("ja falei", "ja mandei", "de novo?"), IMEDIATAMENTE:
+- Peca desculpas: "Desculpa, voce tem razao"
+- Finalize: "Ja tenho todas as informacoes, vou encaminhar pro consultor"
+- nextStage="transfer_to_seller"
 
 === REGRA CRITICA: FOTOS E ESTOQUE ===
 - Quando o cliente pedir fotos ou disser tipo + faixa de preco, SEMPRE coloque sendPhotos=true
@@ -1137,30 +1170,57 @@ export async function handleAttendantMessage(
       });
       console.log(`[AI Attendant] Sent to lead #${leadId}: ${responseText.substring(0, 60)}...`);
 
-      // 4. Send vehicle photos if AI requested it
+      // 4. Send vehicle photos if AI requested it (with DEDUP - never send same vehicle twice)
       if (parsed.sendPhotos) {
         const vType = extracted.vehicleType || updatedData.vehicleType;
         const pMin = extracted.priceMin || updatedData.priceMin;
         const pMax = extracted.priceMax || updatedData.priceMax;
         const vSearch = extracted.vehicleInterest || updatedData.vehicleInterest || lead.vehicleInterest;
+        const alreadySentIds = updatedData.sentVehicleIds || [];
 
         // Search by type + price range (smart search)
-        const matchedVehicles = await searchVehiclesByTypeAndPrice(vType, pMin, pMax, vSearch, 5);
+        let matchedVehicles = await searchVehiclesByTypeAndPrice(vType, pMin, pMax, vSearch, 8);
+        
+        // DEDUP: Filter out vehicles already sent to this lead
+        matchedVehicles = matchedVehicles.filter((v: any) => !alreadySentIds.includes(v.id));
         
         if (matchedVehicles.length > 0) {
           // Small delay before sending photos (feels more natural)
           await new Promise(r => setTimeout(r, 2000));
-          const sentCount = await sendVehiclePhotos(phone, leadId, matchedVehicles);
+          const vehiclesToSend = matchedVehicles.slice(0, 3);
+          const sentCount = await sendVehiclePhotos(phone, leadId, vehiclesToSend);
           if (sentCount > 0) {
+            // Track which vehicles were sent to avoid duplicates
+            const newSentIds = vehiclesToSend.map((v: any) => v.id);
+            updatedData.sentVehicleIds = [...alreadySentIds, ...newSentIds];
             action = action ? action + `,${sentCount}_photos_sent` : `${sentCount}_photos_sent`;
+            console.log(`[AI Attendant] Sent ${sentCount} NEW photos (total sent to lead: ${updatedData.sentVehicleIds.length})`);
+          }
+        } else if (alreadySentIds.length > 0) {
+          // All matching vehicles already sent - try broader search for NEW ones
+          let broadVehicles = await searchVehiclesByTypeAndPrice(vType, undefined, undefined, vSearch, 8);
+          broadVehicles = broadVehicles.filter((v: any) => !alreadySentIds.includes(v.id));
+          if (broadVehicles.length > 0) {
+            await new Promise(r => setTimeout(r, 2000));
+            const vehiclesToSend = broadVehicles.slice(0, 3);
+            const sentCount = await sendVehiclePhotos(phone, leadId, vehiclesToSend);
+            if (sentCount > 0) {
+              const newSentIds = vehiclesToSend.map((v: any) => v.id);
+              updatedData.sentVehicleIds = [...alreadySentIds, ...newSentIds];
+              action = action ? action + `,${sentCount}_photos_sent` : `${sentCount}_photos_sent`;
+            }
+          } else {
+            console.log(`[AI Attendant] All matching vehicles already sent to lead #${leadId} (${alreadySentIds.length} total)`);
           }
         } else {
-          // No vehicles found - try broader search
+          // No vehicles found at all
           const broadVehicles = await searchVehiclesByTypeAndPrice(vType, undefined, undefined, vSearch, 3);
           if (broadVehicles.length > 0) {
             await new Promise(r => setTimeout(r, 2000));
             const sentCount = await sendVehiclePhotos(phone, leadId, broadVehicles);
             if (sentCount > 0) {
+              const newSentIds = broadVehicles.slice(0, 3).map((v: any) => v.id);
+              updatedData.sentVehicleIds = [...alreadySentIds, ...newSentIds];
               action = action ? action + `,${sentCount}_photos_sent` : `${sentCount}_photos_sent`;
             }
           } else {

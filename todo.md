@@ -1993,3 +1993,13 @@
 - [x] MELHORIA: Tratamento de áudio/mídia recebida
 - [x] MELHORIA: Aprovação de crédito como gatilho de conversão
 - [x] MELHORIA: Veículo pode estar em preparação - nunca dizer vendido, dizer que vai verificar
+
+### Bug Fotos Duplicadas IA (05/04)
+- [x] BUG: IA enviando mesmas fotos duas vezes para o mesmo lead - rastrear fotos já enviadas
+
+### Bugs IA Memória e Repetição (05/04 noite)
+- [x] BUG CRITICO: IA não reconhece dados já informados (ex: 245.000 = quilometragem)
+- [x] BUG CRITICO: IA repete mesma pergunta 3+ vezes mesmo depois de cliente responder
+- [x] MELHORIA: Limite de 2 repetições - se perguntou 2x, transfere para consultor
+- [x] MELHORIA: Quando lead qualificado (tem dados suficientes), finaliza e transfere
+- [x] BUG: IA enviando mesmas fotos duas vezes para o mesmo lead
