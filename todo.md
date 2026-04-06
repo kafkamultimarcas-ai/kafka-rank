@@ -2003,3 +2003,10 @@
 - [x] MELHORIA: Limite de 2 repetições - se perguntou 2x, transfere para consultor
 - [x] MELHORIA: Quando lead qualificado (tem dados suficientes), finaliza e transfere
 - [x] BUG: IA enviando mesmas fotos duas vezes para o mesmo lead
+
+### Bugs CRITICOS IA - Limite e Parada (05/04 noite)
+- [x] BUG CRITICO: IA continua respondendo DEPOIS que humano transferiu para consultor (3 cenários de detecção + desabilita permanente)
+- [x] BUG CRITICO: IA repete mesma pergunta sobre quilometragem que cliente já respondeu (memória reforçada + anti-repetição 3 métodos)
+- [x] MELHORIA: Limite HARD de 5 mensagens da IA por lead - depois transfere para consultor (com msg automática de transferência)
+- [x] MELHORIA: Pesquisar melhores práticas de IA SDR automotiva no mercado (Salesforce, Retell AI, Fullpath, Impel AI)
+- [x] MELHORIA: Criar relatório de melhoria com prompt otimizado baseado em pesquisa (relatório completo gerado)

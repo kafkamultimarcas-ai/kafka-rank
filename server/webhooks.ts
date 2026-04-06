@@ -1072,13 +1072,25 @@ export function registerWebhookRoutes(app: Express) {
                 // === END AI ATTENDANT CHECK ===
 
                 // Check per-lead AI setting FIRST (individual toggle)
+                // This catches leads where AI was disabled by: human takeover, message limit, or manual toggle
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);
                 const aiRaw = aiResult as any;
                 const aiRows = Array.isArray(aiRaw?.[0]) ? aiRaw[0] : aiRaw;
                 // If no per-lead setting exists, default to ENABLED (attendant already checked above)
                 // Only skip if explicitly disabled (enabled = false/0)
                 if (aiRows && aiRows.length > 0 && !aiRows[0].enabled) {
-                  console.log(`[AI Auto-Reply] Per-lead AI disabled for lead #${existingLeads[0].id}, skipping`);
+                  console.log(`[AI Auto-Reply] Per-lead AI disabled for lead #${existingLeads[0].id} (human takeover or limit reached), skipping`);
+                  releaseAiLock(leadIdForAi);
+                  return;
+                }
+
+                // Also check if a human has sent messages to this lead (double-safety)
+                const humanCheck = await dbConn.execute(sql`SELECT sentBy, senderName FROM crm_messages WHERE leadId = ${existingLeads[0].id} AND direction = 'outbound' AND sentBy IS NOT NULL AND sentBy != '' ORDER BY timestamp DESC LIMIT 1`);
+                const humanRaw = humanCheck as any;
+                const humanRows = Array.isArray(humanRaw?.[0]) ? humanRaw[0] : humanRaw;
+                if (humanRows && humanRows.length > 0 && humanRows[0].sentBy) {
+                  console.log(`[AI Auto-Reply] Human seller already handling lead #${existingLeads[0].id}, skipping and disabling AI`);
+                  await dbConn.execute(sql`INSERT INTO crm_ai_settings (leadId, enabled) VALUES (${existingLeads[0].id}, 0) ON DUPLICATE KEY UPDATE enabled = 0`);
                   releaseAiLock(leadIdForAi);
                   return;
                 }

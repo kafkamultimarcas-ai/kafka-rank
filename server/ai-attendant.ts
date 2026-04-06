@@ -404,7 +404,7 @@ export async function analyzeLeadTemperature(leadId: number, chatHistory: string
 }
 
 // ===== BUILD SYSTEM PROMPT =====
-function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData: CollectedData, vehicleContext: string, chatHistory: string): string {
+function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData: CollectedData, vehicleContext: string, chatHistory: string, aiMsgCount: number = 0, hardLimit: number = 5): string {
   const firstName = (collectedData.customerName || lead.name || '').split(' ')[0] || 'amigo';
 
   // Build list of data ALREADY collected (to prevent re-asking)
@@ -698,6 +698,12 @@ ${alreadyCollected.length > 0 ? alreadyCollected.join('\n') : 'Nenhum dado colet
 PERGUNTAS JA FEITAS (NUNCA REPITA!):
 ${questionsAsked.length > 0 ? questionsAsked.map((q: string, i: number) => `${i+1}. ${q}`).join('\n') : 'Nenhuma ainda'}
 
+=== REGRA CRITICA: LIMITE DE MENSAGENS ===
+Voce ja enviou ${aiMsgCount} mensagens. Seu LIMITE e ${hardLimit} mensagens no total.
+Mensagens restantes: ${hardLimit - aiMsgCount}.
+${aiMsgCount >= hardLimit - 2 ? 'ATENCAO: Voce esta nas ULTIMAS mensagens! PRIORIZE: coletar o dado mais importante que falta e TRANSFERIR para o consultor.' : ''}
+${aiMsgCount >= hardLimit - 1 ? 'ESTA E SUA ULTIMA MENSAGEM! Diga: "Vou encaminhar seu atendimento para um dos nossos consultores" e use nextStage="transfer_to_seller"' : ''}
+
 === REGRA CRITICA: FINALIZACAO AUTOMATICA ===
 Quando o lead esta QUALIFICADO (tem dados suficientes), FINALIZE e transfira:
 Lead qualificado = tem pelo menos 3 destes:
@@ -810,6 +816,16 @@ HISTORICO DA CONVERSA:
 ${chatHistory}`;
 }
 
+// ===== HELPER: DISABLE AI FOR A SPECIFIC LEAD =====
+async function disableAiForLead(dbConn: any, leadId: number): Promise<void> {
+  try {
+    await dbConn.execute(sql`INSERT INTO crm_ai_settings (leadId, enabled) VALUES (${leadId}, 0) ON DUPLICATE KEY UPDATE enabled = 0`);
+    console.log(`[AI Attendant] AI DISABLED for lead #${leadId}`);
+  } catch (e) {
+    console.error(`[AI Attendant] Error disabling AI for lead #${leadId}:`, e);
+  }
+}
+
 // ===== MAIN HANDLER =====
 export async function handleAttendantMessage(
   leadId: number,
@@ -832,16 +848,28 @@ export async function handleAttendantMessage(
     const lead = await crmDb.getLeadById(leadId);
     if (!lead) return { sent: false };
 
-    // === CHECK IF HUMAN SDR ENTERED THE CONVERSATION ===
-    // If any outbound message was sent by a HUMAN (not IA Kafka), the IA must STOP immediately
+    // === CHECK 1: IS AI DISABLED FOR THIS LEAD? ===
+    // Check per-lead AI setting (may have been disabled by previous takeover or limit)
+    try {
+      const aiSettingResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${leadId} LIMIT 1`);
+      const aiSettingRaw = aiSettingResult as any;
+      const aiSettingRows = Array.isArray(aiSettingRaw?.[0]) ? aiSettingRaw[0] : aiSettingRaw;
+      if (aiSettingRows && aiSettingRows.length > 0 && !aiSettingRows[0].enabled) {
+        console.log(`[AI Attendant] AI explicitly disabled for lead #${leadId}, skipping`);
+        return { sent: false, action: 'ai_disabled' };
+      }
+    } catch { /* continue */ }
+
+    // === CHECK 2: HAS HUMAN SDR ENTERED THE CONVERSATION? ===
+    // If any outbound message was sent by a HUMAN (not IA Kafka), the IA must STOP PERMANENTLY
     // Human messages are identified by:
     // 1. sentBy is set (CRM-sent messages have sellerId in sentBy)
-    // 2. senderName is NOT 'IA Kafka' AND NOT null (WhatsApp-sent by human from phone)
-    // 3. fromMe webhook messages that weren't sent by IA
+    // 2. senderName is NOT 'IA Kafka' AND NOT null/empty (WhatsApp-sent by human from phone)
+    // 3. fromMe webhook messages that weren't sent by IA (senderName is null AND sentBy is null)
     const recentOutbound = await dbConn.execute(
-      sql`SELECT senderName, sentBy, timestamp FROM crm_messages 
+      sql`SELECT senderName, sentBy, content, timestamp FROM crm_messages 
           WHERE leadId = ${leadId} AND direction = 'outbound' 
-          ORDER BY timestamp DESC LIMIT 10`
+          ORDER BY timestamp DESC LIMIT 15`
     );
     const outboundRaw = recentOutbound as any;
     const outboundRows = Array.isArray(outboundRaw?.[0]) ? outboundRaw[0] : outboundRaw;
@@ -849,29 +877,79 @@ export async function handleAttendantMessage(
       for (const msg of outboundRows) {
         const sName = (msg.senderName || '').toString().trim();
         const sByVal = msg.sentBy;
-        const isAiMessage = sName === 'IA Kafka' || sName === 'IA' || sName === 'Bot';
+        const content = (msg.content || '').toString().toLowerCase();
+        const isAiMessage = sName === 'IA Kafka' || sName === 'IA' || sName === 'Bot' || sName === 'IA Kafka (Reativação)';
         
-        // Case 1: Message sent via CRM by a human seller (sentBy has sellerId, senderName is null)
+        // Case 1: Message sent via CRM by a human seller (sentBy has sellerId)
         if (sByVal && !isAiMessage) {
-          console.log(`[AI Attendant] Human seller (ID: ${sByVal}) is handling lead #${leadId} via CRM, IA stopping`);
+          console.log(`[AI Attendant] Human seller (ID: ${sByVal}) is handling lead #${leadId} via CRM, IA stopping PERMANENTLY`);
+          // PERMANENTLY disable AI for this lead
+          await disableAiForLead(dbConn, leadId);
           return { sent: false, action: 'human_handling' };
         }
-        // Case 2: Message sent from WhatsApp phone directly (senderName has human name)
+        // Case 2: Message sent from WhatsApp phone directly by a human (has senderName that's not AI)
         if (sName && !isAiMessage && !sByVal) {
-          console.log(`[AI Attendant] Human "${sName}" is handling lead #${leadId} via WhatsApp, IA stopping`);
+          console.log(`[AI Attendant] Human "${sName}" is handling lead #${leadId} via WhatsApp, IA stopping PERMANENTLY`);
+          await disableAiForLead(dbConn, leadId);
           return { sent: false, action: 'human_handling' };
+        }
+        // Case 3: fromMe message from webhook with NO senderName and NO sentBy
+        // These are messages sent from the WhatsApp phone directly (not via CRM, not via AI)
+        // They have senderName=null and sentBy=null but direction='outbound'
+        if (!sName && !sByVal && !isAiMessage) {
+          // This could be a fromMe webhook message from a human using the phone directly
+          // Check if the content doesn't match any recent AI message
+          const isKnownAiMsg = outboundRows.some((m: any) => {
+            const mName = (m.senderName || '').toString().trim();
+            return (mName === 'IA Kafka' || mName === 'IA') && m.content === msg.content;
+          });
+          if (!isKnownAiMsg && content && content.length > 5) {
+            console.log(`[AI Attendant] Possible human message (fromMe, no sender) for lead #${leadId}: "${content.substring(0, 40)}...", IA stopping`);
+            await disableAiForLead(dbConn, leadId);
+            return { sent: false, action: 'human_handling' };
+          }
         }
       }
     }
 
-    // Check message count limit
+    // === CHECK 3: HARD MESSAGE LIMIT (DEFAULT: 5) ===
+    // Count AI messages sent to this lead
     const msgCountResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_messages WHERE leadId = ${leadId} AND direction = 'outbound' AND senderName = 'IA Kafka'`);
     const msgRaw = msgCountResult as any;
     const msgRows = Array.isArray(msgRaw?.[0]) ? msgRaw[0] : msgRaw;
     const aiMsgCount = Number(msgRows?.[0]?.cnt || 0);
-    if (config.attendantMaxMessages > 0 && aiMsgCount >= config.attendantMaxMessages) {
-      console.log(`[AI Attendant] Lead #${leadId} reached max AI messages (${config.attendantMaxMessages}), skipping`);
-      return { sent: false };
+    
+    // HARD LIMIT: default 5 if not configured (0 means use default of 5)
+    const hardLimit = config.attendantMaxMessages > 0 ? config.attendantMaxMessages : 5;
+    
+    // If we're AT the limit (e.g., 4th message sent, this would be 5th), send transfer message and stop
+    if (aiMsgCount >= hardLimit - 1 && aiMsgCount < hardLimit) {
+      // This is the LAST AI message - send transfer message
+      console.log(`[AI Attendant] Lead #${leadId} at message limit (${aiMsgCount + 1}/${hardLimit}), sending TRANSFER message`);
+      const collectedDataForTransfer = await getCollectedData(leadId);
+      const clientName = collectedDataForTransfer.customerName || lead.name || '';
+      const namePrefix = clientName && clientName !== 'Novo Lead' ? `${clientName.split(' ')[0]}, ` : '';
+      const transferMsg = `${namePrefix}vou encaminhar seu atendimento para um dos nossos consultores que vai te atender com tudo pronto. Ele ja tem todas as informacoes da nossa conversa`;
+      
+      const sendResult = await zapi.sendText(phone, transferMsg);
+      if (sendResult.success) {
+        await crmDb.createMessage({
+          leadId, phone, direction: 'outbound', messageType: 'text',
+          content: transferMsg, mediaUrl: null, senderName: 'IA Kafka',
+          sentBy: null, zapiMessageId: sendResult.messageId || null, timestamp: Date.now(),
+        });
+        // Disable AI for this lead after transfer
+        await disableAiForLead(dbConn, leadId);
+        console.log(`[AI Attendant] Lead #${leadId} transferred to human, AI disabled`);
+      }
+      return { sent: true, message: transferMsg, action: 'transfer_limit_reached' };
+    }
+    
+    // If already past the limit, just stop silently
+    if (aiMsgCount >= hardLimit) {
+      console.log(`[AI Attendant] Lead #${leadId} PAST message limit (${aiMsgCount}/${hardLimit}), AI stopped`);
+      await disableAiForLead(dbConn, leadId);
+      return { sent: false, action: 'limit_exceeded' };
     }
 
     // Get previously collected data
@@ -924,8 +1002,8 @@ export async function handleAttendantMessage(
       return `${role}: ${content}`;
     }).join("\n");
 
-    // Build prompt
-    const systemPrompt = buildAttendantPrompt(config, lead, collectedData, vehicleContext, chatHistory);
+    // Build prompt (pass message count so AI knows how many messages remain)
+    const systemPrompt = buildAttendantPrompt(config, lead, collectedData, vehicleContext, chatHistory, aiMsgCount, hardLimit);
 
     // Call LLM
     const aiResp = await invokeLLM({
@@ -1016,8 +1094,10 @@ export async function handleAttendantMessage(
     // ===== TRANSFER TO SELLER =====
     // If AI decided to transfer to seller (doesn't know how to answer), handle gracefully
     if (parsed.nextStage === 'transfer_to_seller') {
-      console.log(`[AI Attendant] Transferring lead #${leadId} to human seller`);
+      console.log(`[AI Attendant] Transferring lead #${leadId} to human seller (AI decision)`);
       // The message already contains the transfer text from the AI
+      // Disable AI for this lead after sending the transfer message
+      // (will be disabled after the message is sent below)
     }
 
     // Merge extracted data with existing collected data (NEVER overwrite with null)
@@ -1128,26 +1208,42 @@ export async function handleAttendantMessage(
       }
     }
 
-    // === DUPLICATE MESSAGE CHECK ===
+    // === DUPLICATE MESSAGE CHECK (IMPROVED) ===
     // Check if we already sent a very similar message recently (prevents repetition)
     const recentAiMsgs = await dbConn.execute(
-      sql`SELECT content FROM crm_messages WHERE leadId = ${leadId} AND direction = 'outbound' AND senderName = 'IA Kafka' ORDER BY timestamp DESC LIMIT 5`
+      sql`SELECT content FROM crm_messages WHERE leadId = ${leadId} AND direction = 'outbound' AND senderName = 'IA Kafka' ORDER BY timestamp DESC LIMIT 8`
     );
     const recentAiRaw = recentAiMsgs as any;
     const recentAiRows = Array.isArray(recentAiRaw?.[0]) ? recentAiRaw[0] : recentAiRaw;
     if (recentAiRows && recentAiRows.length > 0) {
+      const newContent = responseText.toLowerCase().trim();
+      const newWords = newContent.split(/\s+/).filter((w: string) => w.length > 3);
+      
       for (const prevMsg of recentAiRows) {
         const prevContent = (prevMsg.content || '').toLowerCase().trim();
-        const newContent = responseText.toLowerCase().trim();
-        // Exact match or very similar (>80% overlap)
+        if (!prevContent) continue;
+        
+        // Check 1: Exact match
         if (prevContent === newContent) {
-          console.log(`[AI Attendant] BLOCKED duplicate message for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
+          console.log(`[AI Attendant] BLOCKED exact duplicate for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
           return { sent: false, action: 'duplicate_blocked' };
         }
-        // Check if the core content is the same (first 50 chars match)
-        if (prevContent.length > 20 && newContent.length > 20 && prevContent.substring(0, 50) === newContent.substring(0, 50)) {
-          console.log(`[AI Attendant] BLOCKED similar message for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
+        
+        // Check 2: First 40 chars match (same opening)
+        if (prevContent.length > 15 && newContent.length > 15 && prevContent.substring(0, 40) === newContent.substring(0, 40)) {
+          console.log(`[AI Attendant] BLOCKED similar opening for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
           return { sent: false, action: 'similar_blocked' };
+        }
+        
+        // Check 3: Word overlap > 70% (semantic similarity)
+        const prevWords = prevContent.split(/\s+/).filter((w: string) => w.length > 3);
+        if (prevWords.length >= 4 && newWords.length >= 4) {
+          const commonWords = newWords.filter((w: string) => prevWords.includes(w));
+          const overlapRatio = commonWords.length / Math.max(newWords.length, prevWords.length);
+          if (overlapRatio > 0.7) {
+            console.log(`[AI Attendant] BLOCKED high-overlap message (${Math.round(overlapRatio * 100)}%) for lead #${leadId}: "${responseText.substring(0, 50)}..."`);
+            return { sent: false, action: 'overlap_blocked' };
+          }
         }
       }
     }
@@ -1168,7 +1264,24 @@ export async function handleAttendantMessage(
         zapiMessageId: sendResult.messageId || null,
         timestamp: Date.now(),
       });
-      console.log(`[AI Attendant] Sent to lead #${leadId}: ${responseText.substring(0, 60)}...`);
+      console.log(`[AI Attendant] Sent to lead #${leadId} (msg ${aiMsgCount + 1}/${hardLimit}): ${responseText.substring(0, 60)}...`);
+
+      // === DISABLE AI IF TRANSFER WAS REQUESTED ===
+      if (parsed.nextStage === 'transfer_to_seller') {
+        await disableAiForLead(dbConn, leadId);
+        console.log(`[AI Attendant] Lead #${leadId} transferred to human seller, AI DISABLED`);
+        // Save updated data before returning
+        await saveCollectedData(leadId, updatedData);
+        return { sent: true, message: responseText, action: 'transfer_to_seller' };
+      }
+
+      // === CHECK IF THIS MESSAGE BRINGS US TO THE LIMIT ===
+      // If this was the (hardLimit - 1)th message, the NEXT one would be the limit
+      // We already handled the exact limit case above, but double-check
+      if (aiMsgCount + 1 >= hardLimit) {
+        await disableAiForLead(dbConn, leadId);
+        console.log(`[AI Attendant] Lead #${leadId} reached message limit after send, AI DISABLED`);
+      }
 
       // 4. Send vehicle photos if AI requested it (with DEDUP - never send same vehicle twice)
       if (parsed.sendPhotos) {
