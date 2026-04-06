@@ -105,7 +105,7 @@ describe("AI Attendant - Message Limits & Takeover Detection", () => {
 
   describe("Message Count in Prompt", () => {
     it("should pass aiMsgCount and hardLimit to buildAttendantPrompt", () => {
-      expect(aiAttendantCode).toContain("buildAttendantPrompt(config, lead, collectedData, vehicleContext, chatHistory, aiMsgCount, hardLimit)");
+      expect(aiAttendantCode).toContain("buildAttendantPrompt(config, lead, collectedData, vehicleContext + externalLinkContext, chatHistory, aiMsgCount, hardLimit)");
     });
 
     it("should have aiMsgCount and hardLimit parameters in buildAttendantPrompt", () => {

@@ -21,7 +21,7 @@ const CATEGORIES: { value: Category; label: string; icon: typeof Car; color: str
 ];
 
 /** Vehicle Selector - search from inventory or type manually */
-function VehicleSelector({ value, onChange }: { value: string; onChange: (model: string, price?: number) => void }) {
+function VehicleSelector({ value, onChange }: { value: string; onChange: (model: string, price?: number, plate?: string, inventoryId?: number) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const { data: vehicles } = trpc.inventory.list.useQuery(
@@ -31,7 +31,7 @@ function VehicleSelector({ value, onChange }: { value: string; onChange: (model:
 
   const handleSelect = (v: any) => {
     const label = `${v.brand} ${v.model} ${v.version || ""} ${v.year || ""}`.trim();
-    onChange(label, v.price || undefined);
+    onChange(label, v.price || undefined, v.plate || undefined, v.id || undefined);
     setSearchTerm("");
     setShowDropdown(false);
   };
@@ -122,6 +122,7 @@ export default function RegisterSale() {
 
   // Venda fields
   const [vehicleModel, setVehicleModel] = useState("");
+  const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
   const [value, setValue] = useState("");
   const [description, setDescription] = useState("");
   const [saleLeadSource, setSaleLeadSource] = useState<string>("");
@@ -672,11 +673,18 @@ export default function RegisterSale() {
                   </Label>
                   <VehicleSelector
                     value={vehicleModel}
-                    onChange={(model, price) => {
+                    onChange={(model, price, plate, invId) => {
                       setVehicleModel(model);
                       if (price && !value) setValue(String(price));
+                      if (plate) setVehiclePlate(plate);
+                      if (invId) setSelectedInventoryId(invId);
                     }}
                   />
+                  {selectedInventoryId && (
+                    <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-1">
+                      <CheckCircle2 className="w-3 h-3" /> Veículo selecionado do estoque (saída automática após aprovação)
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">

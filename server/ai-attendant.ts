@@ -536,14 +536,16 @@ ${tradeInStatus}`;
 
   return `Voce e uma SDR (pre-vendas) da KAFKA Multimarcas, especialista em atendimento automotivo via WhatsApp.
 
-=== SEU OBJETIVO ===
-- Atender rapido
-- Gerar conexao
-- Entender o cliente
-- Qualificar o lead
-- Preparar o cliente para o vendedor
-- Levar para simulacao e visita na loja
-Voce NAO fecha a venda. Voce entrega o cliente PRONTO para o fechamento.
+=== SEU OBJETIVO PRINCIPAL: QUALIFICAR O LEAD ===
+Sua UNICA missao e QUALIFICAR o lead para o vendedor. Isso significa:
+1. Descobrir O QUE o cliente quer (veiculo, tipo, faixa de preco)
+2. Descobrir SE tem troca e detalhes do carro
+3. Descobrir COMO pretende pagar (financiamento, avista, troca)
+4. Descobrir DE ONDE e o cliente (cidade)
+5. Descobrir QUANDO quer resolver (urgencia)
+
+Quando tiver pelo menos 3 dessas informacoes, TRANSFIRA para o vendedor.
+Voce NAO fecha a venda. Voce NAO precisa agendar. Voce QUALIFICA e ENTREGA o lead PRONTO.
 
 === PERSONALIDADE PADRAO KAFKA ===
 - Direta, clara e confiante
@@ -586,22 +588,38 @@ Se aceitar: "Pra te passar certinho, preciso do CPF e data de nascimento"
 6. URGENCIA (no momento certo):
 "E me diz, voce ja ta querendo resolver isso agora ou ta analisando com calma?"
 
-=== PERGUNTAS PRESSUPOSICIONAIS (USE SEMPRE) ===
-Em vez de perguntar SE o cliente quer, ASSUMA que ele vai:
-- Em vez de "quer agendar?" → "Vou separar esse carro pra voce ver com calma, qual melhor horario?"
-- Em vez de "quer simular?" → "Vou adiantar uma simulacao pra voce, me passa o CPF"
-- Em vez de "tem interesse?" → "Esse ta com condicao especial, vou te mostrar os detalhes"
-- Em vez de "quer ver fotos?" → "Vou te mandar umas fotos pra voce ja ter uma ideia"
+=== PERGUNTAS NATURAIS (QUALIFICACAO PRIMEIRO) ===
+Foque em perguntas de QUALIFICACAO, nao de venda:
+- "Voce ta buscando algo nessa linha ou tem outro modelo em mente?"
+- "Voce tem carro na troca?"
+- "Como voce pensa em pagar? Financiamento, avista?"
+- "Voce e de Joinville ou de outra cidade?"
+- "Ja ta querendo resolver agora ou ta pesquisando com calma?"
 
-=== AGENDAMENTO (PRIORIDADE MAXIMA) ===
-"Vou separar esse carro pra voce ver com calma aqui na loja, qual melhor horario pra voce passar?"
+So use perguntas pressuposicionais DEPOIS de qualificar:
+- "Vou te mandar umas fotos pra voce ja ter uma ideia" (quando sabe o que quer)
+- "Vou adiantar uma simulacao pra voce" (quando ja tem interesse confirmado)
 
-=== TRANSICAO PARA VENDEDOR ===
-Quando cliente esta qualificado OU quando voce nao sabe responder algo tecnico:
-"Perfeito, vou encaminhar seu atendimento para um dos nossos consultores que vai te atender com tudo pronto"
-OU
-"Vou deixar tudo separado pra voce ver direto aqui na loja com a equipe"
-IMPORTANTE: Se o cliente fizer uma pergunta que voce NAO sabe responder (tecnica, financeira complexa, negociacao de valor), TRANSFIRA para o consultor em vez de inventar resposta. Diga: "Essa parte quem pode te dar a melhor resposta e nosso consultor, vou te encaminhar pra ele"
+=== AGENDAMENTO (SO QUANDO QUALIFICADO) ===
+So agende quando o lead estiver QUALIFICADO (tem pelo menos 3 dados: veiculo, troca, pagamento, cidade).
+Se o lead nao esta qualificado, QUALIFIQUE PRIMEIRO antes de agendar.
+NUNCA agende na primeira ou segunda mensagem.
+Quando for agendar: "Qual melhor horario pra voce passar aqui na loja?"
+
+=== TRANSICAO PARA VENDEDOR (PRIORIDADE MAXIMA) ===
+Sua meta e QUALIFICAR e TRANSFERIR. Transfira quando:
+1. Lead QUALIFICADO: tem 3+ dados (veiculo, troca, pagamento, cidade, urgencia)
+2. Pergunta TECNICA: preco exato, condicao de financiamento, detalhes mecanicos
+3. NEGOCIACAO: cliente quer desconto, contra-proposta, condicao especial
+4. LINK EXTERNO sem estoque: cliente mandou link de outro site e nao temos o carro
+5. DUVIDA que voce nao sabe: qualquer coisa que voce nao tem certeza
+
+Frases de transicao:
+- "Perfeito, ja tenho tudo organizado. Vou encaminhar pro nosso consultor que vai te atender com tudo pronto"
+- "Essa parte quem pode te dar a melhor resposta e nosso consultor, vou te encaminhar"
+- "Vou passar pro nosso especialista que vai te dar as melhores condicoes"
+
+IMPORTANTE: E MELHOR transferir cedo demais do que tarde demais. Na duvida, TRANSFIRA.
 
 === QUEBRA DE OBJECOES ===
 Quando o cliente apresentar objecoes, use estas respostas:
@@ -630,15 +648,26 @@ Quando o cliente apresentar objecoes, use estas respostas:
 "Ta longe" / "Sou de outra cidade":
 → "Posso agendar uma videochamada com nosso consultor pra te mostrar o carro em detalhes, o que acha?"
 
-=== 7 GATILHOS MENTAIS (USE COM INTELIGENCIA) ===
-1. ESCASSEZ: "Esse modelo e dificil de encontrar nesse estado" / "Esse ta saindo rapido"
-2. URGENCIA: "Essa condicao e por tempo limitado" / "Depois nao consigo garantir"
-3. PROVA SOCIAL: "Esse modelo e o mais procurado aqui na loja" / "Ja vendemos varios desse"
-4. AUTORIDADE: "A gente trabalha com veiculo revisado e com garantia" / "Pode ficar tranquilo"
-5. RECIPROCIDADE: "Vou adiantar uma simulacao pra voce sem compromisso, so pra ter uma ideia"
-6. NOVIDADE: "Temos novidades chegando que ainda nao estao no site" / "Tem mais opcoes na loja"
-7. AVERSAO A PERDA: "Se nao garantir agora, pode ser que outro cliente feche antes"
-Use 1-2 gatilhos por mensagem, de forma NATURAL, sem forcar.
+=== GATILHOS MENTAIS (USE COM MODERACAO - MAXIMO 1 POR CONVERSA) ===
+ATENCAO: Gatilhos so devem ser usados NO MOMENTO CERTO, quando o cliente ja demonstrou interesse real.
+NUNCA use gatilhos nas primeiras mensagens. NUNCA use mais de 1 gatilho por conversa.
+NUNCA use gatilhos quando o cliente esta fazendo perguntas ou ainda nao se decidiu.
+
+So use gatilhos quando:
+- O cliente ja sabe o que quer E ja tem dados coletados
+- O cliente demonstra hesitacao DEPOIS de estar interessado
+- O cliente diz "vou pensar" DEPOIS de ter demonstrado interesse
+
+Exemplos CORRETOS de uso:
+- PROVA SOCIAL (mais seguro): "Esse modelo e bem procurado aqui"
+- AUTORIDADE: "A gente trabalha com veiculo revisado e com garantia"
+
+Exemplos PROIBIDOS (nunca use no inicio):
+- "Esse ta saindo rapido" (pressao desnecessaria)
+- "Essa condicao e por tempo limitado" (mentira)
+- "Se nao garantir agora, pode ser que outro cliente feche antes" (agressivo demais)
+
+PRIORIDADE: Qualificar > Entender > Conectar > Gatilho (ultimo recurso)
 
 === ADAPTACAO POR PERFIL ===
 Identifique o perfil do cliente pelo TOM das mensagens e adapte:
@@ -671,6 +700,20 @@ Identifique o perfil do cliente pelo TOM das mensagens e adapte:
 15. NUNCA repita a mesma mensagem ou uma mensagem muito parecida com algo que voce ja enviou. Leia o historico e VARIE suas respostas.
 16. Se voce NAO SABE responder algo (tecnico, financeiro complexo, negociacao), TRANSFIRA para o consultor: "Essa parte quem pode te dar a melhor resposta e nosso consultor, vou te encaminhar". Use nextStage="transfer_to_seller"
 17. NUNCA use as palavras: vendido, esgotado, acabou, nao temos, indisponivel. SEMPRE use: verificar, confirmar, checar com a equipe
+
+=== REGRA MAIS IMPORTANTE: ANALISE DE CONTEXTO ===
+ANTES de responder, voce DEVE analisar TODO o historico da conversa abaixo.
+Sua resposta DEVE ser sobre o MESMO ASSUNTO que o cliente esta falando.
+
+SITUACOES QUE VOCE DEVE IDENTIFICAR:
+1. CLIENTE NOVO (primeira msg): Cumprimente e pergunte o que busca
+2. CLIENTE RETORNANDO (ja conversou antes): Continue de onde parou, NAO se apresente de novo
+3. CLIENTE COM DUVIDA ESPECIFICA: Responda a duvida, nao mude de assunto
+4. CLIENTE FALANDO DE POS-VENDA: Transfira para pos-venda imediatamente
+5. CLIENTE IRRITADO/REPETINDO: Peca desculpas e transfira para consultor
+
+Se o cliente manda uma mensagem sobre um ASSUNTO ESPECIFICO (ex: quer saber sobre um carro, tem duvida sobre financiamento),
+voce DEVE responder sobre AQUELE assunto. NAO mude para outro tema. NAO tente vender algo diferente.
 
 === REGRA CRITICA: MEMORIA (MAIS IMPORTANTE DE TODAS) ===
 VOCE TEM MEMORIA PERFEITA. Analise o HISTORICO abaixo com EXTREMO cuidado.
@@ -1040,6 +1083,170 @@ export async function handleAttendantMessage(
     // Get previously collected data
     const collectedData = await getCollectedData(leadId);
 
+    // === CHECK 4: SMART CONTEXT ANALYSIS (BEFORE LLM CALL) ===
+    // Analyze the conversation to decide IF the AI should respond at all
+    const msgLower = incomingMessage.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
+    // 4A. POST-SALE DETECTION: If client mentions problems, warranty, complaints → TRANSFER immediately
+    const postSaleKeywords = [
+      'problema', 'defeito', 'garantia', 'quebrou', 'barulho', 'vazando', 'nao funciona',
+      'nao liga', 'nao pega', 'acendeu luz', 'luz acesa', 'motor falhando', 'freio',
+      'recall', 'revisao', 'manutencao', 'oficina', 'mecanico', 'funilaria',
+      'bateu', 'batida', 'sinistro', 'seguro', 'guincho', 'reboque',
+      'reclamacao', 'insatisfeito', 'arrependido', 'devolver', 'devolucao',
+      'trocar peca', 'peca quebrada', 'ar condicionado', 'vidro eletrico',
+      'comprei', 'ja comprei', 'comprei aqui', 'comprei ai', 'comprei na kafka',
+      'pos venda', 'pos-venda', 'assistencia', 'suporte tecnico'
+    ];
+    const isPostSale = postSaleKeywords.some(kw => msgLower.includes(kw));
+    
+    if (isPostSale) {
+      console.log(`[AI Attendant] POST-SALE detected for lead #${leadId}: "${incomingMessage.substring(0, 60)}...", transferring to human`);
+      const clientName = collectedData.customerName || lead.name || '';
+      const namePrefix = clientName && clientName !== 'Novo Lead' ? `${clientName.split(' ')[0]}, ` : '';
+      const postSaleMsg = `${namePrefix}entendi, vou encaminhar voce para nosso setor de pos-venda que vai te ajudar com isso`;
+      const sendResult = await zapi.sendText(phone, postSaleMsg);
+      if (sendResult.success) {
+        await crmDb.createMessage({
+          leadId, phone, direction: 'outbound', messageType: 'text',
+          content: postSaleMsg, mediaUrl: null, senderName: 'IA Kafka',
+          sentBy: null, zapiMessageId: sendResult.messageId || null, timestamp: Date.now(),
+        });
+        await disableAiForLead(dbConn, leadId);
+        await logAiConversation(leadId, 'post_sale_transfer', { leadName: lead.name, leadPhone: phone, aiMsgCount: aiMsgCount + 1, messageLimit: hardLimit, collectedData, leadTemperature: 'warm', conversationStage: 'post_sale' });
+      }
+      return { sent: true, message: postSaleMsg, action: 'post_sale_transfer' };
+    }
+
+    // 4B. ALREADY QUALIFIED CHECK: If lead was already fully qualified (has 3+ data points AND AI already sent 3+ msgs)
+    // AND the conversation stage was 'transfer_to_seller' or 'closing', don't restart
+    const previousStage = collectedData.conversationStage || '';
+    const wasAlreadyTransferred = ['transfer_to_seller', 'closing', 'ficha'].includes(previousStage);
+    const hasQualificationData = [
+      collectedData.vehicleInterest,
+      collectedData.tradeInVehicle,
+      collectedData.paymentMethod,
+      collectedData.customerCity,
+      collectedData.customerCpf,
+      collectedData.customerName,
+    ].filter(Boolean).length >= 3;
+    
+    if (wasAlreadyTransferred && hasQualificationData && aiMsgCount >= 3) {
+      console.log(`[AI Attendant] Lead #${leadId} already QUALIFIED (stage=${previousStage}, data=${hasQualificationData}), NOT restarting conversation`);
+      // Send a brief message and transfer
+      const clientName = collectedData.customerName || lead.name || '';
+      const namePrefix = clientName && clientName !== 'Novo Lead' ? `${clientName.split(' ')[0]}, ` : '';
+      const alreadyQualifiedMsg = `${namePrefix}ja encaminhei suas informacoes pro nosso consultor, ele vai te retornar em breve`;
+      const sendResult = await zapi.sendText(phone, alreadyQualifiedMsg);
+      if (sendResult.success) {
+        await crmDb.createMessage({
+          leadId, phone, direction: 'outbound', messageType: 'text',
+          content: alreadyQualifiedMsg, mediaUrl: null, senderName: 'IA Kafka',
+          sentBy: null, zapiMessageId: sendResult.messageId || null, timestamp: Date.now(),
+        });
+        await disableAiForLead(dbConn, leadId);
+        await logAiConversation(leadId, 'already_qualified', { leadName: lead.name, leadPhone: phone, aiMsgCount: aiMsgCount + 1, messageLimit: hardLimit, collectedData, leadTemperature: collectedData.leadTemperature, conversationStage: previousStage });
+      }
+      return { sent: true, message: alreadyQualifiedMsg, action: 'already_qualified' };
+    }
+
+    // 4C. INTERNAL MESSAGE DETECTION: If the message looks like it's from a seller/SDR/manager
+    // (e.g., short internal commands, seller names, internal jargon)
+    const internalKeywords = [
+      'teste', 'testando', 'oi sou vendedor', 'sou o vendedor', 'sou vendedora',
+      'aqui e o', 'aqui eh o', 'sou da loja', 'sou do time', 'sou da equipe',
+      'maicon', // owner name - should not trigger AI
+    ];
+    const isLikelyInternal = internalKeywords.some(kw => msgLower.includes(kw)) && msgLower.length < 50;
+    
+    // Also check if the phone number belongs to a registered seller
+    let isSellerPhone = false;
+    try {
+      const cleanPhone = phone.replace(/\D/g, '');
+      const sellerPhoneResult = await dbConn.execute(
+        sql`SELECT id, name FROM sellers WHERE REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '+', '') LIKE ${`%${cleanPhone.slice(-8)}%`} LIMIT 1`
+      );
+      const spRaw = sellerPhoneResult as any;
+      const spRows = Array.isArray(spRaw?.[0]) ? spRaw[0] : spRaw;
+      if (spRows && spRows.length > 0) {
+        isSellerPhone = true;
+        console.log(`[AI Attendant] Phone ${phone} belongs to seller "${spRows[0].name}" (ID: ${spRows[0].id}), AI will NOT respond`);
+      }
+    } catch { /* ignore */ }
+    
+    if (isSellerPhone || isLikelyInternal) {
+      console.log(`[AI Attendant] INTERNAL message detected for lead #${leadId} (sellerPhone=${isSellerPhone}, internal=${isLikelyInternal}), skipping`);
+      await disableAiForLead(dbConn, leadId);
+      return { sent: false, action: 'internal_message_skipped' };
+    }
+
+    // 4D. CONVERSATION CONTEXT: Add context about the conversation state to help the AI
+    // Count total inbound messages from this lead to understand if it's a returning contact
+    let totalInboundCount = 0;
+    try {
+      const inboundCountResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_messages WHERE leadId = ${leadId} AND direction = 'inbound'`);
+      const icRaw = inboundCountResult as any;
+      const icRows = Array.isArray(icRaw?.[0]) ? icRaw[0] : icRaw;
+      totalInboundCount = Number(icRows?.[0]?.cnt || 0);
+    } catch { /* ignore */ }
+    
+    const isReturningContact = totalInboundCount > 1 && aiMsgCount > 0;
+
+    // === DETECT EXTERNAL LINKS AND EXTRACT VEHICLE INFO ===
+    // If client sends a link from an external site, extract vehicle model and check OUR stock
+    let externalLinkContext = '';
+    const urlRegex = /https?:\/\/[^\s]+/gi;
+    const urls = incomingMessage.match(urlRegex) || [];
+    const ourDomains = ['kafkamultimarcas', 'kafka-multimarcas', 'kafkacarros'];
+    const externalUrls = urls.filter(u => !ourDomains.some(d => u.toLowerCase().includes(d)));
+    
+    if (externalUrls.length > 0) {
+      // Extract vehicle model from URL slug (e.g., /kia-sportage-2020-478934 → Kia Sportage 2020)
+      for (const url of externalUrls) {
+        try {
+          const urlPath = new URL(url).pathname;
+          // Common URL patterns: /anuncio/city-brand-model-year-id or /veiculo/brand-model-year
+          const slugParts = urlPath.split('/').filter(p => p.length > 2);
+          const lastSlug = slugParts[slugParts.length - 1] || '';
+          // Remove numeric IDs and clean up
+          const cleanSlug = lastSlug
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\d{5,}\b/g, '') // remove long IDs
+            .replace(/\b(anuncio|veiculo|carro|joinville|florianopolis|curitiba|blumenau|navegantes|itajai|balneario|camboriu|sao|paulo|rio|janeiro|belo|horizonte)\b/gi, '')
+            .trim();
+          
+          if (cleanSlug.length > 3) {
+            // Search our stock for this vehicle
+            const stockResults = await searchVehiclesByTypeAndPrice(undefined, undefined, undefined, cleanSlug, 5);
+            
+            // Also try individual words (brand + model separately)
+            const words = cleanSlug.split(/\s+/).filter(w => w.length > 2 && !/^\d{1,4}$/.test(w));
+            let additionalResults: any[] = [];
+            for (const word of words.slice(0, 3)) {
+              const wordResults = await searchVehiclesByTypeAndPrice(undefined, undefined, undefined, word, 3);
+              additionalResults = [...additionalResults, ...wordResults];
+            }
+            
+            // Merge and deduplicate
+            const allResults = [...stockResults];
+            for (const r of additionalResults) {
+              if (!allResults.some(a => a.id === r.id)) allResults.push(r);
+            }
+            
+            if (allResults.length > 0) {
+              externalLinkContext = `\n\n=== LINK EXTERNO DETECTADO ===\nO cliente enviou um link de site EXTERNO: ${url}\nModelo extraido do link: ${cleanSlug}\nTEMOS veiculos SIMILARES no nosso estoque:\n${allResults.slice(0, 5).map(v => `- ${v.brand} ${v.model} ${v.year || ''} | R$ ${v.price?.toLocaleString('pt-BR') || 'consultar'} | ${v.km?.toLocaleString('pt-BR') || '0'} km`).join('\n')}\nINSTRUCAO: Diga ao cliente que temos opcoes similares no nosso estoque e envie fotos (sendPhotos=true). NAO mencione o link externo. Foque nas NOSSAS opcoes.\nExemplo: "Temos opcoes parecidas aqui, vou te mandar umas fotos pra voce ver"\n`;
+              // Auto-set vehicleInterest from the extracted slug
+              if (!collectedData.vehicleInterest) {
+                collectedData.vehicleInterest = cleanSlug;
+              }
+            } else {
+              externalLinkContext = `\n\n=== LINK EXTERNO DETECTADO - VEICULO NAO ENCONTRADO NO ESTOQUE ===\nO cliente enviou um link de site EXTERNO: ${url}\nModelo extraido do link: ${cleanSlug}\nNAO temos esse modelo exato no nosso estoque.\nINSTRUCAO OBRIGATORIA: Diga que vai verificar com a equipe e TRANSFIRA para o consultor.\nExemplo: "Vou confirmar com a equipe a disponibilidade desse modelo, vou te encaminhar pro nosso consultor que pode te dar mais detalhes"\nUse nextStage="transfer_to_seller"\nNUNCA agende visita para um carro que NAO temos no estoque!\n`;
+            }
+          }
+        } catch { /* ignore URL parse errors */ }
+      }
+    }
+
     // Get ALL recent inbound messages (in case multiple arrived during debounce)
     const recentMsgs = await crmDb.listMessagesByLead(leadId, 30);
     
@@ -1088,13 +1295,23 @@ export async function handleAttendantMessage(
     }).join("\n");
 
     // Build prompt (pass message count so AI knows how many messages remain)
-    const systemPrompt = buildAttendantPrompt(config, lead, collectedData, vehicleContext, chatHistory, aiMsgCount, hardLimit);
+    const systemPrompt = buildAttendantPrompt(config, lead, collectedData, vehicleContext + externalLinkContext, chatHistory, aiMsgCount, hardLimit);
+
+    // Build context awareness for the LLM
+    let contextNote = '';
+    if (isReturningContact && aiMsgCount > 0) {
+      contextNote = `\n\nCONTEXTO IMPORTANTE: Este cliente JA CONVERSOU com voce antes (${aiMsgCount} msgs enviadas, ${totalInboundCount} msgs recebidas). NAO se apresente de novo. NAO recomece do zero. Continue de onde parou. Analise o historico acima e responda NO CONTEXTO da conversa anterior.`;
+      if (collectedData.vehicleInterest) contextNote += `\nO cliente ja demonstrou interesse em: ${collectedData.vehicleInterest}`;
+      if (collectedData.tradeInVehicle) contextNote += `\nO cliente tem carro de troca: ${collectedData.tradeInVehicle}`;
+      if (collectedData.paymentMethod) contextNote += `\nForma de pagamento: ${collectedData.paymentMethod}`;
+      if (collectedData.customerCity) contextNote += `\nCidade: ${collectedData.customerCity}`;
+    }
 
     // Call LLM
     const aiResp = await invokeLLM({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `O cliente acabou de enviar: "${consolidatedMessage}"\n\nResponda no formato JSON especificado. LEMBRE-SE: nao repita perguntas ja feitas, analise o historico.` }
+        { role: "user", content: `O cliente acabou de enviar: "${consolidatedMessage}"${contextNote}\n\nANALISE O HISTORICO COMPLETO antes de responder. Responda DENTRO DO CONTEXTO da conversa. NAO repita perguntas ja feitas. Se o cliente esta falando sobre algo especifico, responda sobre AQUILO, nao mude de assunto.\n\nResponda no formato JSON especificado.` }
       ],
       response_format: {
         type: "json_schema",

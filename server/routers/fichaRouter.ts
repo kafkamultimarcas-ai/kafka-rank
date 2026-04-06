@@ -246,6 +246,50 @@ export const fichaRouter = router({
     return BANCOS_FINANCIAMENTO;
   }),
 
+  // F&I edita dados da ficha (corrigir valores, digitação, etc.)
+  editFicha: publicProcedure.input(z.object({
+    fichaId: z.number(),
+    // Veículo
+    veiculo: z.string().optional(),
+    placa: z.string().optional(),
+    anoModelo: z.string().optional(),
+    valorFipe: z.number().optional(),
+    valorFinanciado: z.number().optional(),
+    // Dados pessoais
+    nomeCompleto: z.string().optional(),
+    cpf: z.string().optional(),
+    rg: z.string().optional(),
+    dataNascimento: z.string().optional(),
+    estadoCivil: z.string().optional(),
+    nomeMae: z.string().optional(),
+    nomePai: z.string().optional(),
+    cidadeNasceu: z.string().optional(),
+    email: z.string().optional(),
+    telefone: z.string().optional(),
+    cep: z.string().optional(),
+    endereco: z.string().optional(),
+    profissao: z.string().optional(),
+    renda: z.string().optional(),
+    localTrabalho: z.string().optional(),
+    referenciaNome: z.string().optional(),
+    referenciaTelefone: z.string().optional(),
+    observacoesVendedor: z.string().optional(),
+  })).mutation(async ({ input }) => {
+    const { fichaId, ...updateData } = input;
+    // Remove undefined values
+    const cleanData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(updateData)) {
+      if (value !== undefined) {
+        cleanData[key] = key === 'placa' && typeof value === 'string' ? value.toUpperCase() : value;
+      }
+    }
+    if (Object.keys(cleanData).length === 0) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Nenhum campo para atualizar" });
+    }
+    await updateFichaFinanciamento(fichaId, cleanData);
+    return { message: "Ficha atualizada com sucesso" };
+  }),
+
   // Deletar ficha
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     await deleteFichaFinanciamento(input.id);

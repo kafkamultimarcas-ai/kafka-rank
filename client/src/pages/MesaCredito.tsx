@@ -136,6 +136,54 @@ export default function MesaCredito() {
   const [bancoTaxa, setBancoTaxa] = useState("");
   const [obsGeral, setObsGeral] = useState("");
   const [dataPagamentoBanco, setDataPagamentoBanco] = useState("");
+  
+  // === EDIT FICHA STATE ===
+  const [isEditingFicha, setIsEditingFicha] = useState(false);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const editFichaMutation = trpc.fichas.editFicha.useMutation({ onSuccess: () => { refetchDetail(); refetch(); toast.success("Ficha atualizada!"); setIsEditingFicha(false); } });
+  
+  const startEditFicha = () => {
+    if (!fichaDetail) return;
+    setEditForm({
+      veiculo: fichaDetail.veiculo || "",
+      placa: fichaDetail.placa || "",
+      anoModelo: fichaDetail.anoModelo || "",
+      valorFinanciado: fichaDetail.valorFinanciado || "",
+      nomeCompleto: fichaDetail.nomeCompleto || "",
+      cpf: fichaDetail.cpf || "",
+      rg: fichaDetail.rg || "",
+      dataNascimento: fichaDetail.dataNascimento || "",
+      estadoCivil: fichaDetail.estadoCivil || "",
+      nomeMae: fichaDetail.nomeMae || "",
+      nomePai: fichaDetail.nomePai || "",
+      cidadeNasceu: fichaDetail.cidadeNasceu || "",
+      email: fichaDetail.email || "",
+      telefone: fichaDetail.telefone || "",
+      cep: fichaDetail.cep || "",
+      endereco: fichaDetail.endereco || "",
+      profissao: fichaDetail.profissao || "",
+      renda: fichaDetail.renda || "",
+      localTrabalho: fichaDetail.localTrabalho || "",
+      referenciaNome: fichaDetail.referenciaNome || "",
+      referenciaTelefone: fichaDetail.referenciaTelefone || "",
+      observacoesVendedor: fichaDetail.observacoesVendedor || "",
+    });
+    setIsEditingFicha(true);
+  };
+  
+  const saveEditFicha = async () => {
+    if (!selectedFichaId) return;
+    const data: Record<string, any> = { fichaId: selectedFichaId };
+    for (const [key, value] of Object.entries(editForm)) {
+      if (key === 'valorFinanciado') {
+        const num = parseFloat(String(value));
+        if (!isNaN(num)) data[key] = num;
+      } else if (value) {
+        data[key] = value;
+      }
+    }
+    await editFichaMutation.mutateAsync(data as any);
+  };
 
   const handleIniciarAnalise = async (fichaId: number) => {
     if (!feiSellerId) { toast.error("Selecione quem é o F&I!"); return; }
@@ -332,37 +380,90 @@ export default function MesaCredito() {
               </div>
 
               <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* BOTÃO EDITAR */}
+                <div className="flex justify-end">
+                  {!isEditingFicha ? (
+                    <Button size="sm" variant="outline" onClick={startEditFicha}
+                      className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 text-xs">
+                      <FileText className="w-3 h-3 mr-1" /> Editar Ficha
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={saveEditFicha} disabled={editFichaMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700 text-xs">
+                        {editFichaMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <CheckCircle2 className="w-3 h-3 mr-1" />} Salvar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setIsEditingFicha(false)}
+                        className="border-gray-700 text-gray-400 text-xs">
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Dados do veículo */}
                 <div className="bg-gray-800/50 rounded-xl p-3 space-y-2">
                   <h3 className="text-sm font-bold text-blue-400 flex items-center gap-2"><Car className="w-4 h-4" /> VEÍCULO</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-gray-500">Veículo:</span> <span className="text-white">{fichaDetail.veiculo || "—"}</span></div>
-                    <div><span className="text-gray-500">Placa:</span> <span className="text-yellow-400 font-mono">{fichaDetail.placa || "—"}</span></div>
-                    <div><span className="text-gray-500">Ano:</span> <span className="text-white">{fichaDetail.anoModelo || "—"}</span></div>
-                    <div><span className="text-gray-500">Financiado:</span> <span className="text-green-400 font-bold">{formatCurrency(fichaDetail.valorFinanciado)}</span></div>
-                  </div>
+                  {isEditingFicha ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><label className="text-[10px] text-gray-500">Veículo</label><Input value={editForm.veiculo} onChange={e => setEditForm(p => ({...p, veiculo: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Placa</label><Input value={editForm.placa} onChange={e => setEditForm(p => ({...p, placa: e.target.value}))} className="bg-gray-800 border-gray-700 text-yellow-400 text-xs h-8 font-mono" /></div>
+                      <div><label className="text-[10px] text-gray-500">Ano/Modelo</label><Input value={editForm.anoModelo} onChange={e => setEditForm(p => ({...p, anoModelo: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Valor Financiado</label><Input type="number" value={editForm.valorFinanciado} onChange={e => setEditForm(p => ({...p, valorFinanciado: e.target.value}))} className="bg-gray-800 border-gray-700 text-green-400 text-xs h-8" /></div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div><span className="text-gray-500">Veículo:</span> <span className="text-white">{fichaDetail.veiculo || "—"}</span></div>
+                      <div><span className="text-gray-500">Placa:</span> <span className="text-yellow-400 font-mono">{fichaDetail.placa || "—"}</span></div>
+                      <div><span className="text-gray-500">Ano:</span> <span className="text-white">{fichaDetail.anoModelo || "—"}</span></div>
+                      <div><span className="text-gray-500">Financiado:</span> <span className="text-green-400 font-bold">{formatCurrency(fichaDetail.valorFinanciado)}</span></div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Dados pessoais */}
                 <div className="bg-gray-800/50 rounded-xl p-3 space-y-2">
                   <h3 className="text-sm font-bold text-purple-400 flex items-center gap-2"><User className="w-4 h-4" /> DADOS PESSOAIS</h3>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="text-gray-500">CPF:</span> <span className="text-white">{fichaDetail.cpf}</span></div>
-                    <div><span className="text-gray-500">RG:</span> <span className="text-white">{fichaDetail.rg || "—"}</span></div>
-                    <div><span className="text-gray-500">Nascimento:</span> <span className="text-white">{fichaDetail.dataNascimento || "—"}</span></div>
-                    <div><span className="text-gray-500">Estado Civil:</span> <span className="text-white">{fichaDetail.estadoCivil || "—"}</span></div>
-                    <div><span className="text-gray-500">Mãe:</span> <span className="text-white">{fichaDetail.nomeMae || "—"}</span></div>
-                    <div><span className="text-gray-500">Pai:</span> <span className="text-white">{fichaDetail.nomePai || "—"}</span></div>
-                    <div><span className="text-gray-500">Cidade Nasc.:</span> <span className="text-white">{fichaDetail.cidadeNasceu || "—"}</span></div>
-                    <div><span className="text-gray-500">Telefone:</span> <span className="text-blue-400">{fichaDetail.telefone || "—"}</span></div>
-                    <div><span className="text-gray-500">Email:</span> <span className="text-white">{fichaDetail.email || "—"}</span></div>
-                    <div><span className="text-gray-500">CEP:</span> <span className="text-white">{fichaDetail.cep || "—"}</span></div>
-                    <div className="col-span-2"><span className="text-gray-500">Endereço:</span> <span className="text-white">{fichaDetail.endereco || "—"}</span></div>
-                    <div><span className="text-gray-500">Profissão:</span> <span className="text-white">{fichaDetail.profissao || "—"}</span></div>
-                    <div><span className="text-gray-500">Renda:</span> <span className="text-white">{fichaDetail.renda || "—"}</span></div>
-                    <div><span className="text-gray-500">Local Trabalho:</span> <span className="text-white">{fichaDetail.localTrabalho || "—"}</span></div>
-                    <div><span className="text-gray-500">Ref. Pessoal:</span> <span className="text-white">{fichaDetail.referenciaNome || "—"} {fichaDetail.referenciaTelefone ? `(${fichaDetail.referenciaTelefone})` : ""}</span></div>
-                  </div>
+                  {isEditingFicha ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><label className="text-[10px] text-gray-500">Nome Completo</label><Input value={editForm.nomeCompleto} onChange={e => setEditForm(p => ({...p, nomeCompleto: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">CPF</label><Input value={editForm.cpf} onChange={e => setEditForm(p => ({...p, cpf: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">RG</label><Input value={editForm.rg} onChange={e => setEditForm(p => ({...p, rg: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Nascimento</label><Input value={editForm.dataNascimento} onChange={e => setEditForm(p => ({...p, dataNascimento: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Estado Civil</label><Input value={editForm.estadoCivil} onChange={e => setEditForm(p => ({...p, estadoCivil: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Mãe</label><Input value={editForm.nomeMae} onChange={e => setEditForm(p => ({...p, nomeMae: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Pai</label><Input value={editForm.nomePai} onChange={e => setEditForm(p => ({...p, nomePai: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Cidade Nasc.</label><Input value={editForm.cidadeNasceu} onChange={e => setEditForm(p => ({...p, cidadeNasceu: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Telefone</label><Input value={editForm.telefone} onChange={e => setEditForm(p => ({...p, telefone: e.target.value}))} className="bg-gray-800 border-gray-700 text-blue-400 text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Email</label><Input value={editForm.email} onChange={e => setEditForm(p => ({...p, email: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">CEP</label><Input value={editForm.cep} onChange={e => setEditForm(p => ({...p, cep: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div className="col-span-2"><label className="text-[10px] text-gray-500">Endereço</label><Input value={editForm.endereco} onChange={e => setEditForm(p => ({...p, endereco: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Profissão</label><Input value={editForm.profissao} onChange={e => setEditForm(p => ({...p, profissao: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Renda</label><Input value={editForm.renda} onChange={e => setEditForm(p => ({...p, renda: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Local Trabalho</label><Input value={editForm.localTrabalho} onChange={e => setEditForm(p => ({...p, localTrabalho: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Ref. Pessoal</label><Input value={editForm.referenciaNome} onChange={e => setEditForm(p => ({...p, referenciaNome: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Tel. Referência</label><Input value={editForm.referenciaTelefone} onChange={e => setEditForm(p => ({...p, referenciaTelefone: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
+                      <div className="col-span-2"><label className="text-[10px] text-gray-500">Obs. Vendedor</label><Textarea value={editForm.observacoesVendedor} onChange={e => setEditForm(p => ({...p, observacoesVendedor: e.target.value}))} className="bg-gray-800 border-gray-700 text-yellow-200 text-xs resize-none" rows={2} /></div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div><span className="text-gray-500">CPF:</span> <span className="text-white">{fichaDetail.cpf}</span></div>
+                      <div><span className="text-gray-500">RG:</span> <span className="text-white">{fichaDetail.rg || "—"}</span></div>
+                      <div><span className="text-gray-500">Nascimento:</span> <span className="text-white">{fichaDetail.dataNascimento || "—"}</span></div>
+                      <div><span className="text-gray-500">Estado Civil:</span> <span className="text-white">{fichaDetail.estadoCivil || "—"}</span></div>
+                      <div><span className="text-gray-500">Mãe:</span> <span className="text-white">{fichaDetail.nomeMae || "—"}</span></div>
+                      <div><span className="text-gray-500">Pai:</span> <span className="text-white">{fichaDetail.nomePai || "—"}</span></div>
+                      <div><span className="text-gray-500">Cidade Nasc.:</span> <span className="text-white">{fichaDetail.cidadeNasceu || "—"}</span></div>
+                      <div><span className="text-gray-500">Telefone:</span> <span className="text-blue-400">{fichaDetail.telefone || "—"}</span></div>
+                      <div><span className="text-gray-500">Email:</span> <span className="text-white">{fichaDetail.email || "—"}</span></div>
+                      <div><span className="text-gray-500">CEP:</span> <span className="text-white">{fichaDetail.cep || "—"}</span></div>
+                      <div className="col-span-2"><span className="text-gray-500">Endereço:</span> <span className="text-white">{fichaDetail.endereco || "—"}</span></div>
+                      <div><span className="text-gray-500">Profissão:</span> <span className="text-white">{fichaDetail.profissao || "—"}</span></div>
+                      <div><span className="text-gray-500">Renda:</span> <span className="text-white">{fichaDetail.renda || "—"}</span></div>
+                      <div><span className="text-gray-500">Local Trabalho:</span> <span className="text-white">{fichaDetail.localTrabalho || "—"}</span></div>
+                      <div><span className="text-gray-500">Ref. Pessoal:</span> <span className="text-white">{fichaDetail.referenciaNome || "—"} {fichaDetail.referenciaTelefone ? `(${fichaDetail.referenciaTelefone})` : ""}</span></div>
+                    </div>
+                  )}
                 </div>
 
                 {/* CNH */}

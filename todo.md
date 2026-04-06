@@ -2038,3 +2038,23 @@
 - [x] UI: cards coloridos (vermelho=atrasada, amarelo=vence hoje, laranja=vence amanhã, verde=semana)
 - [x] UI: botão de enviar notificação manual + expandível com detalhes por categoria
 - [x] Testes: 7 testes de alertas financeiros (634 testes total)
+
+### Melhorias IA + Estoque + F&I (06/04)
+- [x] IA: verificar estoque no banco de dados antes de agendar (link externo → buscar no estoque interno)
+- [x] IA: se veículo não existe no estoque, transferir para vendedor em vez de agendar
+- [x] IA: calibrar prompt para qualificar melhor o lead (menos gatilhos, mais qualificação real)
+- [x] IA: extrair modelo/marca de links externos (catarinacarros, OLX, etc.) e buscar no estoque
+- [x] F&I: botão de editar fichas aprovadas (corrigir valor, digitação, dados)
+- [x] Registro de venda: puxar veículo do estoque com busca (modelo, placa)
+- [x] Registro de venda: placa do veículo obrigatória
+- [ ] Registro de venda: dar saída automática do estoque ao registrar venda
+
+### BUGS CRÍTICOS IA - Contexto e Inteligência (06/04)
+- [x] BUG: IA respondeu cliente de pós-venda tentando vender (CHECK 4A: 25+ keywords pós-venda)
+- [x] BUG: IA recomeça do zero com cliente já qualificado (CHECK 4B: detecta stage + 3+ dados)
+- [x] BUG: IA responde mensagens internas (CHECK 4C: busca telefone na tabela sellers)
+- [x] BUG: IA não analisa conversa antes de responder (contextNote com dados coletados)
+- [x] MELHORIA: IA diferencia cliente novo vs já qualificado vs pós-venda
+- [x] MELHORIA: IA para de responder após qualificação completa (5 msgs HARD limit)
+- [x] MELHORIA: Prompt reescrito para análise contextual inteligente
+- [x] MELHORIA: IA detecta assunto (compra, pós-venda, dúvida, reclamação) antes de responder
