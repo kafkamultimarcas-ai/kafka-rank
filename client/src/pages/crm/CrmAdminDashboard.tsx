@@ -15,7 +15,7 @@ import {
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
   CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2,
   Shuffle, ArrowRightLeft, Timer, Headphones, Target,
-  ShieldBan, Lock, Unlock, Slash
+  ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
 
@@ -1092,19 +1092,34 @@ function InventoryView() {
 
 // ===== CAMPAIGNS VIEW =====
 function CampaignsView() {
-  const [message, setMessage] = useState("");
-  const [filterScore, setFilterScore] = useState<string>("all");
-  const [filterSource, setFilterSource] = useState<string>("all");
-  const [filterDept, setFilterDept] = useState<string>("all");
-  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
-  const [selectAll, setSelectAll] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
-  const [activeTab, setActiveTab] = useState<"compose" | "import" | "history">("compose");
+  const [activeTab, setActiveTab] = useState<"campaigns" | "responses" | "import">("campaigns");
+  const [showCreate, setShowCreate] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [viewingCampaign, setViewingCampaign] = useState<any>(null);
 
-  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false });
+  // Campaign form state
+  const [campName, setCampName] = useState("");
+  const [campMessage, setCampMessage] = useState("");
+  const [campMediaUrl, setCampMediaUrl] = useState<string | null>(null);
+  const [campMediaType, setCampMediaType] = useState<string | null>(null);
+  const [campMediaFileName, setCampMediaFileName] = useState<string | null>(null);
+  const [campFilterSource, setCampFilterSource] = useState("all");
+  const [campFilterDept, setCampFilterDept] = useState("all");
+  const [campFilterScore, setCampFilterScore] = useState("all");
+  const [campFilterStage, setCampFilterStage] = useState("all");
+  const [campFilterInactiveDays, setCampFilterInactiveDays] = useState<number | null>(null);
+  const [campMaxRecipients, setCampMaxRecipients] = useState<number>(80);
+  const [campIntervalSec, setCampIntervalSec] = useState(45);
+  const [campMaxPerDay, setCampMaxPerDay] = useState(80);
+  const [campStartHour, setCampStartHour] = useState(8);
+  const [campEndHour, setCampEndHour] = useState(20);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { data: campaigns, refetch: refetchCampaigns } = trpc.crmCampaigns.list.useQuery();
   const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
-  const { data: bulkHistory, refetch: refetchHistory } = trpc.whatsapp.bulkHistory.useQuery();
+  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false });
+  const { data: campaignResponses, refetch: refetchResponses } = trpc.crmCampaigns.getCampaignResponses.useQuery();
+  const { data: antiBanDefaults } = trpc.crmCampaigns.getAntiBanDefaults.useQuery();
 
   const importContacts = trpc.whatsapp.importContacts.useMutation({
     onSuccess: (r: any) => { toast.success(r.message); },
@@ -1114,100 +1129,258 @@ function CampaignsView() {
     onSuccess: (r: any) => { toast.success(r.message); },
     onError: (e: any) => toast.error(e.message),
   });
-  const sendBulk = trpc.whatsapp.sendBulk.useMutation({
-    onSuccess: (r: any) => {
-      setSendResult({ sent: r.sent, failed: r.failed });
-      setIsSending(false);
-      refetchHistory();
-      toast.success(`Disparo concluído: ${r.sent} enviados, ${r.failed} falharam`);
-    },
-    onError: (e: any) => { setIsSending(false); toast.error(e.message); },
+
+  const buildFilterConfig = () => {
+    const f: any = {};
+    if (campFilterSource !== "all") f.source = campFilterSource;
+    if (campFilterDept !== "all") f.department = campFilterDept;
+    if (campFilterScore !== "all") f.score = campFilterScore;
+    if (campFilterStage !== "all") f.stage = campFilterStage;
+    if (campFilterInactiveDays) f.inactiveDays = campFilterInactiveDays;
+    return Object.keys(f).length > 0 ? JSON.stringify(f) : null;
+  };
+
+  const { data: preview } = trpc.crmCampaigns.preview.useQuery({
+    filterType: "custom",
+    filterConfig: buildFilterConfig(),
   });
 
-  const filteredLeads = useMemo(() => {
-    if (!allLeads) return [];
-    return allLeads.filter(l => {
-      if (!l.phone) return false;
-      if (filterScore !== "all" && l.score !== filterScore) return false;
-      if (filterSource !== "all" && l.source !== filterSource) return false;
-      if (filterDept !== "all" && l.department !== filterDept) return false;
-      return true;
-    });
-  }, [allLeads, filterScore, filterSource, filterDept]);
+  const createCampaign = trpc.crmCampaigns.create.useMutation({
+    onSuccess: () => { toast.success("Campanha criada!"); setShowCreate(false); resetForm(); refetchCampaigns(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteCampaign = trpc.crmCampaigns.delete.useMutation({
+    onSuccess: () => { toast.success("Campanha excluída"); refetchCampaigns(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const startDispatch = trpc.crmCampaigns.startDispatch.useMutation({
+    onSuccess: (r: any) => { toast.success(r.message); refetchCampaigns(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const cancelDispatch = trpc.crmCampaigns.cancelDispatch.useMutation({
+    onSuccess: () => { toast.success("Disparo cancelado"); refetchCampaigns(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const uploadMedia = trpc.crmCampaigns.uploadMedia.useMutation({
+    onSuccess: (r: any) => {
+      setCampMediaUrl(r.url);
+      setCampMediaFileName(r.fileName);
+      const mime = r.mimeType || '';
+      if (mime.startsWith('image/')) setCampMediaType('image');
+      else if (mime.startsWith('video/')) setCampMediaType('video');
+      else setCampMediaType('document');
+      setIsUploading(false);
+      toast.success("Mídia carregada!");
+    },
+    onError: (e: any) => { setIsUploading(false); toast.error(e.message); },
+  });
+  const markResponseHandled = trpc.crmCampaigns.markResponseHandled.useMutation({
+    onSuccess: () => { refetchResponses(); toast.success("Resposta tratada"); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const uniqueSources = useMemo(() => {
     if (!allLeads) return [];
     return Array.from(new Set(allLeads.map(l => l.source).filter(Boolean)));
   }, [allLeads]);
 
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedPhones(new Set());
-    } else {
-      setSelectedPhones(new Set(filteredLeads.map(l => l.phone!).filter(Boolean)));
-    }
-    setSelectAll(!selectAll);
+  const resetForm = () => {
+    setCampName(""); setCampMessage(""); setCampMediaUrl(null); setCampMediaType(null);
+    setCampMediaFileName(null); setCampFilterSource("all"); setCampFilterDept("all");
+    setCampFilterScore("all"); setCampFilterStage("all"); setCampFilterInactiveDays(null);
+    setCampMaxRecipients(80); setCampIntervalSec(45); setCampMaxPerDay(80);
+    setCampStartHour(8); setCampEndHour(20);
   };
 
-  const togglePhone = (phone: string) => {
-    const next = new Set(selectedPhones);
-    if (next.has(phone)) next.delete(phone); else next.add(phone);
-    setSelectedPhones(next);
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 16 * 1024 * 1024) { toast.error("Arquivo muito grande (máx 16MB)"); return; }
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      uploadMedia.mutate({ fileName: file.name, fileBase64: base64, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleSend = () => {
-    if (!message.trim()) return toast.error("Digite a mensagem");
-    if (selectedPhones.size === 0) return toast.error("Selecione pelo menos 1 destinatário");
-    if (selectedPhones.size > 500) return toast.error("Máximo 500 por disparo");
-    setIsSending(true);
-    setSendResult(null);
-    sendBulk.mutate({ phones: Array.from(selectedPhones), message: message.trim() });
+  const handleCreateCampaign = () => {
+    if (!campName.trim()) return toast.error("Nome da campanha obrigatório");
+    if (!campMessage.trim()) return toast.error("Mensagem obrigatória");
+    createCampaign.mutate({
+      name: campName.trim(),
+      message: campMessage.trim(),
+      mediaUrl: campMediaUrl,
+      mediaType: campMediaType,
+      mediaFileName: campMediaFileName,
+      filterType: "custom",
+      filterConfig: buildFilterConfig(),
+      antiBanIntervalSec: campIntervalSec,
+      antiBanMaxPerDay: campMaxPerDay,
+      antiBanStartHour: campStartHour,
+      antiBanEndHour: campEndHour,
+    });
   };
 
-  // Templates de mensagem para feirão
   const templates = [
-    { name: "Feirão Geral", text: "🔥 *FEIRÃO KAFKA MULTIMARCAS* 🔥\n\nOportunidades imperdíveis em veículos seminovos!\n\n✅ Entrada facilitada\n✅ Financiamento na hora\n✅ Troca com troco\n\nVenha conferir! Estamos te esperando.\n📍 Kafka Multimarcas" },
-    { name: "Retorno Lead", text: "Olá! Tudo bem? 😊\n\nVi que você demonstrou interesse em um de nossos veículos.\n\nTemos condições especiais essa semana! Posso te ajudar a encontrar o carro ideal?\n\n🚗 Kafka Multimarcas" },
-    { name: "Promoção Especial", text: "🎉 *PROMOÇÃO ESPECIAL* 🎉\n\nSomente esta semana:\n\n💰 Desconto especial à vista\n📋 Aprovação de crédito em 30 min\n🔄 Aceitamos seu usado como entrada\n\nAgende sua visita!\n📞 Kafka Multimarcas" },
+    { name: "Feirão", text: "\u{1F525} *FEIR\u00c3O KAFKA MULTIMARCAS* \u{1F525}\n\nOportunidades imperd\u00edveis em ve\u00edculos seminovos!\n\n\u2705 Entrada facilitada\n\u2705 Financiamento na hora\n\u2705 Troca com troco\n\nVenha conferir! Estamos te esperando.\n\u{1F4CD} Kafka Multimarcas" },
+    { name: "Retorno", text: "Ol\u00e1 {nome}! Tudo bem? \u{1F60A}\n\nVi que voc\u00ea demonstrou interesse em um de nossos ve\u00edculos.\n\nTemos condi\u00e7\u00f5es especiais essa semana! Posso te ajudar a encontrar o carro ideal?\n\n\u{1F697} Kafka Multimarcas" },
+    { name: "Promo\u00e7\u00e3o", text: "\u{1F389} *PROMO\u00c7\u00c3O ESPECIAL* \u{1F389}\n\nSomente esta semana:\n\n\u{1F4B0} Desconto especial \u00e0 vista\n\u{1F4CB} Aprova\u00e7\u00e3o de cr\u00e9dito em 30 min\n\u{1F504} Aceitamos seu usado como entrada\n\nAgende sua visita!\n\u{1F4DE} Kafka Multimarcas" },
   ];
+
+  const statusColors: Record<string, string> = {
+    draft: "bg-gray-500/20 text-gray-400",
+    sending: "bg-blue-500/20 text-blue-400",
+    sent: "bg-green-500/20 text-green-400",
+    cancelled: "bg-red-500/20 text-red-400",
+  };
+  const statusLabels: Record<string, string> = {
+    draft: "Rascunho", sending: "Enviando...", sent: "Enviada", cancelled: "Cancelada",
+  };
 
   return (
     <div className="space-y-4">
       {/* Z-API Status */}
-      <div className={`rounded-xl border p-3 flex items-center justify-between ${
-        zapiStatus?.connected ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"
-      }`}>
+      <div className={`rounded-xl border p-3 flex items-center justify-between ${zapiStatus?.connected ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"}`}>
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${zapiStatus?.connected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
-          <span className="text-xs font-medium text-foreground">
-            WhatsApp {zapiStatus?.connected ? "Conectado" : "Desconectado"}
-          </span>
+          <span className="text-xs font-medium text-foreground">WhatsApp {zapiStatus?.connected ? "Conectado" : "Desconectado"}</span>
         </div>
-        <span className="text-[10px] text-muted-foreground">
-          {allLeads?.filter(l => l.phone).length || 0} leads com telefone
-        </span>
+        <span className="text-[10px] text-muted-foreground">{allLeads?.filter(l => l.phone).length || 0} leads com telefone</span>
+      </div>
+
+      {/* Anti-ban info banner */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Shield className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-bold text-amber-400">Prote\u00e7\u00e3o Anti-Ban Ativa</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground">Intervalo de {campIntervalSec}s entre msgs \u2022 M\u00e1x {campMaxPerDay}/dia \u2022 Hor\u00e1rio {campStartHour}h-{campEndHour}h \u2022 Exclui p\u00f3s-venda automaticamente</p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-accent/50 rounded-lg p-1">
-        {(["compose", "import", "history"] as const).map(tab => (
+        {(["campaigns", "responses", "import"] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
+            className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all relative ${
               activeTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
             }`}>
-            {tab === "compose" ? "Disparo" : tab === "import" ? "Importar Leads" : "Histórico"}
+            {tab === "campaigns" ? "Campanhas" : tab === "responses" ? "Respostas" : "Importar"}
+            {tab === "responses" && (campaignResponses?.length || 0) > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">{campaignResponses?.length}</span>
+            )}
           </button>
         ))}
       </div>
 
-      {activeTab === "compose" && (
+      {/* CAMPAIGNS TAB */}
+      {activeTab === "campaigns" && !showCreate && !viewingCampaign && (
+        <div className="space-y-3">
+          <Button onClick={() => { resetForm(); setShowCreate(true); }} className="w-full gap-2" disabled={!zapiStatus?.connected}>
+            <Plus className="w-4 h-4" /> Nova Campanha
+          </Button>
+          {!zapiStatus?.connected && <p className="text-[10px] text-red-400 text-center">Conecte o WhatsApp para criar campanhas</p>}
+
+          {campaigns && campaigns.length > 0 ? campaigns.map((c: any) => (
+            <div key={c.id} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-bold text-foreground">{c.name}</h4>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColors[c.status] || statusColors.draft}`}>
+                  {statusLabels[c.status] || c.status}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{c.message}</p>
+              {c.mediaUrl && (
+                <div className="flex items-center gap-2 mb-3">
+                  {c.mediaType === 'image' && <ImageIcon className="w-3 h-3 text-blue-400" />}
+                  {c.mediaType === 'video' && <Video className="w-3 h-3 text-purple-400" />}
+                  {c.mediaType === 'document' && <FileText className="w-3 h-3 text-amber-400" />}
+                  <span className="text-[10px] text-muted-foreground">{c.mediaFileName || 'M\u00eddia anexada'}</span>
+                </div>
+              )}
+              {/* Stats */}
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                <div className="text-center p-2 rounded-lg bg-accent/50">
+                  <p className="text-sm font-bold text-foreground">{c.totalRecipients}</p>
+                  <p className="text-[9px] text-muted-foreground">Total</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-green-500/10">
+                  <p className="text-sm font-bold text-green-400">{c.totalSent}</p>
+                  <p className="text-[9px] text-muted-foreground">Enviados</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-blue-500/10">
+                  <p className="text-sm font-bold text-blue-400">{c.totalResponded}</p>
+                  <p className="text-[9px] text-muted-foreground">Responderam</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-red-500/10">
+                  <p className="text-sm font-bold text-red-400">{c.totalFailed}</p>
+                  <p className="text-[9px] text-muted-foreground">Falhas</p>
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex gap-2">
+                {c.status === 'draft' && (
+                  <>
+                    <Button size="sm" className="flex-1 gap-1 text-xs h-8" onClick={() => {
+                      if (confirm(`Iniciar disparo para at\u00e9 ${campMaxRecipients} destinat\u00e1rios?`)) {
+                        startDispatch.mutate({ campaignId: c.id, maxRecipients: campMaxRecipients });
+                      }
+                    }} disabled={startDispatch.isPending || !zapiStatus?.connected}>
+                      <Send className="w-3 h-3" /> Disparar
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => setViewingCampaign(c)}>
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs h-8 text-red-400 hover:text-red-300" onClick={() => {
+                      if (confirm("Excluir campanha?")) deleteCampaign.mutate({ id: c.id });
+                    }}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </>
+                )}
+                {c.status === 'sending' && (
+                  <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs h-8 text-red-400" onClick={() => cancelDispatch.mutate({ campaignId: c.id })}>
+                    <XCircle className="w-3 h-3" /> Cancelar Envio
+                  </Button>
+                )}
+                {(c.status === 'sent' || c.status === 'cancelled') && (
+                  <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs h-8" onClick={() => setViewingCampaign(c)}>
+                    <Eye className="w-3 h-3" /> Ver Detalhes
+                  </Button>
+                )}
+              </div>
+              <p className="text-[9px] text-muted-foreground mt-2">
+                Criada em {new Date(c.createdAt).toLocaleString('pt-BR')}
+                {c.createdByName && ` por ${c.createdByName}`}
+              </p>
+            </div>
+          )) : (
+            <p className="text-xs text-muted-foreground text-center py-8">Nenhuma campanha criada ainda</p>
+          )}
+        </div>
+      )}
+
+      {/* CREATE CAMPAIGN FORM */}
+      {activeTab === "campaigns" && showCreate && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-foreground">Nova Campanha</h3>
+            <Button size="sm" variant="ghost" onClick={() => setShowCreate(false)}><X className="w-4 h-4" /></Button>
+          </div>
+
+          {/* Name */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <label className="text-xs font-bold text-foreground block mb-2">Nome da Campanha</label>
+            <Input value={campName} onChange={e => setCampName(e.target.value)} placeholder="Ex: Feir\u00e3o Abril 2026" className="text-sm" />
+          </div>
+
           {/* Templates */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <h4 className="text-xs font-bold text-foreground mb-3">Templates Rápidos</h4>
+            <label className="text-xs font-bold text-foreground block mb-2">Templates R\u00e1pidos</label>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {templates.map(t => (
-                <button key={t.name} onClick={() => setMessage(t.text)}
+                <button key={t.name} onClick={() => setCampMessage(t.text)}
                   className="shrink-0 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary hover:bg-primary/20 transition-all">
                   {t.name}
                 </button>
@@ -1215,181 +1388,322 @@ function CampaignsView() {
             </div>
           </div>
 
-          {/* Message Editor */}
+          {/* Message */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <h4 className="text-xs font-bold text-foreground mb-2">Mensagem</h4>
-            <textarea
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              placeholder="Digite sua mensagem aqui... Use *texto* para negrito"
-              className="w-full h-32 bg-accent/50 border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <p className="text-[10px] text-muted-foreground mt-1">{message.length} caracteres</p>
+            <label className="text-xs font-bold text-foreground block mb-2">Mensagem</label>
+            <textarea value={campMessage} onChange={e => setCampMessage(e.target.value)}
+              placeholder="Digite sua mensagem... Use {nome} para personalizar"
+              className="w-full h-32 bg-accent/50 border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary" />
+            <p className="text-[10px] text-muted-foreground mt-1">{campMessage.length} caracteres \u2022 Use {'{'+'nome'+'}'} para nome do cliente</p>
+          </div>
+
+          {/* Media Upload */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <label className="text-xs font-bold text-foreground block mb-2">M\u00eddia (opcional)</label>
+            {campMediaUrl ? (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
+                {campMediaType === 'image' && <ImageIcon className="w-5 h-5 text-blue-400" />}
+                {campMediaType === 'video' && <Video className="w-5 h-5 text-purple-400" />}
+                {campMediaType === 'document' && <FileText className="w-5 h-5 text-amber-400" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-foreground truncate">{campMediaFileName}</p>
+                  <p className="text-[10px] text-muted-foreground">{campMediaType}</p>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => { setCampMediaUrl(null); setCampMediaType(null); setCampMediaFileName(null); }}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input type="file" accept="image/*,video/*,.pdf,.doc,.docx" onChange={handleFileUpload}
+                  className="absolute inset-0 opacity-0 cursor-pointer" disabled={isUploading} />
+                <div className="flex items-center justify-center gap-2 p-6 border-2 border-dashed border-border rounded-lg hover:border-primary/50 transition-all">
+                  {isUploading ? (
+                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  ) : (
+                    <><Upload className="w-5 h-5 text-muted-foreground" /><span className="text-xs text-muted-foreground">Clique para enviar foto, v\u00eddeo ou documento (m\u00e1x 16MB)</span></>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Filters */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <h4 className="text-xs font-bold text-foreground mb-3">Filtrar Destinatários</h4>
-            <div className="grid grid-cols-3 gap-2">
-              <select value={filterScore} onChange={e => setFilterScore(e.target.value)}
-                className="bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
-                <option value="all">Todos Scores</option>
-                <option value="hot">🔥 Quente</option>
-                <option value="warm">🌡️ Morno</option>
-                <option value="cold">❄️ Frio</option>
-              </select>
-              <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
-                className="bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
-                <option value="all">Todas Origens</option>
-                {uniqueSources.map(s => <option key={s} value={s!}>{s}</option>)}
-              </select>
-              <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
-                className="bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
-                <option value="all">Todos Setores</option>
-                <option value="vendas">Vendas</option>
-                <option value="pre_vendas">Pré-Vendas</option>
-              </select>
+            <label className="text-xs font-bold text-foreground block mb-3">Filtrar P\u00fablico</label>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Origem</label>
+                <select value={campFilterSource} onChange={e => setCampFilterSource(e.target.value)}
+                  className="w-full bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
+                  <option value="all">Todas</option>
+                  {uniqueSources.map(s => <option key={s} value={s!}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Setor</label>
+                <select value={campFilterDept} onChange={e => setCampFilterDept(e.target.value)}
+                  className="w-full bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
+                  <option value="all">Todos</option>
+                  <option value="vendas">Vendas</option>
+                  <option value="pre_vendas">Pr\u00e9-Vendas</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Score</label>
+                <select value={campFilterScore} onChange={e => setCampFilterScore(e.target.value)}
+                  className="w-full bg-accent/50 border border-border rounded-lg px-2 py-1.5 text-xs text-foreground">
+                  <option value="all">Todos</option>
+                  <option value="hot">Quente</option>
+                  <option value="warm">Morno</option>
+                  <option value="cold">Frio</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Inativos h\u00e1 (dias)</label>
+                <Input type="number" min={0} max={365} value={campFilterInactiveDays || ''}
+                  onChange={e => setCampFilterInactiveDays(e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder="Ex: 30" className="text-xs h-8" />
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <p className="text-xs text-primary font-medium">{preview?.count || 0} destinat\u00e1rios encontrados</p>
+              <p className="text-[10px] text-muted-foreground">Clientes p\u00f3s-venda s\u00e3o exclu\u00eddos automaticamente</p>
             </div>
           </div>
 
-          {/* Recipients */}
+          {/* Max recipients */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs font-bold text-foreground">
-                Destinatários ({filteredLeads.length})
-              </h4>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-primary font-medium">{selectedPhones.size} selecionados</span>
-                <button onClick={handleSelectAll}
-                  className="text-[10px] text-primary underline">
-                  {selectAll ? "Desmarcar todos" : "Selecionar todos"}
-                </button>
-              </div>
-            </div>
-            <div className="max-h-60 overflow-y-auto space-y-1">
-              {filteredLeads.slice(0, 200).map(l => (
-                <label key={l.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 cursor-pointer">
-                  <input type="checkbox" checked={selectedPhones.has(l.phone!)} onChange={() => togglePhone(l.phone!)}
-                    className="rounded border-border" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground truncate">{l.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{l.phone}</p>
-                  </div>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${
-                    l.score === "hot" ? "bg-red-500/20 text-red-400" :
-                    l.score === "warm" ? "bg-amber-500/20 text-amber-400" :
-                    "bg-blue-500/20 text-blue-400"
-                  }`}>{l.score === "hot" ? "Quente" : l.score === "warm" ? "Morno" : "Frio"}</span>
-                </label>
-              ))}
-              {filteredLeads.length > 200 && (
-                <p className="text-[10px] text-muted-foreground text-center py-2">
-                  Mostrando 200 de {filteredLeads.length}. Todos serão incluídos no disparo.
-                </p>
-              )}
-              {filteredLeads.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">Nenhum lead com telefone encontrado</p>
-              )}
+            <label className="text-xs font-bold text-foreground block mb-2">Quantidade de Destinat\u00e1rios</label>
+            <div className="flex items-center gap-3">
+              <Input type="number" min={1} max={500} value={campMaxRecipients}
+                onChange={e => setCampMaxRecipients(parseInt(e.target.value) || 80)}
+                className="w-24 text-sm text-center" />
+              <p className="text-[10px] text-muted-foreground">M\u00e1ximo de {Math.min(campMaxRecipients, preview?.count || 0)} ser\u00e3o enviados</p>
             </div>
           </div>
 
-          {/* Send Result */}
-          {sendResult && (
-            <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                <h4 className="text-sm font-bold text-foreground">Disparo Concluído</h4>
+          {/* Anti-ban Config */}
+          <div className="rounded-xl border border-amber-500/30 bg-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="w-4 h-4 text-amber-400" />
+              <label className="text-xs font-bold text-amber-400">Configura\u00e7\u00f5es Anti-Ban</label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Intervalo entre msgs (seg)</label>
+                <Input type="number" min={10} max={300} value={campIntervalSec}
+                  onChange={e => setCampIntervalSec(parseInt(e.target.value) || 45)}
+                  className="text-xs h-8" />
               </div>
-              <div className="flex gap-4">
-                <div><p className="text-lg font-bold text-green-400">{sendResult.sent}</p><p className="text-[10px] text-muted-foreground">Enviados</p></div>
-                <div><p className="text-lg font-bold text-red-400">{sendResult.failed}</p><p className="text-[10px] text-muted-foreground">Falharam</p></div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">M\u00e1x por dia</label>
+                <Input type="number" min={1} max={500} value={campMaxPerDay}
+                  onChange={e => setCampMaxPerDay(parseInt(e.target.value) || 80)}
+                  className="text-xs h-8" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Hora in\u00edcio</label>
+                <Input type="number" min={0} max={23} value={campStartHour}
+                  onChange={e => setCampStartHour(parseInt(e.target.value) || 8)}
+                  className="text-xs h-8" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Hora fim</label>
+                <Input type="number" min={1} max={24} value={campEndHour}
+                  onChange={e => setCampEndHour(parseInt(e.target.value) || 20)}
+                  className="text-xs h-8" />
               </div>
             </div>
-          )}
+            {antiBanDefaults?.tips && (
+              <div className="mt-3 space-y-1">
+                {antiBanDefaults.tips.map((tip: string, i: number) => (
+                  <p key={i} className="text-[9px] text-amber-400/70">\u2022 {tip}</p>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Send Button */}
-          <Button
-            onClick={handleSend}
-            disabled={isSending || !message.trim() || selectedPhones.size === 0 || !zapiStatus?.connected}
-            className="w-full h-12 text-sm font-bold gap-2"
-          >
-            {isSending ? (
-              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enviando... (pode levar alguns minutos)</>
+          {/* Create Button */}
+          <Button onClick={handleCreateCampaign} disabled={createCampaign.isPending || !campName.trim() || !campMessage.trim()}
+            className="w-full h-12 text-sm font-bold gap-2">
+            {createCampaign.isPending ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
-              <><Megaphone className="w-4 h-4" /> Disparar para {selectedPhones.size} contatos</>
+              <><Megaphone className="w-4 h-4" /> Criar Campanha</>
             )}
           </Button>
-          {!zapiStatus?.connected && (
-            <p className="text-[10px] text-red-400 text-center">WhatsApp desconectado. Conecte o Z-API para disparar.</p>
+        </div>
+      )}
+
+      {/* VIEW CAMPAIGN DETAILS */}
+      {activeTab === "campaigns" && viewingCampaign && (
+        <CampaignDetailView campaign={viewingCampaign} onBack={() => { setViewingCampaign(null); refetchCampaigns(); }} />
+      )}
+
+      {/* RESPONSES TAB */}
+      {activeTab === "responses" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-foreground">Respostas de Campanhas</h3>
+            <Button size="sm" variant="ghost" onClick={() => refetchResponses()} className="text-xs"><RefreshCw className="w-3 h-3" /></Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Clientes que responderam a disparos de campanha. Essas conversas ficam separadas dos leads ativos.</p>
+          {campaignResponses && campaignResponses.length > 0 ? campaignResponses.map((r: any) => (
+            <div key={r.id} className="rounded-xl border border-blue-500/20 bg-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">{r.name}</h4>
+                  <p className="text-[10px] text-muted-foreground">{r.phone}</p>
+                </div>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">Campanha: {r.campaignName || `#${r.campaignId}`}</span>
+              </div>
+              <div className="flex items-center gap-4 text-[10px] text-muted-foreground mb-3">
+                <span>Enviado: {r.campaignSentAt ? new Date(r.campaignSentAt).toLocaleString('pt-BR') : 'N/A'}</span>
+                <span>Respondeu: {r.lastMessageAt ? new Date(r.lastMessageAt).toLocaleString('pt-BR') : 'N/A'}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1 text-xs h-8 gap-1" onClick={() => {
+                  // Open chat with this lead
+                  window.dispatchEvent(new CustomEvent('openLeadChat', { detail: { leadId: r.id } }));
+                }}>
+                  <MessageCircle className="w-3 h-3" /> Abrir Conversa
+                </Button>
+                <Button size="sm" variant="outline" className="text-xs h-8 gap-1" onClick={() => markResponseHandled.mutate({ leadId: r.id })}>
+                  <CheckCircle className="w-3 h-3" /> Tratado
+                </Button>
+              </div>
+            </div>
+          )) : (
+            <div className="text-center py-8">
+              <MessageCircle className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">Nenhuma resposta de campanha ainda</p>
+              <p className="text-[10px] text-muted-foreground">Quando clientes responderem a disparos, aparecer\u00e3o aqui separados</p>
+            </div>
           )}
         </div>
       )}
 
+      {/* IMPORT TAB */}
       {activeTab === "import" && (
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-4">
             <h4 className="text-sm font-bold text-foreground mb-2">Importar do WhatsApp Business</h4>
-            <p className="text-xs text-muted-foreground mb-4">
-              Importe contatos e conversas recentes do seu WhatsApp Business para o banco de leads do CRM.
-              Leads já existentes (mesmo telefone) não serão duplicados.
-            </p>
+            <p className="text-xs text-muted-foreground mb-4">Importe contatos e conversas recentes do seu WhatsApp Business para o banco de leads do CRM.</p>
             <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                onClick={() => importContacts.mutate()}
-                disabled={importContacts.isPending || !zapiStatus?.connected}
-                className="h-20 flex-col gap-2"
-              >
-                {importContacts.isPending ? (
-                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                ) : (
-                  <Users className="w-6 h-6 text-primary" />
-                )}
+              <Button variant="outline" onClick={() => importContacts.mutate()} disabled={importContacts.isPending || !zapiStatus?.connected} className="h-20 flex-col gap-2">
+                {importContacts.isPending ? <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> : <Users className="w-6 h-6 text-primary" />}
                 <span className="text-xs">Importar Contatos</span>
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => importChats.mutate()}
-                disabled={importChats.isPending || !zapiStatus?.connected}
-                className="h-20 flex-col gap-2"
-              >
-                {importChats.isPending ? (
-                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                ) : (
-                  <MessageCircle className="w-6 h-6 text-green-400" />
-                )}
+              <Button variant="outline" onClick={() => importChats.mutate()} disabled={importChats.isPending || !zapiStatus?.connected} className="h-20 flex-col gap-2">
+                {importChats.isPending ? <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" /> : <MessageCircle className="w-6 h-6 text-green-400" />}
                 <span className="text-xs">Importar Chats</span>
               </Button>
             </div>
-            {!zapiStatus?.connected && (
-              <p className="text-[10px] text-red-400 text-center mt-3">WhatsApp desconectado. Conecte o Z-API primeiro.</p>
-            )}
+            {!zapiStatus?.connected && <p className="text-[10px] text-red-400 text-center mt-3">WhatsApp desconectado. Conecte o Z-API primeiro.</p>}
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {activeTab === "history" && (
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-foreground">Histórico de Disparos</h4>
-          {bulkHistory && bulkHistory.length > 0 ? bulkHistory.map((h: any) => (
-            <div key={h.id} className="rounded-xl border border-border bg-card p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] text-muted-foreground">
-                  {h.createdAt ? new Date(h.createdAt).toLocaleString("pt-BR") : ""}
-                </span>
-                <div className="flex gap-2">
-                  <span className="text-[10px] text-green-400">{h.sent} enviados</span>
-                  {h.failed > 0 && <span className="text-[10px] text-red-400">{h.failed} falharam</span>}
-                </div>
-              </div>
-              <p className="text-xs text-foreground line-clamp-2">{h.message}</p>
-              <p className="text-[10px] text-muted-foreground mt-1">{h.totalRecipients} destinatários</p>
-            </div>
-          )) : (
-            <p className="text-xs text-muted-foreground text-center py-8">Nenhum disparo realizado ainda</p>
-          )}
+// Campaign Detail View - shows recipients and status
+function CampaignDetailView({ campaign, onBack }: { campaign: any; onBack: () => void }) {
+  const { data: recipients } = trpc.crmCampaigns.getRecipients.useQuery({ campaignId: campaign.id });
+  const { data: status, refetch: refetchStatus } = trpc.crmCampaigns.getStatus.useQuery({ campaignId: campaign.id });
+
+  useEffect(() => {
+    if (status?.isActive) {
+      const interval = setInterval(() => refetchStatus(), 5000);
+      return () => clearInterval(interval);
+    }
+  }, [status?.isActive]);
+
+  const statusColors: Record<string, string> = {
+    pending: "text-gray-400", sent: "text-green-400", failed: "text-red-400",
+    responded: "text-blue-400", daily_limit: "text-amber-400",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="ghost" onClick={onBack}><ChevronLeft className="w-4 h-4" /></Button>
+        <h3 className="text-sm font-bold text-foreground">{campaign.name}</h3>
+      </div>
+
+      {/* Live status */}
+      {status?.isActive && (
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-3 h-3 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+            <span className="text-xs font-bold text-blue-400">Enviando...</span>
+          </div>
+          <div className="w-full bg-accent/50 rounded-full h-2 mb-2">
+            <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${status.stats ? (status.stats.totalSent / Math.max(status.stats.totalRecipients, 1)) * 100 : 0}%` }} />
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            {status.stats?.totalSent || 0} de {status.stats?.totalRecipients || 0} enviados
+            {status.stats?.totalFailed ? ` \u2022 ${status.stats.totalFailed} falhas` : ''}
+          </p>
         </div>
       )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="text-center p-3 rounded-xl border border-border bg-card">
+          <p className="text-lg font-bold text-foreground">{status?.stats?.totalRecipients || campaign.totalRecipients}</p>
+          <p className="text-[9px] text-muted-foreground">Total</p>
+        </div>
+        <div className="text-center p-3 rounded-xl border border-green-500/20 bg-green-500/5">
+          <p className="text-lg font-bold text-green-400">{status?.stats?.totalSent || campaign.totalSent}</p>
+          <p className="text-[9px] text-muted-foreground">Enviados</p>
+        </div>
+        <div className="text-center p-3 rounded-xl border border-blue-500/20 bg-blue-500/5">
+          <p className="text-lg font-bold text-blue-400">{status?.stats?.totalResponded || campaign.totalResponded}</p>
+          <p className="text-[9px] text-muted-foreground">Responderam</p>
+        </div>
+        <div className="text-center p-3 rounded-xl border border-red-500/20 bg-red-500/5">
+          <p className="text-lg font-bold text-red-400">{status?.stats?.totalFailed || campaign.totalFailed}</p>
+          <p className="text-[9px] text-muted-foreground">Falhas</p>
+        </div>
+      </div>
+
+      {/* Message preview */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h4 className="text-xs font-bold text-foreground mb-2">Mensagem</h4>
+        <p className="text-xs text-muted-foreground whitespace-pre-wrap">{campaign.message}</p>
+        {campaign.mediaUrl && (
+          <div className="mt-2 flex items-center gap-2">
+            {campaign.mediaType === 'image' && <img src={campaign.mediaUrl} alt="" className="w-20 h-20 rounded-lg object-cover" />}
+            {campaign.mediaType !== 'image' && <span className="text-[10px] text-muted-foreground">{campaign.mediaFileName || 'M\u00eddia'}</span>}
+          </div>
+        )}
+      </div>
+
+      {/* Recipients list */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h4 className="text-xs font-bold text-foreground mb-3">Destinat\u00e1rios ({recipients?.length || 0})</h4>
+        <div className="max-h-60 overflow-y-auto space-y-1">
+          {recipients?.map((r: any) => (
+            <div key={r.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-foreground truncate">{r.name || r.phone}</p>
+                <p className="text-[10px] text-muted-foreground">{r.phone}</p>
+              </div>
+              <div className="text-right">
+                <span className={`text-[10px] font-medium ${statusColors[r.status] || 'text-gray-400'}`}>
+                  {r.status === 'pending' ? 'Pendente' : r.status === 'sent' ? 'Enviado' : r.status === 'failed' ? 'Falhou' : r.status === 'responded' ? 'Respondeu' : r.status === 'daily_limit' ? 'Limite' : r.status}
+                </span>
+                {r.sentAt && <p className="text-[9px] text-muted-foreground">{new Date(r.sentAt).toLocaleTimeString('pt-BR')}</p>}
+              </div>
+            </div>
+          ))}
+          {(!recipients || recipients.length === 0) && (
+            <p className="text-xs text-muted-foreground text-center py-4">Nenhum destinat\u00e1rio ainda</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1462,6 +1776,19 @@ function SettingsView() {
   const [myOldPassword, setMyOldPassword] = useState("");
   const [myNewPassword, setMyNewPassword] = useState("");
   const [myConfirmPassword, setMyConfirmPassword] = useState("");
+  const [editingAdminId, setEditingAdminId] = useState<number | null>(null);
+  const [editPerms, setEditPerms] = useState<Record<string, boolean>>({});
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+
+  const updateAdmin = trpc.adminAuth.update.useMutation({
+    onSuccess: () => {
+      refetch(); setEditingAdminId(null);
+      toast.success("Admin atualizado com sucesso!");
+    },
+    onError: (e: any) => toast.error('Erro: ' + e.message),
+  });
 
   const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
   const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
@@ -1545,11 +1872,11 @@ function SettingsView() {
                     </span>
                   </div>
                 </div>
-                {/* Reset Password */}
+                {/* Actions Row */}
                 {a.role !== "owner" && (
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {resetPasswordId === a.id ? (
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2 items-center w-full">
                         <Input placeholder="Nova senha" type="password" value={resetPasswordValue}
                           onChange={e => setResetPasswordValue(e.target.value)} className="h-7 text-xs flex-1" />
                         <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => {
@@ -1561,13 +1888,64 @@ function SettingsView() {
                         <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => { setResetPasswordId(null); setResetPasswordValue(""); }}>✕</Button>
                       </div>
                     ) : (
-                      <button onClick={() => setResetPasswordId(a.id)} className="text-[10px] text-amber-400 hover:text-amber-300 font-medium">
-                        🔑 Resetar Senha
-                      </button>
+                      <div className="flex gap-3">
+                        <button onClick={() => setResetPasswordId(a.id)} className="text-[10px] text-amber-400 hover:text-amber-300 font-medium">
+                          🔑 Resetar Senha
+                        </button>
+                        <button onClick={() => {
+                          setEditingAdminId(editingAdminId === a.id ? null : a.id);
+                          setEditName(a.name || '');
+                          setEditEmail(a.email || '');
+                          setEditPhone(a.phone || '');
+                          try { setEditPerms(JSON.parse(a.permissions || '{}')); } catch { setEditPerms({}); }
+                        }} className="text-[10px] text-primary hover:text-primary/80 font-medium">
+                          <Edit className="w-3 h-3 inline mr-0.5" /> Editar
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
-                {a.role !== "owner" && activePerms.length > 0 && (
+
+                {/* Inline Edit Form */}
+                {editingAdminId === a.id && a.role !== 'owner' && (
+                  <div className="mt-3 p-3 rounded-lg bg-accent/30 border border-primary/30 space-y-3">
+                    <p className="text-xs font-bold text-primary">Editando: {a.name}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <Input placeholder="Nome" value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-xs" />
+                      <Input placeholder="Email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="h-8 text-xs" />
+                      <Input placeholder="Telefone" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="h-8 text-xs" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-foreground mb-2">Permissões:</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {Object.entries(PERM_LABELS).map(([key, label]) => (
+                          <label key={key} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-accent/50 cursor-pointer">
+                            <input type="checkbox" checked={editPerms[key] || false}
+                              onChange={e => setEditPerms({ ...editPerms, [key]: e.target.checked })}
+                              className="rounded border-border" />
+                            <span className="text-[11px] text-foreground">{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1 racing-gradient text-white text-xs" disabled={updateAdmin.isPending}
+                        onClick={() => updateAdmin.mutate({
+                          id: a.id,
+                          name: editName || undefined,
+                          email: editEmail || undefined,
+                          phone: editPhone || undefined,
+                          permissions: JSON.stringify(editPerms),
+                        })}>
+                        <Save className="w-3 h-3 mr-1" /> {updateAdmin.isPending ? 'Salvando...' : 'Salvar Alterações'}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-xs" onClick={() => setEditingAdminId(null)}>Cancelar</Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Permissions badges */}
+                {editingAdminId !== a.id && a.role !== "owner" && activePerms.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {activePerms.map(p => (
                       <span key={p} className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">{p}</span>
@@ -2711,7 +3089,20 @@ function AIAttendantView() {
 
   const [localPrompt, setLocalPrompt] = useState("");
   const [localMaxMsg, setLocalMaxMsg] = useState(0);
-  const [activeTab, setActiveTab] = useState<'geral' | 'modo' | 'horario' | 'disparo' | 'instrucoes'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'modo' | 'horario' | 'disparo' | 'instrucoes' | 'historico'>('geral');
+
+  // AI config log
+  const { data: aiConfigLog } = trpc.crmAi.getAiConfigLog.useQuery();
+  // Feirão schedule
+  const { data: feiraoSchedule, refetch: refetchFeiraoSchedule } = trpc.crmAi.getFeiraoSchedule.useQuery();
+  const setFeiraoSchedule = trpc.crmAi.setFeiraoSchedule.useMutation({
+    onSuccess: () => { toast.success("Agendamento do Feirão salvo!"); refetchFeiraoSchedule(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const [feiraoAutoSchedule, setFeiraoAutoSchedule] = useState(false);
+  const [feiraoStartDate, setFeiraoStartDate] = useState('');
+  const [feiraoEndDate, setFeiraoEndDate] = useState('');
+  const [feiraoScheduleInit, setFeiraoScheduleInit] = useState(false);
 
   // Feirao state
   const [aiMode, setAiMode] = useState<'normal' | 'feirao'>('normal');
@@ -2800,12 +3191,21 @@ function AIAttendantView() {
     });
   };
 
+  // Init feirão schedule
+  if (feiraoSchedule && !feiraoScheduleInit) {
+    setFeiraoAutoSchedule(feiraoSchedule.feiraoAutoSchedule);
+    if (feiraoSchedule.feiraoScheduleStart) setFeiraoStartDate(new Date(feiraoSchedule.feiraoScheduleStart).toISOString().slice(0, 16));
+    if (feiraoSchedule.feiraoScheduleEnd) setFeiraoEndDate(new Date(feiraoSchedule.feiraoScheduleEnd).toISOString().slice(0, 16));
+    setFeiraoScheduleInit(true);
+  }
+
   const tabs = [
     { key: 'geral' as const, label: 'Geral', icon: Bot },
     { key: 'modo' as const, label: 'Modo / Feirão', icon: Flame },
     { key: 'horario' as const, label: 'Horário e Limites', icon: Clock },
     { key: 'disparo' as const, label: 'Disparo de Msgs', icon: Send },
     { key: 'instrucoes' as const, label: 'Instruções', icon: Edit },
+    { key: 'historico' as const, label: 'Histórico', icon: Clock },
   ];
 
   return (
@@ -3128,6 +3528,59 @@ function AIAttendantView() {
               </p>
             </div>
           )}
+
+          {/* Feirão Schedule */}
+          <div className="p-5 rounded-xl bg-card border border-amber-500/20 space-y-4 mt-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-amber-400" /> Agendamento Automático do Feirão
+            </h3>
+            <p className="text-xs text-muted-foreground">Programe datas de início e fim para ativar/desativar o modo Feirão automaticamente.</p>
+            
+            <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border">
+              <div>
+                <p className="text-sm font-medium text-foreground">Ativar Agendamento</p>
+                <p className="text-[10px] text-muted-foreground">Feirão liga/desliga automaticamente nas datas</p>
+              </div>
+              <button onClick={() => setFeiraoAutoSchedule(!feiraoAutoSchedule)}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${feiraoAutoSchedule ? 'bg-amber-500' : 'bg-muted'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${feiraoAutoSchedule ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+
+            {feiraoAutoSchedule && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-1">Início do Feirão</label>
+                  <input type="datetime-local" value={feiraoStartDate} onChange={e => setFeiraoStartDate(e.target.value)}
+                    className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-1">Fim do Feirão</label>
+                  <input type="datetime-local" value={feiraoEndDate} onChange={e => setFeiraoEndDate(e.target.value)}
+                    className="w-full bg-accent/30 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30" />
+                </div>
+              </div>
+            )}
+
+            <Button onClick={() => setFeiraoSchedule.mutate({
+              feiraoAutoSchedule: feiraoAutoSchedule,
+              feiraoScheduleStart: feiraoStartDate ? new Date(feiraoStartDate).getTime() : null,
+              feiraoScheduleEnd: feiraoEndDate ? new Date(feiraoEndDate).getTime() : null,
+            })} disabled={setFeiraoSchedule.isPending}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold">
+              {setFeiraoSchedule.isPending ? 'Salvando...' : 'Salvar Agendamento'}
+            </Button>
+
+            {feiraoSchedule && feiraoSchedule.feiraoAutoSchedule && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <p className="text-[10px] text-amber-400">
+                  Agendado: {feiraoSchedule.feiraoScheduleStart ? new Date(feiraoSchedule.feiraoScheduleStart).toLocaleString('pt-BR') : 'N/A'}
+                  {' '}→{' '}
+                  {feiraoSchedule.feiraoScheduleEnd ? new Date(feiraoSchedule.feiraoScheduleEnd).toLocaleString('pt-BR') : 'N/A'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -3256,6 +3709,30 @@ function AIAttendantView() {
           >
             {setAdvanced.isPending ? 'Salvando...' : 'Salvar Configurações de Disparo'}
           </Button>
+        </div>
+      )}
+
+      {/* ===== TAB: HISTÓRICO ===== */}
+      {activeTab === 'historico' && (
+        <div className="p-5 rounded-xl bg-card border border-border space-y-4">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Clock className="w-4 h-4 text-primary" /> Histórico de Alterações da IA
+          </h3>
+          <p className="text-xs text-muted-foreground">Registro de todas as alterações feitas nas configurações da IA.</p>
+          <div className="max-h-96 overflow-y-auto space-y-2">
+            {aiConfigLog && aiConfigLog.length > 0 ? aiConfigLog.map((log: any) => (
+              <div key={log.id} className="p-3 rounded-lg bg-accent/30 border border-border">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-foreground">{log.action}</span>
+                  <span className="text-[9px] text-muted-foreground">{new Date(log.createdAt).toLocaleString('pt-BR')}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">{log.details}</p>
+                {log.changedBy && <p className="text-[9px] text-primary mt-1">Por: {log.changedBy}</p>}
+              </div>
+            )) : (
+              <p className="text-xs text-muted-foreground text-center py-8">Nenhuma alteração registrada ainda</p>
+            )}
+          </div>
         </div>
       )}
 

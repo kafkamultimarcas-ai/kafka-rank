@@ -1034,6 +1034,31 @@ export function registerWebhookRoutes(app: Express) {
           // Lead temperature is now analyzed by AI in ai-attendant.ts (analyzeLeadTemperature)
           // No more simple message-count-based classification
 
+          // Campaign response detection: if lead has lastCampaignId, mark as campaign response
+          if (!fromMe && existingLeads[0]) {
+            try {
+              const { getDb: getDb3 } = await import("./db");
+              const dbConn3 = await getDb3();
+              if (dbConn3) {
+                const { sql: sqlTag3 } = await import("drizzle-orm");
+                const leadCheck = await dbConn3.execute(sqlTag3`SELECT lastCampaignId FROM crm_leads WHERE id = ${existingLeads[0].id} AND lastCampaignId IS NOT NULL LIMIT 1`);
+                const rawCheck = leadCheck as any;
+                const checkRows = Array.isArray(rawCheck?.[0]) ? rawCheck[0] : rawCheck;
+                if (checkRows?.[0]?.lastCampaignId) {
+                  // Mark lead as campaign response
+                  await dbConn3.execute(sqlTag3`UPDATE crm_leads SET isCampaignResponse = 1 WHERE id = ${existingLeads[0].id}`);
+                  // Update campaign recipient as responded
+                  await dbConn3.execute(sqlTag3`UPDATE crm_campaign_recipients SET status = 'responded', respondedAt = ${Date.now()}, responseMessage = ${(messageText || '').substring(0, 500)} WHERE leadId = ${existingLeads[0].id} AND campaignId = ${checkRows[0].lastCampaignId} AND status = 'sent' LIMIT 1`);
+                  // Update campaign responded count
+                  await dbConn3.execute(sqlTag3`UPDATE crm_campaigns SET totalResponded = totalResponded + 1 WHERE id = ${checkRows[0].lastCampaignId}`);
+                  console.log(`[Campaign Response] Lead #${existingLeads[0].id} responded to campaign #${checkRows[0].lastCampaignId}`);
+                }
+              }
+            } catch (campErr) {
+              console.error('[Campaign Response] Error:', campErr);
+            }
+          }
+
           // AI Auto-reply: check if enabled for this lead (for ALL inbound messages including audio, image, etc.)
           if (!fromMe && (messageText || messageType !== "text")) {
             const leadIdForAi = existingLeads[0].id;

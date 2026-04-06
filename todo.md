@@ -2068,3 +2068,25 @@
 - [x] BUG: SDR aparece como "Admin" — SDR tem permissões extras mas NÃO é admin (agora mostra "SDR" baseado nas permissões)
 - [x] BUG: Não consegue desativar vendedor (Tissiane) — botão sem toggle de desativar (toggle adicionado)
 - [x] MELHORIA: Todos os botões do sistema devem ter 2 sentidos (ativar/desativar)
+
+### Melhorias Avançadas (06/04)
+- [x] Editar permissões de admins existentes — botão para editar permissões diretamente na listagem de Ajustes
+- [x] Histórico de alterações da IA — backend com tabela crm_ai_config_log + logging em todas mutations
+- [x] Agendamento de modo Feirão — backend com colunas feiraoScheduleStart/End/AutoSchedule
+
+### Sistema de Campanhas e Disparos WhatsApp (06/04)
+- [x] Tabela crm_campaigns (nome, mensagem, mídia, filtros, config anti-ban, status)
+- [x] Tabela crm_campaign_recipients (campanha, lead, telefone, status envio, resposta)
+- [x] Backend: CRUD de campanhas com templates (texto + mídia)
+- [x] Backend: Disparo com controles anti-ban (intervalo 30-60s, limite 50-100/dia, horário comercial)
+- [x] Backend: Envio de mídia via Z-API (foto, vídeo, documento)
+- [x] Backend: Marcar leads que responderam a campanhas separadamente
+- [x] Frontend: Aba "Campanhas" no CRM Admin Dashboard
+- [x] Frontend: Criar campanha com editor de mensagem + upload de mídia
+- [x] Frontend: Seleção de público com filtros (data, status, inatividade)
+- [x] Frontend: Aba separada "Respostas de Campanhas" (não mistura com leads ativos)
+- [x] Frontend: Dashboard de campanha (enviados, entregues, respondidos, erros)
+- [x] Frontend: Configurações anti-ban pré-configuradas
+- [x] Não disparar para clientes que já fecharam venda (pós-venda)
+- [x] Frontend: Histórico de alterações da IA (aba no AIAttendantView)
+- [x] Frontend: Agendamento do Feirão com data início/fim

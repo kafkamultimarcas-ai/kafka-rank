@@ -671,56 +671,419 @@ export const crmIntegrationsRouter = router({
 
 // ===== CRM CAMPAIGNS =====
 export const crmCampaignsRouter = router({
+  // List all campaigns with stats
   list: adminProcedure.query(async () => {
-    return crmDb.listCampaigns();
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql: sqlTag } = await import("drizzle-orm");
+    const result = await dbConn.execute(sqlTag`SELECT * FROM crm_campaigns ORDER BY createdAt DESC`);
+    const rawRows = result as any;
+    const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+    return (rows || []).map((r: any) => ({
+      id: r.id, name: r.name, message: r.message, mediaUrl: r.mediaUrl, mediaType: r.mediaType,
+      mediaFileName: r.mediaFileName, status: r.status, filterType: r.filterType,
+      filterConfig: r.filterConfig, antiBanIntervalSec: r.antiBanIntervalSec || 45,
+      antiBanMaxPerDay: r.antiBanMaxPerDay || 80, antiBanStartHour: r.antiBanStartHour || 8,
+      antiBanEndHour: r.antiBanEndHour || 20, totalRecipients: r.totalRecipients || 0,
+      totalSent: r.totalSent || 0, totalDelivered: r.totalDelivered || 0,
+      totalResponded: r.totalResponded || 0, totalFailed: r.totalFailed || 0,
+      createdBy: r.createdBy, createdByName: r.createdByName,
+      startedAt: r.startedAt ? Number(r.startedAt) : null,
+      completedAt: r.completedAt ? Number(r.completedAt) : null,
+      createdAt: r.createdAt ? Number(r.createdAt) : Date.now(),
+    }));
   }),
 
+  // Create a new campaign
   create: adminProcedure.input(z.object({
     name: z.string().min(1),
     message: z.string().min(1),
-    filters: z.string().optional(),
-    channel: z.string().optional(),
+    mediaUrl: z.string().nullable().optional(),
+    mediaType: z.string().nullable().optional(),
+    mediaFileName: z.string().nullable().optional(),
+    filterType: z.string().optional(),
+    filterConfig: z.string().nullable().optional(),
+    antiBanIntervalSec: z.number().min(10).max(300).optional(),
+    antiBanMaxPerDay: z.number().min(1).max(500).optional(),
+    antiBanStartHour: z.number().min(0).max(23).optional(),
+    antiBanEndHour: z.number().min(1).max(24).optional(),
+    createdByName: z.string().optional(),
   })).mutation(async ({ input }) => {
-    const id = await crmDb.createCampaign(input);
-    return { id };
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql: sqlTag } = await import("drizzle-orm");
+    const now = Date.now();
+    const result = await dbConn.execute(sqlTag`INSERT INTO crm_campaigns 
+      (name, message, mediaUrl, mediaType, mediaFileName, status, filterType, filterConfig,
+       antiBanIntervalSec, antiBanMaxPerDay, antiBanStartHour, antiBanEndHour,
+       createdByName, createdAt, updatedAt)
+      VALUES (${input.name}, ${input.message}, ${input.mediaUrl || null}, ${input.mediaType || null},
+       ${input.mediaFileName || null}, 'draft', ${input.filterType || 'all'}, ${input.filterConfig || null},
+       ${input.antiBanIntervalSec || 45}, ${input.antiBanMaxPerDay || 80},
+       ${input.antiBanStartHour || 8}, ${input.antiBanEndHour || 20},
+       ${input.createdByName || null}, ${now}, ${now})`);
+    const rawRes = result as any;
+    const insertId = rawRes?.[0]?.insertId || rawRes?.insertId;
+    return { id: Number(insertId) };
   }),
 
+  // Update campaign (only draft)
   update: adminProcedure.input(z.object({
     id: z.number(),
     name: z.string().optional(),
     message: z.string().optional(),
-    filters: z.string().optional(),
-    status: z.enum(["draft", "scheduled", "sending", "sent", "cancelled"]).optional(),
-    scheduledDate: z.number().optional(),
+    mediaUrl: z.string().nullable().optional(),
+    mediaType: z.string().nullable().optional(),
+    mediaFileName: z.string().nullable().optional(),
+    filterType: z.string().optional(),
+    filterConfig: z.string().nullable().optional(),
+    antiBanIntervalSec: z.number().min(10).max(300).optional(),
+    antiBanMaxPerDay: z.number().min(1).max(500).optional(),
+    antiBanStartHour: z.number().min(0).max(23).optional(),
+    antiBanEndHour: z.number().min(1).max(24).optional(),
   })).mutation(async ({ input }) => {
-    const { id, ...data } = input;
-    await crmDb.updateCampaign(id, data as any);
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql: sqlTag } = await import("drizzle-orm");
+    const sets: string[] = [];
+    const vals: any[] = [];
+    // Build dynamic update
+    const now = Date.now();
+    await dbConn.execute(sqlTag`UPDATE crm_campaigns SET
+      name = COALESCE(${input.name}, name),
+      message = COALESCE(${input.message}, message),
+      mediaUrl = ${input.mediaUrl !== undefined ? input.mediaUrl : null},
+      mediaType = ${input.mediaType !== undefined ? input.mediaType : null},
+      mediaFileName = ${input.mediaFileName !== undefined ? input.mediaFileName : null},
+      filterType = COALESCE(${input.filterType}, filterType),
+      filterConfig = ${input.filterConfig !== undefined ? input.filterConfig : null},
+      antiBanIntervalSec = COALESCE(${input.antiBanIntervalSec}, antiBanIntervalSec),
+      antiBanMaxPerDay = COALESCE(${input.antiBanMaxPerDay}, antiBanMaxPerDay),
+      antiBanStartHour = COALESCE(${input.antiBanStartHour}, antiBanStartHour),
+      antiBanEndHour = COALESCE(${input.antiBanEndHour}, antiBanEndHour),
+      updatedAt = ${now}
+    WHERE id = ${input.id} AND status = 'draft'`);
     return { success: true };
   }),
 
+  // Delete campaign (only draft)
   delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
-    await crmDb.deleteCampaign(input.id);
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql: sqlTag } = await import("drizzle-orm");
+    await dbConn.execute(sqlTag`DELETE FROM crm_campaign_recipients WHERE campaignId = ${input.id}`);
+    await dbConn.execute(sqlTag`DELETE FROM crm_campaigns WHERE id = ${input.id}`);
     return { success: true };
   }),
 
-  // Preview: get leads that match campaign filters
+  // Preview: get leads that match filters + exclude post-sale
   preview: adminProcedure.input(z.object({
-    filters: z.string().optional(),
+    filterType: z.string().optional(),
+    filterConfig: z.string().nullable().optional(),
   })).query(async ({ input }) => {
-    // Parse filters and return matching leads count
-    const leads = await crmDb.listAllLeads({ archived: false });
-    if (!input?.filters) return { count: leads.length, sample: leads.slice(0, 5) };
-    try {
-      const f = JSON.parse(input.filters);
-      let filtered = leads;
-      if (f.source) filtered = filtered.filter(l => l.source === f.source);
-      if (f.department) filtered = filtered.filter(l => l.department === f.department);
-      if (f.score) filtered = filtered.filter(l => l.score === f.score);
-      if (f.stage) filtered = filtered.filter(l => l.stage === f.stage);
-      return { count: filtered.length, sample: filtered.slice(0, 5) };
-    } catch {
-      return { count: leads.length, sample: leads.slice(0, 5) };
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { count: 0, recipients: [] };
+    const { sql: sqlTag } = await import("drizzle-orm");
+    
+    // Get all leads with phone
+    const leadsResult = await dbConn.execute(sqlTag`SELECT id, name, phone, source, department, score, stage, createdAt, lastMessageAt FROM crm_leads WHERE archived = 0 AND phone IS NOT NULL AND phone != ''`);
+    const rawLeads = leadsResult as any;
+    let leads = (Array.isArray(rawLeads?.[0]) ? rawLeads[0] : rawLeads) || [];
+
+    // Exclude post-sale customers (leads with stage 'sold' or 'pos_venda')
+    leads = leads.filter((l: any) => l.stage !== 'sold' && l.stage !== 'pos_venda' && l.stage !== 'venda_realizada');
+
+    // Apply filters
+    if (input?.filterConfig) {
+      try {
+        const f = JSON.parse(input.filterConfig);
+        if (f.source) leads = leads.filter((l: any) => l.source === f.source);
+        if (f.department) leads = leads.filter((l: any) => l.department === f.department);
+        if (f.score) leads = leads.filter((l: any) => l.score === f.score);
+        if (f.stage) leads = leads.filter((l: any) => l.stage === f.stage);
+        if (f.inactiveDays) {
+          const cutoff = Date.now() - (f.inactiveDays * 24 * 60 * 60 * 1000);
+          leads = leads.filter((l: any) => {
+            const lastMsg = l.lastMessageAt ? Number(l.lastMessageAt) : 0;
+            return lastMsg < cutoff || lastMsg === 0;
+          });
+        }
+        if (f.createdAfter) {
+          leads = leads.filter((l: any) => {
+            const created = l.createdAt ? new Date(l.createdAt).getTime() : 0;
+            return created >= f.createdAfter;
+          });
+        }
+        if (f.createdBefore) {
+          leads = leads.filter((l: any) => {
+            const created = l.createdAt ? new Date(l.createdAt).getTime() : 0;
+            return created <= f.createdBefore;
+          });
+        }
+      } catch {}
     }
+
+    // Deduplicate by phone
+    const seen = new Set<string>();
+    const unique = leads.filter((l: any) => {
+      const phone = (l.phone || '').replace(/\D/g, '');
+      if (!phone || seen.has(phone)) return false;
+      seen.add(phone);
+      return true;
+    });
+
+    return {
+      count: unique.length,
+      recipients: unique.slice(0, 20).map((l: any) => ({
+        id: l.id, name: l.name, phone: l.phone, source: l.source, stage: l.stage,
+      })),
+    };
+  }),
+
+  // Start dispatch - creates recipients and starts sending
+  startDispatch: adminProcedure.input(z.object({
+    campaignId: z.number(),
+    maxRecipients: z.number().min(1).max(500).optional(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql: sqlTag } = await import("drizzle-orm");
+    const { startCampaignDispatch, isDispatching } = await import("../campaign-dispatch");
+
+    // Check if already dispatching
+    if (isDispatching(input.campaignId)) {
+      throw new Error("Esta campanha j\u00e1 est\u00e1 sendo enviada");
+    }
+
+    // Get campaign
+    const campResult = await dbConn.execute(sqlTag`SELECT * FROM crm_campaigns WHERE id = ${input.campaignId}`);
+    const rawCamp = campResult as any;
+    const campRows = Array.isArray(rawCamp?.[0]) ? rawCamp[0] : rawCamp;
+    const campaign = campRows?.[0];
+    if (!campaign) throw new Error("Campanha n\u00e3o encontrada");
+    if (campaign.status === 'sending') throw new Error("Campanha j\u00e1 est\u00e1 sendo enviada");
+
+    // Get filtered leads (same logic as preview)
+    const leadsResult = await dbConn.execute(sqlTag`SELECT id, name, phone, source, department, score, stage, createdAt, lastMessageAt FROM crm_leads WHERE archived = 0 AND phone IS NOT NULL AND phone != ''`);
+    const rawLeads = leadsResult as any;
+    let leads = (Array.isArray(rawLeads?.[0]) ? rawLeads[0] : rawLeads) || [];
+    leads = leads.filter((l: any) => l.stage !== 'sold' && l.stage !== 'pos_venda' && l.stage !== 'venda_realizada');
+
+    if (campaign.filterConfig) {
+      try {
+        const f = JSON.parse(campaign.filterConfig);
+        if (f.source) leads = leads.filter((l: any) => l.source === f.source);
+        if (f.department) leads = leads.filter((l: any) => l.department === f.department);
+        if (f.score) leads = leads.filter((l: any) => l.score === f.score);
+        if (f.stage) leads = leads.filter((l: any) => l.stage === f.stage);
+        if (f.inactiveDays) {
+          const cutoff = Date.now() - (f.inactiveDays * 24 * 60 * 60 * 1000);
+          leads = leads.filter((l: any) => {
+            const lastMsg = l.lastMessageAt ? Number(l.lastMessageAt) : 0;
+            return lastMsg < cutoff || lastMsg === 0;
+          });
+        }
+        if (f.createdAfter) leads = leads.filter((l: any) => new Date(l.createdAt).getTime() >= f.createdAfter);
+        if (f.createdBefore) leads = leads.filter((l: any) => new Date(l.createdAt).getTime() <= f.createdBefore);
+      } catch {}
+    }
+
+    // Deduplicate by phone
+    const seen = new Set<string>();
+    const unique = leads.filter((l: any) => {
+      const phone = (l.phone || '').replace(/\D/g, '');
+      if (!phone || seen.has(phone)) return false;
+      seen.add(phone);
+      return true;
+    });
+
+    // Apply max recipients limit
+    const maxR = input.maxRecipients || unique.length;
+    const selected = unique.slice(0, maxR);
+
+    if (selected.length === 0) throw new Error("Nenhum destinat\u00e1rio encontrado com os filtros selecionados");
+
+    // Clear old recipients and insert new ones
+    await dbConn.execute(sqlTag`DELETE FROM crm_campaign_recipients WHERE campaignId = ${input.campaignId}`);
+    
+    const recipientIds: number[] = [];
+    for (const lead of selected) {
+      const phone = (lead.phone || '').replace(/\D/g, '');
+      const res = await dbConn.execute(sqlTag`INSERT INTO crm_campaign_recipients (campaignId, leadId, phone, name, status) VALUES (${input.campaignId}, ${lead.id}, ${phone}, ${lead.name || null}, 'pending')`);
+      const rawRes = res as any;
+      recipientIds.push(Number(rawRes?.[0]?.insertId || rawRes?.insertId || 0));
+    }
+
+    // Get recipients with IDs
+    const recipResult = await dbConn.execute(sqlTag`SELECT id, phone, name, leadId FROM crm_campaign_recipients WHERE campaignId = ${input.campaignId} AND status = 'pending' ORDER BY id`);
+    const rawRecip = recipResult as any;
+    const recipients = (Array.isArray(rawRecip?.[0]) ? rawRecip[0] : rawRecip) || [];
+
+    // Start dispatch asynchronously (don't await)
+    startCampaignDispatch(
+      {
+        campaignId: input.campaignId,
+        message: campaign.message,
+        mediaUrl: campaign.mediaUrl,
+        mediaType: campaign.mediaType,
+        mediaFileName: campaign.mediaFileName,
+        intervalSec: campaign.antiBanIntervalSec || 45,
+        maxPerDay: campaign.antiBanMaxPerDay || 80,
+        startHour: campaign.antiBanStartHour || 8,
+        endHour: campaign.antiBanEndHour || 20,
+      },
+      recipients.map((r: any) => ({ id: r.id, phone: r.phone, name: r.name, leadId: r.leadId })),
+      dbConn,
+      (sent, total, phone, success) => {
+        console.log(`[Campaign ${input.campaignId}] ${sent}/${total} - ${phone}: ${success ? 'OK' : 'FAIL'}`);
+      }
+    ).catch(err => {
+      console.error(`[Campaign ${input.campaignId}] Dispatch error:`, err);
+    });
+
+    return { success: true, totalRecipients: selected.length, message: `Disparo iniciado para ${selected.length} destinat\u00e1rios` };
+  }),
+
+  // Cancel active dispatch
+  cancelDispatch: adminProcedure.input(z.object({
+    campaignId: z.number(),
+  })).mutation(async ({ input }) => {
+    const { cancelDispatch } = await import("../campaign-dispatch");
+    cancelDispatch(input.campaignId);
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (dbConn) {
+      const { sql: sqlTag } = await import("drizzle-orm");
+      await dbConn.execute(sqlTag`UPDATE crm_campaigns SET status = 'cancelled' WHERE id = ${input.campaignId}`);
+    }
+    return { success: true };
+  }),
+
+  // Get dispatch status
+  getStatus: adminProcedure.input(z.object({
+    campaignId: z.number(),
+  })).query(async ({ input }) => {
+    const { isDispatching } = await import("../campaign-dispatch");
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return { isActive: false, stats: null };
+    const { sql: sqlTag } = await import("drizzle-orm");
+    const campResult = await dbConn.execute(sqlTag`SELECT status, totalRecipients, totalSent, totalFailed, totalResponded FROM crm_campaigns WHERE id = ${input.campaignId}`);
+    const rawCamp = campResult as any;
+    const rows = Array.isArray(rawCamp?.[0]) ? rawCamp[0] : rawCamp;
+    const camp = rows?.[0];
+    return {
+      isActive: isDispatching(input.campaignId),
+      stats: camp ? {
+        status: camp.status,
+        totalRecipients: Number(camp.totalRecipients || 0),
+        totalSent: Number(camp.totalSent || 0),
+        totalFailed: Number(camp.totalFailed || 0),
+        totalResponded: Number(camp.totalResponded || 0),
+      } : null,
+    };
+  }),
+
+  // Get recipients for a campaign
+  getRecipients: adminProcedure.input(z.object({
+    campaignId: z.number(),
+    status: z.string().optional(),
+  })).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql: sqlTag } = await import("drizzle-orm");
+    let result;
+    if (input.status) {
+      result = await dbConn.execute(sqlTag`SELECT * FROM crm_campaign_recipients WHERE campaignId = ${input.campaignId} AND status = ${input.status} ORDER BY sentAt DESC LIMIT 200`);
+    } else {
+      result = await dbConn.execute(sqlTag`SELECT * FROM crm_campaign_recipients WHERE campaignId = ${input.campaignId} ORDER BY sentAt DESC LIMIT 200`);
+    }
+    const rawRows = result as any;
+    const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+    return (rows || []).map((r: any) => ({
+      id: r.id, campaignId: r.campaignId, leadId: r.leadId, phone: r.phone, name: r.name,
+      status: r.status, sentAt: r.sentAt ? Number(r.sentAt) : null,
+      respondedAt: r.respondedAt ? Number(r.respondedAt) : null,
+      responseMessage: r.responseMessage, errorMessage: r.errorMessage,
+    }));
+  }),
+
+  // Get campaign responses (leads that responded to campaigns)
+  getCampaignResponses: adminProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { sql: sqlTag } = await import("drizzle-orm");
+    // Get leads that have isCampaignResponse = 1
+    const result = await dbConn.execute(sqlTag`
+      SELECT l.id, l.name, l.phone, l.source, l.stage, l.lastCampaignId, l.lastMessageAt,
+        c.name as campaignName, cr.sentAt as campaignSentAt
+      FROM crm_leads l
+      LEFT JOIN crm_campaigns c ON l.lastCampaignId = c.id
+      LEFT JOIN crm_campaign_recipients cr ON cr.leadId = l.id AND cr.campaignId = l.lastCampaignId
+      WHERE l.isCampaignResponse = 1
+      ORDER BY l.lastMessageAt DESC
+      LIMIT 100
+    `);
+    const rawRows = result as any;
+    const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+    return (rows || []).map((r: any) => ({
+      id: r.id, name: r.name, phone: r.phone, source: r.source, stage: r.stage,
+      campaignId: r.lastCampaignId, campaignName: r.campaignName,
+      campaignSentAt: r.campaignSentAt ? Number(r.campaignSentAt) : null,
+      lastMessageAt: r.lastMessageAt ? Number(r.lastMessageAt) : null,
+    }));
+  }),
+
+  // Mark a campaign response as handled (move back to normal leads)
+  markResponseHandled: adminProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql: sqlTag } = await import("drizzle-orm");
+    await dbConn.execute(sqlTag`UPDATE crm_leads SET isCampaignResponse = 0 WHERE id = ${input.leadId}`);
+    return { success: true };
+  }),
+
+  // Upload media for campaign (returns S3 URL)
+  uploadMedia: adminProcedure.input(z.object({
+    fileName: z.string(),
+    fileBase64: z.string(),
+    mimeType: z.string(),
+  })).mutation(async ({ input }) => {
+    const { storagePut } = await import("../storage");
+    const buffer = Buffer.from(input.fileBase64, 'base64');
+    const suffix = Math.random().toString(36).substring(2, 8);
+    const key = `campaigns/${Date.now()}-${suffix}-${input.fileName}`;
+    const { url } = await storagePut(key, buffer, input.mimeType);
+    return { url, key, fileName: input.fileName, mimeType: input.mimeType };
+  }),
+
+  // Get anti-ban defaults
+  getAntiBanDefaults: adminProcedure.query(async () => {
+    return {
+      intervalSec: 45,
+      maxPerDay: 80,
+      startHour: 8,
+      endHour: 20,
+      tips: [
+        "Intervalo m\u00ednimo recomendado: 30 segundos entre mensagens",
+        "M\u00e1ximo seguro por dia: 50-100 mensagens (Z-API n\u00e3o-oficial)",
+        "Envie apenas em hor\u00e1rio comercial (8h-20h)",
+        "Evite enviar para n\u00fameros que nunca interagiram",
+        "Varie o texto usando vari\u00e1veis como {nome}",
+        "N\u00e3o envie a mesma mensagem para muitas pessoas seguidas",
+      ],
+    };
   }),
 });
 
@@ -1181,7 +1544,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     normalConfig: z.object({
       instrucoes: z.string().optional(),
     }).optional(),
-  })).mutation(async ({ input }) => {
+  })).mutation(async ({ input, ctx }) => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
@@ -1189,7 +1552,22 @@ ${chatHistory || '(Primeira mensagem)'}`;
     const feiraoJson = input.feiraoConfig ? JSON.stringify(input.feiraoConfig) : null;
     const normalJson = input.normalConfig ? JSON.stringify(input.normalConfig) : null;
     const now = Date.now();
+    // Get old config for logging
+    let oldMode = 'normal';
+    try {
+      const old = await dbConn.execute(sql`SELECT aiMode FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const oldRows = Array.isArray((old as any)?.[0]) ? (old as any)[0] : old;
+      if (oldRows?.[0]) oldMode = oldRows[0].aiMode || 'normal';
+    } catch {}
     await dbConn.execute(sql`UPDATE crm_ai_global_config SET aiMode = ${input.aiMode}, feiraoConfig = ${feiraoJson}, normalConfig = ${normalJson}, updatedAt = ${now} WHERE id = 1`);
+    // Log the change
+    const adminName = (ctx as any).user?.name || 'Sistema';
+    const adminId = (ctx as any).user?.id || null;
+    if (oldMode !== input.aiMode) {
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, createdAt) VALUES (${adminId}, ${adminName}, 'modo_ia', 'aiMode', ${oldMode}, ${input.aiMode}, ${now})`);
+    } else {
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'config_feirao', 'feiraoConfig', ${null}, ${null}, ${input.aiMode === 'feirao' ? feiraoJson : normalJson}, ${now})`);
+    }
     return { success: true };
   }),
 
@@ -1206,12 +1584,26 @@ ${chatHistory || '(Primeira mensagem)'}`;
     inactiveDispatchHours: z.number().min(1).max(72).optional(),
     inactiveDispatchMessage: z.string().optional(),
     inactiveDispatchMaxPerDay: z.number().min(1).max(5).optional(),
-  })).mutation(async ({ input }) => {
+  })).mutation(async ({ input, ctx }) => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
     const { sql } = await import("drizzle-orm");
     const now = Date.now();
+    // Log changes
+    const adminName = (ctx as any).user?.name || 'Sistema';
+    const adminId = (ctx as any).user?.id || null;
+    const changes: string[] = [];
+    if (input.autoReplyEnabled !== undefined) changes.push(`IA ${input.autoReplyEnabled ? 'ATIVADA' : 'DESATIVADA'}`);
+    if (input.workingHoursEnabled !== undefined) changes.push(`Horário ${input.workingHoursEnabled ? 'ATIVADO' : 'DESATIVADO'}`);
+    if (input.workingHoursStart !== undefined || input.workingHoursEnd !== undefined) changes.push(`Horário: ${input.workingHoursStart ?? '?'}h-${input.workingHoursEnd ?? '?'}h`);
+    if (input.maxMessagesEnabled !== undefined) changes.push(`Limite msgs ${input.maxMessagesEnabled ? 'ATIVADO' : 'DESATIVADO'}`);
+    if (input.maxMessagesPerLead !== undefined) changes.push(`Max msgs: ${input.maxMessagesPerLead}`);
+    if (input.personality !== undefined) changes.push(`Personalidade: ${input.personality}`);
+    if (input.inactiveDispatchEnabled !== undefined) changes.push(`Disparo inativos ${input.inactiveDispatchEnabled ? 'ATIVADO' : 'DESATIVADO'}`);
+    if (changes.length > 0) {
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'config_avancada', 'advanced', ${null}, ${null}, ${changes.join('; ')}, ${now})`);
+    }
     await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
       autoReplyEnabled = ${input.autoReplyEnabled !== undefined ? (input.autoReplyEnabled ? 1 : 0) : sql`autoReplyEnabled`},
       workingHoursEnabled = ${input.workingHoursEnabled !== undefined ? (input.workingHoursEnabled ? 1 : 0) : sql`workingHoursEnabled`},
@@ -1271,6 +1663,80 @@ ${chatHistory || '(Primeira mensagem)'}`;
     return result;
   }),
 
+  // ===== AI CONFIG CHANGE LOG =====
+  getAiConfigLog: publicProcedure.input(z.object({
+    limit: z.number().min(1).max(100).optional(),
+  }).optional()).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    try {
+      const { sql } = await import("drizzle-orm");
+      const limit = input?.limit || 30;
+      const result = await dbConn.execute(sql`SELECT * FROM crm_ai_config_log ORDER BY createdAt DESC LIMIT ${limit}`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      return (rows || []).map((r: any) => ({
+        id: r.id,
+        adminId: r.adminId,
+        adminName: r.adminName || 'Sistema',
+        action: r.action,
+        field: r.field,
+        oldValue: r.oldValue,
+        newValue: r.newValue,
+        details: r.details,
+        createdAt: Number(r.createdAt),
+      }));
+    } catch { return []; }
+  }),
+
+  // ===== FEIR\u00c3O SCHEDULE =====
+  getFeiraoSchedule: publicProcedure.query(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    const defaults = { feiraoScheduleStart: null as number | null, feiraoScheduleEnd: null as number | null, feiraoAutoSchedule: false };
+    if (!dbConn) return defaults;
+    try {
+      const { sql } = await import("drizzle-orm");
+      const result = await dbConn.execute(sql`SELECT feiraoScheduleStart, feiraoScheduleEnd, feiraoAutoSchedule FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const rawRows = result as any;
+      const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
+      if (rows?.[0]) {
+        return {
+          feiraoScheduleStart: rows[0].feiraoScheduleStart ? Number(rows[0].feiraoScheduleStart) : null,
+          feiraoScheduleEnd: rows[0].feiraoScheduleEnd ? Number(rows[0].feiraoScheduleEnd) : null,
+          feiraoAutoSchedule: !!rows[0].feiraoAutoSchedule,
+        };
+      }
+      return defaults;
+    } catch { return defaults; }
+  }),
+
+  setFeiraoSchedule: protectedProcedure.input(z.object({
+    feiraoScheduleStart: z.number().nullable(),
+    feiraoScheduleEnd: z.number().nullable(),
+    feiraoAutoSchedule: z.boolean(),
+  })).mutation(async ({ input, ctx }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    const now = Date.now();
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
+      feiraoScheduleStart = ${input.feiraoScheduleStart},
+      feiraoScheduleEnd = ${input.feiraoScheduleEnd},
+      feiraoAutoSchedule = ${input.feiraoAutoSchedule ? 1 : 0},
+      updatedAt = ${now}
+    WHERE id = 1`);
+    // Log
+    const adminName = (ctx as any).user?.name || 'Sistema';
+    const adminId = (ctx as any).user?.id || null;
+    const startStr = input.feiraoScheduleStart ? new Date(input.feiraoScheduleStart).toLocaleDateString('pt-BR') : 'N/A';
+    const endStr = input.feiraoScheduleEnd ? new Date(input.feiraoScheduleEnd).toLocaleDateString('pt-BR') : 'N/A';
+    await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'agendamento_feirao', 'feiraoSchedule', ${null}, ${null}, ${`Auto: ${input.feiraoAutoSchedule ? 'SIM' : 'N\u00c3O'}, In\u00edcio: ${startStr}, Fim: ${endStr}`}, ${now})`);
+    return { success: true };
+  }),
+
   // ===== AI ATTENDANT CONFIG =====
   getAttendantConfig: publicProcedure.query(async () => {
     const { getDb } = await import("../db");
@@ -1317,12 +1783,26 @@ ${chatHistory || '(Primeira mensagem)'}`;
     attendantAutoDistribute: z.boolean().optional(),
     attendantTankPromo: z.boolean().optional(),
     attendantMaxMessages: z.number().min(0).max(999).optional(), // 0 = ilimitado
-  })).mutation(async ({ input }) => {
+  })).mutation(async ({ input, ctx }) => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
     const { sql } = await import("drizzle-orm");
     const now = Date.now();
+    // Log changes
+    const adminName = (ctx as any).user?.name || 'Sistema';
+    const adminId = (ctx as any).user?.id || null;
+    const changes: string[] = [];
+    if (input.attendantEnabled !== undefined) changes.push(`IA Atendente ${input.attendantEnabled ? 'ATIVADA' : 'DESATIVADA'}`);
+    if (input.attendantMode !== undefined) changes.push(`Modo: ${input.attendantMode}`);
+    if (input.attendantPrompt !== undefined) changes.push('Prompt atualizado');
+    if (input.attendantCollectData !== undefined) changes.push(`Coletar dados: ${input.attendantCollectData ? 'SIM' : 'N\u00c3O'}`);
+    if (input.attendantAutoSchedule !== undefined) changes.push(`Auto agendar: ${input.attendantAutoSchedule ? 'SIM' : 'N\u00c3O'}`);
+    if (input.attendantAutoFicha !== undefined) changes.push(`Auto ficha: ${input.attendantAutoFicha ? 'SIM' : 'N\u00c3O'}`);
+    if (input.attendantMaxMessages !== undefined) changes.push(`Max msgs: ${input.attendantMaxMessages}`);
+    if (changes.length > 0) {
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'config_atendente', 'attendant', ${null}, ${null}, ${changes.join('; ')}, ${now})`);
+    }
     await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
       attendantEnabled = ${input.attendantEnabled !== undefined ? (input.attendantEnabled ? 1 : 0) : sql`attendantEnabled`},
       attendantMode = ${input.attendantMode !== undefined ? input.attendantMode : sql`attendantMode`},
