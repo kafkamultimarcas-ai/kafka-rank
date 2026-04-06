@@ -136,6 +136,7 @@ export const appRouter = router({
       username: z.string().min(1),
       password: z.string().min(1),
     })).mutation(async ({ input, ctx }) => {
+      // SECURITY: Only match by exact username (no name/nickname fallback)
       const seller = await db.getSellerByUsername(input.username);
       if (!seller || !seller.active || !seller.passwordHash) {
         throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
@@ -144,16 +145,24 @@ export const appRouter = router({
       if (!valid) {
         throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
       }
+      // SECURITY: Verify seller.username matches input exactly (prevent any collation tricks)
+      if (!seller.username || seller.username.toLowerCase() !== input.username.toLowerCase()) {
+        console.warn(`[SECURITY] Login attempt with username '${input.username}' matched seller #${seller.id} with username '${seller.username}' - BLOCKED`);
+        throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
+      }
       // Atualizar lastAccess
       await db.updateSellerLastAccess(seller.id);
-      // Gerar JWT e setar cookie
+      // SECURITY: Clear any existing seller_session cookie before setting new one
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+      // Gerar JWT e setar cookie com sellerId + username para dupla verificação
       const token = jwt.sign(
         { sellerId: seller.id, username: seller.username },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
-      const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      console.log(`[AUTH] Seller #${seller.id} (${seller.username}) logged in successfully`);
       return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
     }),
 
@@ -165,17 +174,8 @@ export const appRouter = router({
 
     // Verificar se est\u00e1 logado como vendedor
     me: publicProcedure.query(async ({ ctx }) => {
-      // Primeiro tentar via ctx.user (quando não há conflito com OAuth)
-      if (ctx.user && ctx.user.loginMethod === 'seller_password') {
-        const sellerId = -(ctx.user.id + 1000000);
-        const seller = await db.getSellerById(sellerId);
-        if (seller) {
-          await db.updateSellerLastAccess(sellerId);
-          return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department, sellerRole: seller.sellerRole || 'vendedor' };
-        }
-      }
-      // Fallback: verificar cookie seller_session diretamente
-      // (necessário quando OAuth ou manager token também está presente)
+      // SECURITY: Always use the seller_session JWT cookie as the single source of truth
+      // This prevents any mismatch between ctx.user and the actual seller session
       try {
         const { parse: parseCookie } = await import("cookie");
         const cookies = parseCookie(ctx.req.headers.cookie || "");
@@ -184,12 +184,24 @@ export const appRouter = router({
           const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
           const seller = await db.getSellerById(payload.sellerId);
           if (seller && seller.active) {
+            // SECURITY: Verify that the seller's username still matches the JWT
+            // This prevents stale tokens from accessing wrong profiles
+            if (seller.username && payload.username && seller.username !== payload.username) {
+              console.warn(`[SECURITY] JWT username mismatch for seller #${payload.sellerId}: JWT=${payload.username}, DB=${seller.username}. Clearing session.`);
+              const cookieOptions = getSessionCookieOptions(ctx.req);
+              ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+              return null;
+            }
             await db.updateSellerLastAccess(seller.id);
             return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department, sellerRole: seller.sellerRole || 'vendedor' };
           }
         }
       } catch (e) {
-        // Token inválido ou expirado
+        // Token inválido ou expirado - limpar cookie
+        try {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+        } catch { /* ignore */ }
       }
       return null;
     }),
@@ -213,14 +225,17 @@ export const appRouter = router({
       if (input.department) updateData.department = input.department;
       await db.updateSeller(input.sellerId, updateData);
       await db.updateSellerLastAccess(input.sellerId);
+      // SECURITY: Clear any existing seller_session before setting new one
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie('seller_session', { ...cookieOptions, maxAge: -1 });
       // Auto-login
       const token = jwt.sign(
         { sellerId: seller.id, username: input.username },
         ENV.cookieSecret,
         { expiresIn: '30d' }
       );
-      const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie('seller_session', token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      console.log(`[AUTH] Seller #${seller.id} (${input.username}) first access completed`);
       return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
     }),
 
@@ -239,6 +254,20 @@ export const appRouter = router({
       await db.updateSeller(input.id, { username: input.username, passwordHash });
       return { success: true };
     }),
+    // === RESET ALL PASSWORDS (ADMIN) ===
+    resetAllPasswords: adminProcedure.mutation(async () => {
+      const allSellers = await db.listSellers();
+      let resetCount = 0;
+      for (const seller of allSellers) {
+        if (seller.username) {
+          await db.updateSeller(seller.id, { username: null as any, passwordHash: null as any });
+          resetCount++;
+        }
+      }
+      console.log(`[SECURITY] Admin reset ALL passwords: ${resetCount} sellers affected`);
+      return { success: true, resetCount };
+    }),
+
     // === PERMISSÕES DE VENDEDOR ===
     getPermissions: publicProcedure.input(z.object({
       sellerId: z.number(),

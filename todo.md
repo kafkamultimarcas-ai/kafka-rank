@@ -2020,3 +2020,11 @@
 - [x] Adicionar filtros por período no dashboard de métricas
 - [x] Ações admin: reativar IA para lead e resetar contador de mensagens
 - [x] Testes para os novos endpoints de métricas (12 testes)
+
+### BUG CRÍTICO DE SEGURANÇA - Login Vendedor (06/04)
+- [x] BUG: Vendedor loga com seu email/senha mas cai no perfil de OUTRO vendedor (ex: Wesley entrou e caiu no perfil "LOJA")
+- [x] Investigar sistema de autenticação do vendedor - CAUSA: getSellerByUsername tinha fallbacks por nome/nickname que retornavam vendedor errado
+- [x] Corrigir isolamento de sessão por vendedor - removidos fallbacks perigosos, login só por username exato
+- [x] Resetar TODAS as senhas dos vendedores no banco - botão "Resetar Todas as Senhas" adicionado no admin
+- [x] Forçar primeiro acesso novamente para todos os vendedores cadastrados
+- [x] Garantir que cada vendedor só acessa seus próprios dados - verificação JWT dupla + clear cookie em token inválido

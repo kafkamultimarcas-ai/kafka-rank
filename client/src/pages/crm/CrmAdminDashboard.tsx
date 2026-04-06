@@ -1621,6 +1621,9 @@ function SettingsView() {
         )}
       </div>
 
+      {/* SECURITY: Reset All Seller Passwords */}
+      <ResetAllPasswordsSection />
+
       {/* Tenant Settings (Dados da Loja + Z-API) */}
       <TenantSettingsPanel />
 
@@ -1648,6 +1651,57 @@ function SettingsView() {
           <IntegrationItem name="OLX / Webmotors" status="pendente" description="Receba leads automaticamente das plataformas de anúncio" />
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===== RESET ALL PASSWORDS SECTION =====
+function ResetAllPasswordsSection() {
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const resetAll = trpc.sellers.resetAllPasswords.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.resetCount} senhas resetadas! Todos os vendedores precisarão fazer o primeiro acesso novamente.`);
+      setShowConfirm(false);
+      setConfirmText("");
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  return (
+    <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-4">
+      <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 mb-2">
+        <Shield className="w-4 h-4" /> Segurança - Resetar Senhas
+      </h3>
+      <p className="text-xs text-gray-400 mb-3">
+        Reseta TODAS as senhas dos vendedores. Cada um precisará fazer o primeiro acesso novamente.
+        Use em caso de problema de segurança.
+      </p>
+      {!showConfirm ? (
+        <Button size="sm" variant="destructive" className="text-xs" onClick={() => setShowConfirm(true)}>
+          Resetar Todas as Senhas
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-red-300 font-bold">Digite RESETAR para confirmar:</p>
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="RESETAR"
+            className="h-8 text-sm border-red-500/50"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" variant="destructive" className="text-xs"
+              disabled={confirmText !== "RESETAR" || resetAll.isPending}
+              onClick={() => resetAll.mutate()}>
+              {resetAll.isPending ? "Resetando..." : "Confirmar Reset"}
+            </Button>
+            <Button size="sm" variant="ghost" className="text-xs" onClick={() => { setShowConfirm(false); setConfirmText(""); }}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
