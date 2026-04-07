@@ -67,20 +67,24 @@ export default function CrmAdminDashboard() {
   }
 
   const menuItems = [
-    { key: "chat" as const, icon: MessageCircle, label: "Conversas" },
-    { key: "performance" as const, icon: TrendingUp, label: "Resultados" },
-    { key: "dashboard" as const, icon: LayoutDashboard, label: "Visão Geral" },
-    { key: "leads" as const, icon: Users, label: "Todos os Clientes" },
-    { key: "pipeline" as const, icon: SlidersHorizontal, label: "Etapas de Venda" },
-    { key: "inventory" as const, icon: Car, label: "Estoque" },
-    { key: "financial" as const, icon: Wallet, label: "Financeiro" },
-    { key: "campaigns" as const, icon: Megaphone, label: "Campanhas" },
-    { key: "marketing" as const, icon: BarChart3, label: "Marketing" },
-    { key: "attendant" as const, icon: Bot, label: "IA Atendente" },
-    { key: "ai_metrics" as const, icon: BarChart3, label: "Métricas IA" },
-    { key: "fichas" as const, icon: CreditCard, label: "Fichas de Crédito" },
-    { key: "sdr" as const, icon: Headphones, label: "Painel SDR" },
-    { key: "settings" as const, icon: Settings, label: "Ajustes" },
+    // --- Principal ---
+    { key: "dashboard" as const, icon: LayoutDashboard, label: "Visão Geral", section: "Principal" },
+    { key: "chat" as const, icon: MessageCircle, label: "Conversas", section: "Principal" },
+    { key: "leads" as const, icon: Users, label: "Todos os Clientes", section: "Principal" },
+    { key: "pipeline" as const, icon: SlidersHorizontal, label: "Etapas de Venda", section: "Principal" },
+    // --- Vendas ---
+    { key: "fichas" as const, icon: CreditCard, label: "Fichas de Crédito", section: "Vendas" },
+    { key: "inventory" as const, icon: Car, label: "Estoque", section: "Vendas" },
+    { key: "financial" as const, icon: Wallet, label: "Financeiro", section: "Vendas" },
+    { key: "performance" as const, icon: TrendingUp, label: "Resultados", section: "Vendas" },
+    // --- IA & Marketing ---
+    { key: "attendant" as const, icon: Bot, label: "IA Atendente", section: "IA & Marketing" },
+    { key: "ai_metrics" as const, icon: BarChart3, label: "Métricas IA", section: "IA & Marketing" },
+    { key: "campaigns" as const, icon: Megaphone, label: "Campanhas", section: "IA & Marketing" },
+    { key: "marketing" as const, icon: BarChart3, label: "Marketing", section: "IA & Marketing" },
+    // --- Equipe ---
+    { key: "sdr" as const, icon: Headphones, label: "Painel SDR", section: "Equipe" },
+    { key: "settings" as const, icon: Settings, label: "Ajustes", section: "Equipe" },
   ];
 
   // When clicking a department card, navigate to leads filtered by that dept
@@ -102,14 +106,18 @@ export default function CrmAdminDashboard() {
             </div>
           </div>
         </div>
-        <nav className="flex-1 p-2 space-y-0.5">
-          {menuItems.map(item => (
-            <button key={item.key} onClick={() => { setActiveView(item.key); setSelectedDept(null); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-              <item.icon className="w-4 h-4" />
-              {item.label}
-            </button>
-          ))}
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+          {menuItems.map((item, idx) => {
+            const showSection = idx === 0 || item.section !== menuItems[idx - 1].section;
+            return (<div key={item.key}>
+              {showSection && <div className={`px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 ${idx > 0 ? 'mt-2 border-t border-border/30 pt-3' : ''}`}>{item.section}</div>}
+              <button onClick={() => { setActiveView(item.key); setSelectedDept(null); }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                <item.icon className="w-4 h-4" />
+                {item.label}
+              </button>
+            </div>);
+          })}
         </nav>
         <div className="p-3 border-t border-border">
           <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-all">
@@ -130,14 +138,18 @@ export default function CrmAdminDashboard() {
               </div>
               <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
             </div>
-            <nav className="flex-1 p-2 space-y-0.5">
-              {menuItems.map(item => (
-                <button key={item.key} onClick={() => { setActiveView(item.key); setSelectedDept(null); setSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </button>
-              ))}
+            <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+              {menuItems.map((item, idx) => {
+                const showSection = idx === 0 || item.section !== menuItems[idx - 1].section;
+                return (<div key={item.key}>
+                  {showSection && <div className={`px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 ${idx > 0 ? 'mt-2 border-t border-border/30 pt-3' : ''}`}>{item.section}</div>}
+                  <button onClick={() => { setActiveView(item.key); setSelectedDept(null); setSidebarOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
+                    <item.icon className="w-4 h-4" />
+                    {item.label}
+                  </button>
+                </div>);
+              })}
             </nav>
             <div className="p-3 border-t border-border">
               <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10">
@@ -3786,12 +3798,26 @@ function CreditApplicationsView() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [viewTab, setViewTab] = useState<'fichas' | 'dados_ia'>('fichas');
   const { data: applications, refetch } = trpc.crmAi.listCreditApplications.useQuery({ status: statusFilter as any });
-  const { data: leadsWithAiData } = trpc.crmAi.listLeadsWithAiData.useQuery();
+  const { data: leadsWithAiData, refetch: refetchAiData } = trpc.crmAi.listLeadsWithAiData.useQuery();
   const updateApp = trpc.crmAi.updateCreditApplication.useMutation({
-    onSuccess: () => { refetch(); toast.success("Ficha atualizada!"); },
+    onSuccess: () => { refetch(); toast.success("Ficha atualizada!"); setEditingId(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const convertToFicha = trpc.crmAi.convertAiDataToFicha.useMutation({
+    onSuccess: (data) => { 
+      refetch(); refetchAiData();
+      if (data.alreadyExists) toast.info("Ficha já existe para este lead");
+      else toast.success("Ficha criada com sucesso! Vá para aba Fichas de Crédito.");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const dedup = trpc.crmAi.deduplicateFichas.useMutation({
+    onSuccess: (data) => { refetch(); toast.success(`${data.removed} fichas duplicadas removidas`); },
     onError: (e: any) => toast.error(e.message),
   });
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
   const [expandedLeadId, setExpandedLeadId] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [, navigate] = useLocation();
@@ -3808,6 +3834,61 @@ function CreditApplicationsView() {
     rejected: "Rejeitada", cancelled: "Cancelada",
   };
 
+  const startEdit = (app: any) => {
+    setEditingId(app.id);
+    setEditForm({
+      customerName: app.customerName || '',
+      customerCpf: app.customerCpf || '',
+      customerRg: app.customerRg || '',
+      customerBirthDate: app.customerBirthDate || '',
+      customerPhone: app.customerPhone || app.leadPhone || '',
+      customerEmail: app.customerEmail || '',
+      customerAddress: app.customerAddress || '',
+      customerIncome: app.customerIncome || '',
+      customerEmployer: app.customerEmployer || '',
+      customerEmploymentTime: app.customerEmploymentTime || '',
+      vehicleInterest: app.vehicleInterest || '',
+      downPayment: app.downPayment || '',
+      tradeInVehicle: app.tradeInVehicle || '',
+      tradeInPlate: app.tradeInPlate || '',
+      tradeInKm: app.tradeInKm || '',
+      financingTerm: app.financingTerm || '',
+      bankPreference: app.bankPreference || '',
+    });
+  };
+
+  const saveEdit = (appId: number) => {
+    const payload: any = { id: appId };
+    if (editForm.customerName) payload.customerName = editForm.customerName;
+    if (editForm.customerCpf) payload.customerCpf = editForm.customerCpf;
+    if (editForm.customerRg) payload.customerRg = editForm.customerRg;
+    if (editForm.customerBirthDate) payload.customerBirthDate = editForm.customerBirthDate;
+    if (editForm.customerPhone) payload.customerPhone = editForm.customerPhone;
+    if (editForm.customerEmail) payload.customerEmail = editForm.customerEmail;
+    if (editForm.customerAddress) payload.customerAddress = editForm.customerAddress;
+    if (editForm.customerIncome) payload.customerIncome = Number(editForm.customerIncome) || undefined;
+    if (editForm.customerEmployer) payload.customerEmployer = editForm.customerEmployer;
+    if (editForm.customerEmploymentTime) payload.customerEmploymentTime = editForm.customerEmploymentTime;
+    if (editForm.vehicleInterest) payload.vehicleInterest = editForm.vehicleInterest;
+    if (editForm.downPayment) payload.downPayment = Number(editForm.downPayment) || undefined;
+    if (editForm.tradeInVehicle) payload.tradeInVehicle = editForm.tradeInVehicle;
+    if (editForm.tradeInPlate) payload.tradeInPlate = editForm.tradeInPlate;
+    if (editForm.tradeInKm) payload.tradeInKm = Number(editForm.tradeInKm) || undefined;
+    if (editForm.financingTerm) payload.financingTerm = Number(editForm.financingTerm) || undefined;
+    if (editForm.bankPreference) payload.bankPreference = editForm.bankPreference;
+    if (notes) payload.feiNotes = notes;
+    updateApp.mutate(payload);
+  };
+
+  const EditField = ({ label, field, type = 'text' }: { label: string; field: string; type?: string }) => (
+    <div>
+      <label className="text-[10px] text-muted-foreground block mb-0.5">{label}</label>
+      <input type={type} value={editForm[field] || ''}
+        onChange={e => setEditForm((f: any) => ({ ...f, [field]: e.target.value }))}
+        className="w-full px-2 py-1.5 rounded-md bg-background border border-border text-xs text-foreground" />
+    </div>
+  );
+
   return (
     <div className="space-y-4 max-w-5xl">
       {/* Header */}
@@ -3821,6 +3902,9 @@ function CreditApplicationsView() {
             <p className="text-xs text-muted-foreground">Fila de aprovação de crédito + dados coletados pela IA</p>
           </div>
         </div>
+        <Button size="sm" variant="outline" className="text-xs" onClick={() => dedup.mutate()} disabled={dedup.isPending}>
+          <Trash2 className="w-3 h-3 mr-1" /> Limpar Duplicadas
+        </Button>
       </div>
 
       {/* Main Tabs */}
@@ -3831,23 +3915,20 @@ function CreditApplicationsView() {
         </button>
         <button onClick={() => setViewTab('dados_ia')}
           className={`flex-1 py-2.5 px-4 rounded-md text-sm font-medium transition-colors ${viewTab === 'dados_ia' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-          <Zap className="w-4 h-4 inline mr-2" />Dados para Simulação ({leadsWithAiData?.length || 0})
+          <Zap className="w-4 h-4 inline mr-2" />Dados IA p/ Simulação ({leadsWithAiData?.length || 0})
         </button>
       </div>
 
       {viewTab === 'fichas' && (<>
-      {/* Status Filter Tabs */}
       <div className="flex gap-2 flex-wrap">
         {['pending', 'analyzing', 'approved', 'rejected', 'all'].map(status => (
-          <button key={status}
-            onClick={() => setStatusFilter(status)}
+          <button key={status} onClick={() => setStatusFilter(status)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${statusFilter === status ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-muted-foreground hover:text-foreground'}`}>
             {status === 'all' ? 'Todas' : statusLabels[status] || status}
           </button>
         ))}
       </div>
 
-      {/* Applications List */}
       {!applications || applications.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -3857,11 +3938,8 @@ function CreditApplicationsView() {
         <div className="space-y-3">
           {applications.map((app: any) => (
             <div key={app.id} className="rounded-xl border border-border bg-card overflow-hidden">
-              {/* Card Header */}
-              <button
-                onClick={() => setExpandedId(expandedId === app.id ? null : app.id)}
-                className="w-full p-4 flex items-center justify-between hover:bg-accent/30 transition-all"
-              >
+              <button onClick={() => { setExpandedId(expandedId === app.id ? null : app.id); setEditingId(null); setNotes(''); }}
+                className="w-full p-4 flex items-center justify-between hover:bg-accent/30 transition-all">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                     {(app.customerName || app.leadName || '?')[0]?.toUpperCase()}
@@ -3870,7 +3948,7 @@ function CreditApplicationsView() {
                     <div className="text-sm font-bold text-foreground">{app.customerName || app.leadName || 'Sem nome'}</div>
                     <div className="text-[10px] text-muted-foreground">
                       {app.vehicleInterest || 'Veículo não informado'} • {app.customerCpf || 'CPF não informado'}
-                      {app.sellerName && <span className="ml-2 text-blue-400">Vendedor: {app.sellerName}</span>}
+                      {app.sellerName && <span className="ml-2 text-blue-400">• {app.sellerName}</span>}
                     </div>
                   </div>
                 </div>
@@ -3878,76 +3956,118 @@ function CreditApplicationsView() {
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColors[app.status] || ''}`}>
                     {statusLabels[app.status] || app.status}
                   </span>
-                  {app.aiCollected && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-purple-400 bg-purple-500/10">IA</span>
-                  )}
+                  {app.aiCollected && <span className="px-2 py-0.5 rounded-full text-[10px] font-medium text-purple-400 bg-purple-500/10">IA</span>}
                   <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedId === app.id ? 'rotate-90' : ''}`} />
                 </div>
               </button>
 
-              {/* Expanded Details */}
               {expandedId === app.id && (
                 <div className="border-t border-border p-4 space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <DetailField label="Nome" value={app.customerName} />
-                    <DetailField label="CPF" value={app.customerCpf} />
-                    <DetailField label="RG" value={app.customerRg} />
-                    <DetailField label="Nascimento" value={app.customerBirthDate} />
-                    <DetailField label="Telefone" value={app.customerPhone || app.leadPhone} />
-                    <DetailField label="Email" value={app.customerEmail} />
-                    <DetailField label="Endereço" value={app.customerAddress} />
-                    <DetailField label="Renda" value={app.customerIncome ? `R$ ${Number(app.customerIncome).toLocaleString('pt-BR')}` : null} />
-                    <DetailField label="Empregador" value={app.customerEmployer} />
-                    <DetailField label="Tempo de Emprego" value={app.customerEmploymentTime} />
-                    <DetailField label="Veículo Interesse" value={app.vehicleInterest} />
-                    <DetailField label="Entrada" value={app.downPayment ? `R$ ${Number(app.downPayment).toLocaleString('pt-BR')}` : null} />
-                    <DetailField label="Veículo Troca" value={app.tradeInVehicle} />
-                    <DetailField label="Placa Troca" value={app.tradeInPlate} />
-                    <DetailField label="KM Troca" value={app.tradeInKm ? `${Number(app.tradeInKm).toLocaleString('pt-BR')} km` : null} />
-                    <DetailField label="Prazo" value={app.financingTerm ? `${app.financingTerm} meses` : null} />
-                    <DetailField label="Origem" value={app.leadSource} />
-                    <DetailField label="Criado em" value={app.createdAt ? new Date(Number(app.createdAt)).toLocaleString('pt-BR') : null} />
-                  </div>
+                  {/* EDIT MODE */}
+                  {editingId === app.id ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Edit className="w-4 h-4 text-amber-400" />
+                        <span className="text-sm font-bold text-amber-400">Editando Ficha</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <EditField label="Nome" field="customerName" />
+                        <EditField label="CPF" field="customerCpf" />
+                        <EditField label="RG" field="customerRg" />
+                        <EditField label="Nascimento" field="customerBirthDate" />
+                        <EditField label="Telefone" field="customerPhone" />
+                        <EditField label="Email" field="customerEmail" type="email" />
+                        <EditField label="Endereço" field="customerAddress" />
+                        <EditField label="Renda (R$)" field="customerIncome" type="number" />
+                        <EditField label="Empregador" field="customerEmployer" />
+                        <EditField label="Tempo de Emprego" field="customerEmploymentTime" />
+                        <EditField label="Veículo Interesse" field="vehicleInterest" />
+                        <EditField label="Entrada (R$)" field="downPayment" type="number" />
+                        <EditField label="Veículo Troca" field="tradeInVehicle" />
+                        <EditField label="Placa Troca" field="tradeInPlate" />
+                        <EditField label="KM Troca" field="tradeInKm" type="number" />
+                        <EditField label="Prazo (meses)" field="financingTerm" type="number" />
+                        <EditField label="Banco Preferência" field="bankPreference" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-foreground">Observações F&I</label>
+                        <textarea value={notes || app.feiNotes || ''} onChange={e => setNotes(e.target.value)}
+                          placeholder="Observações..." className="w-full h-20 p-2 rounded-lg bg-background border border-border text-xs text-foreground resize-none" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => saveEdit(app.id)} disabled={updateApp.isPending}>
+                          <Save className="w-3 h-3 mr-1" /> Salvar Alterações
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                          <X className="w-3 h-3 mr-1" /> Cancelar
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* VIEW MODE */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <DetailField label="Nome" value={app.customerName} />
+                        <DetailField label="CPF" value={app.customerCpf} />
+                        <DetailField label="RG" value={app.customerRg} />
+                        <DetailField label="Nascimento" value={app.customerBirthDate} />
+                        <DetailField label="Telefone" value={app.customerPhone || app.leadPhone} />
+                        <DetailField label="Email" value={app.customerEmail} />
+                        <DetailField label="Endereço" value={app.customerAddress} />
+                        <DetailField label="Renda" value={app.customerIncome ? `R$ ${Number(app.customerIncome).toLocaleString('pt-BR')}` : null} />
+                        <DetailField label="Empregador" value={app.customerEmployer} />
+                        <DetailField label="Tempo de Emprego" value={app.customerEmploymentTime} />
+                        <DetailField label="Veículo Interesse" value={app.vehicleInterest} />
+                        <DetailField label="Entrada" value={app.downPayment ? `R$ ${Number(app.downPayment).toLocaleString('pt-BR')}` : null} />
+                        <DetailField label="Veículo Troca" value={app.tradeInVehicle} />
+                        <DetailField label="Placa Troca" value={app.tradeInPlate} />
+                        <DetailField label="KM Troca" value={app.tradeInKm ? `${Number(app.tradeInKm).toLocaleString('pt-BR')} km` : null} />
+                        <DetailField label="Prazo" value={app.financingTerm ? `${app.financingTerm} meses` : null} />
+                        <DetailField label="Banco" value={app.bankPreference} />
+                        <DetailField label="Origem" value={app.leadSource} />
+                        <DetailField label="Criado em" value={app.createdAt ? new Date(Number(app.createdAt)).toLocaleString('pt-BR') : null} />
+                      </div>
 
-                  {/* F&I Notes */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-foreground">Observações F&I</label>
-                    <textarea
-                      value={notes || app.feiNotes || ''}
-                      onChange={e => setNotes(e.target.value)}
-                      placeholder="Adicionar observações sobre a análise..."
-                      className="w-full h-20 p-2 rounded-lg bg-background border border-border text-xs text-foreground resize-none"
-                    />
-                  </div>
+                      {app.feiNotes && (
+                        <div className="p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                          <div className="text-[10px] text-blue-400 font-medium">Observações F&I:</div>
+                          <div className="text-xs text-foreground">{app.feiNotes}</div>
+                        </div>
+                      )}
 
-                  {/* Seller info */}
-                  {app.sellerName && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                      <Users className="w-4 h-4 text-blue-400" />
-                      <span className="text-xs text-blue-400 font-medium">Vendedor: {app.sellerName}</span>
-                    </div>
+                      {app.sellerName && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                          <Users className="w-4 h-4 text-blue-400" />
+                          <span className="text-xs text-blue-400 font-medium">Vendedor: {app.sellerName}</span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 flex-wrap">
+                        <Button size="sm" variant="outline" className="text-amber-400 border-amber-500/30" onClick={() => startEdit(app)}>
+                          <Edit className="w-3 h-3 mr-1" /> Editar Ficha
+                        </Button>
+                        {app.status === 'pending' && (
+                          <Button size="sm" variant="outline" className="text-blue-400 border-blue-500/30"
+                            onClick={() => updateApp.mutate({ id: app.id, status: 'analyzing' })}>
+                            <Eye className="w-3 h-3 mr-1" /> Iniciar Análise
+                          </Button>
+                        )}
+                        {(app.status === 'pending' || app.status === 'analyzing') && (
+                          <>
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => updateApp.mutate({ id: app.id, status: 'approved' })}>
+                              <CheckCircle className="w-3 h-3 mr-1" /> Aprovar
+                            </Button>
+                            <Button size="sm" variant="destructive"
+                              onClick={() => updateApp.mutate({ id: app.id, status: 'rejected' })}>
+                              <XCircle className="w-3 h-3 mr-1" /> Rejeitar
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </>
                   )}
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 flex-wrap">
-                    {app.status === 'pending' && (
-                      <Button size="sm" variant="outline" className="text-blue-400 border-blue-500/30"
-                        onClick={() => updateApp.mutate({ id: app.id, status: 'analyzing', feiNotes: notes || undefined })}>
-                        <Eye className="w-3 h-3 mr-1" /> Iniciar Análise
-                      </Button>
-                    )}
-                    {(app.status === 'pending' || app.status === 'analyzing') && (
-                      <>
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => updateApp.mutate({ id: app.id, status: 'approved', feiNotes: notes || undefined })}>
-                          <CheckCircle className="w-3 h-3 mr-1" /> Aprovar
-                        </Button>
-                        <Button size="sm" variant="destructive"
-                          onClick={() => updateApp.mutate({ id: app.id, status: 'rejected', feiNotes: notes || undefined })}>
-                          <XCircle className="w-3 h-3 mr-1" /> Rejeitar
-                        </Button>
-                      </>
-                    )}
-                  </div>
                 </div>
               )}
             </div>
@@ -3984,7 +4104,7 @@ function CreditApplicationsView() {
                           <div className="text-sm font-bold text-foreground">{lead.name || 'Sem nome'}</div>
                           <div className="text-[10px] text-muted-foreground">
                             {lead.vehicleInterest || ai.vehicleInterest || 'Veículo não informado'}
-                            {lead.sellerName && <span className="ml-2 text-blue-400">Vendedor: {lead.sellerName}</span>}
+                            {lead.sellerName && <span className="ml-2 text-blue-400">• {lead.sellerName}</span>}
                           </div>
                         </div>
                       </div>
@@ -4024,8 +4144,12 @@ function CreditApplicationsView() {
                           </div>
                         )}
                         <div className="flex gap-2">
+                          <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white"
+                            onClick={() => convertToFicha.mutate({ leadId: lead.id })} disabled={convertToFicha.isPending}>
+                            <CreditCard className="w-3 h-3 mr-1" /> {convertToFicha.isPending ? 'Criando...' : 'Enviar p/ F&I (Criar Ficha)'}
+                          </Button>
                           <Button size="sm" variant="outline" onClick={() => navigate(`/crm/lead/${lead.id}`)}>
-                            <Eye className="w-3 h-3 mr-1" /> Ver Lead Completo
+                            <Eye className="w-3 h-3 mr-1" /> Ver Lead
                           </Button>
                         </div>
                         <div className="flex items-center gap-1 text-[10px] text-purple-400">

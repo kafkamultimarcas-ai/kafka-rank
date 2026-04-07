@@ -453,6 +453,9 @@ export const crmLeads = mysqlTable("crm_leads", {
   aiDataCollected: text("aiDataCollected"), // JSON com dados coletados pela IA (CPF, entrada, renda, etc.)
   aiCreditAppId: int("aiCreditAppId"), // ID da ficha de crédito criada pela IA
   aiAppointmentId: int("aiAppointmentId"), // ID do agendamento criado pela IA
+  lastMessageAt: bigint("lastMessageAt", { mode: "number" }), // timestamp da última mensagem
+  lastCampaignId: int("lastCampaignId"), // ID da última campanha enviada
+  isCampaignResponse: boolean("isCampaignResponse").default(false), // se respondeu a uma campanha
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),

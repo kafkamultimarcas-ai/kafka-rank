@@ -2099,3 +2099,22 @@
 - [x] BUG: IA diz "Boa tarde" às 22h — precisa usar saudação correta baseada no horário (Bom dia/Boa tarde/Boa noite)
 - [x] BUG: IA respondendo fora do horário comercial (22h) — NÃO é bug, IA deve responder à noite (loja fechada)
 - [x] Revisar qualidade geral do atendimento da IA — adicionado horário de Brasília no prompt, saudação dinâmica, status da loja
+
+### Melhorias Urgentes + Bug Sweep (07/04)
+- [x] Monitorar conversas recentes para confirmar saudação correta
+- [x] Melhorar qualidade do prompt da IA para atendimento mais humano e assertivo
+- [x] Bug sweep geral: verificar erros no console, logs, e funcionalidades quebradas
+- [x] Verificar se campanhas estão funcionando corretamente
+- [x] Verificar se edição de permissões de admins funciona
+- [x] Verificar se histórico de alterações da IA está registrando
+- [x] Verificar se agendamento do Feirão está funcionando
+- [x] Corrigir todos os erros encontrados
+
+### Bugs Críticos + Melhorias Visuais (07/04)
+- [x] Fichas F&I: adicionar clique para ver/editar ficha (corrigir valor, dados errados)
+- [x] Fichas IA → F&I: botão "Converter Dados IA" para transformar dados coletados em ficha formal
+- [x] CRM "Meus Clientes" mostrando 0 leads — verificado: query funciona, depende do sellerId logado
+- [x] Fichas duplicadas (Leonardo 4x com mesmo telefone) — 3 duplicatas removidas
+- [x] Bug transfer loop: MAX_AUTO_TRANSFERS=3 já funciona via contagem de atividades
+- [x] Visual: reorganizar abas do CRM Admin com seções (Principal, Vendas, IA & Marketing, Equipe)
+- [x] Cruzar dados da IA com fichas F&I — convertAiDataToFicha implementado

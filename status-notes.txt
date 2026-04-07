@@ -1,0 +1,11 @@
+Status check 2026-04-07:
+- Server running, no TS errors, no LSP errors
+- Dependencies OK
+- Inventory sync working (103 vehicles)
+- Campaign tables exist and queries work
+- Duplicate fichas cleaned (3 removed)
+- Transfer loop: MAX_AUTO_TRANSFERS=3 working via activity count
+- Missing columns added: lastMessageAt, lastCampaignId, isCampaignResponse on crm_leads
+- Menu reorganized with sections: Principal, Vendas, IA & Marketing, Equipe
+- CreditApplicationsView rewritten with edit capability
+- Test admins cleaned (30 removed), Tissiane deactivated

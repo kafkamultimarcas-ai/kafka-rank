@@ -1888,6 +1888,21 @@ ${chatHistory || '(Primeira mensagem)'}`;
     bankPreference: z.string().optional(),
     financingValue: z.number().optional(),
     financingTerm: z.number().optional(),
+    customerName: z.string().optional(),
+    customerCpf: z.string().optional(),
+    customerRg: z.string().optional(),
+    customerBirthDate: z.string().optional(),
+    customerPhone: z.string().optional(),
+    customerEmail: z.string().optional(),
+    customerAddress: z.string().optional(),
+    customerIncome: z.number().optional(),
+    customerEmployer: z.string().optional(),
+    customerEmploymentTime: z.string().optional(),
+    vehicleInterest: z.string().optional(),
+    downPayment: z.number().optional(),
+    tradeInVehicle: z.string().optional(),
+    tradeInPlate: z.string().optional(),
+    tradeInKm: z.number().optional(),
   })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const dbConn = await getDb();
@@ -1900,10 +1915,70 @@ ${chatHistory || '(Primeira mensagem)'}`;
       bankPreference = ${input.bankPreference !== undefined ? input.bankPreference : sql`bankPreference`},
       financingValue = ${input.financingValue !== undefined ? input.financingValue : sql`financingValue`},
       financingTerm = ${input.financingTerm !== undefined ? input.financingTerm : sql`financingTerm`},
+      customerName = ${input.customerName !== undefined ? input.customerName : sql`customerName`},
+      customerCpf = ${input.customerCpf !== undefined ? input.customerCpf : sql`customerCpf`},
+      customerRg = ${input.customerRg !== undefined ? input.customerRg : sql`customerRg`},
+      customerBirthDate = ${input.customerBirthDate !== undefined ? input.customerBirthDate : sql`customerBirthDate`},
+      customerPhone = ${input.customerPhone !== undefined ? input.customerPhone : sql`customerPhone`},
+      customerEmail = ${input.customerEmail !== undefined ? input.customerEmail : sql`customerEmail`},
+      customerAddress = ${input.customerAddress !== undefined ? input.customerAddress : sql`customerAddress`},
+      customerIncome = ${input.customerIncome !== undefined ? input.customerIncome : sql`customerIncome`},
+      customerEmployer = ${input.customerEmployer !== undefined ? input.customerEmployer : sql`customerEmployer`},
+      customerEmploymentTime = ${input.customerEmploymentTime !== undefined ? input.customerEmploymentTime : sql`customerEmploymentTime`},
+      vehicleInterest = ${input.vehicleInterest !== undefined ? input.vehicleInterest : sql`vehicleInterest`},
+      downPayment = ${input.downPayment !== undefined ? input.downPayment : sql`downPayment`},
+      tradeInVehicle = ${input.tradeInVehicle !== undefined ? input.tradeInVehicle : sql`tradeInVehicle`},
+      tradeInPlate = ${input.tradeInPlate !== undefined ? input.tradeInPlate : sql`tradeInPlate`},
+      tradeInKm = ${input.tradeInKm !== undefined ? input.tradeInKm : sql`tradeInKm`},
       feiAnalyzedAt = ${input.status === 'approved' || input.status === 'rejected' ? now : sql`feiAnalyzedAt`},
       updatedAt = ${now}
     WHERE id = ${input.id}`);
     return { success: true };
+  }),
+
+  // Convert AI collected data to a credit application
+  convertAiDataToFicha: protectedProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    // Check if ficha already exists for this lead
+    const existingResult = await dbConn.execute(sql`SELECT id FROM credit_applications WHERE leadId = ${input.leadId} LIMIT 1`);
+    const existingRows = Array.isArray((existingResult as any)?.[0]) ? (existingResult as any)[0] : existingResult;
+    if (existingRows?.[0]?.id) {
+      return { success: true, id: existingRows[0].id, alreadyExists: true };
+    }
+    // Get lead data including AI collected data
+    const leadResult = await dbConn.execute(sql`SELECT * FROM crm_leads WHERE id = ${input.leadId}`);
+    const leadRows = Array.isArray((leadResult as any)?.[0]) ? (leadResult as any)[0] : leadResult;
+    const lead = leadRows?.[0];
+    if (!lead) throw new Error("Lead não encontrado");
+    const aiData = lead.aiDataCollected ? (typeof lead.aiDataCollected === 'string' ? JSON.parse(lead.aiDataCollected) : lead.aiDataCollected) : {};
+    const now = Date.now();
+    const result = await dbConn.execute(sql`INSERT INTO credit_applications 
+      (leadId, customerName, customerCpf, customerRg, customerBirthDate, customerPhone, customerEmail, customerAddress, customerIncome, customerEmployer, customerEmploymentTime, vehicleInterest, downPayment, tradeInVehicle, tradeInPlate, tradeInKm, financingTerm, aiCollected, aiCollectedAt, status, updatedAt)
+      VALUES (${input.leadId}, ${aiData.customerName || lead.name || null}, ${aiData.cpf || aiData.customerCpf || null}, ${aiData.rg || null}, ${aiData.birthDate || aiData.customerBirthDate || null}, ${lead.phone || null}, ${aiData.email || null}, ${aiData.address || null}, ${aiData.monthlyIncome || aiData.customerIncome || 0}, ${aiData.employer || null}, ${aiData.employmentTime || null}, ${aiData.vehicleInterest || lead.vehicleInterest || null}, ${aiData.downPayment || 0}, ${aiData.tradeInVehicle || null}, ${aiData.tradeInPlate || null}, ${aiData.tradeInKm || 0}, ${aiData.financingTerm || 48}, 1, ${now}, 'pending', ${now})`);
+    const insertId = (result as any)?.[0]?.insertId || (result as any)?.insertId;
+    if (insertId) {
+      await dbConn.execute(sql`UPDATE crm_leads SET aiCreditAppId = ${insertId} WHERE id = ${input.leadId}`);
+    }
+    return { success: true, id: insertId, alreadyExists: false };
+  }),
+
+  // Deduplicate credit applications (remove duplicates keeping the most recent)
+  deduplicateFichas: protectedProcedure.mutation(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { sql } = await import("drizzle-orm");
+    // Find duplicate leadIds and keep only the latest one
+    const result = await dbConn.execute(sql`DELETE ca FROM credit_applications ca INNER JOIN (
+      SELECT leadId, MAX(id) as maxId FROM credit_applications GROUP BY leadId HAVING COUNT(*) > 1
+    ) dups ON ca.leadId = dups.leadId AND ca.id < dups.maxId`);
+    const affected = (result as any)?.[0]?.affectedRows || 0;
+    return { removed: affected };
   }),
 
   // ===== AI APPOINTMENTS =====
