@@ -1126,12 +1126,15 @@ export function registerWebhookRoutes(app: Express) {
                 const globalRows = Array.isArray(globalRaw?.[0]) ? globalRaw[0] : globalRaw;
                 const globalCfg = globalRows?.[0] || {};
 
-                // Check working hours (only if enabled)
+                // Check working hours (only if enabled) - USE BRASILIA TIME (UTC-3)
+                // NOTE: This check BLOCKS AI during business hours if mode is 'off_hours'
+                // The attendant mode logic in ai-attendant.ts handles when AI should be active
                 if (globalCfg.workingHoursEnabled) {
-                  const currentHour = new Date().getHours();
-                  if (currentHour < (globalCfg.workingHoursStart ?? 8) || currentHour >= (globalCfg.workingHoursEnd ?? 20)) {
-                    console.log(`[AI Auto-Reply] Outside working hours (${globalCfg.workingHoursStart}-${globalCfg.workingHoursEnd}), skipping`);
-                    return;
+                  const nowUtc = new Date();
+                  const brasiliaHour = (nowUtc.getUTCHours() - 3 + 24) % 24;
+                  if (brasiliaHour < (globalCfg.workingHoursStart ?? 8) || brasiliaHour >= (globalCfg.workingHoursEnd ?? 20)) {
+                    console.log(`[AI Auto-Reply] Outside working hours (${globalCfg.workingHoursStart}-${globalCfg.workingHoursEnd}), current Brasilia hour: ${brasiliaHour} - AI active for after-hours support`);
+                    // Don't skip - AI should respond when store is closed
                   }
                 }
 

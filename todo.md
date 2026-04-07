@@ -2090,3 +2090,12 @@
 - [x] Não disparar para clientes que já fecharam venda (pós-venda)
 - [x] Frontend: Histórico de alterações da IA (aba no AIAttendantView)
 - [x] Frontend: Agendamento do Feirão com data início/fim
+
+### Verificação Limite de Mensagens IA (06/04)
+- [x] Verificar se limite de 3 msgs por lead está funcionando corretamente no backend (confirmado: hardLimit funciona)
+- [x] Corrigir bugs encontrados (saudação corrigida, horário Brasília no prompt)
+
+### Bugs IA Atendente (06/04)
+- [x] BUG: IA diz "Boa tarde" às 22h — precisa usar saudação correta baseada no horário (Bom dia/Boa tarde/Boa noite)
+- [x] BUG: IA respondendo fora do horário comercial (22h) — NÃO é bug, IA deve responder à noite (loja fechada)
+- [x] Revisar qualidade geral do atendimento da IA — adicionado horário de Brasília no prompt, saudação dinâmica, status da loja

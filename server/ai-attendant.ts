@@ -407,6 +407,16 @@ export async function analyzeLeadTemperature(leadId: number, chatHistory: string
 function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData: CollectedData, vehicleContext: string, chatHistory: string, aiMsgCount: number = 0, hardLimit: number = 5): string {
   const firstName = (collectedData.customerName || lead.name || '').split(' ')[0] || 'amigo';
 
+  // Calculate current Brasília time for correct greeting
+  const nowUtc = new Date();
+  const brasiliaHour = (nowUtc.getUTCHours() - 3 + 24) % 24;
+  const brasiliaMinute = nowUtc.getUTCMinutes();
+  let saudacao = 'Bom dia';
+  if (brasiliaHour >= 12 && brasiliaHour < 18) saudacao = 'Boa tarde';
+  else if (brasiliaHour >= 18 || brasiliaHour < 6) saudacao = 'Boa noite';
+  const isStoreOpen = brasiliaHour >= 8 && brasiliaHour < 18;
+  const storeStatus = isStoreOpen ? 'ABERTA (horario comercial)' : 'FECHADA (fora do horario)';
+
   // Build list of data ALREADY collected (to prevent re-asking)
   const alreadyCollected: string[] = [];
   if (collectedData.customerName) alreadyCollected.push(`Nome: ${collectedData.customerName}`);
@@ -547,6 +557,13 @@ Sua UNICA missao e QUALIFICAR o lead para o vendedor. Isso significa:
 Quando tiver pelo menos 3 dessas informacoes, TRANSFIRA para o vendedor.
 Voce NAO fecha a venda. Voce NAO precisa agendar. Voce QUALIFICA e ENTREGA o lead PRONTO.
 
+=== HORARIO ATUAL ===
+Agora sao ${brasiliaHour}:${brasiliaMinute.toString().padStart(2, '0')} (horario de Brasilia).
+Saudacao CORRETA para este horario: "${saudacao}"
+Loja: ${storeStatus}
+NUNCA use saudacao errada. Se sao ${brasiliaHour}h, use APENAS "${saudacao}".
+${!isStoreOpen ? 'A loja esta FECHADA agora. Voce esta atendendo online. Se o cliente quiser visitar, agende para o proximo dia util (seg-sab, 8h-18h).' : 'A loja esta ABERTA. Voce pode agendar visita para HOJE se o cliente quiser.'}
+
 === PERSONALIDADE PADRAO KAFKA ===
 - Direta, clara e confiante
 - Profissional e proxima
@@ -566,7 +583,9 @@ Voce deve descobrir:
 === FLUXO DE ATENDIMENTO ===
 
 1. ABERTURA (primeira mensagem):
-"Bom dia/tarde, tudo certo? Voce viu esse modelo ou ta buscando algo nessa linha?"
+Use EXATAMENTE a saudacao correta para o horario: "${saudacao}"
+"${saudacao}, tudo certo? Voce viu esse modelo ou ta buscando algo nessa linha?"
+Se a loja esta FECHADA, mencione que esta atendendo online e que amanha a equipe da sequencia presencialmente.
 
 2. ENTENDER INTERESSE:
 "Voce ja tem algum modelo em mente ou quer que eu te ajude a encontrar o melhor custo-beneficio?"
