@@ -2148,3 +2148,13 @@
 - [x] Exibir metas individuais na área do vendedor (Minha Área) - já implementado com barra de progresso e bônus
 - [x] Admin: gerenciar metas individuais na aba Metas - já implementado com seletor de vendedor, prazo e prêmio
 - [x] Testes completos e auditoria antes da entrega - 657 testes + auditoria visual de metas, feirão, agendamentos
+
+### Melhorias Agendamentos Feirão (08/04)
+- [x] Adicionar datas de início/fim obrigatórias na edição do feirão
+- [x] Validação: agendamento de feirão só aceita datas dentro do período da edição
+- [x] Vinculação automática por data: identificar edição ativa pela data atual
+- [x] Bloqueio: aviso "Nenhuma edição ativa" quando não tem feirão no período
+- [x] Permitir pré-agendamento (até 3 dias antes do início do feirão)
+- [x] Validar que edições não tenham datas sobrepostas
+- [x] Agendamentos normais (não-feirão) continuam sem restrição de datas - testado e confirmado
+- [x] Testes: criar edição, agendar dentro/fora do período, verificar ranking e competição - 8/8 testes passaram

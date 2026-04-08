@@ -2552,8 +2552,46 @@ export async function listFeiraoEditions() {
 export async function getActiveFeiraoEdition() {
   const db = await getDb();
   if (!db) return null;
-  const [edition] = await db.select().from(feiraoEditions).where(and(eq(feiraoEditions.tenantId, getCurrentTenantId()), eq(feiraoEditions.status, 'active'))).orderBy(desc(feiraoEditions.editionNumber)).limit(1);
-  return edition || null;
+  const now = Date.now();
+  // Primeiro tenta encontrar edição ativa cujo período inclui a data atual (ou até 3 dias antes do início para pré-agendamento)
+  const editions = await db.select().from(feiraoEditions).where(and(eq(feiraoEditions.tenantId, getCurrentTenantId()), eq(feiraoEditions.status, 'active'))).orderBy(desc(feiraoEditions.editionNumber));
+  // Prioridade 1: edição com datas definidas que cobre o período atual (com 3 dias de antecedência)
+  const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
+  for (const ed of editions) {
+    if (ed.startDate && ed.endDate) {
+      const preStart = ed.startDate - THREE_DAYS;
+      // endDate vai até o final do dia (23:59:59)
+      const endOfDay = ed.endDate + (24 * 60 * 60 * 1000 - 1);
+      if (now >= preStart && now <= endOfDay) return ed;
+    }
+  }
+  // Prioridade 2: edição ativa sem datas definidas (compatibilidade)
+  for (const ed of editions) {
+    if (!ed.startDate || !ed.endDate) return ed;
+  }
+  return null;
+}
+
+// Verifica se uma data de agendamento está dentro do período da edição
+export function isDateWithinEdition(scheduledDate: number, edition: { startDate: number | null; endDate: number | null }): boolean {
+  if (!edition.startDate || !edition.endDate) return true; // sem datas = sem restrição
+  // endDate vai até o final do dia
+  const endOfDay = edition.endDate + (24 * 60 * 60 * 1000 - 1);
+  return scheduledDate >= edition.startDate && scheduledDate <= endOfDay;
+}
+
+// Verifica se datas de nova edição sobrepõem com edições existentes
+export async function checkEditionOverlap(startDate: number, endDate: number, excludeId?: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const editions = await db.select().from(feiraoEditions).where(eq(feiraoEditions.tenantId, getCurrentTenantId()));
+  for (const ed of editions) {
+    if (excludeId && ed.id === excludeId) continue;
+    if (!ed.startDate || !ed.endDate) continue;
+    // Verifica sobreposição: !(novaEnd < existStart || novaStart > existEnd)
+    if (!(endDate < ed.startDate || startDate > ed.endDate)) return true;
+  }
+  return false;
 }
 
 export async function getFeiraoEditionById(id: number) {

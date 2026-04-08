@@ -33,6 +33,8 @@ export default function RankingFeirao() {
   const [showCreateEdition, setShowCreateEdition] = useState(false);
   const [newEditionNumber, setNewEditionNumber] = useState(40);
   const [newEditionName, setNewEditionName] = useState("");
+  const [newEditionStartDate, setNewEditionStartDate] = useState("");
+  const [newEditionEndDate, setNewEditionEndDate] = useState("");
   // toast via sonner
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -257,12 +259,18 @@ export default function RankingFeirao() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-heading font-bold text-lg text-foreground">{currentEdition.name}</h2>
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                   currentEdition.status === "active" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"
                 }`}>
                   {currentEdition.status === "active" ? "🟢 AO VIVO" : "📁 Finalizado"}
                 </span>
+                {currentEdition.startDate && currentEdition.endDate && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(currentEdition.startDate).toLocaleDateString('pt-BR')} — {new Date(currentEdition.endDate).toLocaleDateString('pt-BR')}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -559,15 +567,52 @@ export default function RankingFeirao() {
                 className="mt-1"
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-foreground">Data Início *</label>
+                <Input
+                  type="date"
+                  value={newEditionStartDate}
+                  onChange={e => setNewEditionStartDate(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground">Data Fim *</label>
+                <Input
+                  type="date"
+                  value={newEditionEndDate}
+                  onChange={e => setNewEditionEndDate(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
-              A edição ativa atual será finalizada automaticamente ao criar uma nova.
+              A edição ativa atual será finalizada automaticamente ao criar uma nova. Agendamentos de feirão só serão aceitos dentro do período definido.
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateEdition(false)}>Cancelar</Button>
             <Button
-              onClick={() => createEditionMut.mutate({ editionNumber: newEditionNumber, name: newEditionName || `Feirão Kafka Ed. ${newEditionNumber}` })}
-              disabled={createEditionMut.isPending}
+              onClick={() => {
+                if (!newEditionStartDate || !newEditionEndDate) {
+                  toast.error('Defina as datas de início e fim do feirão');
+                  return;
+                }
+                const startTs = new Date(newEditionStartDate + 'T00:00:00').getTime();
+                const endTs = new Date(newEditionEndDate + 'T23:59:59').getTime();
+                if (endTs < startTs) {
+                  toast.error('Data de fim não pode ser antes da data de início');
+                  return;
+                }
+                createEditionMut.mutate({
+                  editionNumber: newEditionNumber,
+                  name: newEditionName || `Feirão Kafka Ed. ${newEditionNumber}`,
+                  startDate: startTs,
+                  endDate: endTs,
+                });
+              }}
+              disabled={createEditionMut.isPending || !newEditionStartDate || !newEditionEndDate}
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {createEditionMut.isPending ? "Criando..." : "Criar Edição"}

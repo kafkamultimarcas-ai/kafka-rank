@@ -138,6 +138,7 @@ export default function MeusAgendamentos() {
   const { data: appointments, isLoading } = trpc.sdr.myAppointments.useQuery({ sellerId }, { enabled: sellerId > 0, refetchInterval: 10000 });
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
   const { data: allSellers } = trpc.sellers.list.useQuery();
+  const { data: activeEdition } = trpc.sdr.activeEdition.useQuery();
   const utils = trpc.useUtils();
   const [transferId, setTransferId] = useState<number | null>(null);
   const [transferSellerId, setTransferSellerId] = useState<number>(0);
@@ -1128,7 +1129,12 @@ export default function MeusAgendamentos() {
                     Agendamento de Feirão
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {isFeiraoForm ? 'Este agendamento é para o Feirão Kafka' : 'Marque se este agendamento é para um feirão'}
+                    {isFeiraoForm && activeEdition
+                      ? `${activeEdition.name}${activeEdition.startDate && activeEdition.endDate ? ` (${new Date(activeEdition.startDate).toLocaleDateString('pt-BR')} a ${new Date(activeEdition.endDate).toLocaleDateString('pt-BR')})` : ''}`
+                      : isFeiraoForm && !activeEdition
+                      ? '⚠️ Nenhuma edição de feirão ativa no momento'
+                      : 'Marque se este agendamento é para um feirão'
+                    }
                   </p>
                 </div>
                 <div className={`ml-auto w-12 h-7 rounded-full transition-all flex items-center px-1 ${

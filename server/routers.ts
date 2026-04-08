@@ -1656,7 +1656,16 @@ export const appRouter = router({
       let feiraoEditionId: number | null = null;
       if (input.isFeirão) {
         const activeEdition = await db.getActiveFeiraoEdition();
-        if (activeEdition) feiraoEditionId = activeEdition.id;
+        if (!activeEdition) throw new Error('Nenhuma edição de feirão ativa no momento. Peça ao gerente para criar uma nova edição.');
+        feiraoEditionId = activeEdition.id;
+        // Validar que a data do agendamento está dentro do período da edição
+        if (input.scheduledDate && activeEdition.startDate && activeEdition.endDate) {
+          if (!db.isDateWithinEdition(input.scheduledDate, activeEdition)) {
+            const start = new Date(activeEdition.startDate).toLocaleDateString('pt-BR');
+            const end = new Date(activeEdition.endDate).toLocaleDateString('pt-BR');
+            throw new Error(`A data do agendamento deve estar dentro do período do feirão (${start} a ${end})`);
+          }
+        }
       }
       const result = await db.createSdrRecord({
         sellerId: input.sellerId,
@@ -1813,7 +1822,16 @@ export const appRouter = router({
       let feiraoEditionId: number | null = null;
       if (input.isFeirão) {
         const activeEdition = await db.getActiveFeiraoEdition();
-        if (activeEdition) feiraoEditionId = activeEdition.id;
+        if (!activeEdition) throw new Error('Nenhuma edição de feirão ativa no momento.');
+        feiraoEditionId = activeEdition.id;
+        // Validar data do agendamento dentro do período
+        if ((record as any).scheduledDate && activeEdition.startDate && activeEdition.endDate) {
+          if (!db.isDateWithinEdition((record as any).scheduledDate, activeEdition)) {
+            const start = new Date(activeEdition.startDate).toLocaleDateString('pt-BR');
+            const end = new Date(activeEdition.endDate).toLocaleDateString('pt-BR');
+            throw new Error(`A data deste agendamento está fora do período do feirão (${start} a ${end})`);
+          }
+        }
       }
       await db.updateSdrRecord(input.id, { isFeirão: input.isFeirão, feiraoEditionId } as any);
       return { success: true, message: input.isFeirão ? 'Marcado como Feirão!' : 'Removido do Feirão!' };
@@ -1898,10 +1916,15 @@ export const appRouter = router({
     createEdition: adminProcedure.input(z.object({
       editionNumber: z.number(),
       name: z.string().min(1),
-      startDate: z.number().optional(),
-      endDate: z.number().optional(),
+      startDate: z.number(),
+      endDate: z.number(),
       notes: z.string().optional(),
     })).mutation(async ({ input }) => {
+      // Validar que endDate >= startDate
+      if (input.endDate < input.startDate) throw new Error('Data de fim não pode ser antes da data de início');
+      // Validar sobreposição com edições existentes
+      const hasOverlap = await db.checkEditionOverlap(input.startDate, input.endDate);
+      if (hasOverlap) throw new Error('Já existe uma edição com datas sobrepostas. Ajuste as datas.');
       // Finalizar edição ativa anterior
       const active = await db.getActiveFeiraoEdition();
       if (active) await db.finishFeiraoEdition(active.id);
@@ -1917,6 +1940,12 @@ export const appRouter = router({
       notes: z.string().optional(),
     })).mutation(async ({ input }) => {
       const { id, ...data } = input;
+      // Se está atualizando datas, validar sobreposição
+      if (data.startDate && data.endDate) {
+        if (data.endDate < data.startDate) throw new Error('Data de fim não pode ser antes da data de início');
+        const hasOverlap = await db.checkEditionOverlap(data.startDate, data.endDate, id);
+        if (hasOverlap) throw new Error('Já existe uma edição com datas sobrepostas. Ajuste as datas.');
+      }
       await db.updateFeiraoEdition(id, data as any);
       return { success: true };
     }),
