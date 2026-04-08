@@ -1652,6 +1652,12 @@ export const appRouter = router({
       notes: z.string().optional(),
       isFeirão: z.boolean().optional(),
     })).mutation(async ({ input }) => {
+      // Se for feirão, vincular à edição ativa automaticamente
+      let feiraoEditionId: number | null = null;
+      if (input.isFeirão) {
+        const activeEdition = await db.getActiveFeiraoEdition();
+        if (activeEdition) feiraoEditionId = activeEdition.id;
+      }
       const result = await db.createSdrRecord({
         sellerId: input.sellerId,
         competitionId: input.competitionId ?? null,
@@ -1664,6 +1670,7 @@ export const appRouter = router({
         scheduledDate: input.scheduledDate ?? null,
         converted: false,
         isFeirão: input.isFeirão ?? false,
+        feiraoEditionId,
         notes: input.notes ?? null,
         points: 1,
       });
@@ -1803,7 +1810,12 @@ export const appRouter = router({
       const records = await db.listSdrRecords(undefined, input.sellerId);
       const record = records.find((r: any) => r.id === input.id);
       if (!record) throw new Error('Agendamento não encontrado ou não pertence a este vendedor');
-      await db.updateSdrRecord(input.id, { isFeirão: input.isFeirão } as any);
+      let feiraoEditionId: number | null = null;
+      if (input.isFeirão) {
+        const activeEdition = await db.getActiveFeiraoEdition();
+        if (activeEdition) feiraoEditionId = activeEdition.id;
+      }
+      await db.updateSdrRecord(input.id, { isFeirão: input.isFeirão, feiraoEditionId } as any);
       return { success: true, message: input.isFeirão ? 'Marcado como Feirão!' : 'Removido do Feirão!' };
     }),
     // Vendedor edita/reagenda agendamento (nome, telefone, carro, data, notas)
@@ -1847,12 +1859,12 @@ export const appRouter = router({
       return db.listApprovedAppointments(input?.competitionId);
     }),
     // ===== FEIRÃO =====
-    // Ranking do feirão: quem mais agendou
+    // Ranking do feirão: quem mais agendou (com filtro por edição)
     rankingFeirao: publicProcedure.input(z.object({
       competitionId: z.number().optional(),
+      editionId: z.number().optional(),
     }).optional()).query(async ({ input }) => {
-      const ranking = await db.getRankingFeirao(input?.competitionId);
-      // Enriquecer com nomes dos vendedores/SDRs
+      const ranking = await db.getRankingFeirao(input?.competitionId, input?.editionId);
       const sellersList = await db.listSellers();
       return ranking.map((r: any) => {
         const seller = sellersList.find((s: any) => s.id === r.sellerId);
@@ -1864,16 +1876,53 @@ export const appRouter = router({
         };
       });
     }),
-    // Listar todos agendamentos de feirão (para conferência)
+    // Listar todos agendamentos de feirão (com filtro por edição)
     listFeirao: publicProcedure.input(z.object({
       competitionId: z.number().optional(),
+      editionId: z.number().optional(),
     }).optional()).query(async ({ input }) => {
-      const agendamentos = await db.listFeiraoAgendamentos(input?.competitionId);
+      const agendamentos = await db.listFeiraoAgendamentos(input?.competitionId, input?.editionId);
       const sellersList = await db.listSellers();
       return agendamentos.map((a: any) => ({
         ...a,
         sellerName: sellersList.find((s: any) => s.id === a.sellerId)?.name || 'Desconhecido',
       }));
+    }),
+    // ===== EDIÇÕES DE FEIRÃO =====
+    listEditions: publicProcedure.query(async () => {
+      return db.listFeiraoEditions();
+    }),
+    activeEdition: publicProcedure.query(async () => {
+      return db.getActiveFeiraoEdition();
+    }),
+    createEdition: adminProcedure.input(z.object({
+      editionNumber: z.number(),
+      name: z.string().min(1),
+      startDate: z.number().optional(),
+      endDate: z.number().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      // Finalizar edição ativa anterior
+      const active = await db.getActiveFeiraoEdition();
+      if (active) await db.finishFeiraoEdition(active.id);
+      const result = await db.createFeiraoEdition(input);
+      return { success: true, result };
+    }),
+    updateEdition: adminProcedure.input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      startDate: z.number().optional(),
+      endDate: z.number().optional(),
+      status: z.enum(['active', 'finished']).optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await db.updateFeiraoEdition(id, data as any);
+      return { success: true };
+    }),
+    finishEdition: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.finishFeiraoEdition(input.id);
+      return { success: true };
     }),
     // Buscar agendamento por telefone (para cruzamento com venda)
     findByPhone: publicProcedure.input(z.object({

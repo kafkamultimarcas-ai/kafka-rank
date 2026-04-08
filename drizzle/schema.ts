@@ -334,6 +334,7 @@ export const sdrRecords = mysqlTable("sdr_records", {
   scheduledDate: bigint("scheduledDate", { mode: "number" }),
   converted: boolean("converted").default(false).notNull(),
   isFeirão: boolean("isFeirão").default(false).notNull(), // flag para agendamentos de feirão
+  feiraoEditionId: int("feiraoEditionId"), // vínculo com edição do feirão
   notes: text("notes"),
   // Fluxo de comparecimento
   attendanceStatus: mysqlEnum("attendanceStatus", ["pending", "attended", "no_show", "approved", "rejected"]).default("pending"), // pending=aguardando, attended=vendedor marcou que veio, no_show=não compareceu, approved=gerente aprovou, rejected=gerente reprovou
@@ -1315,3 +1316,18 @@ export const aiConversationLogs = mysqlTable("ai_conversation_logs", {
 });
 export type AiConversationLog = typeof aiConversationLogs.$inferSelect;
 export type InsertAiConversationLog = typeof aiConversationLogs.$inferInsert;
+
+// Edições de Feirão
+export const feiraoEditions = mysqlTable("feirao_editions", {
+  id: int("id").autoincrement().primaryKey(),
+  editionNumber: int("editionNumber").notNull(), // ex: 39, 40, 41
+  name: varchar("name", { length: 255 }).notNull(), // ex: "Feirão Kafka Ed. 39"
+  startDate: bigint("startDate", { mode: "number" }),
+  endDate: bigint("endDate", { mode: "number" }),
+  status: mysqlEnum("status", ["active", "finished"]).default("active").notNull(),
+  notes: text("notes"), // observações do feirão
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+export type FeiraoEdition = typeof feiraoEditions.$inferSelect;
+export type InsertFeiraoEdition = typeof feiraoEditions.$inferInsert;

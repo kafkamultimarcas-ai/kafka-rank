@@ -2125,3 +2125,18 @@
 - [x] Auditoria completa: testar ranking, metas, competições, registro, navegação - 52 verificações visuais + 15 testes de banco, tudo OK
 - [x] Validar que nenhuma atualização anterior quebrou funcionalidades existentes - 657 testes unitários passando
 - [x] Implementar padrão rigoroso de testes antes de qualquer entrega - auditoria completa realizada
+
+### Sistema de Edições de Feirão (08/04)
+- [x] Criar tabela feirao_editions (id, editionNumber, name, startDate, endDate, status, tenantId)
+- [x] Vincular agendamentos à edição do feirão (campo editionId na tabela appointments)
+- [x] Migrar agendamentos existentes do feirão para Edição 39
+- [x] Backend: CRUD de edições (criar, editar, listar, encerrar)
+- [x] Backend: filtrar agendamentos por edição
+- [x] Frontend Admin: criar nova edição de feirão
+- [x] Frontend Admin: navegar entre edições (Edição 39, 40, etc.)
+- [x] Frontend Vendedor: lançar agendamentos na edição ativa
+- [x] Frontend Feirão: exibir dados da edição ativa com opção de ver histórico
+- [x] Manter todos os dados históricos salvos para resgate de clientes
+- [x] Testes completos e auditoria antes da entrega - 657 testes passando + auditoria visual completa
+- [x] Filtro por mês nos agendamentos do admin (abas Março, Abril, etc.)
+- [x] Filtro por mês nos agendamentos do vendedor/SDR (MeusAgendamentos)

@@ -39,6 +39,7 @@ export default function AdminAgendamentos() {
   const [transferId, setTransferId] = useState<number | null>(null);
   const [transferSellerId, setTransferSellerId] = useState<number>(0);
   const [rescueSendingId, setRescueSendingId] = useState<number | null>(null);
+  const [filterMonth, setFilterMonth] = useState<string>("current");
 
   // Live clock for countdown
   useEffect(() => {
@@ -71,9 +72,39 @@ export default function AdminAgendamentos() {
     return map;
   }, [sellersList]);
 
+  const currentMonthKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  const MONTH_NAMES: Record<string, string> = {
+    '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+    '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+    '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+  };
+
+  const availableMonths = useMemo(() => {
+    if (!allRecords) return [];
+    const months = new Set<string>();
+    allRecords.forEach((r: any) => {
+      const d = r.createdAt ? new Date(r.createdAt) : r.scheduledDate ? new Date(r.scheduledDate) : null;
+      if (d) months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    });
+    return Array.from(months).sort().reverse();
+  }, [allRecords]);
+
   const records = useMemo(() => {
     if (!allRecords) return [];
     let filtered = [...allRecords];
+    // Filtro por mês
+    if (filterMonth !== "all") {
+      const monthKey = filterMonth === "current" ? currentMonthKey : filterMonth;
+      filtered = filtered.filter((r: any) => {
+        const d = r.createdAt ? new Date(r.createdAt) : r.scheduledDate ? new Date(r.scheduledDate) : null;
+        if (!d) return false;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === monthKey;
+      });
+    }
     if (search) {
       const s = search.toLowerCase();
       filtered = filtered.filter(r => {
@@ -88,7 +119,7 @@ export default function AdminAgendamentos() {
       filtered = filtered.filter(r => r.sellerId === sellerFilter);
     }
     return filtered;
-  }, [allRecords, search, sellerFilter, sellerMap]);
+  }, [allRecords, search, sellerFilter, sellerMap, filterMonth, currentMonthKey]);
 
   const rescueRecords = useMemo(() => {
     return records.filter(r => {
@@ -275,6 +306,36 @@ function formatDateShort(ts: number | string | Date | null) {
               )}
             </button>
           ))}
+        </div>
+
+        {/* Filtro por Mês */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setFilterMonth("current")}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filterMonth === "current" ? "bg-primary text-white shadow-lg" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+          >
+            Mês Atual
+          </button>
+          {availableMonths.map(m => {
+            const [year, month] = m.split('-');
+            const label = `${MONTH_NAMES[month]} ${year}`;
+            if (m === currentMonthKey && filterMonth === "current") return null;
+            return (
+              <button
+                key={m}
+                onClick={() => setFilterMonth(m)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filterMonth === m ? "bg-primary text-white shadow-lg" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setFilterMonth("all")}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filterMonth === "all" ? "bg-primary text-white shadow-lg" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+          >
+            Todos
+          </button>
         </div>
 
         {/* Filters */}

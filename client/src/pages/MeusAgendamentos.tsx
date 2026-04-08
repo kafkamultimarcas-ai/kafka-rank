@@ -130,6 +130,7 @@ export default function MeusAgendamentos() {
   const [notes, setNotes] = useState("");
   const [isFeiraoForm, setIsFeiraoForm] = useState(false);
   const [filterFeirao, setFilterFeirao] = useState<"todos" | "feirao" | "normal">("todos");
+  const [filterMonth, setFilterMonth] = useState<string>("current"); // "current", "all", "2026-03", "2026-04", etc.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<any>({});
 
@@ -331,13 +332,44 @@ export default function MeusAgendamentos() {
     });
   };
 
+  // Meses disponíveis nos agendamentos
+  const availableMonths = useMemo(() => {
+    const all = (appointments || []).filter((a: any) => a.type === "agendamento");
+    const months = new Set<string>();
+    all.forEach((a: any) => {
+      const d = a.createdAt ? new Date(a.createdAt) : a.scheduledDate ? new Date(Number(a.scheduledDate)) : null;
+      if (d) months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    });
+    return Array.from(months).sort().reverse();
+  }, [appointments]);
+
+  const currentMonthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  const MONTH_NAMES: Record<string, string> = {
+    '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+    '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+    '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+  };
+
   // Separate and sort appointments
   const agendamentos = useMemo(() => {
     let list = (appointments || []).filter((a: any) => a.type === "agendamento");
     if (filterFeirao === "feirao") list = list.filter((a: any) => a.isFeirão);
     if (filterFeirao === "normal") list = list.filter((a: any) => !a.isFeirão);
+    // Filtro por mês
+    if (filterMonth !== "all") {
+      const monthKey = filterMonth === "current" ? currentMonthKey : filterMonth;
+      list = list.filter((a: any) => {
+        const d = a.createdAt ? new Date(a.createdAt) : a.scheduledDate ? new Date(Number(a.scheduledDate)) : null;
+        if (!d) return false;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === monthKey;
+      });
+    }
     return list;
-  }, [appointments, filterFeirao]);
+  }, [appointments, filterFeirao, filterMonth, currentMonthKey]);
 
   const feiraoCount = useMemo(() => (appointments || []).filter((a: any) => a.type === "agendamento" && a.isFeirão).length, [appointments]);
 
@@ -969,6 +1001,36 @@ export default function MeusAgendamentos() {
             <div className={`font-heading font-bold text-xl ${stats.noShowCount > 0 ? "text-red-400" : "text-muted-foreground"}`}>{stats.noShowCount}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Resgatar</div>
           </div>
+        </div>
+
+        {/* Filtro por Mês */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setFilterMonth("current")}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filterMonth === "current" ? "bg-primary text-white shadow-lg" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+          >
+            Mês Atual
+          </button>
+          {availableMonths.map(m => {
+            const [year, month] = m.split('-');
+            const label = `${MONTH_NAMES[month]} ${year}`;
+            if (m === currentMonthKey && filterMonth === "current") return null;
+            return (
+              <button
+                key={m}
+                onClick={() => setFilterMonth(m)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filterMonth === m ? "bg-primary text-white shadow-lg" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setFilterMonth("all")}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${filterMonth === "all" ? "bg-primary text-white shadow-lg" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+          >
+            Todos
+          </button>
         </div>
 
         {/* Filtro Feirão */}

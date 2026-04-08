@@ -28,6 +28,7 @@ import {
   competitionSnapshots, InsertCompetitionSnapshot,
   feiAuditLogs, InsertFeiAuditLog,
   sellerPermissions, InsertSellerPermission,
+  feiraoEditions, InsertFeiraoEdition,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -2514,21 +2515,23 @@ export async function getPvOrcamentoById(id: number) {
 
 // ===== RANKING FEIRÃO =====
 
-// Listar todos agendamentos de feirão (para ranking e conferência)
-export async function listFeiraoAgendamentos(competitionId?: number) {
+// Listar todos agendamentos de feirão (para ranking e conferência) - agora com filtro por edição
+export async function listFeiraoAgendamentos(competitionId?: number, editionId?: number) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(sdrRecords.isFeirão, true), eq(sdrRecords.type, 'agendamento')];
   if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
+  if (editionId) conditions.push(eq(sdrRecords.feiraoEditionId, editionId));
   return db.select().from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(sdrRecords.scheduledDate));
 }
 
-// Ranking de feirão: quem mais agendou pro feirão
-export async function getRankingFeirao(competitionId?: number) {
+// Ranking de feirão: quem mais agendou pro feirão - agora com filtro por edição
+export async function getRankingFeirao(competitionId?: number, editionId?: number) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(sdrRecords.isFeirão, true), eq(sdrRecords.type, 'agendamento')];
   if (competitionId) conditions.push(eq(sdrRecords.competitionId, competitionId));
+  if (editionId) conditions.push(eq(sdrRecords.feiraoEditionId, editionId));
   const result = await db.select({
     sellerId: sdrRecords.sellerId,
     total: sql<number>`count(*)`,
@@ -2537,6 +2540,46 @@ export async function getRankingFeirao(competitionId?: number) {
     pendentes: sql<number>`SUM(CASE WHEN ${sdrRecords.attendanceStatus} = 'pending' THEN 1 ELSE 0 END)`,
   }).from(sdrRecords).where(and(eq(sdrRecords.tenantId, getCurrentTenantId()), and(...conditions))).groupBy(sdrRecords.sellerId).orderBy(desc(sql`count(*)`));
   return result;
+}
+
+// ===== EDIÇÕES DE FEIRÃO =====
+export async function listFeiraoEditions() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(feiraoEditions).where(eq(feiraoEditions.tenantId, getCurrentTenantId())).orderBy(desc(feiraoEditions.editionNumber));
+}
+
+export async function getActiveFeiraoEdition() {
+  const db = await getDb();
+  if (!db) return null;
+  const [edition] = await db.select().from(feiraoEditions).where(and(eq(feiraoEditions.tenantId, getCurrentTenantId()), eq(feiraoEditions.status, 'active'))).orderBy(desc(feiraoEditions.editionNumber)).limit(1);
+  return edition || null;
+}
+
+export async function getFeiraoEditionById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [edition] = await db.select().from(feiraoEditions).where(and(eq(feiraoEditions.id, id), eq(feiraoEditions.tenantId, getCurrentTenantId())));
+  return edition || null;
+}
+
+export async function createFeiraoEdition(data: { editionNumber: number; name: string; startDate?: number; endDate?: number; notes?: string }) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(feiraoEditions).values({ ...data, tenantId: getCurrentTenantId() });
+  return result;
+}
+
+export async function updateFeiraoEdition(id: number, data: Partial<{ name: string; startDate: number; endDate: number; status: 'active' | 'finished'; notes: string }>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(feiraoEditions).set(data as any).where(and(eq(feiraoEditions.id, id), eq(feiraoEditions.tenantId, getCurrentTenantId())));
+}
+
+export async function finishFeiraoEdition(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(feiraoEditions).set({ status: 'finished' }).where(and(eq(feiraoEditions.id, id), eq(feiraoEditions.tenantId, getCurrentTenantId())));
 }
 
 // ===== VÍNCULO TELEFONE: AGENDAMENTO ↔ VENDA =====

@@ -407,6 +407,13 @@
       "when": 1775446511979,
       "tag": "0057_cooing_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "5",
+      "when": 1775664074844,
+      "tag": "0058_closed_enchantress",
+      "breakpoints": true
     }
   ]
 }
