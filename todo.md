@@ -2120,3 +2120,8 @@
 - [x] Cruzar dados da IA com fichas F&I — convertAiDataToFicha implementado
 
 - [x] Bug: Vendas registradas não aparecem na contagem da meta da loja (mostra 0/45 quando deveria contar as vendas do mês) - corrigido com sincronização automática baseada em vendas reais
+
+- [x] Bug CRÍTICO: Vendas aparecem na meta mas NÃO aparecem na competição mata-mata (placares 0x0) - corrigido: participantes sem teamId vinculados, sync automático de bracket scores implementado
+- [x] Auditoria completa: testar ranking, metas, competições, registro, navegação - 52 verificações visuais + 15 testes de banco, tudo OK
+- [x] Validar que nenhuma atualização anterior quebrou funcionalidades existentes - 657 testes unitários passando
+- [x] Implementar padrão rigoroso de testes antes de qualquer entrega - auditoria completa realizada

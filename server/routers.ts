@@ -426,6 +426,12 @@ export const appRouter = router({
   // ===== BRACKET (MATA-MATA) =====
   bracket: router({
     list: publicProcedure.input(z.object({ competitionId: z.number() })).query(async ({ input }) => {
+      // Sincronizar placares com vendas reais antes de retornar
+      try {
+        await db.syncBracketScores(input.competitionId);
+      } catch (e) {
+        console.error('[BracketSync] Erro ao sincronizar:', e);
+      }
       const matches = await db.listBracketMatches(input.competitionId);
       const sellersList = await db.listSellers();
       const teamsList = await db.listTeamsByCompetition(input.competitionId);

@@ -935,6 +935,59 @@ export async function incrementBracketScore(matchId: number, side: 'A' | 'B') {
   }
 }
 
+/** Sincronizar placares de bracket matches baseado em vendas reais aprovadas */
+export async function syncBracketScores(competitionId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const tid = getCurrentTenantId();
+  
+  const comp = await getCompetitionById(competitionId);
+  if (!comp) return;
+  
+  const matches = await listBracketMatches(competitionId);
+  const participants = await listParticipants(competitionId);
+  const isTeamComp = comp.type === 'team' || comp.type === 'group';
+  
+  // Buscar todas as vendas aprovadas desta competição
+  const allSales = await db.select().from(sales)
+    .where(and(
+      eq(sales.tenantId, tid),
+      eq(sales.competitionId, competitionId),
+      eq(sales.status, 'approved')
+    ));
+  
+  for (const match of matches) {
+    if (match.status === 'finished') continue; // Não recalcular partidas encerradas
+    
+    let scoreA = 0;
+    let scoreB = 0;
+    
+    if (isTeamComp) {
+      // Buscar sellers de cada time
+      const teamAMembers = participants.filter(p => p.teamId === match.teamAId).map(p => p.sellerId);
+      const teamBMembers = participants.filter(p => p.teamId === match.teamBId).map(p => p.sellerId);
+      
+      for (const sale of allSales) {
+        if (teamAMembers.includes(sale.sellerId)) scoreA++;
+        if (teamBMembers.includes(sale.sellerId)) scoreB++;
+      }
+    } else {
+      // Individual
+      for (const sale of allSales) {
+        if (sale.sellerId === match.sellerAId) scoreA++;
+        if (sale.sellerId === match.sellerBId) scoreB++;
+      }
+    }
+    
+    // Atualizar se diferente
+    if (match.scoreA !== scoreA || match.scoreB !== scoreB) {
+      await db.update(bracketMatches).set({ scoreA, scoreB })
+        .where(and(eq(bracketMatches.tenantId, tid), eq(bracketMatches.id, match.id)));
+      console.log(`[BracketSync] Match ${match.id}: ${match.scoreA}x${match.scoreB} → ${scoreA}x${scoreB}`);
+    }
+  }
+}
+
 // ===== F&I RECORDS =====
 export async function listFeiRecords(competitionId?: number, sellerId?: number) {
   const db = await getDb();
