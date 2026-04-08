@@ -2140,3 +2140,11 @@
 - [x] Testes completos e auditoria antes da entrega - 657 testes passando + auditoria visual completa
 - [x] Filtro por mês nos agendamentos do admin (abas Março, Abril, etc.)
 - [x] Filtro por mês nos agendamentos do vendedor/SDR (MeusAgendamentos)
+
+### Melhorias (08/04)
+- [x] Criar Edição 40 do Feirão (novo feirão) - criada e ativa
+- [x] Limpar 116 mil notificações antigas para melhorar performance - 215.533 deletadas, restaram 501
+- [x] Implementar metas individuais por vendedor (visível só para o próprio vendedor, para bônus) - já implementado com formulário completo, prazo de aceitação, push notification
+- [x] Exibir metas individuais na área do vendedor (Minha Área) - já implementado com barra de progresso e bônus
+- [x] Admin: gerenciar metas individuais na aba Metas - já implementado com seletor de vendedor, prazo e prêmio
+- [x] Testes completos e auditoria antes da entrega - 657 testes + auditoria visual de metas, feirão, agendamentos
