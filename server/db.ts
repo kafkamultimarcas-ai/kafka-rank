@@ -763,14 +763,77 @@ export async function incrementGoalProgress(goalId: number, amount: number = 1) 
   return { achieved: false, goal };
 }
 
+// Sincronizar progresso da meta da loja baseado em vendas aprovadas reais
+// Isso garante que o currentValue esteja sempre correto, mesmo se algum incremento falhar
+export async function syncStoreGoalProgress(goalId: number, month: number, year: number, category: string) {
+  const db = await getDb();
+  if (!db) return;
+  const tid = getCurrentTenantId();
+  
+  // Calcular início e fim do mês
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 1);
+  
+  // Contar vendas aprovadas no mês/categoria
+  let realCount = 0;
+  if (category === 'vendas') {
+    // Para categoria 'vendas', contar TODAS as vendas aprovadas do mês
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(sales)
+      .where(and(
+        eq(sales.tenantId, tid),
+        eq(sales.status, 'approved'),
+        gte(sales.createdAt, monthStart),
+        lt(sales.createdAt, monthEnd)
+      ));
+    realCount = Number(result?.count || 0);
+  } else {
+    // Para outras categorias, contar vendas da competição com essa categoria
+    const comps = await db.select({ id: competitions.id }).from(competitions).where(and(
+      eq(competitions.tenantId, tid),
+      eq(competitions.category, category)
+    ));
+    const compIds = comps.map(c => c.id);
+    if (compIds.length > 0) {
+      const [result] = await db.select({ count: sql<number>`count(*)` })
+        .from(sales)
+        .where(and(
+          eq(sales.tenantId, tid),
+          eq(sales.status, 'approved'),
+          inArray(sales.competitionId, compIds),
+          gte(sales.createdAt, monthStart),
+          lt(sales.createdAt, monthEnd)
+        ));
+      realCount = Number(result?.count || 0);
+    }
+  }
+  
+  // Atualizar a meta com o valor real
+  const [goal] = await db.select().from(goals).where(eq(goals.id, goalId)).limit(1);
+  if (!goal) return;
+  
+  if (goal.currentValue !== realCount) {
+    const achieved = realCount >= goal.targetValue;
+    await db.update(goals).set({
+      currentValue: realCount,
+      achieved,
+    }).where(eq(goals.id, goalId));
+    console.log(`[GoalSync] Meta ${goalId} sincronizada: ${goal.currentValue} → ${realCount} (${category}, ${month}/${year})`);
+  }
+  
+  return { goalId, currentValue: realCount, achieved: realCount >= goal.targetValue };
+}
+
 // Auto-incrementar meta da loja quando venda é aprovada
 // Determina a categoria da venda pela competição associada ou default "vendas"
 export async function autoUpdateStoreGoal(saleCategory: string, month: number, year: number, amount: number = 1) {
   const db = await getDb();
   if (!db) return;
+  const tid = getCurrentTenantId();
   // Buscar meta da loja do mês/ano/categoria
   const [goal] = await db.select().from(goals)
     .where(and(
+      eq(goals.tenantId, tid),
       eq(goals.type, 'store'),
       eq(goals.month, month),
       eq(goals.year, year),
@@ -778,13 +841,9 @@ export async function autoUpdateStoreGoal(saleCategory: string, month: number, y
     ))
     .limit(1);
   if (!goal) return; // Sem meta cadastrada para essa categoria/mês
-  const newValue = Math.max(0, goal.currentValue + amount);
-  const achieved = newValue >= goal.targetValue;
-  await db.update(goals).set({
-    currentValue: newValue,
-    achieved,
-  }).where(eq(goals.id, goal.id));
-  return { goalId: goal.id, newValue, achieved };
+  // Em vez de incrementar, sincronizar com vendas reais para garantir precisão
+  const synced = await syncStoreGoalProgress(goal.id, month, year, saleCategory);
+  return synced ? { goalId: goal.id, newValue: synced.currentValue, achieved: synced.achieved } : undefined;
 }
 
 // ===== RANKING / DASHBOARD =====

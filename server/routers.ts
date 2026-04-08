@@ -2067,6 +2067,19 @@ export const appRouter = router({
       category: z.string().optional(),
     }).optional()).query(async ({ input, ctx }) => {
       const allGoals = await db.listGoals(input || {});
+      // Sincronizar metas da loja com vendas reais (garante que currentValue esteja sempre correto)
+      const storeGoals = allGoals.filter((g: any) => g.type === 'store');
+      for (const sg of storeGoals) {
+        try {
+          const synced = await db.syncStoreGoalProgress(sg.id, sg.month, sg.year, sg.category);
+          if (synced && synced.currentValue !== sg.currentValue) {
+            (sg as any).currentValue = synced.currentValue;
+            (sg as any).achieved = synced.achieved;
+          }
+        } catch (e) {
+          console.error(`[GoalSync] Erro ao sincronizar meta ${sg.id}:`, e);
+        }
+      }
       // Se o usuário é vendedor logado, filtrar: mostra metas da loja + apenas a meta individual dele (gerente vê tudo)
       const privacySellerId = await getPrivacySellerId(ctx);
       if (privacySellerId) {

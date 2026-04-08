@@ -2118,3 +2118,5 @@
 - [x] Bug transfer loop: MAX_AUTO_TRANSFERS=3 já funciona via contagem de atividades
 - [x] Visual: reorganizar abas do CRM Admin com seções (Principal, Vendas, IA & Marketing, Equipe)
 - [x] Cruzar dados da IA com fichas F&I — convertAiDataToFicha implementado
+
+- [x] Bug: Vendas registradas não aparecem na contagem da meta da loja (mostra 0/45 quando deveria contar as vendas do mês) - corrigido com sincronização automática baseada em vendas reais
