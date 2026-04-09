@@ -414,6 +414,13 @@
       "when": 1775664074844,
       "tag": "0058_closed_enchantress",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "5",
+      "when": 1775752303647,
+      "tag": "0059_green_green_goblin",
+      "breakpoints": true
     }
   ]
 }

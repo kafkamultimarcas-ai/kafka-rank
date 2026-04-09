@@ -1331,3 +1331,45 @@ export const feiraoEditions = mysqlTable("feirao_editions", {
 });
 export type FeiraoEdition = typeof feiraoEditions.$inferSelect;
 export type InsertFeiraoEdition = typeof feiraoEditions.$inferInsert;
+
+
+// ===== CUSTO POR VEÍCULO =====
+export const vehicleCosts = mysqlTable("vehicle_costs", {
+  id: int("id").autoincrement().primaryKey(),
+  plate: varchar("plate", { length: 20 }).notNull(), // placa do veículo
+  brand: varchar("brand", { length: 100 }), // marca (ex: Chevrolet)
+  model: varchar("model", { length: 200 }), // modelo (ex: Onix 1.0 LT)
+  year: int("year"), // ano do modelo
+  color: varchar("color", { length: 50 }), // cor (opcional)
+  fuel: varchar("fuel", { length: 50 }), // combustível (Gasolina, Flex, Diesel)
+  fipeCode: varchar("fipeCode", { length: 30 }), // código FIPE
+  fipeValue: decimal("fipeValue", { precision: 12, scale: 2 }), // valor FIPE consultado
+  purchasePrice: decimal("purchasePrice", { precision: 12, scale: 2 }), // valor de compra
+  salePrice: decimal("salePrice", { precision: 12, scale: 2 }), // valor de venda (quando vendido)
+  entryDate: bigint("entryDate", { mode: "number" }), // data de entrada (timestamp)
+  saleDate: bigint("saleDate", { mode: "number" }), // data de venda (timestamp)
+  photoUrl: text("photoUrl"), // foto principal do veículo
+  photoKey: varchar("photoKey", { length: 500 }),
+  status: mysqlEnum("vehicleStatus", ["in_stock", "sold", "reserved"]).default("in_stock").notNull(),
+  notes: text("notes"), // observações
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+export type VehicleCost = typeof vehicleCosts.$inferSelect;
+export type InsertVehicleCost = typeof vehicleCosts.$inferInsert;
+
+// Itens de custo por veículo (gastos individuais)
+export const vehicleCostItems = mysqlTable("vehicle_cost_items", {
+  id: int("id").autoincrement().primaryKey(),
+  vehicleId: int("vehicleId").notNull(), // FK para vehicle_costs.id
+  description: varchar("description", { length: 255 }).notNull(), // descrição do gasto
+  category: varchar("category", { length: 100 }), // categoria (mecânica, funilaria, documentação, estética, outros)
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(), // valor do gasto
+  date: bigint("date", { mode: "number" }), // data do gasto (timestamp)
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+export type VehicleCostItem = typeof vehicleCostItems.$inferSelect;
+export type InsertVehicleCostItem = typeof vehicleCostItems.$inferInsert;

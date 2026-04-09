@@ -29,6 +29,8 @@ import {
   feiAuditLogs, InsertFeiAuditLog,
   sellerPermissions, InsertSellerPermission,
   feiraoEditions, InsertFeiraoEdition,
+  vehicleCosts, InsertVehicleCost,
+  vehicleCostItems, InsertVehicleCostItem,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -3212,3 +3214,90 @@ export async function initDefaultSellerPermissions(sellerId: number, department:
 }
 
 export { DEFAULT_MODULES as SELLER_PERMISSION_MODULES };
+
+
+// ===== CUSTO POR VEÍCULO =====
+export async function listVehicleCosts(filters?: { search?: string; status?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [eq(vehicleCosts.tenantId, getCurrentTenantId())];
+  if (filters?.status && filters.status !== 'all') conditions.push(eq(vehicleCosts.status, filters.status as any));
+  
+  let records = await db.select().from(vehicleCosts).where(and(...conditions)).orderBy(desc(vehicleCosts.createdAt));
+  
+  // Busca textual por placa, marca, modelo
+  if (filters?.search) {
+    const s = filters.search.toLowerCase();
+    records = records.filter(r => 
+      r.plate?.toLowerCase().includes(s) ||
+      r.brand?.toLowerCase().includes(s) ||
+      r.model?.toLowerCase().includes(s) ||
+      r.color?.toLowerCase().includes(s)
+    );
+  }
+  return records;
+}
+
+export async function getVehicleCostById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.select().from(vehicleCosts).where(and(eq(vehicleCosts.tenantId, getCurrentTenantId()), eq(vehicleCosts.id, id)));
+  return result || null;
+}
+
+export async function createVehicleCost(data: Omit<InsertVehicleCost, 'tenantId'>) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(vehicleCosts).values({ ...data, tenantId: getCurrentTenantId() });
+  return result.insertId;
+}
+
+export async function updateVehicleCost(id: number, data: Partial<InsertVehicleCost>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(vehicleCosts).set(data as any).where(and(eq(vehicleCosts.tenantId, getCurrentTenantId()), eq(vehicleCosts.id, id)));
+}
+
+export async function deleteVehicleCost(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  // Deletar itens de custo associados primeiro
+  await db.delete(vehicleCostItems).where(and(eq(vehicleCostItems.tenantId, getCurrentTenantId()), eq(vehicleCostItems.vehicleId, id)));
+  await db.delete(vehicleCosts).where(and(eq(vehicleCosts.tenantId, getCurrentTenantId()), eq(vehicleCosts.id, id)));
+}
+
+// Itens de custo
+export async function listVehicleCostItems(vehicleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(vehicleCostItems).where(and(eq(vehicleCostItems.tenantId, getCurrentTenantId()), eq(vehicleCostItems.vehicleId, vehicleId))).orderBy(desc(vehicleCostItems.createdAt));
+}
+
+export async function createVehicleCostItem(data: Omit<InsertVehicleCostItem, 'tenantId'>) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(vehicleCostItems).values({ ...data, tenantId: getCurrentTenantId() });
+  return result.insertId;
+}
+
+export async function updateVehicleCostItem(id: number, data: Partial<InsertVehicleCostItem>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(vehicleCostItems).set(data as any).where(and(eq(vehicleCostItems.tenantId, getCurrentTenantId()), eq(vehicleCostItems.id, id)));
+}
+
+export async function deleteVehicleCostItem(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(vehicleCostItems).where(and(eq(vehicleCostItems.tenantId, getCurrentTenantId()), eq(vehicleCostItems.id, id)));
+}
+
+export async function getVehicleCostSummary(vehicleId: number) {
+  const db = await getDb();
+  if (!db) return { totalCosts: 0, itemCount: 0 };
+  const [result] = await db.select({
+    total: sql<string>`COALESCE(SUM(${vehicleCostItems.amount}), 0)`,
+    count: sql<number>`COUNT(*)`,
+  }).from(vehicleCostItems).where(and(eq(vehicleCostItems.tenantId, getCurrentTenantId()), eq(vehicleCostItems.vehicleId, vehicleId)));
+  return { totalCosts: parseFloat(String(result?.total || '0')), itemCount: Number(result?.count || 0) };
+}

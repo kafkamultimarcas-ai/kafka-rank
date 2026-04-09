@@ -25,6 +25,7 @@ import { inventoryRouter } from "./routers/inventoryRouter";
 import { whatsappRouter } from "./routers/whatsappRouter";
 import { managerMentorRouter } from "./routers/managerMentorRouter";
 import { superAdminRouter } from "./routers/superAdminRouter";
+import { vehicleCostRouter } from "./routers/vehicleCostRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import bcrypt from "bcryptjs";
@@ -2142,6 +2143,8 @@ export const appRouter = router({
   }),
 
   // ===== DISPARO WHATSAPP PARA AGENDAMENTOS =====
+  vehicleCosts: vehicleCostRouter,
+
   appointmentDispatch: router({
     // Preview: buscar destinatários com filtros
     preview: adminProcedure

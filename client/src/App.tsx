@@ -35,6 +35,7 @@ const AdminIAM = lazy(() => import("./pages/admin/AdminIAM"));
 const AdminDocumentos = lazy(() => import("./pages/admin/AdminDocumentos"));
 const AdminInventory = lazy(() => import("./pages/admin/AdminInventory"));
 const AdminMonthTurnover = lazy(() => import("./pages/admin/AdminMonthTurnover"));
+const AdminVehicleCosts = lazy(() => import("./pages/admin/AdminVehicleCosts"));
 const Aniversariantes = lazy(() => import("./pages/admin/Aniversariantes"));
 
 const CompetitionView = lazy(() => import("./pages/CompetitionView"));
@@ -111,6 +112,8 @@ function Router() {
         <Route path="/admin/documentos" component={AdminDocumentos} />
         <Route path="/admin/estoque" component={AdminInventory} />
         <Route path="/admin/virada-mes" component={AdminMonthTurnover} />
+        <Route path="/admin/custo-veiculo" component={AdminVehicleCosts} />
+        <Route path="/admin/custo-veiculo/:id" component={AdminVehicleCosts} />
         <Route path="/admin/aniversariantes" component={Aniversariantes} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />

@@ -2171,3 +2171,23 @@
 
 ### Bug IA Atendente (09/04)
 - [x] Bug CRÍTICO: IA Atendente respondendo mensagens mesmo com toggle desativado - corrigido: auto-reply simples agora respeita o toggle global
+
+### Custo por Veículo + Consulta FIPE (09/04)
+- [x] Schema: tabela vehicleCosts (placa, marca, modelo, ano, cor, dataEntrada, valorCompra, valorVenda, fipeValue, fotos, status)
+- [x] Schema: tabela vehicleCostItems (custos individuais: descrição, valor, data, categoria)
+- [x] Backend: CRUD veículos (criar, editar, excluir, listar com busca)
+- [x] Backend: CRUD custos por veículo (adicionar, editar, excluir gastos)
+- [x] Backend: integração API FIPE (marcas, modelos, anos, valores)
+- [x] Backend: OCR de placa por foto usando IA (LLM vision)
+- [x] Backend: consulta dados do veículo pela placa (via IA)
+- [x] Frontend: aba "Custo por Veículo" no admin com visual padrão do sistema
+- [x] Frontend: cards de veículo (compra, gastos, total, venda, lucro, margem com cores verde/amarelo/vermelho)
+- [x] Frontend: busca por placa, nome, modelo com lupa de pesquisa
+- [x] Frontend: cadastro manual (formulário flexível)
+- [x] Frontend: cadastro por foto (câmera/galeria + IA OCR + confirmação)
+- [x] Frontend: consulta FIPE integrada (pesquisa marca/modelo/ano)
+- [x] Frontend: lançamento de custos por veículo
+- [x] Frontend: upload de fotos do veículo
+- [x] Fallback: se IA falhar, direcionar para cadastro manual com dados parciais
+- [x] Regra: nunca cadastrar automaticamente sem confirmação do usuário
+- [x] Testes unitários completos (13 testes passando)

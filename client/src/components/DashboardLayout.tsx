@@ -53,6 +53,7 @@ const menuItems = [
   { icon: Bot, label: "Ajustar IA", path: "/admin/iam" },
   { icon: FileText, label: "Documentos", path: "/admin/documentos" },
   { icon: Car, label: "Estoque", path: "/admin/estoque" },
+  { icon: Car, label: "Custo por Veículo", path: "/admin/custo-veiculo" },
   { icon: CalendarDays, label: "Virada de Mês", path: "/admin/virada-mes" },
   { icon: Cake, label: "Aniversariantes", path: "/admin/aniversariantes" },
 ];
