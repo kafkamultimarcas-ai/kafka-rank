@@ -2141,6 +2141,122 @@ export const appRouter = router({
     }),
   }),
 
+  // ===== DISPARO WHATSAPP PARA AGENDAMENTOS =====
+  appointmentDispatch: router({
+    // Preview: buscar destinatários com filtros
+    preview: adminProcedure
+      .input(z.object({
+        type: z.enum(['feirao', 'normal', 'all']).default('all'),
+        editionId: z.number().optional(),
+        startDate: z.number().optional(),
+        endDate: z.number().optional(),
+        status: z.enum(['attended', 'no_show', 'pending', 'all']).default('all'),
+        sellerId: z.number().optional(),
+        excludeBuyers: z.boolean().default(true),
+      }))
+      .query(async ({ input }) => {
+        const records = await db.getAppointmentsForDispatch(input);
+        // Buscar nomes dos vendedores
+        const allSellers = await db.listSellers();
+        const sellerMap = new Map(allSellers.map(s => [s.id, s.name]));
+        return records.map(r => ({
+          id: r.id,
+          customerName: r.customerName,
+          customerPhone: r.customerPhone,
+          vehicleInterest: r.vehicleInterest,
+          sellerName: sellerMap.get(r.sellerId) || 'Desconhecido',
+          scheduledDate: r.scheduledDate,
+          attendanceStatus: r.attendanceStatus,
+          isFeirão: r.isFeirão,
+        }));
+      }),
+
+    // Disparar mensagens
+    send: adminProcedure
+      .input(z.object({
+        type: z.enum(['feirao', 'normal', 'all']).default('all'),
+        editionId: z.number().optional(),
+        startDate: z.number().optional(),
+        endDate: z.number().optional(),
+        status: z.enum(['attended', 'no_show', 'pending', 'all']).default('all'),
+        sellerId: z.number().optional(),
+        excludeBuyers: z.boolean().default(true),
+        message: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        const records = await db.getAppointmentsForDispatch(input);
+        if (records.length === 0) throw new Error('Nenhum destinatário encontrado com esses filtros');
+        if (records.length > 500) throw new Error('Máximo de 500 destinatários por disparo. Refine os filtros.');
+
+        const phones = records.map(r => r.customerPhone!.replace(/\D/g, '')).filter(p => p.length >= 10);
+        if (phones.length === 0) throw new Error('Nenhum telefone válido encontrado');
+
+        // Buscar nomes dos vendedores uma vez
+        const allSellersForMsg = await db.listSellers();
+        const sellerMapForMsg = new Map(allSellersForMsg.map(s => [s.id, s.name]));
+
+        // Personalizar mensagem para cada destinatário
+        const results: { sent: number; failed: number; errors: string[] } = { sent: 0, failed: 0, errors: [] };
+        const { sendText } = await import('./zapi-service');
+
+        for (let i = 0; i < records.length; i++) {
+          const r = records[i];
+          const phone = r.customerPhone?.replace(/\D/g, '');
+          if (!phone || phone.length < 10) { results.failed++; continue; }
+
+          let msg = input.message;
+          msg = msg.replace(/\{nome\}/gi, r.customerName || 'Cliente');
+          msg = msg.replace(/\{veiculo\}/gi, r.vehicleInterest || 'veículo');
+          msg = msg.replace(/\{vendedor\}/gi, sellerMapForMsg.get(r.sellerId) || 'consultor');
+
+          try {
+            const res = await sendText(phone, msg);
+            if (res.success) results.sent++;
+            else { results.failed++; results.errors.push(`${phone}: ${(res as any).error || 'erro'}`) }
+          } catch (e: any) {
+            results.failed++;
+            results.errors.push(`${phone}: ${e.message}`);
+          }
+
+          // Anti-ban: intervalo de 45s entre mensagens (com jitter +-20%)
+          if (i < records.length - 1) {
+            const baseDelay = 45000;
+            const jitter = baseDelay * 0.2;
+            const delay = baseDelay + (Math.random() * jitter * 2 - jitter);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+
+        // Log do disparo
+        try {
+          const dbConn = await db.getDbInstance();
+          if (dbConn) {
+            const { crmBulkSendLogs } = await import('../drizzle/schema');
+            await dbConn.insert(crmBulkSendLogs).values({
+              message: input.message,
+              totalRecipients: records.length,
+              sent: results.sent,
+              failed: results.failed,
+              errors: JSON.stringify(results.errors.slice(0, 20)),
+              createdAt: Date.now(),
+            });
+          }
+        } catch (e) { console.error('[DispatchLog]', e); }
+
+        return results;
+      }),
+
+    // Listar edições disponíveis para filtro
+    editions: adminProcedure.query(async () => {
+      return db.listFeiraoEditions();
+    }),
+
+    // Listar vendedores para filtro
+    sellers: adminProcedure.query(async () => {
+      return db.listSellers();
+    }),
+  }),
+
   // ===== GOALS (METAS) =====
   goals: router({
     list: publicProcedure.input(z.object({

@@ -1096,6 +1096,20 @@ export function registerWebhookRoutes(app: Express) {
                 }
                 // === END AI ATTENDANT CHECK ===
 
+                // Check GLOBAL AI toggle - if attendant is disabled globally, stop ALL auto-replies
+                try {
+                  const globalToggle = await dbConn.execute(sql`SELECT attendantEnabled FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+                  const gtRaw = globalToggle as any;
+                  const gtRows = Array.isArray(gtRaw?.[0]) ? gtRaw[0] : gtRaw;
+                  if (gtRows && gtRows.length > 0 && !gtRows[0].attendantEnabled) {
+                    console.log(`[AI Auto-Reply] Global AI toggle is OFF - skipping all auto-replies`);
+                    releaseAiLock(leadIdForAi);
+                    return;
+                  }
+                } catch (toggleErr) {
+                  console.error(`[AI Auto-Reply] Error checking global toggle:`, toggleErr);
+                }
+
                 // Check per-lead AI setting FIRST (individual toggle)
                 // This catches leads where AI was disabled by: human takeover, message limit, or manual toggle
                 const aiResult = await dbConn.execute(sql`SELECT enabled FROM crm_ai_settings WHERE leadId = ${existingLeads[0].id} LIMIT 1`);

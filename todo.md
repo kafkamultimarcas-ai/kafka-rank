@@ -2158,3 +2158,16 @@
 - [x] Validar que edições não tenham datas sobrepostas
 - [x] Agendamentos normais (não-feirão) continuam sem restrição de datas - testado e confirmado
 - [x] Testes: criar edição, agendar dentro/fora do período, verificar ranking e competição - 8/8 testes passaram
+
+### Disparo WhatsApp para Agendamentos (09/04)
+- [x] Sistema de disparo em massa de WhatsApp para agendamentos
+- [x] Filtro por data/período (ex: agendamentos de 10/04 a 12/04)
+- [x] Filtro por edição de feirão (Ed. 39, Ed. 40, etc.)
+- [x] Filtro por status (vieram, não vieram, pendentes, todos)
+- [x] Filtro por tipo (feirão vs normal)
+- [x] Mensagem personalizável antes do disparo
+- [x] Evitar disparo para clientes que já compraram
+- [x] Testes completos antes da entrega (12 testes passando)
+
+### Bug IA Atendente (09/04)
+- [x] Bug CRÍTICO: IA Atendente respondendo mensagens mesmo com toggle desativado - corrigido: auto-reply simples agora respeita o toggle global

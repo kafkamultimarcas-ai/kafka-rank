@@ -12,6 +12,7 @@ import {
   Timer, Siren, Flame, Printer, Bot, ArrowRightLeft, RotateCcw, Download,
 } from "lucide-react";
 import { exportAgendamentosPDF } from "@/lib/pdfExport";
+import DispatchAgendamentos from "./DispatchAgendamentos";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
@@ -40,6 +41,7 @@ export default function AdminAgendamentos() {
   const [transferSellerId, setTransferSellerId] = useState<number>(0);
   const [rescueSendingId, setRescueSendingId] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState<string>("current");
+  const [showDispatch, setShowDispatch] = useState(false);
 
   // Live clock for countdown
   useEffect(() => {
@@ -262,6 +264,10 @@ function formatDateShort(ts: number | string | Date | null) {
             <h1 className="text-2xl font-bold font-heading">Agendamentos</h1>
           </div>
           <div className="flex items-center gap-2 text-sm flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => setShowDispatch(true)} className="gap-1.5 border-green-500 text-green-400 hover:bg-green-500/20">
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">Disparar WhatsApp</span>
+            </Button>
             <Button size="sm" variant="outline" onClick={handleExportPdf} className="gap-1.5 border-emerald-500 text-emerald-400 hover:bg-emerald-500/20">
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">Baixar PDF</span>
@@ -280,6 +286,11 @@ function formatDateShort(ts: number | string | Date | null) {
             )}
           </div>
         </div>
+
+        {/* Tela de Disparo */}
+        {showDispatch && (
+          <DispatchAgendamentos onClose={() => setShowDispatch(false)} />
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2">

@@ -1,4 +1,4 @@
-import { eq, desc, and, or, sql, inArray, gte, lt, isNotNull } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray, gte, lt, lte, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -2581,6 +2581,63 @@ export function isDateWithinEdition(scheduledDate: number, edition: { startDate:
 }
 
 // Verifica se datas de nova edição sobrepõem com edições existentes
+// ===== DISPARO WHATSAPP PARA AGENDAMENTOS =====
+export async function getAppointmentsForDispatch(filters: {
+  type?: 'feirao' | 'normal' | 'all';
+  editionId?: number;
+  startDate?: number;
+  endDate?: number;
+  status?: 'attended' | 'no_show' | 'pending' | 'all';
+  sellerId?: number;
+  excludeBuyers?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(sdrRecords.tenantId, getCurrentTenantId()), eq(sdrRecords.type, 'agendamento')];
+  
+  // Filtro por tipo (feirão/normal/todos)
+  if (filters.type === 'feirao') conditions.push(eq(sdrRecords.isFeirão, true));
+  else if (filters.type === 'normal') conditions.push(eq(sdrRecords.isFeirão, false));
+  
+  // Filtro por edição do feirão
+  if (filters.editionId) conditions.push(eq(sdrRecords.feiraoEditionId, filters.editionId));
+  
+  // Filtro por período (data do agendamento)
+  if (filters.startDate) conditions.push(gte(sdrRecords.scheduledDate, filters.startDate));
+  if (filters.endDate) conditions.push(lte(sdrRecords.scheduledDate, filters.endDate));
+  
+  // Filtro por status de comparecimento
+  if (filters.status === 'attended') conditions.push(eq(sdrRecords.attendanceStatus, 'attended'));
+  else if (filters.status === 'no_show') conditions.push(eq(sdrRecords.attendanceStatus, 'no_show'));
+  else if (filters.status === 'pending') conditions.push(or(eq(sdrRecords.attendanceStatus, 'pending'), isNull(sdrRecords.attendanceStatus)) as any);
+  
+  // Filtro por vendedor
+  if (filters.sellerId) conditions.push(eq(sdrRecords.sellerId, filters.sellerId));
+  
+  let records = await db.select().from(sdrRecords).where(and(...conditions)).orderBy(desc(sdrRecords.createdAt));
+  
+  // Excluir quem já comprou (cruzar telefone com vendas aprovadas)
+  if (filters.excludeBuyers) {
+    const approvedSales = await db.select({ phone: sales.customerPhone }).from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.status, 'approved')));
+    const buyerPhones = new Set(approvedSales.map(s => s.phone?.replace(/\D/g, '')).filter(Boolean));
+    records = records.filter(r => {
+      const phone = r.customerPhone?.replace(/\D/g, '');
+      return phone && !buyerPhones.has(phone);
+    });
+  }
+  
+  // Remover duplicatas de telefone (manter o mais recente)
+  const seen = new Set<string>();
+  records = records.filter(r => {
+    const phone = r.customerPhone?.replace(/\D/g, '');
+    if (!phone || seen.has(phone)) return false;
+    seen.add(phone);
+    return true;
+  });
+  
+  return records;
+}
+
 export async function checkEditionOverlap(startDate: number, endDate: number, excludeId?: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
