@@ -3,6 +3,7 @@ import { z } from "zod";
 import * as crmDb from "../crmDb";
 import * as db from "../db";
 import { getDb } from "../db";
+import { invokeLLM } from "../_core/llm";
 import {
   crmMessageTemplates, InsertCrmMessageTemplate,
   crmFollowUpTasks, InsertCrmFollowUpTask,
@@ -496,6 +497,150 @@ export const crmFipeRouter = router({
       return res.json();
     } catch {
       return null;
+    }
+  }),
+  // ===== CONSULTA POR PLACA (IA) =====
+  lookupByPlate: publicProcedure.input(z.object({
+    plate: z.string().min(5).max(10),
+  })).mutation(async ({ input }) => {
+    const cleanPlate = input.plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    
+    // Usar IA para identificar marca, modelo, ano a partir da placa
+    const response = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `Você é um especialista em veículos brasileiros. Dado uma placa de veículo, identifique a marca, modelo, ano e versão do veículo.
+
+IMPORTANTE: Use seu conhecimento sobre o padrão de placas brasileiras:
+- Placas antigas: ABC-1234 (3 letras + 4 números)
+- Placas Mercosul: ABC1D23 (4 letras + 3 números intercalados)
+
+A partir da placa, identifique o veículo. Se não conseguir identificar com certeza pela placa, retorne os dados mais prováveis baseado no padrão.
+
+Resposta APENAS em JSON válido:
+{
+  "plate": "ABC1234",
+  "brand": "Chevrolet",
+  "brandFipe": "GM - Chevrolet",
+  "model": "Onix 1.0 LT",
+  "year": 2022,
+  "fuel": "Flex",
+  "color": "Prata",
+  "confidence": "high",
+  "error": null
+}
+
+Se não conseguir identificar, retorne:
+{"plate": "ABC1234", "brand": null, "brandFipe": null, "model": null, "year": null, "fuel": null, "color": null, "confidence": "low", "error": "Não foi possível identificar o veículo pela placa"}`
+        },
+        {
+          role: "user",
+          content: `Identifique o veículo com a placa: ${cleanPlate}`
+        }
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "vehicle_lookup",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              plate: { type: "string", description: "Placa formatada" },
+              brand: { type: ["string", "null"], description: "Marca do veículo" },
+              brandFipe: { type: ["string", "null"], description: "Nome da marca na FIPE" },
+              model: { type: ["string", "null"], description: "Modelo do veículo" },
+              year: { type: ["integer", "null"], description: "Ano do veículo" },
+              fuel: { type: ["string", "null"], description: "Combustível" },
+              color: { type: ["string", "null"], description: "Cor" },
+              confidence: { type: "string", description: "high, medium, low" },
+              error: { type: ["string", "null"], description: "Mensagem de erro" },
+            },
+            required: ["plate", "brand", "brandFipe", "model", "year", "fuel", "color", "confidence", "error"],
+            additionalProperties: false,
+          },
+        },
+      },
+    });
+
+    const rawContent = response.choices?.[0]?.message?.content;
+    const content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
+    if (!content) throw new Error("IA não retornou resposta");
+    
+    try {
+      const parsed = JSON.parse(content);
+      
+      // Se a IA identificou marca e modelo, tentar buscar o valor FIPE automaticamente
+      if (parsed.brand && parsed.model && parsed.year) {
+        try {
+          // Buscar marcas
+          const brandsRes = await fetch('https://parallelum.com.br/fipe/api/v1/carros/marcas');
+          const brands = await brandsRes.json();
+          
+          // Encontrar a marca mais próxima
+          const brandMatch = brands.find((b: any) => {
+            const bName = b.nome.toLowerCase();
+            const pBrand = (parsed.brandFipe || parsed.brand).toLowerCase();
+            return bName.includes(pBrand) || pBrand.includes(bName) || 
+                   bName.split(' ').some((w: string) => pBrand.includes(w)) ||
+                   pBrand.split(' ').some((w: string) => bName.includes(w));
+          });
+          
+          if (brandMatch) {
+            parsed.fipeBrandCode = brandMatch.codigo;
+            parsed.fipeBrandName = brandMatch.nome;
+            
+            // Buscar modelos
+            const modelsRes = await fetch(`https://parallelum.com.br/fipe/api/v1/carros/marcas/${brandMatch.codigo}/modelos`);
+            const modelsData = await modelsRes.json();
+            
+            // Encontrar modelo mais próximo
+            const modelName = parsed.model.toLowerCase();
+            const modelMatch = modelsData.modelos?.find((m: any) => {
+              const mName = m.nome.toLowerCase();
+              return mName.includes(modelName) || modelName.includes(mName) ||
+                     modelName.split(' ').some((w: string) => w.length > 2 && mName.includes(w));
+            });
+            
+            if (modelMatch) {
+              parsed.fipeModelCode = modelMatch.codigo.toString();
+              parsed.fipeModelName = modelMatch.nome;
+              
+              // Buscar anos
+              const yearsRes = await fetch(`https://parallelum.com.br/fipe/api/v1/carros/marcas/${brandMatch.codigo}/modelos/${modelMatch.codigo}/anos`);
+              const years = await yearsRes.json();
+              
+              // Encontrar ano mais próximo
+              const yearMatch = years.find((y: any) => y.nome.includes(String(parsed.year)));
+              
+              if (yearMatch) {
+                parsed.fipeYearCode = yearMatch.codigo;
+                
+                // Buscar preço FIPE
+                const priceRes = await fetch(`https://parallelum.com.br/fipe/api/v1/carros/marcas/${brandMatch.codigo}/modelos/${modelMatch.codigo}/anos/${yearMatch.codigo}`);
+                const priceData = await priceRes.json();
+                
+                if (priceData.Valor) {
+                  parsed.fipeValue = priceData.Valor;
+                  parsed.fipeCode = priceData.CodigoFipe;
+                  parsed.fipeRef = priceData.MesReferencia;
+                  parsed.fipeFuel = priceData.Combustivel;
+                  parsed.fipeFullName = `${priceData.Marca} ${priceData.Modelo}`;
+                  parsed.fipeYear = priceData.AnoModelo;
+                }
+              }
+            }
+          }
+        } catch (fipeErr) {
+          // Se falhar a busca FIPE, retorna os dados da IA sem o valor FIPE
+          console.error('Erro ao buscar FIPE:', fipeErr);
+        }
+      }
+      
+      return parsed;
+    } catch {
+      throw new Error("Erro ao processar resposta da IA");
     }
   }),
 });

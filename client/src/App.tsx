@@ -58,6 +58,7 @@ const GerentePanel = lazy(() => import("./pages/GerentePanel"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
+const ConsultaFipePlaca = lazy(() => import("./pages/ConsultaFipePlaca"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -131,6 +132,7 @@ function Router() {
         <Route path="/ficha-financiamento" component={FichaFinanciamento} />
         <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/estoque" component={Estoque} />
+        <Route path="/consulta-fipe" component={ConsultaFipePlaca} />
         <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/gerente" component={GerentePanel} />
         <Route path="/super-admin" component={SuperAdmin} />

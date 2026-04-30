@@ -2191,3 +2191,10 @@
 - [x] Fallback: se IA falhar, direcionar para cadastro manual com dados parciais
 - [x] Regra: nunca cadastrar automaticamente sem confirmação do usuário
 - [x] Testes unitários completos (13 testes passando)
+
+### Consulta FIPE por Placa na Tela Principal (09/04)
+- [x] Backend: procedure para consultar veículo por placa (usando IA para identificar marca/modelo/ano) e buscar FIPE automaticamente
+- [x] Frontend: adicionar consulta FIPE por placa na tela principal dos vendedores (campo de placa + botão consultar)
+- [x] Suporte a placa Mercosul e formato antigo
+- [x] Limpar veículos de teste do banco de dados (banco já estava vazio)
+- [x] Testes unitários para consulta por placa (incluídos nos 13 testes do vehicleCost)

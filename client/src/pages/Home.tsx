@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar } from "lucide-react";
+import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar, Search } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -236,6 +236,9 @@ export default function Home() {
               )}
               <Button variant="outline" size="sm" onClick={() => setLocation("/ficha-financiamento")} className="gap-2 border-blue-600 text-blue-400 hover:bg-blue-600/10">
                 <DollarSign className="h-4 w-4" /> Financiamento
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setLocation("/consulta-fipe")} className="gap-2 border-yellow-600 text-yellow-400 hover:bg-yellow-600/10">
+                <Search className="h-4 w-4" /> Consulta FIPE
               </Button>
               {sellerSession ? (
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
