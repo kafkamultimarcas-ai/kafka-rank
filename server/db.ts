@@ -3225,14 +3225,15 @@ export async function listVehicleCosts(filters?: { search?: string; status?: str
   
   let records = await db.select().from(vehicleCosts).where(and(...conditions)).orderBy(desc(vehicleCosts.createdAt));
   
-  // Busca textual por placa, marca, modelo
+  // Busca textual por placa, marca, modelo, cliente
   if (filters?.search) {
     const s = filters.search.toLowerCase();
     records = records.filter(r => 
       r.plate?.toLowerCase().includes(s) ||
       r.brand?.toLowerCase().includes(s) ||
       r.model?.toLowerCase().includes(s) ||
-      r.color?.toLowerCase().includes(s)
+      r.color?.toLowerCase().includes(s) ||
+      r.clientName?.toLowerCase().includes(s)
     );
   }
   return records;

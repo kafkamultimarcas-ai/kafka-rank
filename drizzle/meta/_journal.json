@@ -421,6 +421,13 @@
       "when": 1775752303647,
       "tag": "0059_green_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "5",
+      "when": 1777994866928,
+      "tag": "0060_damp_mad_thinker",
+      "breakpoints": true
     }
   ]
 }

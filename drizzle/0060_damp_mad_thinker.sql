@@ -1,0 +1,1 @@
+ALTER TABLE `vehicle_costs` ADD `clientName` varchar(255);

@@ -2198,3 +2198,11 @@
 - [x] Suporte a placa Mercosul e formato antigo
 - [x] Limpar veículos de teste do banco de dados (banco já estava vazio)
 - [x] Testes unitários para consulta por placa (incluídos nos 13 testes do vehicleCost)
+
+### Melhorias Custo por Veículo (05/05)
+- [x] Remover aba "Por Placa" da consulta FIPE (manter só marca/modelo/ano)
+- [x] Adicionar campo "Nome do Cliente" no cadastro de veículo
+- [x] Permitir edição de veículos já cadastrados (todos os campos)
+- [x] Permitir edição/exclusão de custos lançados
+- [x] Formatação automática de valores monetários (50000 → R$ 50.000,00)
+- [x] Corrigir valores existentes que estão sem formatação (formatação agora é automática no onBlur)

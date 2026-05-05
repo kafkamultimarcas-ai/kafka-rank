@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, Edit, Trash2, Plus, DollarSign, Car, Loader2, TrendingUp, TrendingDown, Minus, Camera } from "lucide-react";
+import { ChevronLeft, Edit, Trash2, Plus, DollarSign, Car, Loader2, TrendingUp, TrendingDown, Minus, Camera, User } from "lucide-react";
 
 function formatCurrency(value: number | string | null | undefined): string {
   const num = typeof value === "string" ? parseFloat(value) : (value || 0);
@@ -33,6 +33,45 @@ function getMarginColor(margin: number | null): string {
   if (margin >= 10) return "text-green-500";
   if (margin >= 5) return "text-yellow-500";
   return "text-red-500";
+}
+
+// Formatação de moeda
+function formatCurrencyInput(value: string): string {
+  if (!value) return '';
+  let clean = value.replace(/[^0-9.,]/g, '');
+  if (clean.includes(',') && !clean.includes('.')) {
+    const parts = clean.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      clean = parts[0].replace(/\./g, '') + '.' + parts[1];
+    } else {
+      clean = clean.replace(/[.,]/g, '');
+    }
+  } else if (clean.includes('.') && clean.includes(',')) {
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  }
+  const num = parseFloat(clean);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function currencyToNumber(value: string): string {
+  if (!value) return '';
+  let clean = value.replace(/[^0-9.,]/g, '');
+  if (clean.includes(',') && !clean.includes('.')) {
+    const parts = clean.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      clean = parts[0] + '.' + parts[1];
+    } else {
+      clean = clean.replace(',', '');
+    }
+  } else if (clean.includes('.') && clean.includes(',')) {
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  } else if (clean.split('.').length > 2) {
+    clean = clean.replace(/\./g, '');
+  }
+  const num = parseFloat(clean);
+  if (isNaN(num)) return '';
+  return num.toString();
 }
 
 const COST_CATEGORIES = [
@@ -83,7 +122,15 @@ function AddCostItemDialog({ open, onClose, vehicleId, onSuccess }: { open: bool
           </div>
           <div>
             <Label>Valor (R$) *</Label>
-            <Input type="number" step="0.01" placeholder="500.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            <Input
+              placeholder="500,00"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              onBlur={(e) => {
+                const formatted = formatCurrencyInput(e.target.value);
+                if (formatted) setForm({ ...form, amount: formatted });
+              }}
+            />
           </div>
           <div>
             <Label>Observações</Label>
@@ -93,11 +140,88 @@ function AddCostItemDialog({ open, onClose, vehicleId, onSuccess }: { open: bool
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
-            onClick={() => createMutation.mutate({ vehicleId, description: form.description, category: form.category || undefined, amount: form.amount, date: Date.now() })}
+            onClick={() => createMutation.mutate({ vehicleId, description: form.description, category: form.category || undefined, amount: currencyToNumber(form.amount) || form.amount, date: Date.now() })}
             disabled={!form.description || !form.amount || createMutation.isPending}
           >
             {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Adicionar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ===== EDIT COST ITEM DIALOG =====
+function EditCostItemDialog({ open, onClose, item, onSuccess }: { open: boolean; onClose: () => void; item: any; onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    description: item?.description || "",
+    category: item?.category || "",
+    amount: item?.amount ? parseFloat(String(item.amount)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "",
+    notes: item?.notes || "",
+  });
+
+  const updateMutation = trpc.vehicleCosts.updateItem.useMutation({
+    onSuccess: () => {
+      toast.success("Gasto atualizado!");
+      onSuccess();
+      onClose();
+    },
+    onError: (err) => toast.error("Erro: " + err.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Edit className="w-5 h-5" /> Editar Gasto</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Descrição *</Label>
+            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div>
+            <Label>Categoria</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>
+                {COST_CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Valor (R$) *</Label>
+            <Input
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              onBlur={(e) => {
+                const formatted = formatCurrencyInput(e.target.value);
+                if (formatted) setForm({ ...form, amount: formatted });
+              }}
+            />
+          </div>
+          <div>
+            <Label>Observações</Label>
+            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            onClick={() => updateMutation.mutate({
+              id: item.id,
+              description: form.description || undefined,
+              category: form.category || undefined,
+              amount: currencyToNumber(form.amount) || undefined,
+              notes: form.notes || undefined,
+            })}
+            disabled={!form.description || !form.amount || updateMutation.isPending}
+          >
+            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Salvar
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -114,9 +238,10 @@ function EditVehicleDialog({ open, onClose, vehicle, onSuccess }: { open: boolea
     year: vehicle?.year?.toString() || "",
     color: vehicle?.color || "",
     fuel: vehicle?.fuel || "",
-    purchasePrice: vehicle?.purchasePrice?.toString() || "",
-    salePrice: vehicle?.salePrice?.toString() || "",
+    purchasePrice: vehicle?.purchasePrice ? parseFloat(String(vehicle.purchasePrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "",
+    salePrice: vehicle?.salePrice ? parseFloat(String(vehicle.salePrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "",
     status: vehicle?.status || "in_stock",
+    clientName: vehicle?.clientName || "",
     notes: vehicle?.notes || "",
   });
 
@@ -131,7 +256,7 @@ function EditVehicleDialog({ open, onClose, vehicle, onSuccess }: { open: boolea
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Edit className="w-5 h-5" /> Editar Veículo</DialogTitle>
         </DialogHeader>
@@ -139,6 +264,10 @@ function EditVehicleDialog({ open, onClose, vehicle, onSuccess }: { open: boolea
           <div className="col-span-2">
             <Label>Placa</Label>
             <Input value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} />
+          </div>
+          <div className="col-span-2">
+            <Label>Nome do Cliente</Label>
+            <Input placeholder="Nome do cliente" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} />
           </div>
           <div>
             <Label>Marca</Label>
@@ -181,11 +310,27 @@ function EditVehicleDialog({ open, onClose, vehicle, onSuccess }: { open: boolea
           </div>
           <div>
             <Label>Valor de Compra (R$)</Label>
-            <Input type="number" step="0.01" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
+            <Input
+              placeholder="50.000,00"
+              value={form.purchasePrice}
+              onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
+              onBlur={(e) => {
+                const formatted = formatCurrencyInput(e.target.value);
+                if (formatted) setForm({ ...form, purchasePrice: formatted });
+              }}
+            />
           </div>
           <div>
             <Label>Valor de Venda (R$)</Label>
-            <Input type="number" step="0.01" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} />
+            <Input
+              placeholder="60.000,00"
+              value={form.salePrice}
+              onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
+              onBlur={(e) => {
+                const formatted = formatCurrencyInput(e.target.value);
+                if (formatted) setForm({ ...form, salePrice: formatted });
+              }}
+            />
           </div>
           <div className="col-span-2">
             <Label>Observações</Label>
@@ -204,9 +349,10 @@ function EditVehicleDialog({ open, onClose, vehicle, onSuccess }: { open: boolea
               color: form.color || undefined,
               fuel: form.fuel || undefined,
               status: form.status as any,
-              purchasePrice: form.purchasePrice || undefined,
-              salePrice: form.salePrice || undefined,
+              purchasePrice: currencyToNumber(form.purchasePrice) || undefined,
+              salePrice: currencyToNumber(form.salePrice) || undefined,
               saleDate: form.status === "sold" ? Date.now() : undefined,
+              clientName: form.clientName || undefined,
               notes: form.notes || undefined,
             })}
             disabled={updateMutation.isPending}
@@ -225,6 +371,7 @@ export default function VehicleDetail({ vehicleId, onBack }: { vehicleId: number
   const [showAddCost, setShowAddCost] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
 
   const utils = trpc.useUtils();
   const { data: vehicle, isLoading } = trpc.vehicleCosts.getById.useQuery({ id: vehicleId });
@@ -287,6 +434,11 @@ export default function VehicleDetail({ vehicleId, onBack }: { vehicleId: number
               {vehicle.brand} {vehicle.model} {vehicle.year}
             </h1>
             <p className="text-sm text-muted-foreground">Placa: {formatPlate(vehicle.plate)}</p>
+            {vehicle.clientName && (
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <User className="w-3 h-3" /> {vehicle.clientName}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
@@ -346,6 +498,12 @@ export default function VehicleDetail({ vehicleId, onBack }: { vehicleId: number
                 {vehicle.status === "in_stock" ? "Em Estoque" : vehicle.status === "sold" ? "Vendido" : "Reservado"}
               </p>
             </div>
+            {vehicle.clientName && (
+              <div>
+                <p className="text-muted-foreground">Cliente</p>
+                <p className="font-medium">{vehicle.clientName}</p>
+              </div>
+            )}
             <div>
               <p className="text-muted-foreground">Cor</p>
               <p className="font-medium">{vehicle.color || "-"}</p>
@@ -421,8 +579,16 @@ export default function VehicleDetail({ vehicleId, onBack }: { vehicleId: number
                       {item.notes ? ` — ${item.notes}` : ""}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <p className="font-bold text-red-400">{formatCurrency(item.amount)}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setEditingItem(item)}
+                    >
+                      <Edit className="w-3 h-3" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -451,6 +617,9 @@ export default function VehicleDetail({ vehicleId, onBack }: { vehicleId: number
 
       {/* Dialogs */}
       <AddCostItemDialog open={showAddCost} onClose={() => setShowAddCost(false)} vehicleId={vehicleId} onSuccess={handleRefresh} />
+      {editingItem && (
+        <EditCostItemDialog open={!!editingItem} onClose={() => setEditingItem(null)} item={editingItem} onSuccess={handleRefresh} />
+      )}
       {showEdit && vehicle && (
         <EditVehicleDialog open={showEdit} onClose={() => setShowEdit(false)} vehicle={vehicle} onSuccess={handleRefresh} />
       )}

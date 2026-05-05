@@ -44,15 +44,67 @@ function getMarginBadge(margin: number | null) {
 }
 
 // ===== CADASTRO MANUAL =====
+// Helper para formatar valor monetário ao digitar
+function parseCurrencyInput(value: string): string {
+  // Remove tudo exceto números e vírgula/ponto
+  const clean = value.replace(/[^0-9.,]/g, '');
+  // Se for só números (ex: 50000), retorna como está para ser convertido
+  return clean;
+}
+
+function formatCurrencyInput(value: string): string {
+  if (!value) return '';
+  // Remove formatação existente
+  let clean = value.replace(/[^0-9.,]/g, '');
+  // Converte vírgula para ponto se for separador decimal
+  if (clean.includes(',') && !clean.includes('.')) {
+    // Se tem vírgula seguida de 1-2 dígitos no final, é decimal
+    const parts = clean.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      clean = parts[0].replace(/\./g, '') + '.' + parts[1];
+    } else {
+      clean = clean.replace(/[.,]/g, '');
+    }
+  } else if (clean.includes('.') && clean.includes(',')) {
+    // Formato brasileiro: 50.000,00
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  }
+  const num = parseFloat(clean);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function currencyToNumber(value: string): string {
+  if (!value) return '';
+  // Remove pontos de milhar e troca vírgula por ponto
+  let clean = value.replace(/[^0-9.,]/g, '');
+  if (clean.includes(',') && !clean.includes('.')) {
+    const parts = clean.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      clean = parts[0] + '.' + parts[1];
+    } else {
+      clean = clean.replace(',', '');
+    }
+  } else if (clean.includes('.') && clean.includes(',')) {
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  } else if (clean.split('.').length > 2) {
+    // Múltiplos pontos = separador de milhar brasileiro
+    clean = clean.replace(/\./g, '');
+  }
+  const num = parseFloat(clean);
+  if (isNaN(num)) return '';
+  return num.toString();
+}
+
 function ManualRegisterDialog({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
   const [form, setForm] = useState({
     plate: "", brand: "", model: "", year: "", color: "", fuel: "",
-    purchasePrice: "", notes: "",
+    purchasePrice: "", clientName: "", notes: "",
   });
   const createMutation = trpc.vehicleCosts.create.useMutation({
     onSuccess: () => {
       toast.success("Veículo cadastrado com sucesso!");
-      setForm({ plate: "", brand: "", model: "", year: "", color: "", fuel: "", purchasePrice: "", notes: "" });
+      setForm({ plate: "", brand: "", model: "", year: "", color: "", fuel: "", purchasePrice: "", clientName: "", notes: "" });
       onSuccess();
       onClose();
     },
@@ -69,6 +121,10 @@ function ManualRegisterDialog({ open, onClose, onSuccess }: { open: boolean; onC
           <div className="col-span-2">
             <Label>Placa *</Label>
             <Input placeholder="ABC1D23" value={form.plate} onChange={(e) => setForm({ ...form, plate: e.target.value.toUpperCase() })} maxLength={8} />
+          </div>
+          <div className="col-span-2">
+            <Label>Nome do Cliente</Label>
+            <Input placeholder="Nome do cliente" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} />
           </div>
           <div>
             <Label>Marca</Label>
@@ -102,7 +158,15 @@ function ManualRegisterDialog({ open, onClose, onSuccess }: { open: boolean; onC
           </div>
           <div>
             <Label>Valor de Compra (R$)</Label>
-            <Input type="number" step="0.01" placeholder="50000.00" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} />
+            <Input 
+              placeholder="50.000,00" 
+              value={form.purchasePrice} 
+              onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
+              onBlur={(e) => {
+                const formatted = formatCurrencyInput(e.target.value);
+                if (formatted) setForm({ ...form, purchasePrice: formatted });
+              }}
+            />
           </div>
           <div className="col-span-2">
             <Label>Observações</Label>
@@ -119,7 +183,8 @@ function ManualRegisterDialog({ open, onClose, onSuccess }: { open: boolean; onC
               year: form.year ? parseInt(form.year) : undefined,
               color: form.color || undefined,
               fuel: form.fuel || undefined,
-              purchasePrice: form.purchasePrice || undefined,
+              purchasePrice: currencyToNumber(form.purchasePrice) || undefined,
+              clientName: form.clientName || undefined,
               entryDate: Date.now(),
             })}
             disabled={!form.plate || createMutation.isPending}
@@ -348,6 +413,7 @@ function VehicleCard({ vehicle, onClick }: { vehicle: any; onClick: () => void }
                 {vehicle.brand} {vehicle.model} {vehicle.year}
               </p>
               <p className="text-xs text-muted-foreground">Placa: {formatPlate(vehicle.plate)}</p>
+              {vehicle.clientName && <p className="text-xs text-muted-foreground">Cliente: {vehicle.clientName}</p>}
             </div>
           </div>
           <div className="flex items-center gap-1">

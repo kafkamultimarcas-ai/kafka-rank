@@ -82,6 +82,7 @@ export const vehicleCostRouter = router({
       purchasePrice: z.string().optional(),
       salePrice: z.string().optional(),
       entryDate: z.number().optional(),
+      clientName: z.string().optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -97,6 +98,7 @@ export const vehicleCostRouter = router({
         purchasePrice: input.purchasePrice || null,
         salePrice: input.salePrice || null,
         entryDate: input.entryDate || Date.now(),
+        clientName: input.clientName || null,
         notes: input.notes || null,
       });
       return { id };
@@ -118,6 +120,7 @@ export const vehicleCostRouter = router({
       entryDate: z.number().optional(),
       saleDate: z.number().optional(),
       status: z.enum(['in_stock', 'sold', 'reserved']).optional(),
+      clientName: z.string().optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {

@@ -1351,6 +1351,7 @@ export const vehicleCosts = mysqlTable("vehicle_costs", {
   photoUrl: text("photoUrl"), // foto principal do veículo
   photoKey: varchar("photoKey", { length: 500 }),
   status: mysqlEnum("vehicleStatus", ["in_stock", "sold", "reserved"]).default("in_stock").notNull(),
+  clientName: varchar("clientName", { length: 255 }), // nome do cliente (comprador ou vendedor)
   notes: text("notes"), // observações
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
