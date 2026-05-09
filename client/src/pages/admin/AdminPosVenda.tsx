@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+
+function formatCurrencyPV(val: string): string {
+  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
+  if (isNaN(num)) return val;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 import { toast } from "sonner";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import {
@@ -720,7 +726,7 @@ function GastosTab({ chamadoId, gastos, onRefresh }: { chamadoId: number; gastos
         <Card className="border-orange-500/30">
           <CardContent className="p-3 space-y-2">
             <Input placeholder="Descrição (ex: troca amortecedor)" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
-            <Input placeholder="Valor (ex: 450.00)" type="number" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
+            <Input placeholder="Ex: 1.500,00" value={valor} onChange={(e) => setValor(e.target.value)} onBlur={() => { if (valor.trim()) setValor(formatCurrencyPV(valor)); }} />
             <div>
               <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
                 <ImagePlus className="h-3 w-3" /> Foto da nota (opcional)

@@ -12,6 +12,37 @@ import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
+/** Formata valor monetário brasileiro: 50000 -> 50.000,00 */
+function formatCurrency(val: string): string {
+  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
+  if (isNaN(num)) return val;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Extrai número de string formatada: 50.000,00 -> 50000 */
+function parseCurrencyToNumber(val: string): number {
+  const cleaned = val.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  return parseFloat(cleaned) || 0;
+}
+
+/** Input de moeda com formatação automática */
+function CurrencyInput({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
+  const handleBlur = () => {
+    if (value && value.trim()) {
+      onChange(formatCurrency(value));
+    }
+  };
+  return (
+    <Input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      onBlur={handleBlur}
+      placeholder={placeholder || "Ex: 50.000,00"}
+      className={className || "bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"}
+    />
+  );
+}
+
 const CATEGORIES: { value: Category; label: string; icon: typeof Car; color: string }[] = [
   { value: "vendas", label: "Venda", icon: Car, color: "text-red-400" },
   { value: "fei", label: "F&I", icon: Banknote, color: "text-green-400" },
@@ -327,7 +358,7 @@ export default function RegisterSale() {
           result = await registerSale.mutateAsync({
             sellerId: sid, competitionId: cid, vehicleModel,
             vehiclePlate: vehiclePlate || undefined,
-            value: value ? parseInt(value.replace(/\D/g, "")) : undefined,
+            value: value ? Math.round(parseCurrencyToNumber(value)) : undefined,
             description: description || undefined,
             leadSource: saleLeadSource as 'lead_loja' | 'lead_vendedor',
             customerPhone: customerPhone || undefined,
@@ -352,7 +383,7 @@ export default function RegisterSale() {
             customerCpf: customerCpf || undefined,
             vehiclePlate: vehiclePlate || undefined,
             bankName, returnType,
-            financedValue: financedValue ? Math.round(parseFloat(financedValue.replace(/\D/g, "")) || 0) : undefined,
+            financedValue: financedValue ? Math.round(parseCurrencyToNumber(financedValue)) : undefined,
             paymentDate: paymentDate ? new Date(paymentDate).getTime() : undefined,
             notes: feiNotes || undefined,
           });
@@ -369,8 +400,8 @@ export default function RegisterSale() {
             entryDate: Date.now(),
             hasAuction,
             vehicleStatus,
-            payoffValue: payoffValue ? Math.round(parseFloat(payoffValue.replace(/\D/g, "")) || 0) : undefined,
-            costValue: costValue ? Math.round(parseFloat(costValue.replace(/\D/g, "")) || 0) : undefined,
+            payoffValue: payoffValue ? Math.round(parseCurrencyToNumber(payoffValue)) : undefined,
+            costValue: costValue ? Math.round(parseCurrencyToNumber(costValue)) : undefined,
             notes: consignNotes || undefined,
           });
           break;
@@ -380,7 +411,7 @@ export default function RegisterSale() {
             sellerId: sid, competitionId: cid,
             vehiclePlate: dispatchPlate || undefined,
             documentType, customerPaid,
-            transferValue: transferValue ? Math.round(parseFloat(transferValue.replace(/\D/g, "")) || 0) : undefined,
+            transferValue: transferValue ? Math.round(parseCurrencyToNumber(transferValue)) : undefined,
           });
           break;
         case "pre_vendas":
@@ -725,8 +756,7 @@ export default function RegisterSale() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">Valor (R$)</Label>
-                    <Input value={value} onChange={e => setValue(e.target.value)}
-                      placeholder="Ex: 85000" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                    <CurrencyInput value={value} onChange={setValue} placeholder="Ex: 50.000,00" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">Placa do veículo</Label>
@@ -776,8 +806,7 @@ export default function RegisterSale() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Valor financiado (R$)</Label>
-                  <Input value={financedValue} onChange={e => setFinancedValue(e.target.value)}
-                    placeholder="Ex: 50000" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  <CurrencyInput value={financedValue} onChange={setFinancedValue} placeholder="Ex: 50.000,00" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
@@ -900,18 +929,14 @@ export default function RegisterSale() {
                 {vehicleStatus === 'financiado' && (
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">Valor de quitação (R$)</Label>
-                    <Input value={payoffValue} onChange={e => setPayoffValue(e.target.value)}
-                      type="number" step="0.01" placeholder="Ex: 25000.00"
-                      className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                    <CurrencyInput value={payoffValue} onChange={setPayoffValue} placeholder="Ex: 25.000,00" />
                   </div>
                 )}
 
                 {/* Valor de custo */}
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold text-sm">Valor de custo (R$)</Label>
-                  <Input value={costValue} onChange={e => setCostValue(e.target.value)}
-                    type="number" step="0.01" placeholder="Valor que o consignado deixou"
-                    className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  <CurrencyInput value={costValue} onChange={setCostValue} placeholder="Ex: 50.000,00" />
                 </div>
 
                 {/* Observações */}
@@ -1056,8 +1081,7 @@ export default function RegisterSale() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">Valor (R$)</Label>
-                    <Input value={transferValue} onChange={e => setTransferValue(e.target.value)}
-                      placeholder="Ex: 350" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                    <CurrencyInput value={transferValue} onChange={setTransferValue} placeholder="Ex: 350,00" />
                   </div>
                 </div>
                 <div className="space-y-2">

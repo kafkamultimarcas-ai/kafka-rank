@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar, Search } from "lucide-react";
+import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
@@ -78,6 +78,13 @@ export default function Home() {
   const { data: appointmentRanking } = trpc.goals.appointmentRanking.useQuery(
     { month: now.getMonth() + 1, year: now.getFullYear() },
     { enabled: showAppointmentRanking }
+  );
+
+  // Ranking de consignação
+  const [showConsignmentRanking, setShowConsignmentRanking] = useState(false);
+  const { data: consignmentRanking } = trpc.goals.consignmentRanking.useQuery(
+    { month: now.getMonth() + 1, year: now.getFullYear() },
+    { enabled: showConsignmentRanking }
   );
 
   // Filtrar apenas vendedores (department = vendas) para o ranking principal
@@ -237,9 +244,7 @@ export default function Home() {
               <Button variant="outline" size="sm" onClick={() => setLocation("/ficha-financiamento")} className="gap-2 border-blue-600 text-blue-400 hover:bg-blue-600/10">
                 <DollarSign className="h-4 w-4" /> Financiamento
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setLocation("/consulta-fipe")} className="gap-2 border-yellow-600 text-yellow-400 hover:bg-yellow-600/10">
-                <Search className="h-4 w-4" /> Consulta FIPE
-              </Button>
+
               {sellerSession ? (
                 <Button variant="outline" size="sm" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
                   <FileText className="h-4 w-4" /> Meus Docs
@@ -965,6 +970,74 @@ export default function Home() {
                           entry.conversionRate >= 80 ? 'text-emerald-400' :
                           entry.conversionRate >= 50 ? 'text-yellow-400' : 'text-red-400'
                         }`}>{entry.conversionRate}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Ranking de Consignação */}
+      <section className="py-12 sm:py-16 border-t border-border">
+        <div className="container">
+          <button
+            onClick={() => setShowConsignmentRanking(!showConsignmentRanking)}
+            className="flex items-center gap-3 mb-6 w-full text-left"
+          >
+            <Car className="h-6 w-6 text-orange-400" />
+            <h2 className="font-heading font-bold text-xl sm:text-2xl text-foreground">RANKING DE CONSIGNAÇÃO</h2>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {showConsignmentRanking ? '▲ Fechar' : '▼ Ver ranking'}
+            </span>
+          </button>
+          {!showConsignmentRanking && (
+            <p className="text-sm text-muted-foreground">Toque acima para ver quem mais consignou carros no mês.</p>
+          )}
+          {showConsignmentRanking && (
+            <div className="racing-card p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Car className="h-5 w-5 text-orange-400" />
+                <h3 className="font-heading font-bold text-sm text-foreground">
+                  CONSIGNAÇÃO — {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                </h3>
+              </div>
+              {!consignmentRanking || consignmentRanking.length === 0 ? (
+                <p className="text-center text-xs text-muted-foreground py-4">Nenhuma consignação aprovada neste mês.</p>
+              ) : (
+                <div className="space-y-2">
+                  {/* Header */}
+                  <div className="grid grid-cols-12 gap-2 text-[10px] text-muted-foreground font-semibold px-2 pb-1 border-b border-border">
+                    <div className="col-span-1">#</div>
+                    <div className="col-span-5">Consignatária</div>
+                    <div className="col-span-3 text-center">Consignou</div>
+                    <div className="col-span-3 text-center">Válidos (7d)</div>
+                  </div>
+                  {consignmentRanking.map((entry: any, idx: number) => (
+                    <div key={entry.seller?.id || idx} className={`grid grid-cols-12 gap-2 items-center p-2 rounded-lg ${
+                      idx === 0 ? 'bg-orange-500/10 border border-orange-500/20' :
+                      idx < 3 ? 'bg-primary/5' : 'bg-muted/30'
+                    }`}>
+                      <span className={`col-span-1 text-xs font-bold ${
+                        idx === 0 ? 'text-orange-400' : idx < 3 ? 'text-primary' : 'text-muted-foreground'
+                      }`}>{idx + 1}</span>
+                      <div className="col-span-5 flex items-center gap-2 min-w-0">
+                        {entry.seller?.photoUrl ? (
+                          <img src={entry.seller.photoUrl} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Car className="w-3 h-3 text-muted-foreground" />
+                          </div>
+                        )}
+                        <p className="text-xs font-semibold text-foreground truncate">{entry.seller?.nickname || entry.seller?.name}</p>
+                      </div>
+                      <div className="col-span-3 text-center">
+                        <span className="text-sm font-bold text-orange-400">{entry.totalConsigned}</span>
+                      </div>
+                      <div className="col-span-3 text-center">
+                        <span className="text-sm font-bold text-emerald-400">{entry.validConsigned}</span>
                       </div>
                     </div>
                   ))}

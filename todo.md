@@ -2206,3 +2206,20 @@
 - [x] Permitir edição/exclusão de custos lançados
 - [x] Formatação automática de valores monetários (50000 → R$ 50.000,00)
 - [x] Corrigir valores existentes que estão sem formatação (formatação agora é automática no onBlur)
+
+### Remover FIPE + Origem Lead + Ranking Consignação (07/05)
+- [ ] Remover tela Consulta FIPE (página, rota, botão na Home)
+- [ ] Adicionar campo "Origem do Lead" nas vendas (lead_loja ou lead_vendedor)
+- [ ] Exibir badge de origem do lead no card de cada venda
+- [ ] Filtro por origem do lead na tela de vendas
+- [ ] Ranking de Consignação: ranking automático de quem mais consignou carros
+- [ ] Ranking de Consignação visível na tela pública (igual ranking vendas/agendamentos)
+- [ ] Varredura e correção de bugs gerais do sistema
+
+### Correções Urgentes + Novas Features (09/05)
+- [ ] Remover Consulta FIPE do sistema (tela, rota, botão)
+- [ ] Formatação automática de valores monetários em TODOS os campos (vendas, consignação, financiamento)
+- [ ] Consignação: permitir edição de valores (menos data de lançamento)
+- [ ] Vendas: adicionar campo origem do lead (lead loja vs lead vendedor)
+- [ ] Ranking de consignação (quem mais consignou = primeiro lugar)
+- [ ] Corrigir bugs gerais do sistema

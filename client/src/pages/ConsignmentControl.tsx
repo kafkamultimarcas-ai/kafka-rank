@@ -97,6 +97,7 @@ export default function ConsignmentControl() {
   });
 
   const isAdmin = user?.role === 'admin';
+  const isConsignacao = (user?.role as string) === 'consignacao' || user?.role === 'admin' || (user?.role as string) === 'manager';
 
   const openEdit = (v: any) => {
     setEditRecord({ ...v });
@@ -374,7 +375,7 @@ export default function ConsignmentControl() {
                       {/* Expanded details */}
                       {isExpanded && <VehicleDetails v={v} />}
                       <div className="mt-2 flex justify-end gap-2">
-                        {isAdmin && (
+                        {isConsignacao && (
                           <>
                             <Button
                               size="sm"
@@ -385,15 +386,17 @@ export default function ConsignmentControl() {
                               <Pencil className="w-3 h-3 mr-1" />
                               Editar
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-500/10"
-                              onClick={(e) => { e.stopPropagation(); openDelete(v.id); }}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Excluir
-                            </Button>
+                            {isAdmin && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-7 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                onClick={(e) => { e.stopPropagation(); openDelete(v.id); }}
+                              >
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Excluir
+                              </Button>
+                            )}
                           </>
                         )}
                         <Button
@@ -610,11 +613,21 @@ export default function ConsignmentControl() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-foreground text-xs">Data de Entrada</Label>
-                  <Input type="date" value={editRecord.entryDate ? new Date(editRecord.entryDate).toISOString().split('T')[0] : ''} onChange={e => setEditRecord({...editRecord, entryDate: new Date(e.target.value).getTime()})} className="bg-muted border-border text-foreground" />
+                  <Input type="date" value={editRecord.entryDate ? new Date(editRecord.entryDate).toISOString().split('T')[0] : ''} disabled className="bg-muted border-border text-foreground opacity-60 cursor-not-allowed" />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-foreground text-xs">Valor Custo (R$)</Label>
-                  <Input type="number" step="0.01" value={editRecord.costValue ? (editRecord.costValue / 100).toFixed(2) : ''} onChange={e => setEditRecord({...editRecord, costValue: Math.round(parseFloat(e.target.value || '0') * 100)})} className="bg-muted border-border text-foreground" />
+                  <Input
+                    value={editRecord.costValueDisplay || (editRecord.costValue ? editRecord.costValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')}
+                    onChange={e => setEditRecord({...editRecord, costValueDisplay: e.target.value})}
+                    onBlur={() => {
+                      const raw = (editRecord.costValueDisplay || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+                      const num = parseFloat(raw) || 0;
+                      setEditRecord({...editRecord, costValue: Math.round(num), costValueDisplay: num ? num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''});
+                    }}
+                    placeholder="Ex: 50.000,00"
+                    className="bg-muted border-border text-foreground"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

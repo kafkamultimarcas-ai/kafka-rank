@@ -3302,3 +3302,60 @@ export async function getVehicleCostSummary(vehicleId: number) {
   }).from(vehicleCostItems).where(and(eq(vehicleCostItems.tenantId, getCurrentTenantId()), eq(vehicleCostItems.vehicleId, vehicleId)));
   return { totalCosts: parseFloat(String(result?.total || '0')), itemCount: Number(result?.count || 0) };
 }
+
+// ===== RANKING DE CONSIGNAÇÃO =====
+export async function getConsignmentRanking(month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const startStr = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
+  const endMonth = month === 12 ? 1 : month + 1;
+  const endYear = month === 12 ? year + 1 : year;
+  const endStr = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00`;
+  
+  // Buscar todas as consignações aprovadas do mês
+  const monthConsignments = await db.select().from(consignmentRecords)
+    .where(and(
+      eq(consignmentRecords.status, 'approved'),
+      gte(consignmentRecords.createdAt, new Date(startStr)),
+      lt(consignmentRecords.createdAt, new Date(endStr)),
+    ));
+  
+  // Agrupar por vendedor (sellerId = quem registrou a consignação)
+  const sellerMap = new Map<number, { total: number; valid: number }>();
+  for (const c of monthConsignments) {
+    const existing = sellerMap.get(c.sellerId) || { total: 0, valid: 0 };
+    existing.total += 1;
+    if (c.isValid) {
+      existing.valid += 1; // completou 7 dias
+    }
+    sellerMap.set(c.sellerId, existing);
+  }
+  
+  // Buscar vendedores do departamento consignação
+  const allSellers = await db.select().from(sellers).where(and(
+    eq(sellers.tenantId, getCurrentTenantId()),
+    eq(sellers.active, true),
+    eq(sellers.department, 'consignacao')
+  ));
+  
+  // Montar ranking
+  const ranking = allSellers
+    .filter(s => sellerMap.has(s.id))
+    .map(s => {
+      const stats = sellerMap.get(s.id)!;
+      return {
+        seller: s,
+        totalConsigned: stats.total,
+        validConsigned: stats.valid,
+      };
+    });
+  
+  // Ordenar por total consignados (decrescente)
+  ranking.sort((a, b) => b.totalConsigned - a.totalConsigned || b.validConsigned - a.validConsigned);
+  
+  return ranking.map((r, idx) => ({
+    position: idx + 1,
+    ...r,
+  }));
+}

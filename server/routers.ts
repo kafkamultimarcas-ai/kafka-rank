@@ -2413,6 +2413,12 @@ export const appRouter = router({
     })).query(async ({ input }) => {
       return db.getAppointmentRanking(input.month, input.year);
     }),
+    consignmentRanking: publicProcedure.input(z.object({
+      month: z.number().min(1).max(12),
+      year: z.number(),
+    })).query(async ({ input }) => {
+      return db.getConsignmentRanking(input.month, input.year);
+    }),
   }),
 
   // ===== PENDING COUNT (all sectors) =====

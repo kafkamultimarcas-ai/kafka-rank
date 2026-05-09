@@ -11,6 +11,20 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 
+function formatCurrency(val: string): string {
+  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
+  if (isNaN(num)) return val;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function parseCurrencyToNumber(val: string): number {
+  const cleaned = val.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  return parseFloat(cleaned) || 0;
+}
+function CurrencyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const handleBlur = () => { if (value && value.trim()) onChange(formatCurrency(value)); };
+  return <Input value={value} onChange={e => onChange(e.target.value)} onBlur={handleBlur} placeholder={placeholder || "Ex: 50.000,00"} className="bg-input border-border text-foreground" />;
+}
+
 export default function AdminSales() {
   const { data: salesList } = trpc.sales.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
@@ -101,7 +115,7 @@ export default function AdminSales() {
       competitionId: form.competitionId ? parseInt(form.competitionId) : undefined,
       description: form.description || undefined,
       vehicleModel: form.vehicleModel || undefined,
-      value: form.value ? parseInt(form.value) : undefined,
+      value: form.value ? Math.round(parseCurrencyToNumber(form.value)) : undefined,
       points: parseInt(form.points) || 1,
     });
   }
@@ -123,7 +137,7 @@ export default function AdminSales() {
     if (!editingSale) return;
     const data: any = { id: editingSale.id };
     if (editForm.vehicleModel !== (editingSale.vehicleModel || "")) data.vehicleModel = editForm.vehicleModel;
-    if (editForm.value !== (editingSale.value ? editingSale.value.toString() : "")) data.value = editForm.value ? parseInt(editForm.value) : 0;
+    if (editForm.value !== (editingSale.value ? editingSale.value.toString() : "")) data.value = editForm.value ? Math.round(parseCurrencyToNumber(editForm.value)) : 0;
     if (editForm.sellerId !== editingSale.sellerId.toString()) data.sellerId = parseInt(editForm.sellerId);
     if (editForm.status !== (editingSale.status || "approved")) data.status = editForm.status;
     if (editForm.leadSource !== (editingSale.leadSource || "")) data.leadSource = editForm.leadSource;
@@ -195,7 +209,7 @@ export default function AdminSales() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-foreground">Valor (R$)</Label>
-                    <Input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="0" className="bg-input border-border text-foreground" />
+                    <CurrencyInput value={form.value} onChange={v => setForm({ ...form, value: v })} placeholder="Ex: 50.000,00" />
                   </div>
                   <div>
                     <Label className="text-foreground">Pontos</Label>
@@ -237,7 +251,7 @@ export default function AdminSales() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-foreground">Valor (R$)</Label>
-                  <Input type="number" value={editForm.value} onChange={e => setEditForm({ ...editForm, value: e.target.value })} placeholder="0" className="bg-input border-border text-foreground" />
+                   <CurrencyInput value={editForm.value} onChange={v => setEditForm({ ...editForm, value: v })} placeholder="Ex: 50.000,00" />
                 </div>
                 <div>
                   <Label className="text-foreground">Status</Label>
@@ -341,6 +355,11 @@ export default function AdminSales() {
                       {" — "}
                       {new Date(sale.createdAt).toLocaleDateString("pt-BR")}
                     </p>
+                    {sale.leadSource && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold mt-0.5 ${sale.leadSource === 'lead_loja' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'}`}>
+                        {sale.leadSource === 'lead_loja' ? 'Lead Loja' : 'Lead Vendedor'}
+                      </span>
+                    )}
                   </div>
                   <div className="text-right shrink-0 flex items-center gap-2">
                     <div>

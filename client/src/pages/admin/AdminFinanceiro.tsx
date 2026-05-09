@@ -6,6 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+function formatCurrencyVal(val: string): string {
+  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
+  if (isNaN(num)) return val;
+  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function parseCurrencyStr(val: string): string {
+  const cleaned = val.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  return cleaned || "0";
+}
+function FinCurrencyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const handleBlur = () => { if (value && value.trim()) onChange(formatCurrencyVal(value)); };
+  return <Input value={value} onChange={e => onChange(e.target.value)} onBlur={handleBlur} placeholder={placeholder || "Ex: 50.000,00"} />;
+}
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -557,7 +571,7 @@ export default function AdminFinanceiro() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Valor (R$) *</Label>
-                  <Input type="number" step="0.01" placeholder="0.00" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
+                  <FinCurrencyInput value={txAmount} onChange={setTxAmount} placeholder="Ex: 1.500,00" />
                 </div>
                 <div>
                   <Label>Vencimento *</Label>
@@ -597,7 +611,7 @@ export default function AdminFinanceiro() {
                   createTransaction.mutate({
                     type: txType,
                     description: txDescription,
-                    amount: txAmount,
+                    amount: parseCurrencyStr(txAmount),
                     dueDate: new Date(txDueDate + "T12:00:00").getTime(),
                     categoryId: txCategoryId,
                     supplier: txSupplier || undefined,
@@ -657,7 +671,7 @@ export default function AdminFinanceiro() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Valor (R$) *</Label>
-                  <Input type="number" step="0.01" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
+                  <FinCurrencyInput value={txAmount} onChange={setTxAmount} placeholder="Ex: 1.500,00" />
                 </div>
                 <div>
                   <Label>Vencimento *</Label>
@@ -685,9 +699,9 @@ export default function AdminFinanceiro() {
                   updateTransaction.mutate({
                     id: editingTransaction.id,
                     description: txDescription,
-                    amount: txAmount,
+                    amount: parseCurrencyStr(txAmount),
                     dueDate: new Date(txDueDate + "T12:00:00").getTime(),
-                    categoryId: txCategoryId,
+                    categoryId: txCategoryId || undefined,
                     supplier: txSupplier || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,

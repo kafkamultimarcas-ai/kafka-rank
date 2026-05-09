@@ -430,7 +430,7 @@ export default function AdminMarketing() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-foreground">Orçamento (R$)</Label>
-                      <Input type="number" value={strategyForm.budget} onChange={e => setStrategyForm({ ...strategyForm, budget: e.target.value })} placeholder="0" className="bg-input border-border text-foreground" />
+                      <Input value={strategyForm.budget} onChange={e => setStrategyForm({ ...strategyForm, budget: e.target.value })} onBlur={() => { const n = parseFloat((strategyForm.budget || '0').replace(/[^\d.,]/g, '').replace(',', '.')); if (!isNaN(n) && n > 0) setStrategyForm({...strategyForm, budget: n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}); }} placeholder="Ex: 5.000,00" className="bg-input border-border text-foreground" />
                     </div>
                     <div>
                       <Label className="text-foreground">Responsável</Label>
