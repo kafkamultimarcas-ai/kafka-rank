@@ -1,0 +1,35 @@
+{
+  "query": "SELECT id, model, price FROM inventory_vehicles LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, model, price FROM inventory_vehicles LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "model": "208",
+      "price": "76990"
+    },
+    {
+      "id": "2",
+      "model": "208",
+      "price": "75990"
+    },
+    {
+      "id": "3",
+      "model": "208",
+      "price": "44990"
+    },
+    {
+      "id": "4",
+      "model": "208",
+      "price": "75990"
+    },
+    {
+      "id": "5",
+      "model": "208",
+      "price": "40990"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tmodel\tprice\n1\t208\t76990\n2\t208\t75990\n3\t208\t44990\n4\t208\t75990\n5\t208\t40990\n",
+  "stderr": "",
+  "execution_time_ms": 274
+}

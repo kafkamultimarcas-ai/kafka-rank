@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, vehicleModel, costValue, payoffValue FROM consignment_records WHERE costValue IS NOT NULL LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, vehicleModel, costValue, payoffValue FROM consignment_records WHERE costValue IS NOT NULL LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "vehicleModel": "Sandero ",
+      "costValue": "37000",
+      "payoffValue": "NULL"
+    },
+    {
+      "id": "2",
+      "vehicleModel": "Up Tsi ",
+      "costValue": "60000",
+      "payoffValue": "NULL"
+    },
+    {
+      "id": "3",
+      "vehicleModel": "Focus 2010",
+      "costValue": "31000",
+      "payoffValue": "NULL"
+    },
+    {
+      "id": "4",
+      "vehicleModel": "Kicks 2026",
+      "costValue": "160000",
+      "payoffValue": "NULL"
+    },
+    {
+      "id": "6",
+      "vehicleModel": "Hb20 hatch aut ",
+      "costValue": "485000",
+      "payoffValue": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tvehicleModel\tcostValue\tpayoffValue\n1\tSandero \t37000\tNULL\n2\tUp Tsi \t60000\tNULL\n3\tFocus 2010\t31000\tNULL\n4\tKicks 2026\t160000\tNULL\n6\tHb20 hatch aut \t485000\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 294
+}

@@ -150,9 +150,9 @@ export default function ConsignmentControl() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const formatCurrency = (cents: number | null | undefined) => {
-    if (!cents) return "—";
-    return `R$ ${(cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const formatCurrency = (value: number | null | undefined) => {
+    if (!value) return "—";
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
   };
 
   // Detail panel component

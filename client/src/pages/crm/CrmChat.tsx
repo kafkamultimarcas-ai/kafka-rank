@@ -953,7 +953,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-foreground truncate">{v.brand} {v.model}</p>
-                      <p className="text-[10px] text-muted-foreground">{v.year} - {v.mileage?.toLocaleString("pt-BR")} km - R$ {(v.price / 100).toLocaleString("pt-BR")}</p>
+                      <p className="text-[10px] text-muted-foreground">{v.year} - {v.mileage?.toLocaleString("pt-BR")} km - R$ {v.price.toLocaleString("pt-BR")}</p>
                     </div>
                   </button>
                 ))}

@@ -950,6 +950,31 @@ export const appRouter = router({
       }
       return { success: true, sale: result };
     }),
+    // Aprovar TODAS as vendas pendentes de uma vez
+    approveAll: managerOrAdminProcedure.mutation(async () => {
+      const pending = await db.listPendingSales();
+      const results = [];
+      for (const sale of pending) {
+        try {
+          const approved = await db.approveSale(sale.id);
+          const seller = await db.getSellerById(approved.sellerId);
+          const saleDate = new Date(approved.createdAt);
+          const comp = approved.competitionId ? await db.getCompetitionById(approved.competitionId) : null;
+          const saleCategory = comp?.category || 'vendas';
+          await db.autoUpdateStoreGoal(saleCategory, saleDate.getMonth() + 1, saleDate.getFullYear(), 1);
+          if (seller) {
+            await db.createNotification({
+              sellerId: approved.sellerId,
+              type: 'sale_approved',
+              title: 'Venda aprovada!',
+              message: `Sua venda de ${approved.vehicleModel || 'veículo'} foi aprovada e já conta no ranking!`,
+            });
+          }
+          results.push({ id: sale.id, success: true });
+        } catch (e) { results.push({ id: sale.id, success: false }); }
+      }
+      return { success: true, count: results.filter(r => r.success).length, total: pending.length };
+    }),
     // Excluir venda (admin/gerente) - reverte pontos e meta se aprovada
     delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar venda antes de deletar para decrementar meta
@@ -1256,7 +1281,7 @@ export const appRouter = router({
       const id = await db.createFeiRecord({ ...input, points, status: 'pending' });
       await notifyOwner({
         title: `Novo registro F&I para aprovar!`,
-        content: `${seller.name} registrou F&I: Banco ${input.bankName} | ${input.returnType} | R$ ${((input.financedValue || 0) / 100).toLocaleString("pt-BR")}`,
+        content: `${seller.name} registrou F&I: Banco ${input.bankName} | ${input.returnType} | R$ ${(input.financedValue || 0).toLocaleString("pt-BR")}`,
       });
       // Notificação persistente para admin
       await db.createNotification({
@@ -1291,6 +1316,27 @@ export const appRouter = router({
         }).catch(console.error);
       }
       return { success: true };
+    }),
+    // Aprovar TODOS os registros F&I pendentes de uma vez
+    approveAll: managerOrAdminProcedure.mutation(async () => {
+      const pending = await db.listPendingFeiRecords();
+      const results = [];
+      for (const record of pending) {
+        try {
+          await db.approveFeiRecord(record.id);
+          const seller = await db.getSellerById(record.sellerId);
+          if (seller) {
+            await db.createNotification({
+              sellerId: record.sellerId,
+              type: 'fei_approved',
+              title: 'F&I aprovado!',
+              message: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi aprovado!`,
+            });
+          }
+          results.push({ id: record.id, success: true });
+        } catch (e) { results.push({ id: record.id, success: false }); }
+      }
+      return { success: true, count: results.filter(r => r.success).length, total: pending.length };
     }),
     reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar registro antes de rejeitar para ter os dados
@@ -1481,6 +1527,29 @@ export const appRouter = router({
       }
       return { success: true, isValid: result.isValid };
     }),
+    // Aprovar TODAS as consignações pendentes de uma vez
+    approveAll: managerOrAdminProcedure.mutation(async () => {
+      const pending = await db.listPendingConsignmentRecords();
+      const results = [];
+      for (const record of pending) {
+        try {
+          const result = await db.approveConsignmentRecord(record.id);
+          const seller = await db.getSellerById(result.sellerId);
+          if (seller) {
+            await db.createNotification({
+              sellerId: result.sellerId,
+              type: 'consignment_approved',
+              title: 'Consignação aprovada!',
+              message: result.isValid
+                ? `Sua consignação de ${result.vehicleModel} foi aprovada e já conta pontos!`
+                : `Sua consignação de ${result.vehicleModel} foi aprovada. Pontos após 7 dias.`,
+            });
+          }
+          results.push({ id: record.id, success: true });
+        } catch (e) { results.push({ id: record.id, success: false }); }
+      }
+      return { success: true, count: results.filter(r => r.success).length, total: pending.length };
+    }),
     reject: managerOrAdminProcedure.input(z.object({ 
       id: z.number(),
       reason: z.string().optional(),
@@ -1601,6 +1670,28 @@ export const appRouter = router({
         }).catch(console.error);
       }
       return { success: true };
+    }),
+    // Aprovar TODOS os registros de despachante pendentes de uma vez
+    approveAll: managerOrAdminProcedure.mutation(async () => {
+      const pending = await db.listPendingDispatchRecords();
+      const results = [];
+      for (const record of pending) {
+        try {
+          await db.approveDispatchRecord(record.id);
+          const seller = await db.getSellerById(record.sellerId);
+          if (seller) {
+            const totalPts = record.points + (record.bonusPoints || 0);
+            await db.createNotification({
+              sellerId: record.sellerId,
+              type: 'dispatch_approved',
+              title: 'Documento aprovado!',
+              message: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos.`,
+            });
+          }
+          results.push({ id: record.id, success: true });
+        } catch (e) { results.push({ id: record.id, success: false }); }
+      }
+      return { success: true, count: results.filter(r => r.success).length, total: pending.length };
     }),
     reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const records = await db.listDispatchRecords();
@@ -1746,6 +1837,18 @@ export const appRouter = router({
       const record = await db.approveSdrRecord(input.id);
       return { success: true, record };
     }),
+    // Aprovar TODOS os registros SDR pendentes de uma vez
+    approveAll: managerOrAdminProcedure.mutation(async () => {
+      const pending = await db.listPendingSdrRecords();
+      const results = [];
+      for (const record of pending) {
+        try {
+          await db.approveSdrRecord(record.id);
+          results.push({ id: record.id, success: true });
+        } catch (e) { results.push({ id: record.id, success: false }); }
+      }
+      return { success: true, count: results.filter(r => r.success).length, total: pending.length };
+    }),
     reject: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.rejectSdrRecord(input.id);
       return { success: true };
@@ -1771,6 +1874,21 @@ export const appRouter = router({
         sendPushAttendanceApproved(record.sellerId, record.customerName || 'Cliente').catch(console.error);
       }
       return { success: true, record };
+    }),
+    // Aprovar TODOS os comparecimentos pendentes de uma vez
+    approveAllAttendance: managerOrAdminProcedure.mutation(async () => {
+      const pending = await db.listPendingAttendance();
+      const results = [];
+      for (const record of pending) {
+        try {
+          const approved = await db.approveAttendance(record.id);
+          if (approved && approved.sellerId) {
+            sendPushAttendanceApproved(approved.sellerId, approved.customerName || 'Cliente').catch(console.error);
+          }
+          results.push({ id: record.id, success: true });
+        } catch (e) { results.push({ id: record.id, success: false }); }
+      }
+      return { success: true, count: results.filter(r => r.success).length, total: pending.length };
     }),
     // Gerente reprova comparecimento
     rejectAttendance: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {

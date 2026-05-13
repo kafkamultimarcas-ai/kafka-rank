@@ -1,0 +1,35 @@
+{
+  "query": "SELECT id, bankName, financedValue FROM fei_records WHERE financedValue > 0 LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 72z9zwCQQTtJjjC.7f634d589b23 --database NKs9YYU4Bt79zUwnWH56wx --execute SELECT id, bankName, financedValue FROM fei_records WHERE financedValue > 0 LIMIT 5;",
+  "rows": [
+    {
+      "id": "30001",
+      "bankName": "SANTANDER",
+      "financedValue": "57000"
+    },
+    {
+      "id": "30002",
+      "bankName": "PAN",
+      "financedValue": "46000"
+    },
+    {
+      "id": "60001",
+      "bankName": "SANTANDER",
+      "financedValue": "56000"
+    },
+    {
+      "id": "60002",
+      "bankName": "SANTANDER",
+      "financedValue": "60000"
+    },
+    {
+      "id": "90001",
+      "bankName": "DAYCOVALL",
+      "financedValue": "29998"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tbankName\tfinancedValue\n30001\tSANTANDER\t57000\n30002\tPAN\t46000\n60001\tSANTANDER\t56000\n60002\tSANTANDER\t60000\n90001\tDAYCOVALL\t29998\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

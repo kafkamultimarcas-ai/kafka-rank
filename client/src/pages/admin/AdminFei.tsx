@@ -36,7 +36,7 @@ function formatDateTime(ts: number | string | Date | null | undefined) {
 
 function formatCurrency(v: number | null | undefined) {
   if (!v) return "—";
-  return `R$ ${(v / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -115,12 +115,12 @@ export default function AdminFei() {
 
   function handleSaveEdit() {
     if (!editingRecord) return;
-    const financedValueCents = editForm.financedValue ? Math.round(parseFloat(editForm.financedValue.replace(',', '.')) * 100) : undefined;
+    const financedValueNum = editForm.financedValue ? Math.round(parseFloat(editForm.financedValue.replace(/\./g, '').replace(',', '.'))) : undefined;
     updateFei.mutate({
       id: editingRecord.id,
       bankName: editForm.bankName || undefined,
       returnType: editForm.returnType || undefined,
-      financedValue: financedValueCents,
+      financedValue: financedValueNum,
       vehiclePlate: editForm.vehiclePlate || undefined,
       customerCpf: editForm.customerCpf || undefined,
       customerName: editForm.customerName || undefined,
@@ -161,7 +161,7 @@ export default function AdminFei() {
     setEditForm({
       bankName: record.bankName || "",
       returnType: record.returnType || "",
-      financedValue: record.financedValue ? String(record.financedValue / 100) : "",
+      financedValue: record.financedValue ? record.financedValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : "",
       vehiclePlate: record.vehiclePlate || "",
       customerCpf: record.customerCpf || "",
       customerName: record.customerName || "",

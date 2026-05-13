@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck, Ban } from "lucide-react";
+import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck, Ban, CheckCheck } from "lucide-react";
 import { useLocation } from "wouter";
 import {
   Dialog,
@@ -43,6 +43,35 @@ export default function AdminApprovals() {
   const rejectSdr = trpc.sdr.reject.useMutation();
   const approveAttendance = trpc.sdr.approveAttendance.useMutation();
   const rejectAttendance = trpc.sdr.rejectAttendance.useMutation();
+
+  // Aprovar todos de uma vez
+  const approveAllSales = trpc.sales.approveAll.useMutation();
+  const approveAllFei = trpc.fei.approveAll.useMutation();
+  const approveAllConsignment = trpc.consignment.approveAll.useMutation();
+  const approveAllDispatch = trpc.dispatch.approveAll.useMutation();
+  const approveAllSdr = trpc.sdr.approveAll.useMutation();
+  const approveAllAttendance = trpc.sdr.approveAllAttendance.useMutation();
+  const [approvingAll, setApprovingAll] = useState(false);
+
+  const handleApproveAll = async () => {
+    setApprovingAll(true);
+    try {
+      let result: any;
+      switch (tab) {
+        case "vendas": result = await approveAllSales.mutateAsync(); refetchSales(); break;
+        case "fei": result = await approveAllFei.mutateAsync(); refetchFei(); break;
+        case "consignacao": result = await approveAllConsignment.mutateAsync(); refetchConsignment(); break;
+        case "despachante": result = await approveAllDispatch.mutateAsync(); refetchDispatch(); break;
+        case "sdr": result = await approveAllSdr.mutateAsync(); refetchSdr(); break;
+        case "comparecimento": result = await approveAllAttendance.mutateAsync(); refetchAttendance(); break;
+      }
+      toast.success(`${result?.count || 0} registro(s) aprovado(s) com sucesso!`);
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao aprovar todos");
+    } finally {
+      setApprovingAll(false);
+    }
+  };
 
   const getSeller = (id: number) => sellers?.find(s => s.id === id);
   const getCompetition = (id: number | null) => id ? competitions?.find(c => c.id === id) : null;
@@ -497,6 +526,20 @@ export default function AdminApprovals() {
 
     return (
       <div className="space-y-3">
+        {/* Botão Aprovar Todos */}
+        <div className="flex justify-end">
+          <Button
+            onClick={handleApproveAll}
+            disabled={approvingAll}
+            className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
+          >
+            {approvingAll ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Aprovando...</>
+            ) : (
+              <><CheckCheck className="w-4 h-4" /> Aprovar Todos ({items.length})</>
+            )}
+          </Button>
+        </div>
         {tab === "vendas" && items.map(renderSaleCard)}
         {tab === "fei" && items.map(renderFeiCard)}
         {tab === "consignacao" && items.map(renderConsignmentCard)}

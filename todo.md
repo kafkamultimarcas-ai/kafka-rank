@@ -2223,3 +2223,8 @@
 - [ ] Vendas: adicionar campo origem do lead (lead loja vs lead vendedor)
 - [ ] Ranking de consignação (quem mais consignou = primeiro lugar)
 - [ ] Corrigir bugs gerais do sistema
+
+### Aprovar Todos + Correções (13/05)
+- [x] Botão "Aprovar Todos" na página de aprovação (por aba/categoria)
+- [x] Corrigir valores monetários (divisão por 100 incorreta em F&I, Consignação, CRM inventario)
+- [x] Verificar e corrigir bugs gerais do sistema
