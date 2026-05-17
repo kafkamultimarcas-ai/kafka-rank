@@ -251,7 +251,7 @@ export default function AdminApprovals() {
                 <Car className="w-4 h-4 text-blue-400" />
                 <span className="font-semibold">{sale.vehicleModel || 'Veículo'}</span>
               </div>
-              {sale.value > 0 && <p className="text-green-400 font-bold text-lg">R$ {sale.value.toLocaleString("pt-BR")}</p>}
+              {sale.value > 0 && <p className="text-green-400 font-bold text-lg">R$ {sale.value.toLocaleString("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>}
               {sale.description && <p className="text-muted-foreground text-sm mt-1">{sale.description}</p>}
               {competition && <p className="text-muted-foreground text-xs mt-1">Campanha: {competition.name}</p>}
               <p className="text-muted-foreground/60 text-xs mt-1">{new Date(sale.createdAt).toLocaleString("pt-BR")}</p>
@@ -299,7 +299,7 @@ export default function AdminApprovals() {
                 {record.customerCpf && <span className="text-muted-foreground">CPF: <span className="text-foreground">{record.customerCpf}</span></span>}
                 <span className="text-muted-foreground">Retorno: <span className="text-yellow-400 font-bold">{record.returnType}</span></span>
               </div>
-              {record.financedValue > 0 && <p className="text-green-400 font-bold">Financiado: R$ {record.financedValue.toLocaleString("pt-BR")}</p>}
+              {record.financedValue > 0 && <p className="text-green-400 font-bold">Financiado: R$ {record.financedValue.toLocaleString("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>}
               {record.paymentDate && <p className="text-yellow-400 text-sm">Pago em: {new Date(Number(record.paymentDate)).toLocaleDateString("pt-BR")}</p>}
               <p className="text-muted-foreground/60 text-xs mt-1">{new Date(record.createdAt).toLocaleString("pt-BR")}</p>
             </div>
@@ -421,7 +421,7 @@ export default function AdminApprovals() {
               </div>
               <div className="flex flex-wrap gap-3 text-sm">
                 {record.vehiclePlate && <span className="text-muted-foreground">Placa: <span className="text-foreground">{record.vehiclePlate}</span></span>}
-                {record.transferValue > 0 && <span className="text-green-400 font-bold">R$ {record.transferValue.toLocaleString("pt-BR")}</span>}
+                {record.transferValue > 0 && <span className="text-green-400 font-bold">R$ {record.transferValue.toLocaleString("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>}
               </div>
               {record.bonusPoints > 0 && (
                 <p className="text-green-400 text-xs mt-1 font-semibold">+{record.bonusPoints} pontos de bônus (cliente pagou)</p>
@@ -527,10 +527,17 @@ export default function AdminApprovals() {
     return (
       <div className="space-y-3">
         {/* Botão Aprovar Todos */}
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-muted-foreground">
+            {items.length} registro(s) pendente(s)
+          </p>
           <Button
-            onClick={handleApproveAll}
-            disabled={approvingAll}
+            onClick={() => {
+              if (window.confirm(`Tem certeza que deseja aprovar TODOS os ${items.length} registros pendentes?`)) {
+                handleApproveAll();
+              }
+            }}
+            disabled={approvingAll || items.length === 0}
             className="bg-green-600 hover:bg-green-700 text-white font-bold gap-2"
           >
             {approvingAll ? (

@@ -42,7 +42,7 @@ export default function CrmAdminLogin() {
     onSuccess: (data) => {
       localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
       toast.success(`Bem-vindo, ${data.admin.name}!`);
-      navigate("/crm/admin");
+      navigate("/crm/admin", { replace: true });
     },
     onError: () => {
       setAutoLoginFailed(true);
@@ -55,10 +55,14 @@ export default function CrmAdminLogin() {
     autoLoginTriedRef.current = true;
     const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
     if (existingToken) {
-      navigate("/crm/admin");
+      // Only navigate if not already on admin page to prevent loops
+      if (!window.location.pathname.startsWith("/crm/admin") || window.location.pathname === "/crm/admin/login") {
+        navigate("/crm/admin", { replace: true });
+      }
       return;
     }
     autoLoginMutation.mutate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Login direto com usuário + senha
@@ -71,7 +75,7 @@ export default function CrmAdminLogin() {
       } else {
         localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
         toast.success(`Bem-vindo, ${data.admin.name}!`);
-        navigate("/crm/admin");
+        navigate("/crm/admin", { replace: true });
       }
     },
     onError: (err) => {
@@ -84,7 +88,7 @@ export default function CrmAdminLogin() {
     onSuccess: () => {
       localStorage.setItem(ADMIN_TOKEN_KEY, token);
       toast.success("Senha alterada com sucesso!");
-      navigate("/crm/admin");
+      navigate("/crm/admin", { replace: true });
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao alterar senha");

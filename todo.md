@@ -2228,3 +2228,8 @@
 - [x] Botão "Aprovar Todos" na página de aprovação (por aba/categoria)
 - [x] Corrigir valores monetários (divisão por 100 incorreta em F&I, Consignação, CRM inventario)
 - [x] Verificar e corrigir bugs gerais do sistema
+
+### Correção de Bugs e Usabilidade (17/05)
+- [x] Bug: "Maximum update depth exceeded" na página /crm/admin/login (loop infinito de setState)
+- [x] Verificar e corrigir outros bugs do sistema
+- [x] Melhorar usabilidade: confirmação antes de Aprovar Todos, formatação de valores consistente

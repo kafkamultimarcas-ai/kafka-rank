@@ -50,9 +50,13 @@ export default function CrmAdminDashboard() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate("/crm/admin/login");
+      // Only navigate if not already on login page to prevent loops
+      if (window.location.pathname !== "/crm/admin/login") {
+        navigate("/crm/admin/login", { replace: true });
+      }
     }
-  }, [isLoading, isAuthenticated, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isAuthenticated]);
 
   if (isLoading) {
     return (
