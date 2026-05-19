@@ -323,8 +323,8 @@ export const appRouter = router({
       const fileKey = `sellers/${sellerId}-competition-${nanoid(8)}.${ext}`;
       const buffer = Buffer.from(input.base64, 'base64');
       const { url } = await storagePut(fileKey, buffer, input.mimeType);
-      // Salvar como foto da competição (NÃO altera a foto principal do cadastro)
-      await db.updateSeller(sellerId, { competitionPhotoUrl: url, competitionPhotoKey: fileKey });
+      // Salvar como foto principal do perfil E da competição
+      await db.updateSeller(sellerId, { photoUrl: url, photoKey: fileKey, competitionPhotoUrl: url, competitionPhotoKey: fileKey });
       return { url };
     }),
   }),
@@ -1713,6 +1713,17 @@ export const appRouter = router({
       }
       return { success: true };
     }),
+    update: managerOrAdminProcedure.input(z.object({
+      id: z.number(),
+      vehiclePlate: z.string().optional(),
+      documentType: z.string().optional(),
+      customerPaid: z.boolean().optional(),
+      transferValue: z.number().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      const updated = await db.updateDispatchRecord(id, data);
+      return { success: true, record: updated };
+    }),
     delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteDispatchRecord(input.id);
       return { success: true };
@@ -1974,8 +1985,8 @@ export const appRouter = router({
       await db.updateSdrRecord(id, data as any);
       return { success: true, message: 'Agendamento atualizado com sucesso!' };
     }),
-    // Admin edita agendamento
-    update: adminProcedure.input(z.object({
+    // Admin/Gerente edita agendamento
+    update: managerOrAdminProcedure.input(z.object({
       id: z.number(),
       customerName: z.string().optional(),
       customerPhone: z.string().optional(),

@@ -142,6 +142,35 @@ export default function MinhaArea() {
   const dept = sellerSession?.department || "vendas";
   const deptInfo = DEPT_CONFIG[dept] || DEPT_CONFIG.vendas;
 
+  // Upload de foto de perfil
+  const profilePhotoRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const utils = trpc.useUtils();
+  const uploadMyPhotoMut = trpc.sellers.uploadMyPhoto.useMutation({
+    onSuccess: () => {
+      toast.success("Foto atualizada com sucesso!");
+      utils.sellers.getById.invalidate({ id: sellerId });
+      utils.sellers.me.invalidate();
+      setUploadingPhoto(false);
+    },
+    onError: (err) => { toast.error(err.message); setUploadingPhoto(false); },
+  });
+  const handleProfilePhotoChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    if (file.size > 7 * 1024 * 1024) { toast.error('Imagem muito grande. Máximo 7MB.'); return; }
+    setUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      await uploadMyPhotoMut.mutateAsync({ base64, mimeType: file.type });
+    };
+    reader.onerror = () => { toast.error('Erro ao ler arquivo'); setUploadingPhoto(false); };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, [uploadMyPhotoMut]);
+
   // Filter state for F&I records
   const [feiFilter, setFeiFilter] = useState<"todos" | "approved" | "pending" | "rejected">("todos");
 
@@ -353,13 +382,20 @@ export default function MinhaArea() {
       <div className="bg-gray-900/80 border-b border-gray-800 px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <div className="flex items-center gap-3">
-            {seller?.photoUrl ? (
-              <img src={seller.photoUrl} alt={seller.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-red-500" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center ring-2 ring-red-500">
-                <User className="w-5 h-5 text-red-400" />
+            <input type="file" ref={profilePhotoRef} accept="image/*" className="hidden" onChange={handleProfilePhotoChange} />
+            <div className="relative cursor-pointer" onClick={() => profilePhotoRef.current?.click()}>
+              {seller?.photoUrl ? (
+                <img src={seller.photoUrl} alt={seller.name} className="w-10 h-10 rounded-full object-cover ring-2 ring-red-500" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center ring-2 ring-red-500">
+                  <User className="w-5 h-5 text-red-400" />
+                </div>
+              )}
+              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center border border-gray-900">
+                <Camera className="w-2.5 h-2.5 text-white" />
               </div>
-            )}
+              {uploadingPhoto && <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
+            </div>
             <div>
               <p className="text-white font-bold text-sm">{seller?.nickname || seller?.name}</p>
               <p className={`text-xs ${deptInfo.color}`}>{deptInfo.label}</p>

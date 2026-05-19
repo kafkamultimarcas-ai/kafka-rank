@@ -15,6 +15,7 @@ import {
 import { eq, and, desc, asc, lte, sql, or, like, ne } from "drizzle-orm";
 import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 import { createNotification } from "../db";
+import * as zapi from "../zapi-service";
 
 // ===== MESSAGE TEMPLATES =====
 export const crmTemplatesRouter = router({
@@ -257,6 +258,14 @@ export const crmDistributionRouter = router({
         sellerId: Number(sid),
         targetType: 'seller',
       }).catch(console.error);
+      // Send WhatsApp to seller
+      const sellerRecord = allVendedores.find(s => s.id === Number(sid));
+      if (sellerRecord?.phone) {
+        const leadsForSeller = assignments.filter(a => a.sellerId === Number(sid));
+        const leadNames = leadsForSeller.slice(0, 3).map(l => l.leadName).join(', ');
+        const msg = `\ud83d\udea8 *${info.count} NOVO(S) LEAD(S)!*\n\n${leadNames}${leadsForSeller.length > 3 ? ` e mais ${leadsForSeller.length - 3}...` : ''}\n\n\u26a1 Abra o app e responda R\u00c1PIDO!`;
+        zapi.sendText(sellerRecord.phone, msg).catch(console.error);
+      }
     }
 
     return { distributed: assignments.length, total: unassigned.length, assignments };
@@ -310,6 +319,13 @@ export const crmDistributionRouter = router({
       sellerId: nextSeller.id,
       targetType: 'seller',
     }).catch(console.error);
+    // Send WhatsApp to seller
+    if (nextSeller.phone) {
+      const vehicleLabel = leadInfo?.vehicleInterest ? `\n\ud83d\ude97 Ve\u00edculo: ${leadInfo.vehicleInterest}` : '';
+      const phoneLabel = leadInfo?.phone ? `\n\ud83d\udcf1 Tel: ${leadInfo.phone}` : '';
+      const msg = `\ud83d\udea8 *NOVO LEAD!*\n\n\ud83d\udc64 ${leadInfo?.name || 'Novo Lead'}${phoneLabel}${vehicleLabel}\n\n\u26a1 Responda R\u00c1PIDO!`;
+      zapi.sendText(nextSeller.phone, msg).catch(console.error);
+    }
 
     return { assigned: true, sellerId: nextSeller.id, sellerName: nextSeller.name };
   }),

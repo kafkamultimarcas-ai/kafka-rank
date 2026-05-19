@@ -4,7 +4,9 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck, Ban, CheckCheck } from "lucide-react";
+import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, Warehouse, Headphones, UserCheck, Ban, CheckCheck, Edit3 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
 import {
   Dialog,
@@ -111,6 +113,57 @@ export default function AdminApprovals() {
     }
   };
 
+  // State for edit dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [editType, setEditType] = useState<Tab>("vendas");
+  const [editForm, setEditForm] = useState<any>({});
+
+  const editSale = trpc.sales.edit.useMutation({ onSuccess: () => { refetchSales(); toast.success("Venda atualizada!"); setEditDialogOpen(false); } });
+  const editDispatch = trpc.dispatch.update.useMutation({ onSuccess: () => { refetchDispatch(); toast.success("Despachante atualizado!"); setEditDialogOpen(false); } });
+  const editSdr = trpc.sdr.update.useMutation({ onSuccess: () => { refetchSdr(); toast.success("SDR atualizado!"); setEditDialogOpen(false); } });
+
+  const openEditDialog = (type: Tab, record: any) => {
+    setEditType(type);
+    setEditingRecord(record);
+    switch (type) {
+      case "vendas":
+        setEditForm({ vehicleModel: record.vehicleModel || "", value: record.value?.toString() || "0", vehiclePlate: record.vehiclePlate || "" });
+        break;
+      case "fei":
+        setEditForm({ bankName: record.bankName || "", financedValue: record.financedValue?.toString() || "0", vehiclePlate: record.vehiclePlate || "", customerCpf: record.customerCpf || "", returnType: record.returnType || "" });
+        break;
+      case "despachante":
+        setEditForm({ documentType: record.documentType || "", vehiclePlate: record.vehiclePlate || "", transferValue: record.transferValue?.toString() || "0" });
+        break;
+      case "sdr":
+        setEditForm({ customerName: record.customerName || "", customerPhone: record.customerPhone || "", vehicleInterest: record.vehicleInterest || "", notes: record.notes || "" });
+        break;
+      default:
+        setEditForm({});
+    }
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingRecord) return;
+    try {
+      switch (editType) {
+        case "vendas":
+          await editSale.mutateAsync({ id: editingRecord.id, vehicleModel: editForm.vehicleModel, value: editForm.value ? parseInt(String(editForm.value)) : undefined });
+          break;
+        case "despachante":
+          await editDispatch.mutateAsync({ id: editingRecord.id, documentType: editForm.documentType, vehiclePlate: editForm.vehiclePlate, transferValue: parseInt(editForm.transferValue) || 0 });
+          break;
+        case "sdr":
+          await editSdr.mutateAsync({ id: editingRecord.id, customerName: editForm.customerName, customerPhone: editForm.customerPhone, vehicleInterest: editForm.vehicleInterest, notes: editForm.notes });
+          break;
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao editar");
+    }
+  };
+
   // State for consignment rejection dialog
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectRecordId, setRejectRecordId] = useState<number | null>(null);
@@ -214,6 +267,9 @@ export default function AdminApprovals() {
               <Button size="sm" onClick={() => handleApprove("sdr", record.id)} disabled={approveSdr.isPending} className="bg-green-600 hover:bg-green-700 text-white font-bold px-4">
                 <Check className="w-4 h-4 mr-1" /> Aprovar
               </Button>
+              <Button size="sm" variant="outline" onClick={() => openEditDialog("sdr", record)} className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 font-bold px-4">
+                <Edit3 className="w-4 h-4 mr-1" /> Editar
+              </Button>
               <Button size="sm" variant="outline" onClick={() => handleReject("sdr", record.id)} disabled={rejectSdr.isPending} className="border-red-500/50 text-red-400 hover:bg-red-500/10 font-bold px-4">
                 <X className="w-4 h-4 mr-1" /> Rejeitar
               </Button>
@@ -259,6 +315,9 @@ export default function AdminApprovals() {
             <div className="flex flex-col gap-2 flex-shrink-0">
               <Button size="sm" onClick={() => handleApprove("vendas", sale.id)} disabled={approveSale.isPending} className="bg-green-600 hover:bg-green-700 text-white font-bold px-4">
                 <Check className="w-4 h-4 mr-1" /> Aprovar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openEditDialog("vendas", sale)} className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 font-bold px-4">
+                <Edit3 className="w-4 h-4 mr-1" /> Editar
               </Button>
               <Button size="sm" variant="outline" onClick={() => handleReject("vendas", sale.id)} disabled={rejectSale.isPending} className="border-red-500/50 text-red-400 hover:bg-red-500/10 font-bold px-4">
                 <X className="w-4 h-4 mr-1" /> Rejeitar
@@ -432,6 +491,9 @@ export default function AdminApprovals() {
               <Button size="sm" onClick={() => handleApprove("despachante", record.id)} disabled={approveDispatch.isPending} className="bg-green-600 hover:bg-green-700 text-white font-bold px-4">
                 <Check className="w-4 h-4 mr-1" /> Aprovar
               </Button>
+              <Button size="sm" variant="outline" onClick={() => openEditDialog("despachante", record)} className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 font-bold px-4">
+                <Edit3 className="w-4 h-4 mr-1" /> Editar
+              </Button>
               <Button size="sm" variant="outline" onClick={() => handleReject("despachante", record.id)} disabled={rejectDispatch.isPending} className="border-red-500/50 text-red-400 hover:bg-red-500/10 font-bold px-4">
                 <X className="w-4 h-4 mr-1" /> Rejeitar
               </Button>
@@ -602,7 +664,81 @@ export default function AdminApprovals() {
           renderCurrentTab()
         )}
       </div>
-      {/* Dialog de Rejeição de Consignação */}
+      {/* Dialog de Edição */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Edit3 className="w-5 h-5 text-blue-400" />
+              Editar Registro
+            </DialogTitle>
+            <DialogDescription>
+              Corrija os dados antes de aprovar ou rejeitar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {editType === "vendas" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Ve\u00edculo</label>
+                  <Input value={editForm.vehicleModel || ""} onChange={e => setEditForm({...editForm, vehicleModel: e.target.value})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Placa</label>
+                  <Input value={editForm.vehiclePlate || ""} onChange={e => setEditForm({...editForm, vehiclePlate: e.target.value.toUpperCase()})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Valor (R$)</label>
+                  <Input value={editForm.value || ""} onChange={e => setEditForm({...editForm, value: e.target.value.replace(/[^0-9]/g, '')})} className="bg-muted border-border" placeholder="Ex: 50000" />
+                </div>
+              </>
+            )}
+            {editType === "despachante" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Tipo Documento</label>
+                  <Input value={editForm.documentType || ""} onChange={e => setEditForm({...editForm, documentType: e.target.value})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Placa</label>
+                  <Input value={editForm.vehiclePlate || ""} onChange={e => setEditForm({...editForm, vehiclePlate: e.target.value.toUpperCase()})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Valor Transfer\u00eancia (R$)</label>
+                  <Input value={editForm.transferValue || ""} onChange={e => setEditForm({...editForm, transferValue: e.target.value.replace(/[^0-9]/g, '')})} className="bg-muted border-border" placeholder="Ex: 89000" />
+                </div>
+              </>
+            )}
+            {editType === "sdr" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Nome do Cliente</label>
+                  <Input value={editForm.customerName || ""} onChange={e => setEditForm({...editForm, customerName: e.target.value})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Telefone</label>
+                  <Input value={editForm.customerPhone || ""} onChange={e => setEditForm({...editForm, customerPhone: e.target.value})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Ve\u00edculo de Interesse</label>
+                  <Input value={editForm.vehicleInterest || ""} onChange={e => setEditForm({...editForm, vehicleInterest: e.target.value})} className="bg-muted border-border" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Observa\u00e7\u00f5es</label>
+                  <Textarea value={editForm.notes || ""} onChange={e => setEditForm({...editForm, notes: e.target.value})} className="bg-muted border-border min-h-[60px]" />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={editSale.isPending || editDispatch.isPending || editSdr.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {(editSale.isPending || editDispatch.isPending || editSdr.isPending) ? "Salvando..." : "Salvar Altera\u00e7\u00f5es"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog de Rejei\u00e7\u00e3o de Consigna\u00e7\u00e3o */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>

@@ -2233,3 +2233,10 @@
 - [x] Bug: "Maximum update depth exceeded" na página /crm/admin/login (loop infinito de setState)
 - [x] Verificar e corrigir outros bugs do sistema
 - [x] Melhorar usabilidade: confirmação antes de Aprovar Todos, formatação de valores consistente
+
+### Correções e Melhorias (19/05)
+- [x] Corrigir erro "An unexpected error occurred" no app (loop de navegação CRM admin)
+- [x] Permitir edição de lançamentos em todas as abas (vendas, despachante, SDR) na tela de aprovação
+- [x] Upload de foto de perfil na MinhaArea (vendedor clica na foto para trocar)
+- [x] Notificação de lead via WhatsApp para vendedores (quando recebem lead com veículo procurado)
+- [x] Corrigir bugs gerais do sistema

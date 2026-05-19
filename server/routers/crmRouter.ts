@@ -9,6 +9,31 @@ import * as db from "../db";
 import { storagePut } from "../storage";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
+import * as zapi from "../zapi-service";
+import { sellers } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
+
+// ===== HELPER: Notify seller via WhatsApp when they receive a new lead =====
+async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadPhone: string | null, source: string | null, vehicleInterest: string | null) {
+  try {
+    const { getDb } = await import("../db");
+    const database = await getDb();
+    if (!database) return;
+    const [seller] = await database.select().from(sellers).where(eq(sellers.id, sellerId)).limit(1);
+    if (!seller || !seller.phone) return; // Seller has no phone registered
+    
+    const sourceLabel = source ? ` (${source})` : "";
+    const vehicleLabel = vehicleInterest ? `\n\ud83d\ude97 Ve\u00edculo: ${vehicleInterest}` : "";
+    const phoneLabel = leadPhone ? `\n\ud83d\udcf1 Tel: ${leadPhone}` : "";
+    
+    const message = `\ud83d\udea8 *NOVO LEAD RECEBIDO!*\n\n\ud83d\udc64 ${leadName}${sourceLabel}${phoneLabel}${vehicleLabel}\n\n\u26a1 Responda R\u00c1PIDO para n\u00e3o perder essa venda!`;
+    
+    await zapi.sendText(seller.phone, message);
+    console.log(`[WhatsApp] Lead notification sent to seller #${sellerId} (${seller.phone})`);
+  } catch (err: any) {
+    console.error(`[WhatsApp] Failed to notify seller #${sellerId}:`, err.message);
+  }
+}
 
 // ===== ADMIN AUTH (Login direto com usuário + senha) =====
 
@@ -203,6 +228,8 @@ export const crmLeadsRouter = router({
     // Send push notification to the seller about the new lead
     if (input.sellerId > 0) {
       sendPushNewLead(input.sellerId, input.name, input.phone || null, input.source || null, input.vehicleInterest || null).catch(console.error);
+      // Send WhatsApp to seller if they have a phone number
+      notifySellerViaWhatsApp(input.sellerId, input.name, input.phone || null, input.source || null, input.vehicleInterest || null).catch(console.error);
     }
     return { id };
   }),
@@ -367,6 +394,8 @@ export const crmLeadsRouter = router({
       sellerId: input.newSellerId,
       targetType: 'seller',
     }).catch(console.error);
+    // Send WhatsApp to new seller
+    notifySellerViaWhatsApp(input.newSellerId, lead.name || 'Lead', lead.phone || null, lead.source || null, lead.vehicleInterest || null).catch(console.error);
     return { success: true };
   }),
 
@@ -1114,7 +1143,6 @@ export const crmVoiceRouter = router({
 
 
 // ===== CHAT MESSAGES =====
-import * as zapi from "../zapi-service";
 import { invokeLLM } from "../_core/llm";
 
 export const crmChatRouter = router({

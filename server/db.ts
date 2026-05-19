@@ -1440,6 +1440,17 @@ export async function deleteDispatchRecord(id: number) {
   await db.delete(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id)));
 }
 
+// Despachante: editar registro
+export async function updateDispatchRecord(id: number, data: Partial<{ vehiclePlate: string; documentType: string; customerPaid: boolean; transferValue: number }>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id))).limit(1);
+  if (!result[0]) throw new Error("Registro de despachante n\u00e3o encontrado");
+  await db.update(dispatchRecords).set(data as any).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id)));
+  const updated = await db.select().from(dispatchRecords).where(and(eq(dispatchRecords.tenantId, getCurrentTenantId()), eq(dispatchRecords.id, id))).limit(1);
+  return updated[0];
+}
+
 // Despachante: marcar como transferido com documento emitido
 export async function markDispatchTransferred(id: number, documentUrl: string, documentKey: string) {
   const db = await getDb();
