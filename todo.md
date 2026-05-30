@@ -2240,3 +2240,5 @@
 - [x] Upload de foto de perfil na MinhaArea (vendedor clica na foto para trocar)
 - [x] Notificação de lead via WhatsApp para vendedores (quando recebem lead com veículo procurado)
 - [x] Corrigir bugs gerais do sistema
+- [ ] Bug: Página do CRM não abre (crash/erro)
+- [x] Botão "Imprimir Lista de Ligação" na tela de Conversas do CRM admin (gera lista formatada para impressão com nome, telefone, veículo, vendedor)

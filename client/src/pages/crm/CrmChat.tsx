@@ -7,7 +7,7 @@ import {
   Send, ArrowLeft, Phone, MessageCircle, Clock, Flame, Thermometer, Snowflake,
   User, Bot, Star, AlertTriangle, ChevronDown, Image, Paperclip, Search,
   X, Filter, Users, Zap, TrendingUp, CheckCircle, XCircle, BarChart3,
-  Volume2, Download, Play, File, Mic, Square, Copy, Check, Eye
+  Volume2, Download, Play, File, Mic, Square, Copy, Check, Eye, Printer
 } from "lucide-react";
 import { ChannelIcon } from "@/components/ChannelIcon";
 
@@ -340,12 +340,69 @@ function LeadList({
               <p className="text-[10px] text-muted-foreground">{stats.total} leads ativos</p>
             </div>
           </div>
-          {alerts && alerts.length > 0 && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30">
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-red-400">{alerts.length} urgentes</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {alerts && alerts.length > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/30">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-red-400">{alerts.length} urgentes</span>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                const printLeads = leads.length > 0 ? leads : [];
+                if (printLeads.length === 0) {
+                  toast.error("Nenhum contato para imprimir");
+                  return;
+                }
+                const printWindow = window.open("", "_blank");
+                if (!printWindow) { toast.error("Popup bloqueado. Permita popups."); return; }
+                const now = new Date();
+                const dateStr = now.toLocaleDateString("pt-BR");
+                const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                const rows = printLeads.map((l: any, i: number) => {
+                  const phone = l.phone ? formatPhoneDisplay(l.phone) : "Sem telefone";
+                  const seller = l.sellerId > 0 ? (sellerMap[l.sellerId] || "-") : "Sem vendedor";
+                  const vehicle = l.vehicleInterest || "-";
+                  const score = l.score === "hot" ? "🔥 Quente" : l.score === "warm" ? "🌡️ Morno" : "❄️ Frio";
+                  return `<tr>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">${i+1}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">${l.name || "Sem nome"}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;font-family:monospace;">${phone}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${vehicle}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${seller}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${score}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">☐</td>
+                  </tr>`;
+                }).join("");
+                printWindow.document.write(`<!DOCTYPE html><html><head><title>Lista de Ligação - Kafka</title>
+                  <style>@media print { body { margin: 0; } .no-print { display: none; } }
+                  body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+                  th { background: #1a1a2e; color: #fff; padding: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+                  h1 { font-size: 18px; margin: 0; } .subtitle { font-size: 12px; color: #666; margin-top: 4px; }
+                  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a1a2e; padding-bottom: 12px; margin-bottom: 8px; }
+                  .btn { background: #1a1a2e; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+                  .btn:hover { background: #2d2d4e; }
+                  </style></head><body>
+                  <div class="header">
+                    <div><h1>📋 Lista de Ligação - Kafka Multimarcas</h1>
+                    <p class="subtitle">Gerada em ${dateStr} às ${timeStr} | ${printLeads.length} contatos</p></div>
+                    <button class="btn no-print" onclick="window.print()">🖨️ Imprimir</button>
+                  </div>
+                  <table><thead><tr>
+                    <th>#</th><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Vendedor</th><th>Temp.</th><th>Ligou?</th>
+                  </tr></thead><tbody>${rows}</tbody></table>
+                  <p style="margin-top:16px;font-size:10px;color:#999;text-align:center;">Kafka Multimarcas - Sistema CRM | ${dateStr}</p>
+                </body></html>`);
+                printWindow.document.close();
+                toast.success(`Lista com ${printLeads.length} contatos pronta para impressão!`);
+              }}
+              className="p-2 rounded-xl bg-accent/30 hover:bg-accent/50 border border-border/50 transition-all"
+              title="Imprimir lista de ligação"
+            >
+              <Printer className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         {/* Search */}
