@@ -98,7 +98,7 @@ export async function listLeadsByDepartment(department: string, opts?: { archive
   return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.updatedAt));
 }
 
-export async function listAllLeads(opts?: { archived?: boolean; department?: string; sellerId?: number }) {
+export async function listAllLeads(opts?: { archived?: boolean; department?: string; sellerId?: number; limit?: number; offset?: number }) {
   const db = await getDb();
   if (!db) return [];
   const conditions: any[] = [];
@@ -107,7 +107,9 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
   if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const tid = getCurrentTenantId();
-  // Fetch leads with last message preview via subquery
+  const queryLimit = opts?.limit || 100;
+  const queryOffset = opts?.offset || 0;
+  // Optimized: use lastMessageAt column for ordering (indexed), limit subqueries to paginated results only
   const leads = await db.select({
     id: crmLeads.id,
     sellerId: crmLeads.sellerId,
@@ -147,9 +149,9 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
     lastMessageSender: sql<string | null>`(SELECT senderName FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
     unreadCount: sql<number>`(SELECT COUNT(*) FROM crm_messages WHERE crm_messages.leadId = crm_leads.id AND crm_messages.direction = 'inbound' AND crm_messages.timestamp > COALESCE(crm_leads.acknowledgedAt, crm_leads.lastAutoTransferAt, 0))`,
   }).from(crmLeads).where(and(eq(crmLeads.tenantId, tid), where)).orderBy(
-    sql`(SELECT timestamp FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1) DESC`,
+    desc(crmLeads.lastMessageAt),
     desc(crmLeads.updatedAt)
-  );
+  ).limit(queryLimit).offset(queryOffset);
   return leads;
 }
 

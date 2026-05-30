@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -264,8 +264,58 @@ function LeadList({
   const [printDateFrom, setPrintDateFrom] = useState("");
   const [printDateTo, setPrintDateTo] = useState("");
   const [printMode, setPrintMode] = useState<"all" | "period">("all");
+  const [loadedLeads, setLoadedLeads] = useState<any[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 100;
 
-  const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 3000 });
+  // Initial load - first page
+  const { data: firstPageData, isLoading: isFirstLoading } = trpc.crmLeads.listAll.useQuery(
+    { archived: false, limit: PAGE_SIZE, offset: 0 },
+    { refetchInterval: 5000 }
+  );
+
+  // Load more pages
+  const { data: moreData } = trpc.crmLeads.listAll.useQuery(
+    { archived: false, limit: PAGE_SIZE, offset: page * PAGE_SIZE },
+    { enabled: page > 0 && hasMore }
+  );
+
+  // Merge first page
+  useEffect(() => {
+    if (firstPageData) {
+      setLoadedLeads(firstPageData);
+      setHasMore(firstPageData.length >= PAGE_SIZE);
+    }
+  }, [firstPageData]);
+
+  // Merge additional pages
+  useEffect(() => {
+    if (moreData && page > 0) {
+      setLoadedLeads(prev => {
+        const existingIds = new Set(prev.map((l: any) => l.id));
+        const newLeads = moreData.filter((l: any) => !existingIds.has(l.id));
+        return [...prev, ...newLeads];
+      });
+      setHasMore(moreData.length >= PAGE_SIZE);
+      setIsLoadingMore(false);
+    }
+  }, [moreData, page]);
+
+  // Scroll handler for infinite scroll
+  const handleScroll = useCallback(() => {
+    if (!listRef.current || !hasMore || isLoadingMore) return;
+    const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+    if (scrollHeight - scrollTop - clientHeight < 300) {
+      setIsLoadingMore(true);
+      setPage(p => p + 1);
+    }
+  }, [hasMore, isLoadingMore]);
+
+  const allLeads = loadedLeads;
+
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
     { query: searchQuery },
     { enabled: searchQuery.length >= 2 }
@@ -409,7 +459,13 @@ function LeadList({
       <div className="h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
 
       {/* Lead list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={listRef} onScroll={handleScroll}>
+        {isFirstLoading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="ml-2 text-xs text-muted-foreground">Carregando leads...</span>
+          </div>
+        )}
         {leads.map((lead: any) => {
           const scoreCfg = SCORE_CFG[lead.score as keyof typeof SCORE_CFG] || SCORE_CFG.warm;
           const ScoreIcon = scoreCfg.icon;
@@ -550,13 +606,26 @@ function LeadList({
           );
         })}
 
-        {leads.length === 0 && (
+        {leads.length === 0 && !isFirstLoading && (
           <div className="text-center py-16">
             <div className="w-16 h-16 rounded-2xl bg-accent/30 flex items-center justify-center mx-auto mb-3">
               <MessageCircle className="w-8 h-8 text-muted-foreground/20" />
             </div>
             <p className="text-sm font-medium text-muted-foreground">Nenhum lead encontrado</p>
             <p className="text-xs text-muted-foreground/50 mt-1">Tente ajustar os filtros</p>
+          </div>
+        )}
+
+        {/* Load more indicator */}
+        {isLoadingMore && (
+          <div className="flex items-center justify-center py-4">
+            <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="ml-2 text-[10px] text-muted-foreground">Carregando mais...</span>
+          </div>
+        )}
+        {hasMore && !isLoadingMore && leads.length > 0 && (
+          <div className="text-center py-3">
+            <span className="text-[10px] text-muted-foreground/50">{leads.length} leads carregados</span>
           </div>
         )}
       </div>

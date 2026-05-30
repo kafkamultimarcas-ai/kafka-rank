@@ -289,6 +289,8 @@ export const crmLeadsRouter = router({
     archived: z.boolean().optional(),
     department: z.string().optional(),
     sellerId: z.number().optional(),
+    limit: z.number().optional(),
+    offset: z.number().optional(),
   }).optional()).query(async ({ input }) => {
     return crmDb.listAllLeads(input || {});
   }),

@@ -2243,3 +2243,4 @@
 - [ ] Bug: Página do CRM não abre (crash/erro)
 - [x] Botão "Imprimir Lista de Ligação" na tela de Conversas do CRM admin (gera lista formatada para impressão com nome, telefone, veículo, vendedor)
 - [x] Telefone clicável na lista de conversas do CRM (abre WhatsApp Web direto)
+- [x] Otimizar carregamento de leads no CRM (paginação + índices + scroll infinito)
