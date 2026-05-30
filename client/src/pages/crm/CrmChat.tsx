@@ -260,6 +260,11 @@ function LeadList({
   filterScore: string | null;
   setFilterScore: (s: string | null) => void;
 }) {
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printDateFrom, setPrintDateFrom] = useState("");
+  const [printDateTo, setPrintDateTo] = useState("");
+  const [printMode, setPrintMode] = useState<"all" | "period">("all");
+
   const { data: allLeads } = trpc.crmLeads.listAll.useQuery({ archived: false }, { refetchInterval: 3000 });
   const { data: searchResults } = trpc.crmLeads.search.useQuery(
     { query: searchQuery },
@@ -348,55 +353,7 @@ function LeadList({
               </div>
             )}
             <button
-              onClick={() => {
-                const printLeads = leads.length > 0 ? leads : [];
-                if (printLeads.length === 0) {
-                  toast.error("Nenhum contato para imprimir");
-                  return;
-                }
-                const printWindow = window.open("", "_blank");
-                if (!printWindow) { toast.error("Popup bloqueado. Permita popups."); return; }
-                const now = new Date();
-                const dateStr = now.toLocaleDateString("pt-BR");
-                const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                const rows = printLeads.map((l: any, i: number) => {
-                  const phone = l.phone ? formatPhoneDisplay(l.phone) : "Sem telefone";
-                  const seller = l.sellerId > 0 ? (sellerMap[l.sellerId] || "-") : "Sem vendedor";
-                  const vehicle = l.vehicleInterest || "-";
-                  const score = l.score === "hot" ? "🔥 Quente" : l.score === "warm" ? "🌡️ Morno" : "❄️ Frio";
-                  return `<tr>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">${i+1}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">${l.name || "Sem nome"}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;font-family:monospace;">${phone}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${vehicle}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${seller}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${score}</td>
-                    <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">☐</td>
-                  </tr>`;
-                }).join("");
-                printWindow.document.write(`<!DOCTYPE html><html><head><title>Lista de Ligação - Kafka</title>
-                  <style>@media print { body { margin: 0; } .no-print { display: none; } }
-                  body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-                  th { background: #1a1a2e; color: #fff; padding: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-                  h1 { font-size: 18px; margin: 0; } .subtitle { font-size: 12px; color: #666; margin-top: 4px; }
-                  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a1a2e; padding-bottom: 12px; margin-bottom: 8px; }
-                  .btn { background: #1a1a2e; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-                  .btn:hover { background: #2d2d4e; }
-                  </style></head><body>
-                  <div class="header">
-                    <div><h1>📋 Lista de Ligação - Kafka Multimarcas</h1>
-                    <p class="subtitle">Gerada em ${dateStr} às ${timeStr} | ${printLeads.length} contatos</p></div>
-                    <button class="btn no-print" onclick="window.print()">🖨️ Imprimir</button>
-                  </div>
-                  <table><thead><tr>
-                    <th>#</th><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Vendedor</th><th>Temp.</th><th>Ligou?</th>
-                  </tr></thead><tbody>${rows}</tbody></table>
-                  <p style="margin-top:16px;font-size:10px;color:#999;text-align:center;">Kafka Multimarcas - Sistema CRM | ${dateStr}</p>
-                </body></html>`);
-                printWindow.document.close();
-                toast.success(`Lista com ${printLeads.length} contatos pronta para impressão!`);
-              }}
+              onClick={() => setShowPrintModal(true)}
               className="p-2 rounded-xl bg-accent/30 hover:bg-accent/50 border border-border/50 transition-all"
               title="Imprimir lista de ligação"
             >
@@ -596,6 +553,139 @@ function LeadList({
           </div>
         )}
       </div>
+
+      {/* Print Modal with date filter */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPrintModal(false)}>
+          <div className="bg-card border border-border rounded-2xl p-5 w-[340px] max-w-[90vw] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Printer className="w-4 h-4 text-primary" /> Imprimir Lista de Ligação
+              </h3>
+              <button onClick={() => setShowPrintModal(false)} className="p-1 rounded-lg hover:bg-accent">
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Mode selection */}
+              <div className="flex gap-2">
+                <button onClick={() => setPrintMode("all")}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-medium border transition-all ${printMode === "all" ? "bg-primary/15 border-primary/40 text-primary" : "bg-accent/30 border-border text-muted-foreground"}`}>
+                  Todos ({leads.length})
+                </button>
+                <button onClick={() => setPrintMode("period")}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-medium border transition-all ${printMode === "period" ? "bg-primary/15 border-primary/40 text-primary" : "bg-accent/30 border-border text-muted-foreground"}`}>
+                  Por Período
+                </button>
+              </div>
+
+              {/* Date inputs */}
+              {printMode === "period" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground font-medium">Data Inicial</label>
+                    <input type="date" value={printDateFrom} onChange={e => setPrintDateFrom(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-accent/30 border border-border text-sm text-foreground" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground font-medium">Data Final</label>
+                    <input type="date" value={printDateTo} onChange={e => setPrintDateTo(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-accent/30 border border-border text-sm text-foreground" />
+                  </div>
+                </div>
+              )}
+
+              {/* Preview count */}
+              <div className="text-center py-2">
+                <span className="text-xs text-muted-foreground">
+                  {(() => {
+                    if (printMode === "all") return `${leads.length} contatos serão impressos`;
+                    const from = printDateFrom ? new Date(printDateFrom + "T00:00:00").getTime() : 0;
+                    const to = printDateTo ? new Date(printDateTo + "T23:59:59").getTime() : Infinity;
+                    const count = leads.filter((l: any) => {
+                      const ts = l.lastMessageTimestamp || l.createdAt;
+                      const leadTime = typeof ts === "number" ? ts : new Date(ts).getTime();
+                      return leadTime >= from && leadTime <= to;
+                    }).length;
+                    return `${count} contatos no período selecionado`;
+                  })()}
+                </span>
+              </div>
+
+              {/* Print button */}
+              <button
+                onClick={() => {
+                  let printLeads = [...leads];
+                  let periodLabel = "";
+                  if (printMode === "period") {
+                    const from = printDateFrom ? new Date(printDateFrom + "T00:00:00").getTime() : 0;
+                    const to = printDateTo ? new Date(printDateTo + "T23:59:59").getTime() : Infinity;
+                    printLeads = leads.filter((l: any) => {
+                      const ts = l.lastMessageTimestamp || l.createdAt;
+                      const leadTime = typeof ts === "number" ? ts : new Date(ts).getTime();
+                      return leadTime >= from && leadTime <= to;
+                    });
+                    const fromStr = printDateFrom ? new Date(printDateFrom + "T12:00:00").toLocaleDateString("pt-BR") : "início";
+                    const toStr = printDateTo ? new Date(printDateTo + "T12:00:00").toLocaleDateString("pt-BR") : "hoje";
+                    periodLabel = `Período: ${fromStr} a ${toStr}`;
+                  }
+                  if (printLeads.length === 0) {
+                    toast.error("Nenhum contato no período selecionado");
+                    return;
+                  }
+                  const printWindow = window.open("", "_blank");
+                  if (!printWindow) { toast.error("Popup bloqueado. Permita popups."); return; }
+                  const now = new Date();
+                  const dateStr = now.toLocaleDateString("pt-BR");
+                  const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  const rows = printLeads.map((l: any, i: number) => {
+                    const phone = l.phone ? formatPhoneDisplay(l.phone) : "Sem telefone";
+                    const seller = l.sellerId > 0 ? (sellerMap[l.sellerId] || "-") : "Sem vendedor";
+                    const vehicle = l.vehicleInterest || "-";
+                    const score = l.score === "hot" ? "🔥 Quente" : l.score === "warm" ? "🌡️ Morno" : "❄️ Frio";
+                    return `<tr>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">${i+1}</td>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">${l.name || "Sem nome"}</td>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;font-family:monospace;">${phone}</td>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${vehicle}</td>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${seller}</td>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">${score}</td>
+                      <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;">☐</td>
+                    </tr>`;
+                  }).join("");
+                  printWindow.document.write(`<!DOCTYPE html><html><head><title>Lista de Ligação - Kafka</title>
+                    <style>@media print { body { margin: 0; } .no-print { display: none; } }
+                    body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+                    th { background: #1a1a2e; color: #fff; padding: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+                    h1 { font-size: 18px; margin: 0; } .subtitle { font-size: 12px; color: #666; margin-top: 4px; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a1a2e; padding-bottom: 12px; margin-bottom: 8px; }
+                    .btn { background: #1a1a2e; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+                    .btn:hover { background: #2d2d4e; }
+                    </style></head><body>
+                    <div class="header">
+                      <div><h1>📋 Lista de Ligação - Kafka Multimarcas</h1>
+                      <p class="subtitle">Gerada em ${dateStr} às ${timeStr} | ${printLeads.length} contatos${periodLabel ? " | " + periodLabel : ""}</p></div>
+                      <button class="btn no-print" onclick="window.print()">🖨️ Imprimir</button>
+                    </div>
+                    <table><thead><tr>
+                      <th>#</th><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Vendedor</th><th>Temp.</th><th>Ligou?</th>
+                    </tr></thead><tbody>${rows}</tbody></table>
+                    <p style="margin-top:16px;font-size:10px;color:#999;text-align:center;">Kafka Multimarcas - Sistema CRM | ${dateStr}</p>
+                  </body></html>`);
+                  printWindow.document.close();
+                  setShowPrintModal(false);
+                  toast.success(`Lista com ${printLeads.length} contatos pronta para impressão!`);
+                }}
+                className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-all"
+              >
+                🖨️ Gerar Lista ({printMode === "all" ? leads.length : "filtrado"})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
