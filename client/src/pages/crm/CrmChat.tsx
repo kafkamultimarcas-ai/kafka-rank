@@ -468,13 +468,20 @@ function LeadList({
                     </span>
                   </div>
 
-                  {/* Row 2: Phone number - HIGHLIGHTED */}
+                  {/* Row 2: Phone number - HIGHLIGHTED & CLICKABLE */}
                   {lead.phone && (
                     <div className="flex items-center gap-1.5 mb-1">
                       <Phone className="w-3 h-3 text-green-500/70 shrink-0" />
-                      <span className="text-[12px] font-mono text-green-400/90 tracking-wide">
+                      <a
+                        href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[12px] font-mono text-green-400/90 tracking-wide hover:text-green-300 hover:underline transition-colors cursor-pointer"
+                        title="Abrir no WhatsApp"
+                      >
                         {formatPhoneDisplay(lead.phone)}
-                      </span>
+                      </a>
                     </div>
                   )}
 
