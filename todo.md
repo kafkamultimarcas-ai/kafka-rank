@@ -2222,7 +2222,7 @@
 - [ ] Consignação: permitir edição de valores (menos data de lançamento)
 - [ ] Vendas: adicionar campo origem do lead (lead loja vs lead vendedor)
 - [ ] Ranking de consignação (quem mais consignou = primeiro lugar)
-- [ ] Corrigir bugs gerais do sistema
+- [x] Corrigir bugs gerais do sistema
 
 ### Aprovar Todos + Correções (13/05)
 - [x] Botão "Aprovar Todos" na página de aprovação (por aba/categoria)
@@ -2244,3 +2244,25 @@
 - [x] Botão "Imprimir Lista de Ligação" na tela de Conversas do CRM admin (gera lista formatada para impressão com nome, telefone, veículo, vendedor)
 - [x] Telefone clicável na lista de conversas do CRM (abre WhatsApp Web direto)
 - [x] Otimizar carregamento de leads no CRM (paginação + índices + scroll infinito)
+- [x] Central de Resultados: Card 1 - Ganho Previsto do Mês (cálculo automático baseado em vendas, comissão, ajuda de custo, bônus, vales)
+- [x] Central de Resultados: Card 2 - Minha Performance (vendas do mês, próxima meta, barra de progresso, mensagem motivacional)
+- [x] Central de Resultados: Card 3 - Ranking da Empresa (posição, líder, diferença de vendas)
+- [x] Central de Resultados: Card 4 - Simulador de Ganhos (projeção se vender +1, +2, bônus desbloqueáveis)
+- [x] Central de Resultados: Card 5 - Vales e Adiantamentos (total, histórico)
+- [x] Central de Resultados: Card 6 - Resumo Financeiro (ajuda de custo, comissão, bônus, vales, líquido previsto)
+- [x] Central de Resultados: Gamificação com medalhas automáticas (5, 8, 10, 12 vendas)
+- [x] Central de Resultados: Botão em destaque na tela inicial do vendedor
+- [ ] Schema: Tabela bonus_vehicles (carros bônus com campanha, valor, datas, placa)
+- [ ] Schema: Tabela seller_bonuses (bônus lançados automaticamente com status aprovação)
+- [ ] Backend: Lançamento automático de bônus quando venda com placa bate com carro bônus ativo
+- [ ] Backend: CRUD de carros bônus (gestor)
+- [ ] Backend: Fluxo de aprovação de bônus (aguardando/aprovado/recusado/pago)
+- [ ] Backend: Integração bônus aprovados no cálculo da Central de Resultados
+- [ ] Frontend: Central de Resultados - página completa com 6 cards + gamificação
+- [ ] Frontend: Central de Resultados - campanhas ativas e carros bônus disponíveis
+- [ ] Frontend: Central de Resultados - bônus pendentes/aprovados/pagos
+- [ ] Frontend: Painel admin para cadastro de carros bônus
+- [ ] Frontend: Visibilidade financeiro/gestão (resumo por vendedor com comissão, bônus, vales, total)
+- [ ] Frontend: Botão destaque na tela inicial do vendedor para Central de Resultados
+- [ ] Correção de bugs gerais
+- [x] Remover aba Sorteio Feirão do menu lateral admin

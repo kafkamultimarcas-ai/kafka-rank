@@ -1152,6 +1152,23 @@ export default function MinhaArea() {
             <SdrConversionsCard sellerId={Number(sellerId)} />
           )}
 
+          {/* Central de Resultados */}
+          {dept === "vendas" && (
+            <button
+              onClick={() => navigate(`/meus-resultados/${sellerId}`)}
+              className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-bold">Central de Resultados</p>
+                <p className="text-gray-400 text-sm">Comissões, bônus, vales e simulações</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-500" />
+            </button>
+          )}
+
           {/* Registrar - botão específico por setor (não mostrar para financeiro) */}
           {dept !== 'financeiro' && (
           <button

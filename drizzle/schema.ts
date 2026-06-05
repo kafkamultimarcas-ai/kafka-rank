@@ -1374,3 +1374,79 @@ export const vehicleCostItems = mysqlTable("vehicle_cost_items", {
 });
 export type VehicleCostItem = typeof vehicleCostItems.$inferSelect;
 export type InsertVehicleCostItem = typeof vehicleCostItems.$inferInsert;
+
+// Vales e Adiantamentos dos vendedores
+export const sellerAdvances = mysqlTable("seller_advances", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  amount: int("amount").notNull(), // valor em centavos
+  description: varchar("description", { length: 500 }),
+  date: bigint("date", { mode: "number" }).notNull(), // timestamp da data do vale
+  month: int("month").notNull(), // 1-12
+  year: int("year").notNull(),
+  createdBy: int("createdBy"), // admin/gerente que registrou
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+
+export type SellerAdvance = typeof sellerAdvances.$inferSelect;
+export type InsertSellerAdvance = typeof sellerAdvances.$inferInsert;
+
+// Tabela de regras de comissão (configurável pelo admin)
+export const commissionRules = mysqlTable("commission_rules", {
+  id: int("id").autoincrement().primaryKey(),
+  minSales: int("minSales").notNull(), // mínimo de vendas para esta faixa
+  maxSales: int("maxSales"), // máximo (null = sem limite)
+  helpAllowance: int("helpAllowance").notNull(), // ajuda de custo em centavos
+  commissionPerSale: int("commissionPerSale").notNull(), // comissão por carro em centavos
+  bonus: int("bonus").default(0).notNull(), // bônus em centavos
+  bonusDescription: varchar("bonusDescription", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+
+export type CommissionRule = typeof commissionRules.$inferSelect;
+export type InsertCommissionRule = typeof commissionRules.$inferInsert;
+
+// Carros Bônus (cadastrados pelo gestor, vinculados a campanhas)
+export const bonusVehicles = mysqlTable("bonus_vehicles", {
+  id: int("id").autoincrement().primaryKey(),
+  vehicleModel: varchar("vehicleModel", { length: 255 }).notNull(),
+  plate: varchar("plate", { length: 20 }), // placa específica (opcional)
+  bonusAmount: int("bonusAmount").notNull(), // valor do bônus em centavos
+  campaignName: varchar("campaignName", { length: 255 }).notNull(),
+  campaignRules: text("campaignRules"),
+  startDate: bigint("startDate", { mode: "number" }).notNull(), // timestamp início
+  endDate: bigint("endDate", { mode: "number" }).notNull(), // timestamp fim
+  active: boolean("active").default(true).notNull(),
+  createdBy: int("createdBy"), // admin/gerente
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+
+export type BonusVehicle = typeof bonusVehicles.$inferSelect;
+export type InsertBonusVehicle = typeof bonusVehicles.$inferInsert;
+
+// Bônus lançados para vendedores (automático ou manual)
+export const sellerBonuses = mysqlTable("seller_bonuses", {
+  id: int("id").autoincrement().primaryKey(),
+  sellerId: int("sellerId").notNull(),
+  saleId: int("saleId"), // venda que gerou o bônus (se automático)
+  bonusVehicleId: int("bonusVehicleId"), // carro bônus vinculado (se aplicável)
+  type: varchar("type", { length: 50 }).notNull(), // 'carro_bonus' | 'campanha' | 'premiacao' | 'manual'
+  amount: int("amount").notNull(), // valor em centavos
+  description: varchar("description", { length: 500 }).notNull(),
+  campaignName: varchar("campaignName", { length: 255 }),
+  status: varchar("status", { length: 30 }).notNull().default("pending"), // 'pending' | 'approved' | 'rejected' | 'paid'
+  month: int("month").notNull(),
+  year: int("year").notNull(),
+  approvedBy: int("approvedBy"),
+  approvedAt: bigint("approvedAt", { mode: "number" }),
+  paidAt: bigint("paidAt", { mode: "number" }),
+  rejectionReason: varchar("rejectionReason", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+});
+
+export type SellerBonus = typeof sellerBonuses.$inferSelect;
+export type InsertSellerBonus = typeof sellerBonuses.$inferInsert;

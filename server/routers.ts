@@ -892,6 +892,21 @@ export const appRouter = router({
           }
         } catch (e) { console.error('Erro ao cruzar consignação:', e); }
       }
+      // AUTO-LAUNCH BÔNUS: verificar se veículo vendido tem bônus ativo
+      try {
+        const bonusResult = await db.autoLaunchBonus(input.id, sale.sellerId, sale.vehiclePlate || null, sale.vehicleModel || null);
+        if (bonusResult) {
+          console.log(`[Bonus] Bônus automático lançado para vendedor ${sale.sellerId} - venda #${input.id}`);
+          if (seller) {
+            await db.createNotification({
+              sellerId: sale.sellerId,
+              type: 'bonus_earned',
+              title: '🎉 Bônus de Carro!',
+              message: `Você ganhou um bônus pela venda! Aguardando aprovação.`,
+            });
+          }
+        }
+      } catch (e) { console.error('[Bonus] Erro ao lançar bônus automático:', e); }
       return { success: true };
     }),
     // Rejeitar venda (admin/gerente)
@@ -3259,5 +3274,312 @@ Adapte o formato conforme o assunto, mas sempre inclua:
 
   // ===== SUPER ADMIN (MULTI-TENANT) =====
   superAdmin: superAdminRouter,
+
+  // ===== CENTRAL DE RESULTADOS (VENDEDOR) =====
+  sellerResults: router({
+    // Dashboard completo do vendedor
+    getDashboard: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      month: z.number().min(1).max(12).optional(),
+      year: z.number().optional(),
+    })).query(async ({ input }) => {
+      const now = new Date();
+      const month = input.month || (now.getMonth() + 1);
+      const year = input.year || now.getFullYear();
+      
+      // 1. Vendas aprovadas do mês
+      const monthSales = await db.getApprovedSalesForMonth(input.sellerId, month, year);
+      const salesCount = monthSales.length;
+      
+      // 2. Regras de comissão
+      const rules = await db.getCommissionRules();
+      const commission = db.calculateCommission(salesCount, rules);
+      
+      // 3. Vales do mês
+      const advances = await db.getSellerAdvances(input.sellerId, month, year);
+      const totalAdvances = advances.reduce((sum, a) => sum + a.amount, 0);
+      
+      // 4. Ranking
+      const ranking = await db.getSalesRankingForMonth(month, year);
+      const myPosition = ranking.find(r => r.sellerId === input.sellerId);
+      const leader = ranking[0] || null;
+      
+      // 5. Meta individual
+      const allGoals = await db.getGoalsForMonth(month, year);
+      const myGoal = allGoals.find((g: any) => g.type === 'individual' && g.sellerId === input.sellerId && g.category === 'vendas');
+      
+      // 5.5 Bônus do vendedor (carros bônus, campanhas, premiações)
+      const sellerBonusList = await db.listSellerBonuses({ sellerId: input.sellerId, month, year });
+      const approvedBonuses = sellerBonusList.filter((b: any) => b.status === 'approved' || b.status === 'paid');
+      const pendingBonuses = sellerBonusList.filter((b: any) => b.status === 'pending');
+      const totalApprovedBonuses = approvedBonuses.reduce((sum: number, b: any) => sum + b.amount, 0);
+      
+      // 5.6 Campanhas ativas (carros bônus disponíveis)
+      const activeBonusVehicles = await db.listBonusVehicles(true);
+      
+      // 6. Cálculo do ganho previsto (com bônus de carro)
+      const netEarnings = commission.helpAllowance + commission.totalCommission + commission.bonus + totalApprovedBonuses - totalAdvances;
+      
+      // 7. Simulação: se vender +1, +2, etc
+      const simulations = [];
+      for (let extra = 1; extra <= 3; extra++) {
+        const simCount = salesCount + extra;
+        const simComm = db.calculateCommission(simCount, rules);
+        simulations.push({
+          extraSales: extra,
+          totalSales: simCount,
+          netEarnings: simComm.helpAllowance + simComm.commissionPerSale * simCount + simComm.bonus - totalAdvances,
+          bonus: simComm.bonus,
+          bonusDescription: simComm.bonusDescription,
+          newTier: simComm.commissionPerSale !== commission.commissionPerSale || simComm.helpAllowance !== commission.helpAllowance,
+        });
+      }
+      
+      // 8. Bônus desbloqueáveis
+      const unlockableBonuses = rules.filter(r => r.bonus > 0 && r.minSales > salesCount).map(r => ({
+        salesNeeded: r.minSales,
+        remaining: r.minSales - salesCount,
+        bonus: r.bonus,
+        description: r.bonusDescription,
+      }));
+      
+      // 9. Medalhas
+      const badges = [];
+      if (salesCount >= 5) badges.push({ level: 'bronze', title: 'Vendedor em Evolução', icon: '🥉', threshold: 5 });
+      if (salesCount >= 8) badges.push({ level: 'silver', title: 'Alta Performance', icon: '🥈', threshold: 8 });
+      if (salesCount >= 10) badges.push({ level: 'gold', title: 'Elite Kafka', icon: '🥇', threshold: 10 });
+      if (salesCount >= 12) badges.push({ level: 'legend', title: 'Lenda Kafka', icon: '👑', threshold: 12 });
+      
+      // Próxima medalha
+      const allBadges = [
+        { level: 'bronze', title: 'Vendedor em Evolução', icon: '🥉', threshold: 5 },
+        { level: 'silver', title: 'Alta Performance', icon: '🥈', threshold: 8 },
+        { level: 'gold', title: 'Elite Kafka', icon: '🥇', threshold: 10 },
+        { level: 'legend', title: 'Lenda Kafka', icon: '👑', threshold: 12 },
+      ];
+      const nextBadge = allBadges.find(b => b.threshold > salesCount) || null;
+      
+      return {
+        month,
+        year,
+        salesCount,
+        // Card 1 - Ganho Previsto
+        earnings: {
+          helpAllowance: commission.helpAllowance,
+          totalCommission: commission.totalCommission,
+          commissionPerSale: commission.commissionPerSale,
+          bonus: commission.bonus,
+          bonusDescription: commission.bonusDescription,
+          totalAdvances,
+          netEarnings,
+        },
+        // Card 2 - Performance
+        performance: {
+          salesCount,
+          goalTarget: myGoal?.targetValue || 0,
+          goalProgress: myGoal ? Math.round((salesCount / myGoal.targetValue) * 100) : 0,
+          remaining: myGoal ? Math.max(0, myGoal.targetValue - salesCount) : 0,
+        },
+        // Card 3 - Ranking
+        ranking: {
+          myPosition: myPosition?.position || 0,
+          mySales: salesCount,
+          leader: leader ? { name: leader.name, salesCount: leader.salesCount, position: 1 } : null,
+          top5: ranking.slice(0, 5),
+          totalSellers: ranking.length,
+          gapToLeader: leader ? leader.salesCount - salesCount : 0,
+        },
+        // Card 4 - Simulador
+        simulations,
+        unlockableBonuses,
+        // Card 5 - Vales
+        advances: {
+          total: totalAdvances,
+          items: advances,
+        },
+        // Card 6 - Resumo Financeiro
+        summary: {
+          helpAllowance: commission.helpAllowance,
+          totalCommission: commission.totalCommission,
+          bonus: commission.bonus,
+          totalAdvances,
+          netEarnings,
+        },
+        // Gamificação
+        badges,
+        nextBadge,
+        // Bônus de carros/campanhas
+        sellerBonuses: {
+          approved: approvedBonuses,
+          pending: pendingBonuses,
+          totalApproved: totalApprovedBonuses,
+          all: sellerBonusList,
+        },
+        // Campanhas ativas
+        activeCampaigns: activeBonusVehicles.map(bv => ({
+          id: bv.id,
+          vehicleModel: bv.vehicleModel,
+          plate: bv.plate,
+          bonusAmount: bv.bonusAmount,
+          campaignName: bv.campaignName,
+          campaignRules: bv.campaignRules,
+          startDate: bv.startDate,
+          endDate: bv.endDate,
+        })),
+      };
+    }),
+
+    // CRUD de vales (admin/gerente)
+    createAdvance: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      amount: z.number().min(1),
+      description: z.string().optional(),
+      date: z.number(),
+      month: z.number(),
+      year: z.number(),
+    })).mutation(async ({ input }) => {
+      await db.createSellerAdvance({ ...input, tenantId: 1 });
+      return { success: true };
+    }),
+
+    deleteAdvance: publicProcedure.input(z.object({
+      id: z.number(),
+    })).mutation(async ({ input }) => {
+      await db.deleteSellerAdvance(input.id);
+      return { success: true };
+    }),
+
+    // Listar vales
+    listAdvances: publicProcedure.input(z.object({
+      sellerId: z.number(),
+      month: z.number(),
+      year: z.number(),
+    })).query(async ({ input }) => {
+      return db.getSellerAdvances(input.sellerId, input.month, input.year);
+    }),
+
+    // Regras de comissão
+    getCommissionRules: publicProcedure.query(async () => {
+      return db.getCommissionRules();
+    }),
+
+    // ===== BONUS VEHICLES (CARROS BÔNUS) =====
+    listBonusVehicles: publicProcedure.input(z.object({
+      activeOnly: z.boolean().optional(),
+    }).optional()).query(async ({ input }) => {
+      return db.listBonusVehicles(input?.activeOnly || false);
+    }),
+
+    createBonusVehicle: publicProcedure.input(z.object({
+      vehicleModel: z.string(),
+      plate: z.string().optional(),
+      bonusAmount: z.number().min(1),
+      campaignName: z.string(),
+      campaignRules: z.string().optional(),
+      startDate: z.number(),
+      endDate: z.number(),
+      inventoryId: z.number().optional(), // ID do veículo no estoque
+    })).mutation(async ({ input }) => {
+      await db.createBonusVehicle({ ...input, active: true, tenantId: 1 });
+      return { success: true };
+    }),
+
+    updateBonusVehicle: publicProcedure.input(z.object({
+      id: z.number(),
+      vehicleModel: z.string().optional(),
+      plate: z.string().optional(),
+      bonusAmount: z.number().optional(),
+      campaignName: z.string().optional(),
+      campaignRules: z.string().optional(),
+      startDate: z.number().optional(),
+      endDate: z.number().optional(),
+      active: z.boolean().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await db.updateBonusVehicle(id, data);
+      return { success: true };
+    }),
+
+    deleteBonusVehicle: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteBonusVehicle(input.id);
+      return { success: true };
+    }),
+
+    // ===== SELLER BONUSES (BÔNUS LANÇADOS) =====
+    listSellerBonuses: publicProcedure.input(z.object({
+      sellerId: z.number().optional(),
+      month: z.number().optional(),
+      year: z.number().optional(),
+      status: z.string().optional(),
+    })).query(async ({ input }) => {
+      return db.listSellerBonuses(input);
+    }),
+
+    updateBonusStatus: publicProcedure.input(z.object({
+      id: z.number(),
+      status: z.enum(['pending', 'approved', 'rejected', 'paid']),
+      rejectionReason: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      await db.updateSellerBonusStatus(input.id, input.status, undefined, input.rejectionReason);
+      return { success: true };
+    }),
+
+    // Dashboard financeiro para gestão (todos vendedores)
+    financialOverview: publicProcedure.input(z.object({
+      month: z.number().optional(),
+      year: z.number().optional(),
+    })).query(async ({ input }) => {
+      const now = new Date();
+      const month = input.month || (now.getMonth() + 1);
+      const year = input.year || now.getFullYear();
+      
+      // Buscar todos os vendedores ativos do dept vendas
+      const allSellers = await db.listSellers(true);
+      const salesSellers = allSellers.filter((s: any) => s.department === 'vendas');
+      const rules = await db.getCommissionRules();
+      
+      const overview = await Promise.all(salesSellers.map(async (seller: any) => {
+        const monthSales = await db.getApprovedSalesForMonth(seller.id, month, year);
+        const salesCount = monthSales.length;
+        const commission = db.calculateCommission(salesCount, rules);
+        const advances = await db.getSellerAdvances(seller.id, month, year);
+        const totalAdvances = advances.reduce((sum: number, a: any) => sum + a.amount, 0);
+        const bonuses = await db.listSellerBonuses({ sellerId: seller.id, month, year });
+        const approvedBonuses = bonuses.filter((b: any) => b.status === 'approved' || b.status === 'paid');
+        const totalBonuses = approvedBonuses.reduce((sum: number, b: any) => sum + b.amount, 0);
+        const pendingBonuses = bonuses.filter((b: any) => b.status === 'pending');
+        
+        const netEarnings = commission.helpAllowance + commission.totalCommission + commission.bonus + totalBonuses - totalAdvances;
+        
+        return {
+          sellerId: seller.id,
+          name: seller.nickname || seller.name,
+          photoUrl: seller.photoUrl,
+          salesCount,
+          helpAllowance: commission.helpAllowance,
+          totalCommission: commission.totalCommission,
+          commissionBonus: commission.bonus,
+          totalBonuses,
+          totalAdvances,
+          netEarnings,
+          pendingBonusCount: pendingBonuses.length,
+          advances: advances.map((a: any) => ({ id: a.id, amount: a.amount, description: a.description, date: a.date })),
+        };
+      }));
+      
+      return {
+        month,
+        year,
+        sellers: overview.sort((a, b) => b.salesCount - a.salesCount),
+        totals: {
+          totalSellers: overview.length,
+          totalSales: overview.reduce((s, o) => s + o.salesCount, 0),
+          totalToPay: overview.reduce((s, o) => s + Math.max(0, o.netEarnings), 0),
+          totalAdvances: overview.reduce((s, o) => s + o.totalAdvances, 0),
+          totalBonuses: overview.reduce((s, o) => s + o.totalBonuses, 0),
+        },
+      };
+    }),
+  }),
 });
 export type AppRouter = typeof appRouter;

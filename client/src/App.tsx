@@ -22,7 +22,6 @@ const AdminActionPlans = lazy(() => import("./pages/admin/AdminActionPlans"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminApprovals = lazy(() => import("./pages/admin/AdminApprovals"));
 const AdminGoals = lazy(() => import("./pages/admin/AdminGoals"));
-const AdminSorteio = lazy(() => import("./pages/admin/AdminSorteio"));
 const AdminAgendamentos = lazy(() => import("./pages/admin/AdminAgendamentos"));
 const AdminGerentes = lazy(() => import("./pages/admin/AdminGerentes"));
 const AdminFei = lazy(() => import("./pages/admin/AdminFei"));
@@ -51,13 +50,15 @@ const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
 const IAVendedor = lazy(() => import("./pages/IAVendedor"));
 const SimuladorFinanciamento = lazy(() => import("./pages/SimuladorFinanciamento"));
-const RankingFeirao = lazy(() => import("./pages/RankingFeirao"));
 const FichaFinanciamento = lazy(() => import("./pages/FichaFinanciamento"));
 const MesaCredito = lazy(() => import("./pages/MesaCredito"));
 const GerentePanel = lazy(() => import("./pages/GerentePanel"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
+const CentralResultados = lazy(() => import("./pages/CentralResultados"));
+const AdminBonusVehicles = lazy(() => import("./pages/admin/AdminBonusVehicles"));
+const FinanceiroVendedores = lazy(() => import("./pages/admin/FinanceiroVendedores"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -100,7 +101,6 @@ function Router() {
         <Route path="/admin/aprovacoes" component={AdminApprovals} />
         <Route path="/admin/metas" component={AdminGoals} />
         <Route path="/admin/agendamentos" component={AdminAgendamentos} />
-        <Route path="/admin/sorteio" component={AdminSorteio} />
         <Route path="/admin/gerentes" component={AdminGerentes} />
         <Route path="/admin/fei" component={AdminFei} />
         <Route path="/admin/pos-venda" component={AdminPosVenda} />
@@ -123,7 +123,6 @@ function Router() {
         <Route path="/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
         <Route path="/pos-venda" component={PosVenda} />
-        <Route path="/feirao" component={RankingFeirao} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
@@ -132,6 +131,9 @@ function Router() {
         <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
+        <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
+        <Route path="/admin/bonus-veiculos" component={AdminBonusVehicles} />
+        <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         <Route path="/gerente" component={GerentePanel} />
         <Route path="/super-admin" component={SuperAdmin} />
         <Route path="/404" component={NotFound} />

@@ -1,4 +1,4 @@
-import { eq, desc, and, or, sql, inArray, gte, lt, lte, isNotNull, isNull } from "drizzle-orm";
+import { eq, desc, asc, and, or, sql, inArray, gte, lt, lte, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -28,6 +28,10 @@ import {
   competitionSnapshots, InsertCompetitionSnapshot,
   feiAuditLogs, InsertFeiAuditLog,
   sellerPermissions, InsertSellerPermission,
+  sellerAdvances, InsertSellerAdvance,
+  commissionRules, InsertCommissionRule,
+  bonusVehicles, InsertBonusVehicle,
+  sellerBonuses, InsertSellerBonus,
   feiraoEditions, InsertFeiraoEdition,
   vehicleCosts, InsertVehicleCost,
   vehicleCostItems, InsertVehicleCostItem,
@@ -3369,4 +3373,292 @@ export async function getConsignmentRanking(month: number, year: number) {
     position: idx + 1,
     ...r,
   }));
+}
+
+
+// ===== CENTRAL DE RESULTADOS =====
+
+// Alias para buscar metas do mês
+export async function getGoalsForMonth(month: number, year: number) {
+  return listGoals({ month, year });
+}
+
+// Buscar regras de comissão
+export async function getCommissionRules() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(commissionRules).orderBy(asc(commissionRules.minSales));
+}
+
+// Calcular comissão do vendedor baseado no número de vendas
+export function calculateCommission(salesCount: number, rules: any[]) {
+  if (!rules.length || salesCount === 0) {
+    return { helpAllowance: 0, commissionPerSale: 0, totalCommission: 0, bonus: 0, bonusDescription: null, currentRule: null, nextRule: null };
+  }
+  
+  // Encontrar a faixa correta
+  let currentRule = rules[0]; // default
+  for (const rule of rules) {
+    if (salesCount >= rule.minSales && (rule.maxSales === null || salesCount <= rule.maxSales)) {
+      currentRule = rule;
+      break;
+    }
+  }
+  
+  // Encontrar próxima faixa (para simulador)
+  const currentIdx = rules.indexOf(currentRule);
+  const nextRule = currentIdx < rules.length - 1 ? rules[currentIdx + 1] : null;
+  
+  return {
+    helpAllowance: currentRule.helpAllowance,
+    commissionPerSale: currentRule.commissionPerSale,
+    totalCommission: currentRule.commissionPerSale * salesCount,
+    bonus: currentRule.bonus,
+    bonusDescription: currentRule.bonusDescription,
+    currentRule,
+    nextRule,
+  };
+}
+
+// Buscar vales/adiantamentos do vendedor no mês
+export async function getSellerAdvances(sellerId: number, month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(sellerAdvances)
+    .where(and(
+      eq(sellerAdvances.sellerId, sellerId),
+      eq(sellerAdvances.month, month),
+      eq(sellerAdvances.year, year)
+    ))
+    .orderBy(desc(sellerAdvances.date));
+}
+
+// Criar vale/adiantamento
+export async function createSellerAdvance(data: InsertSellerAdvance) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(sellerAdvances).values(data);
+  return result;
+}
+
+// Deletar vale/adiantamento
+export async function deleteSellerAdvance(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(sellerAdvances).where(eq(sellerAdvances.id, id));
+}
+
+// Buscar vendas aprovadas do mês para um vendedor
+export async function getApprovedSalesForMonth(sellerId: number, month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const startOfMonth = new Date(year, month - 1, 1);
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+  return db.select().from(sales)
+    .where(and(
+      eq(sales.sellerId, sellerId),
+      eq(sales.status, "approved"),
+      gte(sales.createdAt, startOfMonth),
+      lte(sales.createdAt, endOfMonth)
+    ));
+}
+
+// Ranking de vendas do mês (todos os vendedores do dept vendas)
+export async function getSalesRankingForMonth(month: number, year: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const startOfMonth = new Date(year, month - 1, 1);
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+  
+  // Buscar todos os vendedores do dept vendas
+  const allSellers = await db.select({
+    id: sellers.id,
+    name: sellers.name,
+    nickname: sellers.nickname,
+    photoUrl: sellers.photoUrl,
+    department: sellers.department,
+  }).from(sellers).where(and(
+    eq(sellers.active, true),
+    eq(sellers.department, "vendas")
+  ));
+  
+  // Buscar vendas aprovadas do mês
+  const monthSales = await db.select().from(sales)
+    .where(and(
+      eq(sales.status, "approved"),
+      gte(sales.createdAt, startOfMonth),
+      lte(sales.createdAt, endOfMonth)
+    ));
+  
+  // Contar vendas por vendedor
+  const salesBySeller: Record<number, number> = {};
+  for (const sale of monthSales) {
+    salesBySeller[sale.sellerId] = (salesBySeller[sale.sellerId] || 0) + 1;
+  }
+  
+  // Montar ranking
+  const ranking = allSellers.map(s => ({
+    sellerId: s.id,
+    name: s.nickname || s.name,
+    photoUrl: s.photoUrl,
+    salesCount: salesBySeller[s.id] || 0,
+  })).sort((a, b) => b.salesCount - a.salesCount);
+  
+  return ranking.map((r, idx) => ({ ...r, position: idx + 1 }));
+}
+
+
+// ===== CARROS BÔNUS & SELLER BONUSES =====
+
+// CRUD Bonus Vehicles
+export async function listBonusVehicles(activeOnly = false) {
+  const db = await getDb();
+  if (!db) return [];
+  if (activeOnly) {
+    const now = Date.now();
+    return db.select().from(bonusVehicles)
+      .where(and(eq(bonusVehicles.active, true), lte(bonusVehicles.startDate, now), gte(bonusVehicles.endDate, now)))
+      .orderBy(desc(bonusVehicles.createdAt));
+  }
+  return db.select().from(bonusVehicles).orderBy(desc(bonusVehicles.createdAt));
+}
+
+export async function createBonusVehicle(data: InsertBonusVehicle) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(bonusVehicles).values(data);
+  return result;
+}
+
+export async function updateBonusVehicle(id: number, data: Partial<InsertBonusVehicle>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(bonusVehicles).set(data).where(eq(bonusVehicles.id, id));
+}
+
+export async function deleteBonusVehicle(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(bonusVehicles).where(eq(bonusVehicles.id, id));
+}
+
+// Verificar se uma placa tem bônus ativo
+export async function checkBonusForPlate(plate: string): Promise<any | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const now = Date.now();
+  const normalizedPlate = plate.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const results = await db.select().from(bonusVehicles)
+    .where(and(
+      eq(bonusVehicles.active, true),
+      lte(bonusVehicles.startDate, now),
+      gte(bonusVehicles.endDate, now)
+    ));
+  // Verificar por placa ou modelo
+  return results.find(bv => {
+    if (bv.plate) {
+      const bvPlate = bv.plate.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      return bvPlate === normalizedPlate;
+    }
+    return false;
+  }) || null;
+}
+
+// Verificar se modelo tem bônus ativo (para quando não tem placa específica)
+export async function checkBonusForModel(model: string): Promise<any | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const now = Date.now();
+  const results = await db.select().from(bonusVehicles)
+    .where(and(
+      eq(bonusVehicles.active, true),
+      lte(bonusVehicles.startDate, now),
+      gte(bonusVehicles.endDate, now),
+      isNull(bonusVehicles.plate) // sem placa específica = vale para qualquer carro desse modelo
+    ));
+  const normalizedModel = model.toLowerCase().trim();
+  return results.find(bv => normalizedModel.includes(bv.vehicleModel.toLowerCase().trim())) || null;
+}
+
+// CRUD Seller Bonuses
+export async function listSellerBonuses(filters: { sellerId?: number; month?: number; year?: number; status?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters.sellerId) conditions.push(eq(sellerBonuses.sellerId, filters.sellerId));
+  if (filters.month) conditions.push(eq(sellerBonuses.month, filters.month));
+  if (filters.year) conditions.push(eq(sellerBonuses.year, filters.year));
+  if (filters.status) conditions.push(eq(sellerBonuses.status, filters.status));
+  if (conditions.length > 0) {
+    return db.select().from(sellerBonuses).where(and(...conditions)).orderBy(desc(sellerBonuses.createdAt));
+  }
+  return db.select().from(sellerBonuses).orderBy(desc(sellerBonuses.createdAt));
+}
+
+export async function createSellerBonus(data: InsertSellerBonus) {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(sellerBonuses).values(data);
+  return result;
+}
+
+export async function updateSellerBonusStatus(id: number, status: string, approvedBy?: number, rejectionReason?: string) {
+  const db = await getDb();
+  if (!db) return;
+  const updateData: any = { status };
+  if (status === 'approved') {
+    updateData.approvedBy = approvedBy;
+    updateData.approvedAt = Date.now();
+  } else if (status === 'paid') {
+    updateData.paidAt = Date.now();
+  } else if (status === 'rejected') {
+    updateData.rejectionReason = rejectionReason;
+  }
+  await db.update(sellerBonuses).set(updateData).where(eq(sellerBonuses.id, id));
+}
+
+// Verificar se já existe bônus lançado para essa venda
+export async function bonusAlreadyExists(saleId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const existing = await db.select({ id: sellerBonuses.id }).from(sellerBonuses)
+    .where(eq(sellerBonuses.saleId, saleId)).limit(1);
+  return existing.length > 0;
+}
+
+// Lançar bônus automaticamente quando venda é aprovada
+export async function autoLaunchBonus(saleId: number, sellerId: number, vehiclePlate: string | null, vehicleModel: string | null) {
+  // Verificar se já existe bônus para essa venda
+  if (await bonusAlreadyExists(saleId)) return null;
+  
+  let bonusVehicle: any = null;
+  
+  // Primeiro tenta por placa
+  if (vehiclePlate) {
+    bonusVehicle = await checkBonusForPlate(vehiclePlate);
+  }
+  
+  // Se não achou por placa, tenta por modelo
+  if (!bonusVehicle && vehicleModel) {
+    bonusVehicle = await checkBonusForModel(vehicleModel);
+  }
+  
+  if (!bonusVehicle) return null; // Nenhum bônus aplicável
+  
+  const now = new Date();
+  const bonus: InsertSellerBonus = {
+    sellerId,
+    saleId,
+    bonusVehicleId: bonusVehicle.id,
+    type: 'carro_bonus',
+    amount: bonusVehicle.bonusAmount,
+    description: `Bônus carro: ${bonusVehicle.vehicleModel} - ${bonusVehicle.campaignName}`,
+    campaignName: bonusVehicle.campaignName,
+    status: 'pending',
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+    tenantId: 1,
+  };
+  
+  return createSellerBonus(bonus);
 }
