@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Plus, Car, Trash2, Edit, ToggleLeft, ToggleRight, Search } from "lucide-react";
+import { Plus, Car, Trash2, Edit, ToggleLeft, ToggleRight, Search, Package, PenLine } from "lucide-react";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
@@ -16,7 +16,11 @@ function formatDate(ts: number) {
 export default function AdminBonusVehicles() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Mode: 'stock' = selecionar do estoque, 'manual' = digitar manualmente
+  const [inputMode, setInputMode] = useState<'stock' | 'manual'>('stock');
+  const [stockSearch, setStockSearch] = useState("");
+  const [showStockDropdown, setShowStockDropdown] = useState(false);
   
   // Form state
   const [vehicleModel, setVehicleModel] = useState("");
@@ -29,6 +33,12 @@ export default function AdminBonusVehicles() {
 
   const utils = trpc.useUtils();
   const { data: bonusVehicles = [], isLoading } = trpc.sellerResults.listBonusVehicles.useQuery({});
+  
+  // Buscar veículos do estoque
+  const { data: stockVehicles } = trpc.inventory.list.useQuery(
+    { status: "available", search: stockSearch || undefined },
+    { enabled: inputMode === 'stock' && stockSearch.length >= 2 }
+  );
 
   const createMutation = trpc.sellerResults.createBonusVehicle.useMutation({
     onSuccess: () => { utils.sellerResults.listBonusVehicles.invalidate(); resetForm(); },
@@ -43,6 +53,9 @@ export default function AdminBonusVehicles() {
   function resetForm() {
     setShowForm(false);
     setEditingId(null);
+    setInputMode('stock');
+    setStockSearch("");
+    setShowStockDropdown(false);
     setVehicleModel("");
     setPlate("");
     setBonusAmount("");
@@ -50,6 +63,14 @@ export default function AdminBonusVehicles() {
     setCampaignRules("");
     setStartDate("");
     setEndDate("");
+  }
+
+  function handleSelectFromStock(v: any) {
+    const label = `${v.brand} ${v.model} ${v.version || ""} ${v.year || ""}`.trim();
+    setVehicleModel(label);
+    setPlate(v.plate || "");
+    setStockSearch(label);
+    setShowStockDropdown(false);
   }
 
   function handleSubmit() {
@@ -75,6 +96,7 @@ export default function AdminBonusVehicles() {
 
   function handleEdit(bv: any) {
     setEditingId(bv.id);
+    setInputMode('manual');
     setVehicleModel(bv.vehicleModel);
     setPlate(bv.plate || "");
     setBonusAmount((bv.bonusAmount / 100).toFixed(2).replace('.', ','));
@@ -108,21 +130,111 @@ export default function AdminBonusVehicles() {
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="font-bold text-emerald-400">{editingId ? 'Editar' : 'Novo'} Carro Bônus</h3>
             
+            {/* Toggle: Estoque vs Manual */}
+            {!editingId && (
+              <div className="flex gap-2 p-1 bg-background rounded-lg border border-border w-fit">
+                <button
+                  onClick={() => { setInputMode('stock'); setVehicleModel(""); setPlate(""); setStockSearch(""); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${inputMode === 'stock' ? 'bg-emerald-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Package className="w-3.5 h-3.5" /> Do Estoque
+                </button>
+                <button
+                  onClick={() => { setInputMode('manual'); setVehicleModel(""); setPlate(""); setStockSearch(""); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${inputMode === 'manual' ? 'bg-emerald-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  <PenLine className="w-3.5 h-3.5" /> Manual
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="text-sm text-muted-foreground mb-1 block">Veículo/Modelo *</label>
-                <Input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Ex: Onix 2022, Saveiro Robust 1.6" className="bg-background" />
-                <p className="text-xs text-muted-foreground mt-1">O sistema cruza automaticamente com a placa ou modelo na hora da venda</p>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-1 block">Placa (opcional)</label>
-                <Input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="ABC1D23" className="bg-background" />
-                <p className="text-xs text-muted-foreground mt-1">Se informar, o bônus vale só para este carro específico</p>
-              </div>
-              <div>
+              {/* Veículo - Do Estoque */}
+              {inputMode === 'stock' && (
+                <div className="md:col-span-2 relative">
+                  <label className="text-sm text-muted-foreground mb-1 block">Buscar no Estoque *</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={vehicleModel || stockSearch}
+                      onChange={(e) => {
+                        if (vehicleModel) { setVehicleModel(""); setPlate(""); }
+                        setStockSearch(e.target.value);
+                        setShowStockDropdown(true);
+                      }}
+                      onFocus={() => stockSearch.length >= 2 && setShowStockDropdown(true)}
+                      placeholder="Digite modelo, marca ou placa para buscar..."
+                      className="bg-background pl-9"
+                    />
+                  </div>
+                  {vehicleModel && (
+                    <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                      <Car className="w-3 h-3" /> Selecionado: {vehicleModel} {plate && `(${plate})`}
+                      <button onClick={() => { setVehicleModel(""); setPlate(""); setStockSearch(""); }} className="text-red-400 ml-2 underline text-[10px]">limpar</button>
+                    </p>
+                  )}
+                  {!vehicleModel && <p className="text-xs text-muted-foreground mt-1">Digite pelo menos 2 caracteres para buscar no estoque</p>}
+                  
+                  {/* Dropdown de resultados */}
+                  {showStockDropdown && stockVehicles && stockVehicles.length > 0 && !vehicleModel && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-card border border-border rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      {stockVehicles.slice(0, 15).map((v: any) => (
+                        <button
+                          key={v.id}
+                          onClick={() => handleSelectFromStock(v)}
+                          className="w-full text-left px-3 py-2.5 hover:bg-accent/50 border-b border-border/50 last:border-0 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-sm text-foreground">{v.brand} {v.model} {v.version || ""} {v.year || ""}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {v.plate && <span className="font-mono mr-2">{v.plate}</span>}
+                                {v.color && <span className="mr-2">{v.color}</span>}
+                                {v.km && <span>{Number(v.km).toLocaleString('pt-BR')} km</span>}
+                              </p>
+                            </div>
+                            {v.price && <span className="text-xs text-emerald-400 font-medium">{formatCurrency(v.price)}</span>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {showStockDropdown && stockSearch.length >= 2 && stockVehicles && stockVehicles.length === 0 && !vehicleModel && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-card border border-border rounded-lg shadow-xl p-3">
+                      <p className="text-sm text-muted-foreground text-center">Nenhum veículo encontrado no estoque</p>
+                      <button onClick={() => setInputMode('manual')} className="text-xs text-emerald-400 underline mt-1 block mx-auto">Cadastrar manualmente</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Veículo - Manual */}
+              {inputMode === 'manual' && (
+                <>
+                  <div className="md:col-span-2">
+                    <label className="text-sm text-muted-foreground mb-1 block">Veículo/Modelo *</label>
+                    <Input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Ex: Onix 2022, Saveiro Robust 1.6" className="bg-background" />
+                    <p className="text-xs text-muted-foreground mt-1">O sistema cruza automaticamente com a placa ou modelo na hora da venda</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-1 block">Placa (opcional)</label>
+                    <Input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="ABC1D23" className="bg-background" />
+                    <p className="text-xs text-muted-foreground mt-1">Se informar, o bônus vale só para este carro específico</p>
+                  </div>
+                </>
+              )}
+
+              {/* Campos comuns */}
+              <div className={inputMode === 'stock' ? '' : ''}>
                 <label className="text-sm text-muted-foreground mb-1 block">Valor do Bônus (R$) *</label>
                 <Input value={bonusAmount} onChange={(e) => setBonusAmount(e.target.value)} placeholder="500,00" className="bg-background" />
               </div>
+              {inputMode === 'stock' && (
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Placa (automática)</label>
+                  <Input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="Preenchida do estoque" className="bg-background" disabled={!!plate} />
+                </div>
+              )}
               <div className="md:col-span-2">
                 <label className="text-sm text-muted-foreground mb-1 block">Nome da Campanha *</label>
                 <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="Ex: Feirão Kafka, Queima de Estoque" className="bg-background" />
