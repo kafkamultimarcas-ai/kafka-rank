@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send } from "lucide-react";
+import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
@@ -76,10 +76,38 @@ export default function Estoque() {
 
   const sendViaWhatsApp = (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
-    // Mensagem simples: só modelo, ano e fotos como imagem
+    // Mensagem simples: só modelo, ano e fotos
     const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *Kafka Multimarcas*`;
     const encoded = encodeURIComponent(text);
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
+  };
+
+  const downloadPhotos = async (v: any) => {
+    const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
+    if (photos.length === 0) {
+      toast.error("Nenhuma foto disponível");
+      return;
+    }
+    toast.info(`Baixando ${photos.length} foto(s)...`);
+    for (let i = 0; i < Math.min(photos.length, 10); i++) {
+      try {
+        const response = await fetch(photos[i]);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${v.brand}-${v.model}-${i + 1}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        // Pequeno delay entre downloads para não travar
+        if (i < photos.length - 1) await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        console.error("Erro ao baixar foto", i, err);
+      }
+    }
+    toast.success(`${Math.min(photos.length, 10)} foto(s) salva(s) na galeria!`);
   };
 
   const copyVehicleInfo = (v: any) => {
@@ -361,6 +389,15 @@ export default function Estoque() {
                             </Button>
                           )}
                         </div>
+                        {photos.length > 0 && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); downloadPhotos(v); }}
+                            className="w-full gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Baixar Fotos ({photos.length})
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); sendViaWhatsApp(v); }}
