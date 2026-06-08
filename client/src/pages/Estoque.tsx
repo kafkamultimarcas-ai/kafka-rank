@@ -88,17 +88,28 @@ export default function Estoque() {
       toast.error("Nenhuma foto disponível");
       return;
     }
-    toast.info(`Preparando ${Math.min(photos.length, 10)} foto(s)...`);
+    const maxPhotos = Math.min(photos.length, 10);
+    toast.info(`Preparando ${maxPhotos} foto(s)...`);
     
     try {
-      // Baixar as fotos como blobs
+      // Baixar as fotos via proxy do backend (evita CORS)
       const files: File[] = [];
-      for (let i = 0; i < Math.min(photos.length, 10); i++) {
+      for (let i = 0; i < maxPhotos; i++) {
         try {
-          const response = await fetch(photos[i]);
-          const blob = await response.blob();
-          const file = new File([blob], `${v.brand}-${v.model}-${i + 1}.jpg`, { type: "image/jpeg" });
-          files.push(file);
+          const proxyUrl = `/api/trpc/inventory.proxyPhoto?input=${encodeURIComponent(JSON.stringify({ url: photos[i] }))}`;
+          const response = await fetch(proxyUrl);
+          const json = await response.json();
+          const result = json?.result?.data;
+          if (result?.data) {
+            const byteChars = atob(result.data);
+            const byteArray = new Uint8Array(byteChars.length);
+            for (let j = 0; j < byteChars.length; j++) {
+              byteArray[j] = byteChars.charCodeAt(j);
+            }
+            const blob = new Blob([byteArray], { type: result.contentType || "image/jpeg" });
+            const file = new File([blob], `${v.brand}-${v.model}-${i + 1}.jpg`, { type: "image/jpeg" });
+            files.push(file);
+          }
         } catch (err) {
           console.error("Erro ao baixar foto", i, err);
         }
@@ -119,15 +130,13 @@ export default function Estoque() {
         toast.success("Fotos compartilhadas!");
       } else {
         // Fallback: abrir cada foto em nova aba para salvar manualmente
-        // No celular, segurando a imagem o usuário pode salvar na galeria
-        for (const photo of photos.slice(0, 10)) {
+        for (const photo of photos.slice(0, maxPhotos)) {
           window.open(photo, "_blank");
           await new Promise(r => setTimeout(r, 300));
         }
         toast.success("Fotos abertas! Segure a imagem para salvar na galeria.");
       }
     } catch (err: any) {
-      // Se o usuário cancelou o share, não mostrar erro
       if (err?.name !== "AbortError") {
         toast.error("Erro ao compartilhar fotos");
       }

@@ -164,4 +164,16 @@ export const inventoryRouter = router({
       }).where(eq(inventoryVehicles.id, input.id));
       return { success: true };
     }),
+
+  // Proxy para baixar foto de domínio externo (evita CORS)
+  proxyPhoto: publicProcedure
+    .input(z.object({ url: z.string().url() }))
+    .query(async ({ input }) => {
+      const response = await fetch(input.url);
+      if (!response.ok) throw new Error("Failed to fetch image");
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      return { data: base64, contentType };
+    }),
 });
