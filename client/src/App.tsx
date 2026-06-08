@@ -60,6 +60,7 @@ const CentralResultados = lazy(() => import("./pages/CentralResultados"));
 const AdminBonusVehicles = lazy(() => import("./pages/admin/AdminBonusVehicles"));
 const FinanceiroVendedores = lazy(() => import("./pages/admin/FinanceiroVendedores"));
 const RankingFeirao = lazy(() => import("./pages/RankingFeirao"));
+const CarrosBonusSeller = lazy(() => import("./pages/CarrosBonusSeller"));
 
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
@@ -134,6 +135,7 @@ function Router() {
         <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/feirao" component={RankingFeirao} />
         <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
+        <Route path="/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
         <Route path="/admin/bonus-veiculos" component={AdminBonusVehicles} />
         <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         <Route path="/gerente" component={GerentePanel} />

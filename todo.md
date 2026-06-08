@@ -2268,3 +2268,6 @@
 - [x] Remover aba Sorteio Feirão do menu lateral admin
 - [x] Permitir lançar venda com data retroativa (mês passado)
 - [x] Vendedor pode editar valor da venda enquanto status pendente
+- [x] Criar aba Carros Bônus visível para vendedor (lista carros com bônus ativo, valor, campanha, prazo)
+- [ ] Ajustar regra de ajuda de custo: só libera a partir de 3 carros vendidos no mês
+- [x] Mostrar campanhas ativas para vendedor se motivar
