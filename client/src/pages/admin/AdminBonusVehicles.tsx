@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Plus, Car, Trash2, Edit, ToggleLeft, ToggleRight, Search, Package, PenLine } from "lucide-react";
+import { toast } from "sonner";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
@@ -74,8 +75,27 @@ export default function AdminBonusVehicles() {
   }
 
   function handleSubmit() {
-    const amount = Math.round(parseFloat(bonusAmount.replace(/[^\d,]/g, '').replace(',', '.')) * 100);
-    if (!vehicleModel || !amount || !campaignName || !startDate || !endDate) return;
+    // Validar campos obrigatórios
+    if (!vehicleModel) { toast.error("Selecione ou digite o veículo"); return; }
+    if (!bonusAmount) { toast.error("Informe o valor do bônus"); return; }
+    if (!campaignName) { toast.error("Informe o nome da campanha"); return; }
+    if (!startDate) { toast.error("Informe a data de início"); return; }
+    if (!endDate) { toast.error("Informe a data de fim"); return; }
+
+    const cleanAmount = bonusAmount.replace(/[^\d,\.]/g, '').replace(',', '.');
+    const amount = Math.round(parseFloat(cleanAmount) * 100);
+    if (isNaN(amount) || amount <= 0) { toast.error("Valor do bônus inválido"); return; }
+
+    // Tratar formato de data (iOS pode enviar formato diferente)
+    let startTs: number, endTs: number;
+    try {
+      startTs = new Date(startDate + 'T00:00:00').getTime();
+      endTs = new Date(endDate + 'T23:59:59').getTime();
+      if (isNaN(startTs) || isNaN(endTs)) throw new Error('Data inválida');
+    } catch {
+      toast.error("Data inválida. Selecione novamente.");
+      return;
+    }
 
     const data = {
       vehicleModel,
@@ -83,14 +103,17 @@ export default function AdminBonusVehicles() {
       bonusAmount: amount,
       campaignName,
       campaignRules: campaignRules || undefined,
-      startDate: new Date(startDate + 'T00:00:00').getTime(),
-      endDate: new Date(endDate + 'T23:59:59').getTime(),
+      startDate: startTs,
+      endDate: endTs,
     };
 
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...data });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(data, {
+        onSuccess: () => toast.success("Carro bônus cadastrado com sucesso!"),
+        onError: (err) => toast.error(`Erro ao cadastrar: ${err.message}`),
+      });
     }
   }
 
@@ -193,7 +216,7 @@ export default function AdminBonusVehicles() {
                                 {v.km && <span>{Number(v.km).toLocaleString('pt-BR')} km</span>}
                               </p>
                             </div>
-                            {v.price && <span className="text-xs text-emerald-400 font-medium">{formatCurrency(v.price)}</span>}
+                            {v.price && <span className="text-xs text-emerald-400 font-medium">R$ {Number(v.price).toLocaleString('pt-BR')}</span>}
                           </div>
                         </button>
                       ))}

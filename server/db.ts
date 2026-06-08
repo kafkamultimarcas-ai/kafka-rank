@@ -411,7 +411,7 @@ export async function deleteSale(saleId: number) {
   return sale;
 }
 
-export async function editSale(saleId: number, data: { vehicleModel?: string; value?: number; sellerId?: number; status?: 'pending' | 'approved' | 'rejected'; leadSource?: string }) {
+export async function editSale(saleId: number, data: { vehicleModel?: string; value?: number; sellerId?: number; status?: 'pending' | 'approved' | 'rejected'; leadSource?: string; createdAt?: number }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const saleResult = await db.select().from(sales).where(and(eq(sales.tenantId, getCurrentTenantId()), eq(sales.id, saleId))).limit(1);
@@ -422,6 +422,7 @@ export async function editSale(saleId: number, data: { vehicleModel?: string; va
   if (data.vehicleModel !== undefined) updates.vehicleModel = data.vehicleModel;
   if (data.value !== undefined) updates.value = data.value;
   if (data.leadSource !== undefined) updates.leadSource = data.leadSource;
+  if (data.createdAt !== undefined) updates.createdAt = new Date(data.createdAt);
 
   // Se mudou o status, precisa ajustar pontos
   const oldStatus = oldSale.status;

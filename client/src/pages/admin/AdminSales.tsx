@@ -38,7 +38,7 @@ export default function AdminSales() {
     sellerId: "", competitionId: "", description: "", vehicleModel: "", value: "", points: "1",
   });
   const [editForm, setEditForm] = useState({
-    vehicleModel: "", value: "", sellerId: "", status: "", leadSource: "",
+    vehicleModel: "", value: "", sellerId: "", status: "", leadSource: "", saleDate: "",
   });
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
@@ -128,6 +128,7 @@ export default function AdminSales() {
       sellerId: sale.sellerId.toString(),
       status: sale.status || "approved",
       leadSource: sale.leadSource || "",
+      saleDate: sale.createdAt ? new Date(sale.createdAt).toISOString().slice(0, 16) : "",
     });
     setEditDialogOpen(true);
   }
@@ -141,6 +142,12 @@ export default function AdminSales() {
     if (editForm.sellerId !== editingSale.sellerId.toString()) data.sellerId = parseInt(editForm.sellerId);
     if (editForm.status !== (editingSale.status || "approved")) data.status = editForm.status;
     if (editForm.leadSource !== (editingSale.leadSource || "")) data.leadSource = editForm.leadSource;
+    // Se alterou a data
+    if (editForm.saleDate) {
+      const newDate = new Date(editForm.saleDate).getTime();
+      const oldDate = editingSale.createdAt ? new Date(editingSale.createdAt).getTime() : 0;
+      if (Math.abs(newDate - oldDate) > 60000) data.createdAt = newDate;
+    }
     // Sempre enviar pelo menos o id
     editSale.mutate(data);
   }
@@ -275,6 +282,11 @@ export default function AdminSales() {
                     <SelectItem value="lead_vendedor">Lead Vendedor</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label className="text-foreground">Data da Venda</Label>
+                <Input type="datetime-local" value={editForm.saleDate || ""} onChange={e => setEditForm({ ...editForm, saleDate: e.target.value })} className="bg-input border-border text-foreground" />
+                <p className="text-xs text-muted-foreground mt-1">Altere a data para mover a venda para o mês correto</p>
               </div>
               {editingSale && editForm.status !== (editingSale.status || "approved") && (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">

@@ -951,6 +951,7 @@ export const appRouter = router({
       sellerId: z.number().optional(),
       status: z.enum(['pending', 'approved', 'rejected']).optional(),
       leadSource: z.string().optional(),
+      createdAt: z.number().optional(), // timestamp para alterar data da venda
     })).mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
       const oldSalesList = await db.listSales(undefined, undefined);

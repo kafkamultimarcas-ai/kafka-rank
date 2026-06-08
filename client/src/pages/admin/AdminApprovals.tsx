@@ -128,7 +128,7 @@ export default function AdminApprovals() {
     setEditingRecord(record);
     switch (type) {
       case "vendas":
-        setEditForm({ vehicleModel: record.vehicleModel || "", value: record.value?.toString() || "0", vehiclePlate: record.vehiclePlate || "" });
+        setEditForm({ vehicleModel: record.vehicleModel || "", value: record.value?.toString() || "0", vehiclePlate: record.vehiclePlate || "", saleDate: record.createdAt ? new Date(record.createdAt).toISOString().slice(0, 16) : "" });
         break;
       case "fei":
         setEditForm({ bankName: record.bankName || "", financedValue: record.financedValue?.toString() || "0", vehiclePlate: record.vehiclePlate || "", customerCpf: record.customerCpf || "", returnType: record.returnType || "" });
@@ -150,7 +150,7 @@ export default function AdminApprovals() {
     try {
       switch (editType) {
         case "vendas":
-          await editSale.mutateAsync({ id: editingRecord.id, vehicleModel: editForm.vehicleModel, value: editForm.value ? parseInt(String(editForm.value)) : undefined });
+          await editSale.mutateAsync({ id: editingRecord.id, vehicleModel: editForm.vehicleModel, value: editForm.value ? parseInt(String(editForm.value)) : undefined, createdAt: editForm.saleDate ? new Date(editForm.saleDate).getTime() : undefined });
           break;
         case "despachante":
           await editDispatch.mutateAsync({ id: editingRecord.id, documentType: editForm.documentType, vehiclePlate: editForm.vehiclePlate, transferValue: parseInt(editForm.transferValue) || 0 });
@@ -680,7 +680,7 @@ export default function AdminApprovals() {
             {editType === "vendas" && (
               <>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground">Ve\u00edculo</label>
+                  <label className="text-sm font-semibold text-foreground">Veículo</label>
                   <Input value={editForm.vehicleModel || ""} onChange={e => setEditForm({...editForm, vehicleModel: e.target.value})} className="bg-muted border-border" />
                 </div>
                 <div className="space-y-2">
@@ -690,6 +690,11 @@ export default function AdminApprovals() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">Valor (R$)</label>
                   <Input value={editForm.value || ""} onChange={e => setEditForm({...editForm, value: e.target.value.replace(/[^0-9]/g, '')})} className="bg-muted border-border" placeholder="Ex: 50000" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Data da Venda</label>
+                  <Input type="datetime-local" value={editForm.saleDate || ""} onChange={e => setEditForm({...editForm, saleDate: e.target.value})} className="bg-muted border-border" />
+                  <p className="text-xs text-muted-foreground">Altere a data para mover a venda para o mês correto</p>
                 </div>
               </>
             )}
@@ -704,7 +709,7 @@ export default function AdminApprovals() {
                   <Input value={editForm.vehiclePlate || ""} onChange={e => setEditForm({...editForm, vehiclePlate: e.target.value.toUpperCase()})} className="bg-muted border-border" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground">Valor Transfer\u00eancia (R$)</label>
+                  <label className="text-sm font-semibold text-foreground">Valor Transferência (R$)</label>
                   <Input value={editForm.transferValue || ""} onChange={e => setEditForm({...editForm, transferValue: e.target.value.replace(/[^0-9]/g, '')})} className="bg-muted border-border" placeholder="Ex: 89000" />
                 </div>
               </>
@@ -720,11 +725,11 @@ export default function AdminApprovals() {
                   <Input value={editForm.customerPhone || ""} onChange={e => setEditForm({...editForm, customerPhone: e.target.value})} className="bg-muted border-border" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground">Ve\u00edculo de Interesse</label>
+                  <label className="text-sm font-semibold text-foreground">Veículo de Interesse</label>
                   <Input value={editForm.vehicleInterest || ""} onChange={e => setEditForm({...editForm, vehicleInterest: e.target.value})} className="bg-muted border-border" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground">Observa\u00e7\u00f5es</label>
+                  <label className="text-sm font-semibold text-foreground">Observações</label>
                   <Textarea value={editForm.notes || ""} onChange={e => setEditForm({...editForm, notes: e.target.value})} className="bg-muted border-border min-h-[60px]" />
                 </div>
               </>
@@ -733,12 +738,12 @@ export default function AdminApprovals() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveEdit} disabled={editSale.isPending || editDispatch.isPending || editSdr.isPending} className="bg-blue-600 hover:bg-blue-700 text-white">
-              {(editSale.isPending || editDispatch.isPending || editSdr.isPending) ? "Salvando..." : "Salvar Altera\u00e7\u00f5es"}
+              {(editSale.isPending || editDispatch.isPending || editSdr.isPending) ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* Dialog de Rejei\u00e7\u00e3o de Consigna\u00e7\u00e3o */}
+      {/* Dialog de Rejeição de Consignação */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>

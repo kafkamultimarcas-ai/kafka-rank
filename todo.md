@@ -2273,3 +2273,11 @@
 - [x] Mostrar campanhas ativas para vendedor se motivar
 - [x] Botão "Enviar pro Cliente via WhatsApp" no estoque - vendedor seleciona lead e envia fotos do carro direto pelo WhatsApp
 - [x] Filtro de valor/preço no estoque: vendedor digita "até 30 mil" ou "até 50000" na busca e sistema filtra por preço
+- [ ] Corrigir preço na busca do estoque no Carros Bônus (mostrava centavos em vez de reais)
+- [ ] Adicionar feedback visual (toast) quando cadastro de carro bônus falha por campo obrigatório
+- [ ] Lightbox para ampliar fotos no estoque (clicar na miniatura abre foto grande com navegação)
+- [ ] Botão Voltar em todas as telas (incluindo lightbox de fotos)
+- [ ] Corrigir download de fotos no iPhone (usar abordagem compatível com iOS)
+- [x] Admin: Adicionar campo de data no formulário "Editar Registro" de vendas (pendentes e aprovadas)
+- [x] Admin: Ao alterar data da venda, venda conta automaticamente no mês correto
+- [x] Bug: Label "Ve\u00edculo" com Unicode escapado no formulário de edição
