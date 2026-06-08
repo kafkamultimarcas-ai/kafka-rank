@@ -99,6 +99,25 @@ async function startServer() {
   app.use(express.json({ limit: "16mb" }));
   app.use(express.urlencoded({ limit: "16mb", extended: true }));
 
+  // Rota de proxy para download direto de imagem (salvar na galeria do celular)
+  app.get("/api/photo-download", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      if (!url) { res.status(400).json({ error: "URL required" }); return; }
+      const response = await fetch(url);
+      if (!response.ok) { res.status(502).json({ error: "Failed to fetch" }); return; }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      const filename = (req.query.name as string) || "foto.jpg";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Length", buffer.length.toString());
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ error: "Download failed" });
+    }
+  });
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // CRM webhook endpoints for external integrations

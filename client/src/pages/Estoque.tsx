@@ -82,63 +82,78 @@ export default function Estoque() {
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
 
-  const downloadPhotos = async (v: any) => {
+  // Salvar fotos na galeria do celular (download direto)
+  const savePhotosToGallery = async (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
     if (photos.length === 0) {
       toast.error("Nenhuma foto disponível");
       return;
     }
-    const maxPhotos = Math.min(photos.length, 10);
+    const maxPhotos = Math.min(photos.length, 5);
+    toast.info(`Baixando ${maxPhotos} foto(s)...`);
+    
+    // Usar link de download direto via proxy do servidor
+    for (let i = 0; i < maxPhotos; i++) {
+      const filename = `${v.brand}-${v.model}-${i + 1}.jpg`;
+      const downloadUrl = `/api/photo-download?url=${encodeURIComponent(photos[i])}&name=${encodeURIComponent(filename)}`;
+      
+      // Criar link temporário e clicar para forçar download
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      // Delay entre downloads
+      if (i < maxPhotos - 1) await new Promise(r => setTimeout(r, 800));
+    }
+    toast.success(`${maxPhotos} foto(s) salva(s)! Verifique seus Downloads/Galeria.`);
+  };
+
+  // Compartilhar fotos via WhatsApp/outros apps (Web Share API)
+  const sharePhotos = async (v: any) => {
+    const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
+    if (photos.length === 0) {
+      toast.error("Nenhuma foto disponível");
+      return;
+    }
+    const maxPhotos = Math.min(photos.length, 5);
     toast.info(`Preparando ${maxPhotos} foto(s)...`);
     
     try {
-      // Baixar as fotos via proxy do backend (evita CORS)
       const files: File[] = [];
       for (let i = 0; i < maxPhotos; i++) {
         try {
-          const proxyUrl = `/api/trpc/inventory.proxyPhoto?input=${encodeURIComponent(JSON.stringify({ json: { url: photos[i] } }))}`;
-          const response = await fetch(proxyUrl);
-          const json = await response.json();
-          const result = json?.result?.data?.json;
-          if (result?.data) {
-            const byteChars = atob(result.data);
-            const byteArray = new Uint8Array(byteChars.length);
-            for (let j = 0; j < byteChars.length; j++) {
-              byteArray[j] = byteChars.charCodeAt(j);
-            }
-            const blob = new Blob([byteArray], { type: result.contentType || "image/jpeg" });
-            const file = new File([blob], `${v.brand}-${v.model}-${i + 1}.jpg`, { type: "image/jpeg" });
-            files.push(file);
-          }
+          const downloadUrl = `/api/photo-download?url=${encodeURIComponent(photos[i])}&name=foto.jpg`;
+          const response = await fetch(downloadUrl);
+          const blob = await response.blob();
+          const file = new File([blob], `${v.brand}-${v.model}-${i + 1}.jpg`, { type: "image/jpeg" });
+          files.push(file);
         } catch (err) {
           console.error("Erro ao baixar foto", i, err);
         }
       }
 
       if (files.length === 0) {
-        toast.error("Não foi possível baixar as fotos");
+        toast.error("Não foi possível preparar as fotos");
         return;
       }
 
-      // Tentar usar Web Share API (funciona no celular - salva/compartilha direto)
       if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
         await navigator.share({
-          title: `${v.brand} ${v.model} - Fotos`,
-          text: `${v.brand} ${v.model} ${v.year || ""}`,
+          title: `${v.brand} ${v.model}`,
           files,
         });
-        toast.success("Fotos compartilhadas!");
       } else {
-        // Fallback: abrir cada foto em nova aba para salvar manualmente
-        for (const photo of photos.slice(0, maxPhotos)) {
-          window.open(photo, "_blank");
-          await new Promise(r => setTimeout(r, 300));
-        }
-        toast.success("Fotos abertas! Segure a imagem para salvar na galeria.");
+        // Fallback: baixar direto
+        savePhotosToGallery(v);
       }
     } catch (err: any) {
       if (err?.name !== "AbortError") {
-        toast.error("Erro ao compartilhar fotos");
+        // Se share falhou, tenta download direto
+        savePhotosToGallery(v);
       }
     }
   };
@@ -423,20 +438,29 @@ export default function Estoque() {
                           )}
                         </div>
                         {photos.length > 0 && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); downloadPhotos(v); }}
-                            className="w-full gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            <Download className="h-3.5 w-3.5" /> Salvar Fotos ({photos.length})
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); savePhotosToGallery(v); }}
+                              className="flex-1 gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <Download className="h-3.5 w-3.5" /> Salvar Fotos
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); sharePhotos(v); }}
+                              className="flex-1 gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                              <Send className="h-3.5 w-3.5" /> Enviar Fotos
+                            </Button>
+                          </div>
                         )}
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); sendViaWhatsApp(v); }}
                           className="w-full gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white"
                         >
-                          <Send className="h-3.5 w-3.5" /> Enviar pro Cliente via WhatsApp
+                          <Send className="h-3.5 w-3.5" /> Enviar Texto via WhatsApp
                         </Button>
                       </div>
                     </div>
