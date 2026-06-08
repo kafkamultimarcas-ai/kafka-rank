@@ -974,6 +974,19 @@ export const appRouter = router({
       }
       return { success: true, sale: result };
     }),
+    // Vendedor edita valor de venda pendente
+    editValue: publicProcedure.input(z.object({
+      saleId: z.number(),
+      value: z.number().min(1),
+    })).mutation(async ({ input }) => {
+      // Verificar se a venda existe e está pendente
+      const salesList = await db.listSales(undefined, undefined);
+      const sale = salesList.find((s: any) => s.id === input.saleId);
+      if (!sale) throw new Error('Venda não encontrada');
+      if (sale.status !== 'pending') throw new Error('Só é possível editar vendas pendentes');
+      await db.editSale(input.saleId, { value: input.value });
+      return { success: true };
+    }),
     // Aprovar TODAS as vendas pendentes de uma vez
     approveAll: managerOrAdminProcedure.mutation(async () => {
       const pending = await db.listPendingSales();

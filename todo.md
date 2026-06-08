@@ -2267,3 +2267,4 @@
 - [ ] Correção de bugs gerais
 - [x] Remover aba Sorteio Feirão do menu lateral admin
 - [x] Permitir lançar venda com data retroativa (mês passado)
+- [x] Vendedor pode editar valor da venda enquanto status pendente

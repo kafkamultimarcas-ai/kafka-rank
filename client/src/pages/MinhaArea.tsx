@@ -272,6 +272,14 @@ export default function MinhaArea() {
     },
   });
 
+  const editSaleValue = trpc.sales.editValue.useMutation({
+    onSuccess: () => {
+      toast.success("Valor corrigido com sucesso!");
+      utils.sales.list.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao editar valor"),
+  });
+
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
   const pendingApproval = (appointments || []).filter((a: any) => a.attendanceStatus === 'attended');
@@ -722,9 +730,29 @@ export default function MinhaArea() {
               <Clock className="w-4 h-4" /> Vendas aguardando aprovação ({pendingSales.length})
             </h3>
             {pendingSales.slice(0, 5).map((s: any) => (
-              <div key={s.id} className="text-sm text-gray-300 py-1 flex justify-between">
-                <span>{s.vehicleModel}</span>
-                <span className="text-gray-500">{formatCurrency(s.value)}</span>
+              <div key={s.id} className="text-sm text-gray-300 py-2 border-b border-gray-800 last:border-0">
+                <div className="flex justify-between items-center">
+                  <span>{s.vehicleModel}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">{formatCurrency(s.value)}</span>
+                    <button
+                      onClick={() => {
+                        const novoValor = prompt(`Corrigir valor de ${s.vehicleModel}:\n\nValor atual: R$ ${formatCurrency(s.value)}\n\nDigite o novo valor (ex: 70000):`);
+                        if (novoValor) {
+                          const parsed = parseFloat(novoValor.replace(/\./g, '').replace(',', '.'));
+                          if (!isNaN(parsed) && parsed > 0) {
+                            editSaleValue.mutate({ saleId: s.id, value: Math.round(parsed) });
+                          } else {
+                            toast.error('Valor inválido!');
+                          }
+                        }
+                      }}
+                      className="text-blue-400 hover:text-blue-300 text-xs underline"
+                    >
+                      Editar
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
