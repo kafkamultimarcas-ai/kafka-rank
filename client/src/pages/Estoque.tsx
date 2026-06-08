@@ -107,13 +107,9 @@ export default function Estoque() {
     const maxPhotos = Math.min(photos.length, 5);
 
     if (isIOS()) {
-      // iOS: Abrir fotos inline em nova aba - usuário segura para salvar na galeria
-      toast.info("Abrindo fotos... Segure a imagem para salvar na galeria.");
-      for (let i = 0; i < maxPhotos; i++) {
-        const viewUrl = `/api/photo-view?url=${encodeURIComponent(photos[i])}`;
-        window.open(viewUrl, "_blank");
-        if (i < maxPhotos - 1) await new Promise(r => setTimeout(r, 600));
-      }
+      // iOS: Abrir no lightbox interno - usuário segura a imagem para salvar
+      openLightbox(photos.slice(0, maxPhotos), 0);
+      toast.info("Segure a imagem para salvar na galeria.", { duration: 4000 });
     } else {
       // Android: Download direto funciona
       toast.info(`Baixando ${maxPhotos} foto(s)...`);
@@ -194,9 +190,13 @@ export default function Estoque() {
     <div className="min-h-screen bg-background">
       {/* Lightbox / Visualizador de Fotos */}
       {lightboxOpen && lightboxPhotos.length > 0 && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col" onClick={() => setLightboxOpen(false)}>
-          {/* Header */}
-          <div className="flex items-center justify-between p-4">
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+          {/* Header com botão Voltar */}
+          <div className="flex items-center justify-between p-4 bg-black/80">
+            <button onClick={() => setLightboxOpen(false)} className="flex items-center gap-2 text-white p-2 -ml-2">
+              <ArrowLeft className="h-5 w-5" />
+              <span className="text-sm font-medium">Voltar</span>
+            </button>
             <span className="text-white/70 text-sm">{lightboxIndex + 1} / {lightboxPhotos.length}</span>
             <button onClick={() => setLightboxOpen(false)} className="text-white/70 hover:text-white p-2">
               <X className="h-6 w-6" />
@@ -204,7 +204,7 @@ export default function Estoque() {
           </div>
           
           {/* Image */}
-          <div className="flex-1 flex items-center justify-center px-4 relative" onClick={(e) => e.stopPropagation()}>
+          <div className="flex-1 flex items-center justify-center px-4 relative">
             {lightboxIndex > 0 && (
               <button
                 onClick={() => setLightboxIndex(i => i - 1)}
@@ -217,7 +217,7 @@ export default function Estoque() {
             <img
               src={lightboxPhotos[lightboxIndex]}
               alt={`Foto ${lightboxIndex + 1}`}
-              className="max-h-[75vh] max-w-full object-contain rounded-lg"
+              className="max-h-[70vh] max-w-full object-contain rounded-lg"
             />
             
             {lightboxIndex < lightboxPhotos.length - 1 && (
@@ -230,8 +230,13 @@ export default function Estoque() {
             )}
           </div>
 
+          {/* Dica para iOS */}
+          {isIOS() && (
+            <p className="text-center text-white/60 text-xs py-1">Segure a imagem para salvar na galeria</p>
+          )}
+
           {/* Thumbnails */}
-          <div className="p-4 flex gap-2 overflow-x-auto justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="p-3 flex gap-2 overflow-x-auto justify-center bg-black/80">
             {lightboxPhotos.map((photo, i) => (
               <img
                 key={i}
