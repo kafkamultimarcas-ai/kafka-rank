@@ -749,6 +749,7 @@ export const appRouter = router({
       customerEmail: z.string().optional(),
       customerCpf: z.string().optional(),
       customerBirthday: z.string().optional(),
+      retroDate: z.string().optional(), // Data retroativa YYYY-MM-DD
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
@@ -767,7 +768,15 @@ export const appRouter = router({
         }
       }
       
-      const id = await db.createSale({ ...input, points, status: 'pending', sdrRecordId });
+      // Se retroDate fornecido, usar como createdAt
+      const saleData: any = { ...input, points, status: 'pending', sdrRecordId };
+      if (input.retroDate) {
+        saleData.createdAt = new Date(input.retroDate + 'T12:00:00');
+        delete saleData.retroDate;
+      } else {
+        delete saleData.retroDate;
+      }
+      const id = await db.createSale(saleData);
       
       // Se encontrou agendamento vinculado, marcar como convertido e notificar SDR
       if (sdrRecordId && sdrSellerName) {

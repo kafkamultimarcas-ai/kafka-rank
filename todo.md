@@ -2266,3 +2266,4 @@
 - [ ] Frontend: Botão destaque na tela inicial do vendedor para Central de Resultados
 - [ ] Correção de bugs gerais
 - [x] Remover aba Sorteio Feirão do menu lateral admin
+- [x] Permitir lançar venda com data retroativa (mês passado)

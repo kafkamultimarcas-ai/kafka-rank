@@ -151,6 +151,9 @@ export default function RegisterSale() {
   const [submitted, setSubmitted] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState("");
 
+  // Data retroativa (opcional - para lançar vendas de meses anteriores)
+  const [retroDate, setRetroDate] = useState("");
+
   // Venda fields
   const [vehicleModel, setVehicleModel] = useState("");
   const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
@@ -366,6 +369,7 @@ export default function RegisterSale() {
             customerEmail: saleCustomerEmail || undefined,
             customerCpf: saleCustomerCpf || undefined,
             customerBirthday: saleCustomerBirthday || undefined,
+            retroDate: retroDate || undefined,
           });
           // Mostrar alerta se venda foi vinculada a agendamento SDR
           if ((result as any).linkedSdr) {
@@ -1102,6 +1106,24 @@ export default function RegisterSale() {
                   </div>
                 )}
               </>
+            )}
+
+            {/* Data retroativa (opcional) */}
+            {(category === "vendas" || category === "fei" || category === "consignacao" || category === "despachante") && (
+              <div className="space-y-2 border border-yellow-500/30 bg-yellow-500/5 rounded-lg p-3">
+                <Label className="text-yellow-400 font-semibold text-sm flex items-center gap-2">
+                  📅 Data da Venda (opcional - retroativo)
+                </Label>
+                <Input
+                  type="date"
+                  value={retroDate}
+                  onChange={e => setRetroDate(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white"
+                />
+                <p className="text-gray-500 text-xs">
+                  {retroDate ? `A venda será registrada com data ${new Date(retroDate + 'T12:00:00').toLocaleDateString('pt-BR')}` : 'Deixe vazio para usar a data de hoje'}
+                </p>
+              </div>
             )}
 
             {/* Botão registrar */}
