@@ -76,7 +76,8 @@ export default function Estoque() {
 
   const sendViaWhatsApp = (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
-    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n\n📅 Ano: ${v.year || "N/A"}\n🎨 Cor: ${v.color || "N/A"}\n🛣️ KM: ${v.km ? Number(v.km).toLocaleString("pt-BR") : "N/A"}\n⛽ Combustível: ${v.fuel || "N/A"}\n💰 *Preço: ${formatPrice(v.price)}*${v.fipePrice ? `\n📊 FIPE: ${formatPrice(v.fipePrice)}` : ""}${photos.length > 0 ? `\n\n📸 Fotos:\n${photos.slice(0, 5).join("\n")}` : ""}\n\n🏪 *Kafka Multimarcas*\n📍 Navegantes/SC`;
+    // Mensagem simples: só modelo, ano e fotos como imagem
+    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *Kafka Multimarcas*`;
     const encoded = encodeURIComponent(text);
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
