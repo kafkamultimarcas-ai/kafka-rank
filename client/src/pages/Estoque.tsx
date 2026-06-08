@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check } from "lucide-react";
+import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send } from "lucide-react";
 import { toast } from "sonner";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
@@ -28,6 +28,13 @@ export default function Estoque() {
   });
   const { data: brands } = trpc.inventory.brands.useQuery();
   const { data: stats } = trpc.inventory.stats.useQuery();
+
+  const sendViaWhatsApp = (v: any) => {
+    const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
+    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n\n📅 Ano: ${v.year || "N/A"}\n🎨 Cor: ${v.color || "N/A"}\n🛣️ KM: ${v.km ? Number(v.km).toLocaleString("pt-BR") : "N/A"}\n⛽ Combustível: ${v.fuel || "N/A"}\n💰 *Preço: ${formatPrice(v.price)}*${v.fipePrice ? `\n📊 FIPE: ${formatPrice(v.fipePrice)}` : ""}${photos.length > 0 ? `\n\n📸 Fotos:\n${photos.slice(0, 5).join("\n")}` : ""}\n\n🏪 *Kafka Multimarcas*\n📍 Navegantes/SC`;
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+  };
 
   const copyVehicleInfo = (v: any) => {
     const text = `${v.brand} ${v.model}${v.version ? ` ${v.version}` : ""}\nAno: ${v.year || "N/A"}\nCor: ${v.color || "N/A"}\nKM: ${v.km ? Number(v.km).toLocaleString("pt-BR") : "N/A"}\nPreço: ${formatPrice(v.price)}${v.fipePrice ? `\nFIPE: ${formatPrice(v.fipePrice)}` : ""}`;
@@ -261,26 +268,35 @@ export default function Estoque() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => { e.stopPropagation(); copyVehicleInfo(v); }}
-                          className="flex-1 gap-1.5 text-xs"
-                        >
-                          {copiedId === v.id ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-                          {copiedId === v.id ? "Copiado!" : "Copiar Info"}
-                        </Button>
-                        {v.externalUrl && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={(e) => { e.stopPropagation(); window.open(v.externalUrl!, "_blank"); }}
-                            className="flex-1 gap-1.5 text-xs border-cyan-600 text-cyan-400"
+                            onClick={(e) => { e.stopPropagation(); copyVehicleInfo(v); }}
+                            className="flex-1 gap-1.5 text-xs"
                           >
-                            <ExternalLink className="h-3.5 w-3.5" /> Ver no Site
+                            {copiedId === v.id ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                            {copiedId === v.id ? "Copiado!" : "Copiar Info"}
                           </Button>
-                        )}
+                          {v.externalUrl && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); window.open(v.externalUrl!, "_blank"); }}
+                              className="flex-1 gap-1.5 text-xs border-cyan-600 text-cyan-400"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" /> Ver no Site
+                            </Button>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); sendViaWhatsApp(v); }}
+                          className="w-full gap-1.5 text-xs bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <Send className="h-3.5 w-3.5" /> Enviar pro Cliente via WhatsApp
+                        </Button>
                       </div>
                     </div>
                   )}
