@@ -13,6 +13,46 @@ function formatPrice(v: number | null | undefined) {
   return `R$ ${Number(v).toLocaleString("pt-BR")}`;
 }
 
+// Detecta padrões de preço na busca: "até 30 mil", "ate 50000", "até 100k", "30000", etc.
+function extractPriceFilter(text: string): { cleanSearch: string; maxPrice?: number; minPrice?: number } {
+  if (!text) return { cleanSearch: "" };
+
+  // Pattern: "até X mil" ou "ate X mil" ou "até Xk"
+  const ateMatch = text.match(/at[eé]\s*(\d+[\.,]?\d*)\s*(mil|k)?/i);
+  if (ateMatch) {
+    let value = parseFloat(ateMatch[1].replace(",", "."));
+    if (ateMatch[2] && (ateMatch[2].toLowerCase() === "mil" || ateMatch[2].toLowerCase() === "k")) {
+      value *= 1000;
+    } else if (value < 1000) {
+      // Se digitou "até 30" sem "mil", assume que é 30 mil
+      value *= 1000;
+    }
+    const cleanSearch = text.replace(/at[eé]\s*\d+[\.,]?\d*\s*(mil|k)?/i, "").trim();
+    return { cleanSearch, maxPrice: value };
+  }
+
+  // Pattern: "de X a Y" ou "de X até Y"
+  const rangeMatch = text.match(/de\s*(\d+[\.,]?\d*)\s*(mil|k)?\s*(a|at[eé]|até)\s*(\d+[\.,]?\d*)\s*(mil|k)?/i);
+  if (rangeMatch) {
+    let minVal = parseFloat(rangeMatch[1].replace(",", "."));
+    if (rangeMatch[2] && (rangeMatch[2].toLowerCase() === "mil" || rangeMatch[2].toLowerCase() === "k")) {
+      minVal *= 1000;
+    } else if (minVal < 1000) {
+      minVal *= 1000;
+    }
+    let maxVal = parseFloat(rangeMatch[4].replace(",", "."));
+    if (rangeMatch[5] && (rangeMatch[5].toLowerCase() === "mil" || rangeMatch[5].toLowerCase() === "k")) {
+      maxVal *= 1000;
+    } else if (maxVal < 1000) {
+      maxVal *= 1000;
+    }
+    const cleanSearch = text.replace(/de\s*\d+[\.,]?\d*\s*(mil|k)?\s*(a|at[eé]|até)\s*\d+[\.,]?\d*\s*(mil|k)?/i, "").trim();
+    return { cleanSearch, minPrice: minVal, maxPrice: maxVal };
+  }
+
+  return { cleanSearch: text };
+}
+
 export default function Estoque() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
@@ -21,10 +61,15 @@ export default function Estoque() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
+  // Extrair filtro de preço da busca
+  const priceFilter = useMemo(() => extractPriceFilter(search), [search]);
+
   const { data: vehicles, isLoading } = trpc.inventory.list.useQuery({
     status: statusFilter === "all" ? undefined : statusFilter as any,
-    search: search || undefined,
+    search: priceFilter.cleanSearch || undefined,
     brand: brandFilter || undefined,
+    maxPrice: priceFilter.maxPrice || undefined,
+    minPrice: priceFilter.minPrice || undefined,
   });
   const { data: brands } = trpc.inventory.brands.useQuery();
   const { data: stats } = trpc.inventory.stats.useQuery();
@@ -44,6 +89,9 @@ export default function Estoque() {
       setTimeout(() => setCopiedId(null), 2000);
     });
   };
+
+  // Indicador visual de filtro de preço ativo
+  const hasPriceFilter = !!(priceFilter.maxPrice || priceFilter.minPrice);
 
   return (
     <div className="min-h-screen bg-background">
@@ -101,7 +149,7 @@ export default function Estoque() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar marca, modelo, versão..."
+              placeholder="Buscar marca, modelo... ou 'até 30 mil'"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-10 h-10"
@@ -112,6 +160,25 @@ export default function Estoque() {
               </button>
             )}
           </div>
+
+          {/* Price filter indicator */}
+          {hasPriceFilter && (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary border border-primary/30">
+                <Tag className="h-3 w-3" />
+                {priceFilter.minPrice && priceFilter.maxPrice
+                  ? `R$ ${(priceFilter.minPrice / 1000).toFixed(0)} mil a R$ ${(priceFilter.maxPrice / 1000).toFixed(0)} mil`
+                  : priceFilter.maxPrice
+                  ? `Até R$ ${priceFilter.maxPrice >= 1000 ? `${(priceFilter.maxPrice / 1000).toFixed(0)} mil` : priceFilter.maxPrice}`
+                  : `A partir de R$ ${priceFilter.minPrice! >= 1000 ? `${(priceFilter.minPrice! / 1000).toFixed(0)} mil` : priceFilter.minPrice}`
+                }
+                <button onClick={() => setSearch(priceFilter.cleanSearch)} className="ml-0.5 hover:text-primary/80">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setStatusFilter("available")}
@@ -163,6 +230,9 @@ export default function Estoque() {
           <div className="text-center py-16">
             <Car className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">Nenhum veículo encontrado</p>
+            {hasPriceFilter && (
+              <p className="text-xs text-muted-foreground mt-1">Tente ajustar o filtro de preço</p>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
