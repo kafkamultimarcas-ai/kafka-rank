@@ -96,10 +96,10 @@ export default function Estoque() {
       const files: File[] = [];
       for (let i = 0; i < maxPhotos; i++) {
         try {
-          const proxyUrl = `/api/trpc/inventory.proxyPhoto?input=${encodeURIComponent(JSON.stringify({ url: photos[i] }))}`;
+          const proxyUrl = `/api/trpc/inventory.proxyPhoto?input=${encodeURIComponent(JSON.stringify({ json: { url: photos[i] } }))}`;
           const response = await fetch(proxyUrl);
           const json = await response.json();
-          const result = json?.result?.data;
+          const result = json?.result?.data?.json;
           if (result?.data) {
             const byteChars = atob(result.data);
             const byteArray = new Uint8Array(byteChars.length);
