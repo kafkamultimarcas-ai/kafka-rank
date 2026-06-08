@@ -88,26 +88,50 @@ export default function Estoque() {
       toast.error("Nenhuma foto disponível");
       return;
     }
-    toast.info(`Baixando ${photos.length} foto(s)...`);
-    for (let i = 0; i < Math.min(photos.length, 10); i++) {
-      try {
-        const response = await fetch(photos[i]);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${v.brand}-${v.model}-${i + 1}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        // Pequeno delay entre downloads para não travar
-        if (i < photos.length - 1) await new Promise(r => setTimeout(r, 500));
-      } catch (err) {
-        console.error("Erro ao baixar foto", i, err);
+    toast.info(`Preparando ${Math.min(photos.length, 10)} foto(s)...`);
+    
+    try {
+      // Baixar as fotos como blobs
+      const files: File[] = [];
+      for (let i = 0; i < Math.min(photos.length, 10); i++) {
+        try {
+          const response = await fetch(photos[i]);
+          const blob = await response.blob();
+          const file = new File([blob], `${v.brand}-${v.model}-${i + 1}.jpg`, { type: "image/jpeg" });
+          files.push(file);
+        } catch (err) {
+          console.error("Erro ao baixar foto", i, err);
+        }
+      }
+
+      if (files.length === 0) {
+        toast.error("Não foi possível baixar as fotos");
+        return;
+      }
+
+      // Tentar usar Web Share API (funciona no celular - salva/compartilha direto)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files })) {
+        await navigator.share({
+          title: `${v.brand} ${v.model} - Fotos`,
+          text: `${v.brand} ${v.model} ${v.year || ""}`,
+          files,
+        });
+        toast.success("Fotos compartilhadas!");
+      } else {
+        // Fallback: abrir cada foto em nova aba para salvar manualmente
+        // No celular, segurando a imagem o usuário pode salvar na galeria
+        for (const photo of photos.slice(0, 10)) {
+          window.open(photo, "_blank");
+          await new Promise(r => setTimeout(r, 300));
+        }
+        toast.success("Fotos abertas! Segure a imagem para salvar na galeria.");
+      }
+    } catch (err: any) {
+      // Se o usuário cancelou o share, não mostrar erro
+      if (err?.name !== "AbortError") {
+        toast.error("Erro ao compartilhar fotos");
       }
     }
-    toast.success(`${Math.min(photos.length, 10)} foto(s) salva(s) na galeria!`);
   };
 
   const copyVehicleInfo = (v: any) => {
@@ -395,7 +419,7 @@ export default function Estoque() {
                             onClick={(e) => { e.stopPropagation(); downloadPhotos(v); }}
                             className="w-full gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white"
                           >
-                            <Download className="h-3.5 w-3.5" /> Baixar Fotos ({photos.length})
+                            <Download className="h-3.5 w-3.5" /> Salvar Fotos ({photos.length})
                           </Button>
                         )}
                         <Button
