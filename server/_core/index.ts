@@ -118,6 +118,25 @@ async function startServer() {
     }
   });
 
+  // Rota para visualizar imagem inline (iOS - segure para salvar)
+  app.get("/api/photo-view", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      if (!url) { res.status(400).json({ error: "URL required" }); return; }
+      const response = await fetch(url);
+      if (!response.ok) { res.status(502).json({ error: "Failed to fetch" }); return; }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", "inline");
+      res.setHeader("Content-Length", buffer.length.toString());
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ error: "View failed" });
+    }
+  });
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // CRM webhook endpoints for external integrations

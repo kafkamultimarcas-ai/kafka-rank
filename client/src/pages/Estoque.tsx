@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
-import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download } from "lucide-react";
+import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
@@ -24,7 +24,6 @@ function extractPriceFilter(text: string): { cleanSearch: string; maxPrice?: num
     if (ateMatch[2] && (ateMatch[2].toLowerCase() === "mil" || ateMatch[2].toLowerCase() === "k")) {
       value *= 1000;
     } else if (value < 1000) {
-      // Se digitou "até 30" sem "mil", assume que é 30 mil
       value *= 1000;
     }
     const cleanSearch = text.replace(/at[eé]\s*\d+[\.,]?\d*\s*(mil|k)?/i, "").trim();
@@ -53,6 +52,11 @@ function extractPriceFilter(text: string): { cleanSearch: string; maxPrice?: num
   return { cleanSearch: text };
 }
 
+// Detectar se é iOS
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 export default function Estoque() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
@@ -60,6 +64,11 @@ export default function Estoque() {
   const [brandFilter, setBrandFilter] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  
+  // Lightbox state
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Extrair filtro de preço da busca
   const priceFilter = useMemo(() => extractPriceFilter(search), [search]);
@@ -74,45 +83,57 @@ export default function Estoque() {
   const { data: brands } = trpc.inventory.brands.useQuery();
   const { data: stats } = trpc.inventory.stats.useQuery();
 
+  // Abrir lightbox
+  const openLightbox = (photos: string[], index: number) => {
+    setLightboxPhotos(photos);
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
   const sendViaWhatsApp = (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
-    // Mensagem simples: só modelo, ano e fotos
     const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *Kafka Multimarcas*`;
     const encoded = encodeURIComponent(text);
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
 
-  // Salvar fotos na galeria do celular (download direto)
-  const savePhotosToGallery = async (v: any) => {
+  // Salvar fotos - abordagem diferente para iOS vs Android
+  const savePhotos = async (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
     if (photos.length === 0) {
       toast.error("Nenhuma foto disponível");
       return;
     }
     const maxPhotos = Math.min(photos.length, 5);
-    toast.info(`Baixando ${maxPhotos} foto(s)...`);
-    
-    // Usar link de download direto via proxy do servidor
-    for (let i = 0; i < maxPhotos; i++) {
-      const filename = `${v.brand}-${v.model}-${i + 1}.jpg`;
-      const downloadUrl = `/api/photo-download?url=${encodeURIComponent(photos[i])}&name=${encodeURIComponent(filename)}`;
-      
-      // Criar link temporário e clicar para forçar download
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = filename;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      // Delay entre downloads
-      if (i < maxPhotos - 1) await new Promise(r => setTimeout(r, 800));
+
+    if (isIOS()) {
+      // iOS: Abrir fotos inline em nova aba - usuário segura para salvar na galeria
+      toast.info("Abrindo fotos... Segure a imagem para salvar na galeria.");
+      for (let i = 0; i < maxPhotos; i++) {
+        const viewUrl = `/api/photo-view?url=${encodeURIComponent(photos[i])}`;
+        window.open(viewUrl, "_blank");
+        if (i < maxPhotos - 1) await new Promise(r => setTimeout(r, 600));
+      }
+    } else {
+      // Android: Download direto funciona
+      toast.info(`Baixando ${maxPhotos} foto(s)...`);
+      for (let i = 0; i < maxPhotos; i++) {
+        const filename = `${v.brand}-${v.model}-${i + 1}.jpg`;
+        const downloadUrl = `/api/photo-download?url=${encodeURIComponent(photos[i])}&name=${encodeURIComponent(filename)}`;
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (i < maxPhotos - 1) await new Promise(r => setTimeout(r, 800));
+      }
+      toast.success(`${maxPhotos} foto(s) salva(s)!`);
     }
-    toast.success(`${maxPhotos} foto(s) salva(s)! Verifique seus Downloads/Galeria.`);
   };
 
-  // Compartilhar fotos via WhatsApp/outros apps (Web Share API)
+  // Compartilhar fotos via Web Share API (funciona em ambos)
   const sharePhotos = async (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
     if (photos.length === 0) {
@@ -147,13 +168,12 @@ export default function Estoque() {
           files,
         });
       } else {
-        // Fallback: baixar direto
-        savePhotosToGallery(v);
+        // Fallback
+        savePhotos(v);
       }
     } catch (err: any) {
       if (err?.name !== "AbortError") {
-        // Se share falhou, tenta download direto
-        savePhotosToGallery(v);
+        savePhotos(v);
       }
     }
   };
@@ -172,6 +192,59 @@ export default function Estoque() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Lightbox / Visualizador de Fotos */}
+      {lightboxOpen && lightboxPhotos.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col" onClick={() => setLightboxOpen(false)}>
+          {/* Header */}
+          <div className="flex items-center justify-between p-4">
+            <span className="text-white/70 text-sm">{lightboxIndex + 1} / {lightboxPhotos.length}</span>
+            <button onClick={() => setLightboxOpen(false)} className="text-white/70 hover:text-white p-2">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          {/* Image */}
+          <div className="flex-1 flex items-center justify-center px-4 relative" onClick={(e) => e.stopPropagation()}>
+            {lightboxIndex > 0 && (
+              <button
+                onClick={() => setLightboxIndex(i => i - 1)}
+                className="absolute left-2 z-10 bg-black/50 text-white rounded-full p-2"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+            )}
+            
+            <img
+              src={lightboxPhotos[lightboxIndex]}
+              alt={`Foto ${lightboxIndex + 1}`}
+              className="max-h-[75vh] max-w-full object-contain rounded-lg"
+            />
+            
+            {lightboxIndex < lightboxPhotos.length - 1 && (
+              <button
+                onClick={() => setLightboxIndex(i => i + 1)}
+                className="absolute right-2 z-10 bg-black/50 text-white rounded-full p-2"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            )}
+          </div>
+
+          {/* Thumbnails */}
+          <div className="p-4 flex gap-2 overflow-x-auto justify-center" onClick={(e) => e.stopPropagation()}>
+            {lightboxPhotos.map((photo, i) => (
+              <img
+                key={i}
+                src={photo}
+                alt={`Thumb ${i + 1}`}
+                onClick={() => setLightboxIndex(i)}
+                className={`h-14 w-20 object-cover rounded cursor-pointer border-2 transition-all ${i === lightboxIndex ? "border-white opacity-100" : "border-transparent opacity-50"}`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14">
@@ -325,7 +398,7 @@ export default function Estoque() {
                     {/* Photo */}
                     <div className="w-28 sm:w-36 flex-shrink-0 bg-accent/30 relative">
                       {v.photoUrl ? (
-                        <img src={v.photoUrl} alt={`${v.brand} ${v.model}`} className="w-full h-full object-cover min-h-[100px]" loading="lazy" />
+                        <img src={v.photoUrl} alt={`${v.brand} ${v.model}`} className="w-full h-full min-h-[100px] object-cover" />
                       ) : (
                         <div className="w-full h-full min-h-[100px] flex items-center justify-center">
                           <Car className="h-8 w-8 text-muted-foreground/30" />
@@ -371,17 +444,25 @@ export default function Estoque() {
                   {/* Expanded Details */}
                   {isExpanded && (
                     <div className="border-t border-border p-3 space-y-3 bg-accent/5">
-                      {/* Photo Gallery */}
-                      {photos.length > 1 && (
+                      {/* Photo Gallery - clicável para ampliar */}
+                      {photos.length > 0 && (
                         <div className="flex gap-2 overflow-x-auto pb-2">
                           {photos.map((photo, i) => (
-                            <img
+                            <div
                               key={i}
-                              src={photo}
-                              alt={`Foto ${i + 1}`}
-                              className="h-20 w-28 object-cover rounded-lg flex-shrink-0 border border-border"
-                              loading="lazy"
-                            />
+                              className="relative flex-shrink-0 cursor-pointer group"
+                              onClick={(e) => { e.stopPropagation(); openLightbox(photos, i); }}
+                            >
+                              <img
+                                src={photo}
+                                alt={`Foto ${i + 1}`}
+                                className="h-20 w-28 object-cover rounded-lg border border-border"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-active:bg-black/30 rounded-lg flex items-center justify-center transition-all">
+                                <ZoomIn className="h-5 w-5 text-white opacity-0 group-active:opacity-100 transition-opacity" />
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -441,7 +522,7 @@ export default function Estoque() {
                           <div className="flex gap-2">
                             <Button
                               size="sm"
-                              onClick={(e) => { e.stopPropagation(); savePhotosToGallery(v); }}
+                              onClick={(e) => { e.stopPropagation(); savePhotos(v); }}
                               className="flex-1 gap-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white"
                             >
                               <Download className="h-3.5 w-3.5" /> Salvar Fotos
