@@ -280,6 +280,14 @@ export default function MinhaArea() {
     onError: (err: any) => toast.error(err.message || "Erro ao editar valor"),
   });
 
+  const editFeiValue = trpc.fei.update.useMutation({
+    onSuccess: () => {
+      toast.success("F&I atualizado com sucesso!");
+      utils.fei.list.invalidate();
+    },
+    onError: (err: any) => toast.error(err.message || "Erro ao editar F&I"),
+  });
+
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
   const pendingApproval = (appointments || []).filter((a: any) => a.attendanceStatus === 'attended');
@@ -732,20 +740,29 @@ export default function MinhaArea() {
             {pendingSales.slice(0, 5).map((s: any) => (
               <div key={s.id} className="text-sm text-gray-300 py-2 border-b border-gray-800 last:border-0">
                 <div className="flex justify-between items-center">
-                  <span>{s.vehicleModel}</span>
+                  <div>
+                    <span>{s.vehicleModel}</span>
+                    <p className="text-xs text-gray-500">{formatDate(s.createdAt)}</p>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-gray-500">{formatCurrency(s.value)}</span>
                     <button
                       onClick={() => {
-                        const novoValor = prompt(`Corrigir valor de ${s.vehicleModel}:\n\nValor atual: R$ ${formatCurrency(s.value)}\n\nDigite o novo valor (ex: 70000):`);
-                        if (novoValor) {
+                        const novoModelo = prompt(`Corrigir modelo:\n\nAtual: ${s.vehicleModel}\n\nDigite o novo modelo (ou deixe vazio para manter):`);
+                        const novoValor = prompt(`Corrigir valor de ${s.vehicleModel}:\n\nValor atual: R$ ${s.value?.toLocaleString('pt-BR')}\n\nDigite o novo valor (ex: 70000, ou deixe vazio para manter):`);
+                        const updateData: any = { saleId: s.id, value: s.value };
+                        if (novoValor && novoValor.trim()) {
                           const parsed = parseFloat(novoValor.replace(/\./g, '').replace(',', '.'));
                           if (!isNaN(parsed) && parsed > 0) {
-                            editSaleValue.mutate({ saleId: s.id, value: Math.round(parsed) });
+                            updateData.value = Math.round(parsed);
                           } else {
-                            toast.error('Valor inválido!');
+                            toast.error('Valor inválido!'); return;
                           }
                         }
+                        if (novoModelo && novoModelo.trim()) {
+                          updateData.vehicleModel = novoModelo.trim();
+                        }
+                        editSaleValue.mutate(updateData);
                       }}
                       className="text-blue-400 hover:text-blue-300 text-xs underline"
                     >
@@ -856,6 +873,23 @@ export default function MinhaArea() {
                         </div>
                       )}
                     </div>
+                    {/* Botão Editar F&I */}
+                    <button
+                      onClick={() => {
+                        const novoValor = prompt(`Corrigir valor financiado:\n\nAtual: R$ ${(r.financedValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\nDigite o novo valor (ex: 50000):`);
+                        if (novoValor && novoValor.trim()) {
+                          const parsed = parseFloat(novoValor.replace(/\./g, '').replace(',', '.'));
+                          if (!isNaN(parsed) && parsed > 0) {
+                            editFeiValue.mutate({ id: r.id, financedValue: Math.round(parsed * 100) });
+                          } else {
+                            toast.error('Valor inválido!');
+                          }
+                        }
+                      }}
+                      className="mt-2 text-blue-400 hover:text-blue-300 text-xs underline"
+                    >
+                      ✏️ Editar Valor
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1349,9 +1383,33 @@ export default function MinhaArea() {
                       <p className="text-sm text-white font-medium">{s.vehicleModel}</p>
                       <p className="text-xs text-gray-500">{formatDate(s.createdAt)} {s.leadSource ? `• ${s.leadSource === 'lead_loja' ? 'Lead Loja' : 'Lead Vendedor'}` : ''}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-emerald-400 font-bold">{formatCurrency(s.value)}</p>
-                      <p className="text-xs text-yellow-500">+{s.points} pts</p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-sm text-emerald-400 font-bold">{formatCurrency(s.value)}</p>
+                        <p className="text-xs text-yellow-500">+{s.points} pts</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const novoModelo = prompt(`Corrigir modelo:\n\nAtual: ${s.vehicleModel}\n\nDigite o novo modelo (ou deixe vazio para manter):`);
+                          const novoValor = prompt(`Corrigir valor:\n\nValor atual: R$ ${s.value?.toLocaleString('pt-BR')}\n\nDigite o novo valor (ex: 70000, ou deixe vazio para manter):`);
+                          const updateData: any = { saleId: s.id, value: s.value };
+                          if (novoValor && novoValor.trim()) {
+                            const parsed = parseFloat(novoValor.replace(/\\./g, '').replace(',', '.'));
+                            if (!isNaN(parsed) && parsed > 0) {
+                              updateData.value = Math.round(parsed);
+                            } else {
+                              toast.error('Valor inválido!'); return;
+                            }
+                          }
+                          if (novoModelo && novoModelo.trim()) {
+                            updateData.vehicleModel = novoModelo.trim();
+                          }
+                          editSaleValue.mutate(updateData);
+                        }}
+                        className="text-blue-400 hover:text-blue-300 text-xs"
+                      >
+                        ✏️
+                      </button>
                     </div>
                   </div>
                 ))}

@@ -2281,3 +2281,6 @@
 - [x] Admin: Adicionar campo de data no formulário "Editar Registro" de vendas (pendentes e aprovadas)
 - [x] Admin: Ao alterar data da venda, venda conta automaticamente no mês correto
 - [x] Bug: Label "Ve\u00edculo" com Unicode escapado no formulário de edição
+- [x] Vendedor: permitir editar valor e modelo da venda quando ainda está pendente
+- [x] Vendedor: permitir editar valor e modelo da venda mesmo depois de aprovada
+- [x] F&I: permitir editar valor do registro quando está pendente ou aprovado
