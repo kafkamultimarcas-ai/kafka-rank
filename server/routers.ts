@@ -753,6 +753,13 @@ export const appRouter = router({
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
+      
+      // Verificar duplicados antes de criar
+      const dupCheck = await db.checkDuplicateSale(input.vehiclePlate, input.customerCpf, input.customerName);
+      if (dupCheck.isDuplicate) {
+        throw new Error(`⚠️ DUPLICADO: ${dupCheck.reason}`);
+      }
+      
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
       
@@ -1316,6 +1323,13 @@ export const appRouter = router({
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
+      
+      // Verificar duplicados antes de criar
+      const dupCheck = await db.checkDuplicateFei(input.vehiclePlate, input.customerCpf);
+      if (dupCheck.isDuplicate) {
+        throw new Error(`\u26a0\ufe0f DUPLICADO: ${dupCheck.reason}`);
+      }
+      
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
       const id = await db.createFeiRecord({ ...input, points, status: 'pending' });
@@ -1669,6 +1683,13 @@ export const appRouter = router({
     })).mutation(async ({ input }) => {
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Colaborador n\u00e3o encontrado");
+      
+      // Verificar duplicados antes de criar
+      const dupCheck = await db.checkDuplicateDispatch(input.vehiclePlate);
+      if (dupCheck.isDuplicate) {
+        throw new Error(`\u26a0\ufe0f DUPLICADO: ${dupCheck.reason}`);
+      }
+      
       const comp = input.competitionId ? await db.getCompetitionById(input.competitionId) : null;
       const points = comp ? comp.pointsPerSale : 1;
       const bonusPoints = input.customerPaid ? Math.max(1, Math.floor(points * 0.5)) : 0;

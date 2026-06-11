@@ -298,6 +298,138 @@ export async function updateParticipantPoints(id: number, points: number, salesC
   await db.update(competitionParticipants).set({ points, salesCount }).where(and(eq(competitionParticipants.tenantId, getCurrentTenantId()), eq(competitionParticipants.id, id)));
 }
 
+// ===== DUPLICATE CHECK HELPERS =====
+// Verifica duplicados no mesmo mês por placa ou CPF
+export async function checkDuplicateSale(plate?: string | null, cpf?: string | null, customerName?: string | null): Promise<{ isDuplicate: boolean; reason?: string; existingRecord?: any }> {
+  const db = await getDb();
+  if (!db) return { isDuplicate: false };
+  const tid = getCurrentTenantId();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  
+  // Verificar por placa (mais confiável)
+  if (plate && plate.trim().length >= 5) {
+    const plateNorm = plate.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const existing = await db.select().from(sales).where(and(
+      eq(sales.tenantId, tid),
+      sql`UPPER(REPLACE(${sales.vehiclePlate}, '-', '')) = ${plateNorm}`,
+      sql`${sales.status} != 'rejected'`,
+      gte(sales.createdAt, monthStart),
+      lt(sales.createdAt, monthEnd)
+    )).limit(1);
+    if (existing.length > 0) {
+      return { isDuplicate: true, reason: `Já existe uma venda com a placa ${plate} neste mês (registrada por outro vendedor ou duplicada).`, existingRecord: existing[0] };
+    }
+  }
+  
+  // Verificar por CPF
+  if (cpf && cpf.trim().length >= 11) {
+    const cpfNorm = cpf.trim().replace(/[^0-9]/g, '');
+    const existing = await db.select().from(sales).where(and(
+      eq(sales.tenantId, tid),
+      sql`REPLACE(REPLACE(REPLACE(${sales.customerCpf}, '.', ''), '-', ''), ' ', '') = ${cpfNorm}`,
+      sql`${sales.status} != 'rejected'`,
+      gte(sales.createdAt, monthStart),
+      lt(sales.createdAt, monthEnd)
+    )).limit(1);
+    if (existing.length > 0) {
+      return { isDuplicate: true, reason: `Já existe uma venda com o CPF ${cpf} neste mês.`, existingRecord: existing[0] };
+    }
+  }
+  
+  return { isDuplicate: false };
+}
+
+export async function checkDuplicateFei(plate?: string | null, cpf?: string | null): Promise<{ isDuplicate: boolean; reason?: string; existingRecord?: any }> {
+  const db = await getDb();
+  if (!db) return { isDuplicate: false };
+  const tid = getCurrentTenantId();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  
+  if (plate && plate.trim().length >= 5) {
+    const plateNorm = plate.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const existing = await db.select().from(feiRecords).where(and(
+      eq(feiRecords.tenantId, tid),
+      sql`UPPER(REPLACE(${feiRecords.vehiclePlate}, '-', '')) = ${plateNorm}`,
+      sql`${feiRecords.status} != 'rejected'`,
+      gte(feiRecords.createdAt, monthStart),
+      lt(feiRecords.createdAt, monthEnd)
+    )).limit(1);
+    if (existing.length > 0) {
+      return { isDuplicate: true, reason: `Já existe um registro F&I com a placa ${plate} neste mês.`, existingRecord: existing[0] };
+    }
+  }
+  
+  if (cpf && cpf.trim().length >= 11) {
+    const cpfNorm = cpf.trim().replace(/[^0-9]/g, '');
+    const existing = await db.select().from(feiRecords).where(and(
+      eq(feiRecords.tenantId, tid),
+      sql`REPLACE(REPLACE(REPLACE(${feiRecords.customerCpf}, '.', ''), '-', ''), ' ', '') = ${cpfNorm}`,
+      sql`${feiRecords.status} != 'rejected'`,
+      gte(feiRecords.createdAt, monthStart),
+      lt(feiRecords.createdAt, monthEnd)
+    )).limit(1);
+    if (existing.length > 0) {
+      return { isDuplicate: true, reason: `Já existe um registro F&I com o CPF ${cpf} neste mês.`, existingRecord: existing[0] };
+    }
+  }
+  
+  return { isDuplicate: false };
+}
+
+export async function checkDuplicateDispatch(plate?: string | null): Promise<{ isDuplicate: boolean; reason?: string; existingRecord?: any }> {
+  const db = await getDb();
+  if (!db) return { isDuplicate: false };
+  const tid = getCurrentTenantId();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  
+  if (plate && plate.trim().length >= 5) {
+    const plateNorm = plate.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const existing = await db.select().from(dispatchRecords).where(and(
+      eq(dispatchRecords.tenantId, tid),
+      sql`UPPER(REPLACE(${dispatchRecords.vehiclePlate}, '-', '')) = ${plateNorm}`,
+      sql`${dispatchRecords.status} != 'rejected'`,
+      gte(dispatchRecords.createdAt, monthStart),
+      lt(dispatchRecords.createdAt, monthEnd)
+    )).limit(1);
+    if (existing.length > 0) {
+      return { isDuplicate: true, reason: `Já existe um registro de despachante com a placa ${plate} neste mês.`, existingRecord: existing[0] };
+    }
+  }
+  
+  return { isDuplicate: false };
+}
+
+export async function checkDuplicateConsignment(plate?: string | null): Promise<{ isDuplicate: boolean; reason?: string; existingRecord?: any }> {
+  const db = await getDb();
+  if (!db) return { isDuplicate: false };
+  const tid = getCurrentTenantId();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  
+  if (plate && plate.trim().length >= 5) {
+    const plateNorm = plate.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const existing = await db.select().from(consignmentRecords).where(and(
+      eq(consignmentRecords.tenantId, tid),
+      sql`UPPER(REPLACE(${consignmentRecords.vehiclePlate}, '-', '')) = ${plateNorm}`,
+      sql`${consignmentRecords.status} != 'rejected'`,
+      gte(consignmentRecords.createdAt, monthStart),
+      lt(consignmentRecords.createdAt, monthEnd)
+    )).limit(1);
+    if (existing.length > 0) {
+      return { isDuplicate: true, reason: `Já existe um registro de consignação com a placa ${plate} neste mês.`, existingRecord: existing[0] };
+    }
+  }
+  
+  return { isDuplicate: false };
+}
+
 // ===== SALES =====
 export async function listSales(competitionId?: number, sellerId?: number) {
   const db = await getDb();
@@ -1088,7 +1220,7 @@ export async function updateFeiRecord(id: number, data: {
   // Track who edited and when
   if (editedBy) {
     updateData.lastEditedBy = editedBy;
-    updateData.lastEditedAt = new Date();
+    updateData.lastEditedAt = Date.now();
     if (editReason) updateData.editNotes = editReason;
   }
   if (Object.keys(updateData).length > 0) {

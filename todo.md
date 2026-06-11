@@ -2284,3 +2284,10 @@
 - [x] Vendedor: permitir editar valor e modelo da venda quando ainda está pendente
 - [x] Vendedor: permitir editar valor e modelo da venda mesmo depois de aprovada
 - [x] F&I: permitir editar valor do registro quando está pendente ou aprovado
+- [ ] Relatório de duplicados: analisar banco e listar todos os lançamentos duplicados (placa, CPF, nome) no mesmo mês
+- [ ] Bloqueio de duplicados: impedir lançamento de venda/transferência/ficha/consignação duplicada no mesmo mês (por placa, CPF)
+- [ ] Bug: Corrigir erro SQL ao editar valor F&I (Failed query: update fei_records set financedValue)
+- [ ] UX: Ícone do perfil/login mais visível e maior no header (difícil de clicar no canto)
+- [ ] UX: Login automático direto quando vendedor já salvou credenciais no celular
+- [ ] Performance: Otimizar carregamento do app (menos lentidão)
+- [ ] Bloqueio de duplicados: impedir lançamento duplicado no mesmo mês (placa, CPF, nome+placa)

@@ -146,7 +146,7 @@ export const feiRecords = mysqlTable("fei_records", {
   paymentDate: bigint("paymentDate", { mode: "number" }), // data que o banco pagou a ficha
   notes: text("notes"), // observações do F&I
   lastEditedBy: varchar("lastEditedBy", { length: 255 }), // quem editou por último
-  lastEditedAt: timestamp("lastEditedAt"), // quando foi editado
+  lastEditedAt: bigint("lastEditedAt", { mode: "number" }), // quando foi editado (timestamp ms)
   editNotes: text("editNotes"), // motivo da edição
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
