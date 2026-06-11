@@ -3795,3 +3795,67 @@ export async function autoLaunchBonus(saleId: number, sellerId: number, vehicleP
   
   return createSellerBonus(bonus);
 }
+
+
+// ===== BUSCA CROSS-SETOR POR PLACA =====
+export async function searchAllByPlate(plate: string) {
+  const db = await getDb();
+  if (!db) return { sales: [], fei: [], dispatch: [], consignment: [], sdr: [] };
+  const normalizedPlate = plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (normalizedPlate.length < 3) return { sales: [], fei: [], dispatch: [], consignment: [], sdr: [] };
+  
+  const tid = getCurrentTenantId();
+  
+  // Buscar em vendas
+  const allSales = await db.select().from(sales)
+    .where(eq(sales.tenantId, tid))
+    .orderBy(desc(sales.createdAt));
+  const matchedSales = allSales.filter(s => {
+    const p = (s.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return p.includes(normalizedPlate);
+  });
+  
+  // Buscar em F&I
+  const allFei = await db.select().from(feiRecords)
+    .where(eq(feiRecords.tenantId, tid))
+    .orderBy(desc(feiRecords.createdAt));
+  const matchedFei = allFei.filter(f => {
+    const p = (f.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return p.includes(normalizedPlate);
+  });
+  
+  // Buscar em Despachante
+  const allDispatch = await db.select().from(dispatchRecords)
+    .where(eq(dispatchRecords.tenantId, tid))
+    .orderBy(desc(dispatchRecords.createdAt));
+  const matchedDispatch = allDispatch.filter(d => {
+    const p = (d.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return p.includes(normalizedPlate);
+  });
+  
+  // Buscar em Consignação
+  const allConsignment = await db.select().from(consignmentRecords)
+    .where(eq(consignmentRecords.tenantId, tid))
+    .orderBy(desc(consignmentRecords.createdAt));
+  const matchedConsignment = allConsignment.filter(c => {
+    const p = (c.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return p.includes(normalizedPlate);
+  });
+  
+  // Buscar em SDR/Agendamentos (por veículo de interesse)
+  const allSdr = await db.select().from(sdrRecords)
+    .where(eq(sdrRecords.tenantId, tid))
+    .orderBy(desc(sdrRecords.createdAt));
+  const matchedSdr = allSdr.filter(s => {
+    const v = (s.vehicleInterest || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return v.includes(normalizedPlate);
+  });
+  
+  return {
+    sales: matchedSales,
+    fei: matchedFei,
+    dispatch: matchedDispatch,
+    consignment: matchedConsignment,
+    sdr: matchedSdr,
+  };
+}

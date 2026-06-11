@@ -288,13 +288,57 @@ export default function MinhaArea() {
     onError: (err: any) => toast.error(err.message || "Erro ao editar F&I"),
   });
 
+  // === BUSCA POR PLACA (todos os setores) ===
+  const [sectorSearch, setSectorSearch] = useState("");
+
+  // === DELETE mutations ===
+  const deleteSaleMut = trpc.sales.delete.useMutation({
+    onSuccess: () => { toast.success("Venda excluída!"); utils.sales.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteFeiMut = trpc.fei.delete.useMutation({
+    onSuccess: () => { toast.success("F&I excluído!"); utils.fei.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteDispatchMut = trpc.dispatch.delete.useMutation({
+    onSuccess: () => { toast.success("Despachante excluído!"); utils.dispatch.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteConsignmentMut = trpc.consignment.delete.useMutation({
+    onSuccess: () => { toast.success("Consignação excluída!"); utils.consignment.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // === UPDATE mutations ===
+  const updateDispatchMut = trpc.dispatch.update.useMutation({
+    onSuccess: () => { toast.success("Despachante atualizado!"); utils.dispatch.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateConsignmentMut = trpc.consignment.update.useMutation({
+    onSuccess: () => { toast.success("Consignação atualizada!"); utils.consignment.list.invalidate(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
   const pendingApproval = (appointments || []).filter((a: any) => a.attendanceStatus === 'attended');
   const totalAppointments = (appointments || []).length;
 
-  const approvedSales = (mySales || []).filter((s: any) => s.status === 'approved');
-  const pendingSales = (mySales || []).filter((s: any) => s.status === 'pending');
+  const filteredSales = useMemo(() => {
+    let list = mySales || [];
+    if (sectorSearch.trim()) {
+      const q = sectorSearch.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      list = list.filter((s: any) => {
+        const plate = (s.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const model = (s.vehicleModel || '').toUpperCase();
+        const client = (s.customerName || '').toUpperCase();
+        return plate.includes(q) || model.includes(sectorSearch.toUpperCase()) || client.includes(sectorSearch.toUpperCase());
+      });
+    }
+    return list;
+  }, [mySales, sectorSearch]);
+  const approvedSales = filteredSales.filter((s: any) => s.status === 'approved');
+  const pendingSales = filteredSales.filter((s: any) => s.status === 'pending');
 
   const allFei = myFei || [];
   const approvedFei = allFei.filter((r: any) => r.status === 'approved');
@@ -302,16 +346,51 @@ export default function MinhaArea() {
   const rejectedFei = allFei.filter((r: any) => r.status === 'rejected');
 
   const filteredFei = useMemo(() => {
-    if (feiFilter === "todos") return allFei;
-    return allFei.filter((r: any) => r.status === feiFilter);
-  }, [allFei, feiFilter]);
+    let list = allFei;
+    if (feiFilter !== "todos") list = list.filter((r: any) => r.status === feiFilter);
+    if (sectorSearch.trim()) {
+      const q = sectorSearch.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      list = list.filter((r: any) => {
+        const plate = (r.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const name = (r.customerName || '').toUpperCase();
+        const cpf = (r.customerCpf || '').replace(/[^0-9]/g, '');
+        return plate.includes(q) || name.includes(sectorSearch.toUpperCase()) || cpf.includes(q);
+      });
+    }
+    return list;
+  }, [allFei, feiFilter, sectorSearch]);
 
-  const approvedConsignment = (myConsignment || []).filter((r: any) => r.status === 'approved');
-  const pendingConsignment = (myConsignment || []).filter((r: any) => r.status === 'pending');
-  const activeConsignment = (myConsignment || []).filter((r: any) => r.status === 'approved' && !r.exitDate);
+  const filteredConsignment = useMemo(() => {
+    let list = myConsignment || [];
+    if (sectorSearch.trim()) {
+      const q = sectorSearch.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      list = list.filter((r: any) => {
+        const plate = (r.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const model = (r.vehicleModel || '').toUpperCase();
+        const owner = (r.ownerName || '').toUpperCase();
+        return plate.includes(q) || model.includes(sectorSearch.toUpperCase()) || owner.includes(sectorSearch.toUpperCase());
+      });
+    }
+    return list;
+  }, [myConsignment, sectorSearch]);
+  const approvedConsignment = filteredConsignment.filter((r: any) => r.status === 'approved');
+  const pendingConsignment = filteredConsignment.filter((r: any) => r.status === 'pending');
+  const activeConsignment = filteredConsignment.filter((r: any) => r.status === 'approved' && !r.exitDate);
 
-  const approvedDispatch = (myDispatch || []).filter((r: any) => r.status === 'approved');
-  const pendingDispatch = (myDispatch || []).filter((r: any) => r.status === 'pending');
+  const filteredDispatch = useMemo(() => {
+    let list = myDispatch || [];
+    if (sectorSearch.trim()) {
+      const q = sectorSearch.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      list = list.filter((r: any) => {
+        const plate = (r.vehiclePlate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const docType = (r.documentType || '').toUpperCase();
+        return plate.includes(q) || docType.includes(sectorSearch.toUpperCase());
+      });
+    }
+    return list;
+  }, [myDispatch, sectorSearch]);
+  const approvedDispatch = filteredDispatch.filter((r: any) => r.status === 'approved');
+  const pendingDispatch = filteredDispatch.filter((r: any) => r.status === 'pending');
 
   // Pós-Venda computed
   const allPv = myPvChamados || [];
@@ -731,6 +810,38 @@ export default function MinhaArea() {
           </div>
         )}
 
+        {/* === CAMPO DE BUSCA POR PLACA/CARRO === */}
+        {(dept === "vendas" || dept === "fei" || dept === "despachante" || dept === "consignacao" || dept === "pre_vendas") && (
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                value={sectorSearch}
+                onChange={(e) => setSectorSearch(e.target.value)}
+                placeholder="Buscar por placa, modelo ou cliente..."
+                className="w-full bg-gray-900/60 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-gray-500 focus:border-red-500 focus:outline-none uppercase"
+              />
+              {sectorSearch && (
+                <button onClick={() => setSectorSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
+                  <XIcon className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {/* Botão Busca Geral Cross-Setor */}
+            <button
+              onClick={() => navigate('/busca-veiculo')}
+              className="w-full bg-gradient-to-r from-red-600/10 to-red-500/5 border border-red-500/30 rounded-xl p-3 flex items-center gap-3 hover:border-red-500/60 transition-all"
+            >
+              <Search className="w-5 h-5 text-red-400" />
+              <div className="text-left flex-1">
+                <p className="text-white font-bold text-sm">Busca Geral por Veículo</p>
+                <p className="text-gray-400 text-[11px]">Ver tudo de um veículo em todos os setores</p>
+              </div>
+            </button>
+          </div>
+        )}
+
         {/* Pendentes - Vendas */}
         {dept === "vendas" && pendingSales.length > 0 && (
           <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4">
@@ -764,9 +875,19 @@ export default function MinhaArea() {
                         }
                         editSaleValue.mutate(updateData);
                       }}
-                      className="text-blue-400 hover:text-blue-300 text-xs underline"
+                      className="text-blue-400 hover:text-blue-300 text-xs"
                     >
-                      Editar
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Excluir venda "${s.vehicleModel}"?\nEsta ação não pode ser desfeita.`)) {
+                          deleteSaleMut.mutate({ id: s.id });
+                        }
+                      }}
+                      className="text-red-400 hover:text-red-300 text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -873,23 +994,35 @@ export default function MinhaArea() {
                         </div>
                       )}
                     </div>
-                    {/* Botão Editar F&I */}
-                    <button
-                      onClick={() => {
-                        const novoValor = prompt(`Corrigir valor financiado:\n\nAtual: R$ ${(r.financedValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\nDigite o novo valor (ex: 50000):`);
-                        if (novoValor && novoValor.trim()) {
-                          const parsed = parseFloat(novoValor.replace(/\./g, '').replace(',', '.'));
-                          if (!isNaN(parsed) && parsed > 0) {
-                            editFeiValue.mutate({ id: r.id, financedValue: Math.round(parsed * 100) });
-                          } else {
-                            toast.error('Valor inválido!');
+                    {/* Botões Editar + Excluir F&I */}
+                    <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-800/50">
+                      <button
+                        onClick={() => {
+                          const novoValor = prompt(`Corrigir valor financiado:\n\nAtual: R$ ${(r.financedValue / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2})}\n\nDigite o novo valor (ex: 50000):`);
+                          if (novoValor && novoValor.trim()) {
+                            const parsed = parseFloat(novoValor.replace(/\./g, '').replace(',', '.'));
+                            if (!isNaN(parsed) && parsed > 0) {
+                              editFeiValue.mutate({ id: r.id, financedValue: Math.round(parsed * 100) });
+                            } else {
+                              toast.error('Valor inválido!');
+                            }
                           }
-                        }
-                      }}
-                      className="mt-2 text-blue-400 hover:text-blue-300 text-xs underline"
-                    >
-                      ✏️ Editar Valor
-                    </button>
+                        }}
+                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Excluir F&I "${r.bankName} - ${r.vehiclePlate}"?\nEsta ação não pode ser desfeita.`)) {
+                            deleteFeiMut.mutate({ id: r.id });
+                          }
+                        }}
+                        className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Excluir
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -979,10 +1112,39 @@ export default function MinhaArea() {
             <h3 className="text-orange-400 font-bold text-sm mb-2 flex items-center gap-2">
               <Clock className="w-4 h-4" /> Documentos aguardando aprovação ({pendingDispatch.length})
             </h3>
-            {pendingDispatch.slice(0, 5).map((r: any) => (
-              <div key={r.id} className="text-sm text-gray-300 py-1 flex justify-between">
-                <span>{r.documentType}</span>
-                <span className="text-gray-500">{r.vehiclePlate || 'N/I'}</span>
+            {pendingDispatch.map((r: any) => (
+              <div key={r.id} className="text-sm text-gray-300 py-2 border-b border-gray-800 last:border-0">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span>{r.documentType}</span>
+                    <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const novaPlaca = prompt(`Editar placa:\n\nAtual: ${r.vehiclePlate || 'N/I'}`);
+                        const novoDoc = prompt(`Editar tipo documento:\n\nAtual: ${r.documentType}`);
+                        const data: any = { id: r.id };
+                        if (novaPlaca && novaPlaca.trim()) data.vehiclePlate = novaPlaca.trim().toUpperCase();
+                        if (novoDoc && novoDoc.trim()) data.documentType = novoDoc.trim();
+                        if (data.vehiclePlate || data.documentType) updateDispatchMut.mutate(data);
+                      }}
+                      className="text-blue-400 hover:text-blue-300 text-xs"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Excluir "${r.documentType} - ${r.vehiclePlate}"?`)) {
+                          deleteDispatchMut.mutate({ id: r.id });
+                        }
+                      }}
+                      className="text-red-400 hover:text-red-300 text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1408,7 +1570,17 @@ export default function MinhaArea() {
                         }}
                         className="text-blue-400 hover:text-blue-300 text-xs"
                       >
-                        ✏️
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Excluir venda "${s.vehicleModel}"?`)) {
+                            deleteSaleMut.mutate({ id: s.id });
+                          }
+                        }}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -1448,6 +1620,31 @@ export default function MinhaArea() {
                       )}
                     </div>
                     {r.notes && <p className="text-[10px] text-gray-500 italic mt-0.5">{r.notes}</p>}
+                    <div className="flex items-center gap-3 mt-2 pt-1 border-t border-gray-800/50">
+                      <button
+                        onClick={() => {
+                          const novaPlaca = prompt(`Editar placa:\n\nAtual: ${r.vehiclePlate || 'N/I'}\n\nDigite a nova placa (ou vazio para manter):`);
+                          const novoModelo = prompt(`Editar modelo:\n\nAtual: ${r.vehicleModel}\n\nDigite o novo modelo (ou vazio para manter):`);
+                          const data: any = { id: r.id };
+                          if (novaPlaca && novaPlaca.trim()) data.vehiclePlate = novaPlaca.trim().toUpperCase();
+                          if (novoModelo && novoModelo.trim()) data.vehicleModel = novoModelo.trim();
+                          if (data.vehiclePlate || data.vehicleModel) updateConsignmentMut.mutate(data);
+                        }}
+                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Excluir consignação "${r.vehicleModel} - ${r.vehiclePlate}"?`)) {
+                            deleteConsignmentMut.mutate({ id: r.id });
+                          }
+                        }}
+                        className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Excluir
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1455,15 +1652,42 @@ export default function MinhaArea() {
 
             {dept === "despachante" && approvedDispatch.length > 0 && (
               <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-                {approvedDispatch.slice(0, 10).map((r: any) => (
-                  <div key={r.id} className="p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-white font-medium">{r.documentType}</p>
-                      <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.createdAt)}</p>
+                {approvedDispatch.map((r: any) => (
+                  <div key={r.id} className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-white font-medium">{r.documentType}</p>
+                        <p className="text-xs text-gray-500">Placa: {r.vehiclePlate || 'N/I'} • {formatDate(r.createdAt)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-yellow-500">+{r.points + (r.bonusPoints || 0)} pts</p>
+                        {r.customerPaid && <p className="text-xs text-emerald-400">Bônus!</p>}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-yellow-500">+{r.points + (r.bonusPoints || 0)} pts</p>
-                      {r.customerPaid && <p className="text-xs text-emerald-400">Bônus!</p>}
+                    <div className="flex items-center gap-3 mt-2 pt-1 border-t border-gray-800/50">
+                      <button
+                        onClick={() => {
+                          const novaPlaca = prompt(`Editar placa:\n\nAtual: ${r.vehiclePlate || 'N/I'}\n\nDigite a nova placa (ou vazio para manter):`);
+                          const novoDoc = prompt(`Editar tipo documento:\n\nAtual: ${r.documentType}\n\nDigite o novo tipo (ou vazio para manter):`);
+                          const data: any = { id: r.id };
+                          if (novaPlaca && novaPlaca.trim()) data.vehiclePlate = novaPlaca.trim().toUpperCase();
+                          if (novoDoc && novoDoc.trim()) data.documentType = novoDoc.trim();
+                          if (data.vehiclePlate || data.documentType) updateDispatchMut.mutate(data);
+                        }}
+                        className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Editar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Excluir registro "${r.documentType} - ${r.vehiclePlate}"?`)) {
+                            deleteDispatchMut.mutate({ id: r.id });
+                          }
+                        }}
+                        className="flex items-center gap-1 text-red-400 hover:text-red-300 text-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Excluir
+                      </button>
                     </div>
                   </div>
                 ))}

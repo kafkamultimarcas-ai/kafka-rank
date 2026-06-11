@@ -1022,8 +1022,8 @@ export const appRouter = router({
       }
       return { success: true, count: results.filter(r => r.success).length, total: pending.length };
     }),
-    // Excluir venda (admin/gerente) - reverte pontos e meta se aprovada
-    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Excluir venda (qualquer setor) - reverte pontos e meta se aprovada
+    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       // Buscar venda antes de deletar para decrementar meta
       const salesList = await db.listSales(undefined, undefined);
       const sale = salesList.find((s: any) => s.id === input.id);
@@ -1416,7 +1416,7 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteFeiRecord(input.id);
       return { success: true };
     }),
@@ -1629,13 +1629,13 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    // Excluir consignação (admin/gerente)
-    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Excluir consignação (qualquer setor)
+    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       const deleted = await db.deleteConsignmentRecord(input.id);
       return { success: true, deleted };
     }),
-    // Editar consignação (admin/gerente)
-    update: managerOrAdminProcedure.input(z.object({
+    // Editar consignação (qualquer setor)
+    update: publicProcedure.input(z.object({
       id: z.number(),
       vehiclePlate: z.string().optional(),
       vehicleModel: z.string().optional(),
@@ -1774,7 +1774,7 @@ export const appRouter = router({
       }
       return { success: true };
     }),
-    update: managerOrAdminProcedure.input(z.object({
+    update: publicProcedure.input(z.object({
       id: z.number(),
       vehiclePlate: z.string().optional(),
       documentType: z.string().optional(),
@@ -1785,7 +1785,7 @@ export const appRouter = router({
       const updated = await db.updateDispatchRecord(id, data);
       return { success: true, record: updated };
     }),
-    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteDispatchRecord(input.id);
       return { success: true };
     }),
@@ -1925,7 +1925,7 @@ export const appRouter = router({
       await db.rejectSdrRecord(input.id);
       return { success: true };
     }),
-    delete: managerOrAdminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.deleteSdrRecord(input.id);
       return { success: true };
     }),
@@ -2046,8 +2046,8 @@ export const appRouter = router({
       await db.updateSdrRecord(id, data as any);
       return { success: true, message: 'Agendamento atualizado com sucesso!' };
     }),
-    // Admin/Gerente edita agendamento
-    update: managerOrAdminProcedure.input(z.object({
+    // Editar agendamento (qualquer setor)
+    update: publicProcedure.input(z.object({
       id: z.number(),
       customerName: z.string().optional(),
       customerPhone: z.string().optional(),
@@ -3624,6 +3624,25 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           totalAdvances: overview.reduce((s, o) => s + o.totalAdvances, 0),
           totalBonuses: overview.reduce((s, o) => s + o.totalBonuses, 0),
         },
+      };
+    }),
+  }),
+
+  // ===== BUSCA GERAL POR VEÍCULO (CROSS-SETOR) =====
+  vehicleSearch: router({
+    byPlate: publicProcedure.input(z.object({
+      plate: z.string().min(3),
+    })).query(async ({ input }) => {
+      const results = await db.searchAllByPlate(input.plate);
+      // Enriquecer com nomes dos vendedores
+      const sellersList = await db.listSellers();
+      const getSeller = (id: number) => sellersList.find(s => s.id === id);
+      return {
+        sales: results.sales.map((s: any) => ({ ...s, sellerName: getSeller(s.sellerId)?.name || 'Desconhecido' })),
+        fei: results.fei.map((f: any) => ({ ...f, sellerName: getSeller(f.sellerId)?.name || 'Desconhecido' })),
+        dispatch: results.dispatch.map((d: any) => ({ ...d, sellerName: getSeller(d.sellerId)?.name || 'Desconhecido' })),
+        consignment: results.consignment.map((c: any) => ({ ...c, sellerName: getSeller(c.sellerId)?.name || 'Desconhecido' })),
+        sdr: results.sdr.map((s: any) => ({ ...s, sellerName: getSeller(s.sellerId)?.name || 'Desconhecido' })),
       };
     }),
   }),

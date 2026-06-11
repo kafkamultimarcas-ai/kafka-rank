@@ -2291,3 +2291,9 @@
 - [ ] UX: Login automático direto quando vendedor já salvou credenciais no celular
 - [ ] Performance: Otimizar carregamento do app (menos lentidão)
 - [ ] Bloqueio de duplicados: impedir lançamento duplicado no mesmo mês (placa, CPF, nome+placa)
+
+## Busca, Edição e Exclusão em Todos os Setores (Urgente)
+- [x] Busca por placa/carro/cliente em cada setor (Despachante, F&I, Vendas, Consignação, SDR)
+- [x] Botão de excluir lançamentos em todos os setores (não só admin)
+- [x] Edição completa de todos os campos em todos os setores (não só admin)
+- [x] Filtro geral por veículo (placa) - busca cross-setor mostrando tudo de um veículo
