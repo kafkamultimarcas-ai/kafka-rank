@@ -113,33 +113,33 @@ export default function AdminDocumentos() {
           <p className="text-muted-foreground text-sm ml-10">Gerencie transferências e documentos de vendas</p>
         </div>
 
-        {/* Stats */}
+        {/* Stats - Clicáveis */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <button onClick={() => setFilter("todos")} className={`bg-card border border-border rounded-xl p-4 text-center cursor-pointer transition-all ${filter === 'todos' ? 'ring-2 ring-foreground/50' : 'hover:ring-1 hover:ring-foreground/30'}`}>
             <FileText className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
             <p className="text-2xl font-black text-foreground">{counts.total}</p>
             <p className="text-xs text-muted-foreground">Total</p>
-          </div>
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+          </button>
+          <button onClick={() => setFilter("aguardando_docs")} className={`bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center cursor-pointer transition-all ${filter === 'aguardando_docs' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
             <FileWarning className="w-5 h-5 text-red-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-red-400">{counts.aguardando}</p>
             <p className="text-xs text-red-400/70">Aguardando</p>
-          </div>
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center">
+          </button>
+          <button onClick={() => setFilter("docs_enviados")} className={`bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-center cursor-pointer transition-all ${filter === 'docs_enviados' ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-blue-400/50'}`}>
             <FileCheck className="w-5 h-5 text-blue-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-blue-400">{counts.recebidos}</p>
             <p className="text-xs text-blue-400/70">Recebidos</p>
-          </div>
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-center">
+          </button>
+          <button onClick={() => setFilter("em_transferencia")} className={`bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-center cursor-pointer transition-all ${filter === 'em_transferencia' ? 'ring-2 ring-yellow-400' : 'hover:ring-1 hover:ring-yellow-400/50'}`}>
             <Clock className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-yellow-400">{counts.emTransferencia}</p>
             <p className="text-xs text-yellow-400/70">Em Transferência</p>
-          </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-center">
+          </button>
+          <button onClick={() => setFilter("transferido")} className={`bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 text-center cursor-pointer transition-all ${filter === 'transferido' ? 'ring-2 ring-emerald-400' : 'hover:ring-1 hover:ring-emerald-400/50'}`}>
             <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
             <p className="text-2xl font-black text-emerald-400">{counts.transferidos}</p>
             <p className="text-xs text-emerald-400/70">Transferidos</p>
-          </div>
+          </button>
         </div>
 
         {/* Filters */}

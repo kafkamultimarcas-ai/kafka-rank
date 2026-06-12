@@ -2297,3 +2297,12 @@
 - [x] Botão de excluir lançamentos em todos os setores (não só admin)
 - [x] Edição completa de todos os campos em todos os setores (não só admin)
 - [x] Filtro geral por veículo (placa) - busca cross-setor mostrando tudo de um veículo
+
+## Melhorias de Usabilidade - Cards Clicáveis e Expansão de Detalhes
+- [x] Cards de estatísticas clicáveis na competição (Vieram, Pendentes, Não Vieram → expandir lista)
+- [x] Cards clicáveis no Admin Despachante (total, aprovados, pendentes → expandir lista)
+- [x] Cards clicáveis no Admin F&I (total, aprovados, pendentes → expandir lista)
+- [x] Cards clicáveis no Admin Consignação (total, no pátio, saíram → expandir lista)
+- [x] Cards clicáveis no Admin Vendas (total, aprovadas, pendentes → expandir lista)
+- [x] Cards clicáveis na MinhaArea (resumo do setor → expandir detalhes)
+- [x] Varredura geral de usabilidade: facilitar navegação e acesso rápido

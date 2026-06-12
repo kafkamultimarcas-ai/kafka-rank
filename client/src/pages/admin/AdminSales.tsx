@@ -45,10 +45,13 @@ export default function AdminSales() {
   const [showAll, setShowAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSellerId, setFilterSellerId] = useState<string>("todos");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
 
   const filteredSales = useMemo(() => {
     if (!salesList) return [];
     let result = showAll ? salesList : filterByMonth(salesList, filterMonth, filterYear, 'createdAt' as any);
+    // Filtro por status
+    if (statusFilter !== "todos") result = result.filter((s: any) => (s.status || 'approved') === statusFilter);
     // Filtro por vendedor
     if (filterSellerId !== "todos") {
       result = result.filter((s: any) => String(s.sellerId) === filterSellerId);
@@ -309,6 +312,35 @@ export default function AdminSales() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Stats - Clicáveis */}
+        {(() => {
+          const baseList = showAll ? (salesList || []) : filterByMonth(salesList || [], filterMonth, filterYear, 'createdAt' as any);
+          const totalCount = baseList.length;
+          const approvedCount = baseList.filter((s: any) => (s.status || 'approved') === 'approved').length;
+          const pendingCount = baseList.filter((s: any) => s.status === 'pending').length;
+          const rejectedCount = baseList.filter((s: any) => s.status === 'rejected').length;
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button onClick={() => setStatusFilter('todos')} className={`racing-card p-4 text-center transition-all cursor-pointer ${statusFilter === 'todos' ? 'ring-2 ring-foreground/50' : 'hover:ring-1 hover:ring-foreground/30'}`}>
+                <p className="text-2xl font-black text-foreground">{totalCount}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </button>
+              <button onClick={() => setStatusFilter('approved')} className={`racing-card p-4 text-center border-l-4 border-l-emerald-500 transition-all cursor-pointer ${statusFilter === 'approved' ? 'ring-2 ring-emerald-400' : 'hover:ring-1 hover:ring-emerald-400/50'}`}>
+                <p className="text-2xl font-black text-emerald-400">{approvedCount}</p>
+                <p className="text-xs text-muted-foreground">Aprovadas</p>
+              </button>
+              <button onClick={() => setStatusFilter('pending')} className={`racing-card p-4 text-center border-l-4 border-l-yellow-500 transition-all cursor-pointer ${statusFilter === 'pending' ? 'ring-2 ring-yellow-400' : 'hover:ring-1 hover:ring-yellow-400/50'}`}>
+                <p className="text-2xl font-black text-yellow-400">{pendingCount}</p>
+                <p className="text-xs text-muted-foreground">Pendentes</p>
+              </button>
+              <button onClick={() => setStatusFilter('rejected')} className={`racing-card p-4 text-center border-l-4 border-l-red-500 transition-all cursor-pointer ${statusFilter === 'rejected' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
+                <p className="text-2xl font-black text-red-400">{rejectedCount}</p>
+                <p className="text-xs text-muted-foreground">Rejeitadas</p>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Month Filter */}
         <MonthFilter

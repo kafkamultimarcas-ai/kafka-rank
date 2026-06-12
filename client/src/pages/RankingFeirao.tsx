@@ -28,6 +28,7 @@ export default function RankingFeirao() {
   const [tab, setTab] = useState<TabKey>("ranking");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [statsFilter, setStatsFilter] = useState<"all" | "compareceram" | "naoVieram" | "pendentes" | null>(null);
   const [showEditions, setShowEditions] = useState(false);
   const [selectedEditionId, setSelectedEditionId] = useState<number | undefined>(undefined);
   const [showCreateEdition, setShowCreateEdition] = useState(false);
@@ -276,24 +277,24 @@ export default function RankingFeirao() {
           </div>
         )}
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Clicáveis */}
         <div className="grid grid-cols-4 gap-2">
-          <div className="racing-card p-3 text-center">
+          <button onClick={() => { setTab("conferencia"); setStatsFilter("all"); }} className={`racing-card p-3 text-center transition-all ${statsFilter === 'all' ? 'ring-2 ring-orange-400' : 'hover:ring-1 hover:ring-orange-400/50'}`}>
             <div className="font-heading font-bold text-xl text-orange-400">{stats.total}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Total</div>
-          </div>
-          <div className="racing-card p-3 text-center">
+          </button>
+          <button onClick={() => { setTab("conferencia"); setStatsFilter("compareceram"); }} className={`racing-card p-3 text-center transition-all ${statsFilter === 'compareceram' ? 'ring-2 ring-emerald-400' : 'hover:ring-1 hover:ring-emerald-400/50'}`}>
             <div className="font-heading font-bold text-xl text-emerald-400">{stats.compareceram}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Vieram</div>
-          </div>
-          <div className="racing-card p-3 text-center">
+          </button>
+          <button onClick={() => { setTab("conferencia"); setStatsFilter("naoVieram"); }} className={`racing-card p-3 text-center transition-all ${statsFilter === 'naoVieram' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
             <div className="font-heading font-bold text-xl text-red-400">{stats.naoVieram}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Não vieram</div>
-          </div>
-          <div className="racing-card p-3 text-center">
+          </button>
+          <button onClick={() => { setTab("conferencia"); setStatsFilter("pendentes"); }} className={`racing-card p-3 text-center transition-all ${statsFilter === 'pendentes' ? 'ring-2 ring-yellow-400' : 'hover:ring-1 hover:ring-yellow-400/50'}`}>
             <div className="font-heading font-bold text-xl text-yellow-400">{stats.pendentes}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Pendentes</div>
-          </div>
+          </button>
         </div>
 
         {/* Tabs */}
@@ -400,11 +401,17 @@ export default function RankingFeirao() {
               />
             </div>
 
+            {statsFilter && statsFilter !== 'all' && (
+              <button onClick={() => setStatsFilter(null)} className="text-xs text-orange-400 hover:underline flex items-center gap-1">
+                ← Mostrar todos
+              </button>
+            )}
+
             {loadingAgendamentos ? (
               <div className="text-center py-12 text-muted-foreground">Carregando...</div>
             ) : (
               <>
-                {conferencia.pendentes.length > 0 && (
+                {(!statsFilter || statsFilter === 'all' || statsFilter === 'pendentes') && conferencia.pendentes.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="flex items-center gap-2 text-xs font-bold text-yellow-400 uppercase tracking-wider">
                       <Timer className="h-3.5 w-3.5" /> Aguardando conferência ({conferencia.pendentes.length})
@@ -413,7 +420,7 @@ export default function RankingFeirao() {
                   </div>
                 )}
 
-                {conferencia.compareceram.length > 0 && (
+                {(!statsFilter || statsFilter === 'all' || statsFilter === 'compareceram') && conferencia.compareceram.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Compareceram ({conferencia.compareceram.length})
@@ -422,7 +429,7 @@ export default function RankingFeirao() {
                   </div>
                 )}
 
-                {conferencia.naoVieram.length > 0 && (
+                {(!statsFilter || statsFilter === 'all' || statsFilter === 'naoVieram') && conferencia.naoVieram.length > 0 && (
                   <div className="space-y-2">
                     <h3 className="flex items-center gap-2 text-xs font-bold text-red-400 uppercase tracking-wider">
                       <XCircle className="h-3.5 w-3.5" /> Não compareceram ({conferencia.naoVieram.length})

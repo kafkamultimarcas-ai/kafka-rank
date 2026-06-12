@@ -986,22 +986,22 @@ export default function MeusAgendamentos() {
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-3">
-          <div className="racing-card p-3 text-center">
+          <button onClick={() => document.getElementById('section-active')?.scrollIntoView({ behavior: 'smooth' })} className="racing-card p-3 text-center cursor-pointer hover:ring-1 hover:ring-foreground/30 transition-all">
             <div className="font-heading font-bold text-xl text-foreground">{stats.total}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Total</div>
-          </div>
-          <div className="racing-card p-3 text-center">
+          </button>
+          <button onClick={() => document.getElementById('section-active')?.scrollIntoView({ behavior: 'smooth' })} className="racing-card p-3 text-center cursor-pointer hover:ring-1 hover:ring-yellow-400/50 transition-all">
             <div className="font-heading font-bold text-xl text-yellow-400">{stats.pending}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Pendentes</div>
-          </div>
-          <div className="racing-card p-3 text-center">
+          </button>
+          <button onClick={() => document.getElementById('section-completed')?.scrollIntoView({ behavior: 'smooth' })} className="racing-card p-3 text-center cursor-pointer hover:ring-1 hover:ring-emerald-400/50 transition-all">
             <div className="font-heading font-bold text-xl text-emerald-400">{stats.attendanceConfirmed}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Compareceu</div>
-          </div>
-          <div className="racing-card p-3 text-center">
+          </button>
+          <button onClick={() => document.getElementById('section-noshow')?.scrollIntoView({ behavior: 'smooth' })} className="racing-card p-3 text-center cursor-pointer hover:ring-1 hover:ring-red-400/50 transition-all">
             <div className={`font-heading font-bold text-xl ${stats.noShowCount > 0 ? "text-red-400" : "text-muted-foreground"}`}>{stats.noShowCount}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">Resgatar</div>
-          </div>
+          </button>
         </div>
 
         {/* Filtro por Mês */}
@@ -1168,7 +1168,7 @@ export default function MeusAgendamentos() {
           <div className="space-y-6">
             {/* No Show / Rescue Section */}
             {categorized.noShow.length > 0 && (
-              <div className="space-y-3">
+              <div id="section-noshow" className="space-y-3">
                 <h2 className="flex items-center gap-2 font-heading font-bold text-sm text-orange-400">
                   <AlertTriangle className="h-4 w-4" />
                   RESGATAR CLIENTES ({categorized.noShow.length})
@@ -1181,7 +1181,7 @@ export default function MeusAgendamentos() {
 
             {/* Active Appointments */}
             {categorized.active.length > 0 && (
-              <div className="space-y-3">
+              <div id="section-active" className="space-y-3">
                 <h2 className="flex items-center gap-2 font-heading font-bold text-sm text-foreground">
                   <Calendar className="h-4 w-4 text-primary" />
                   AGENDAMENTOS ATIVOS ({categorized.active.length})
@@ -1194,7 +1194,7 @@ export default function MeusAgendamentos() {
 
             {/* Completed */}
             {categorized.completed.length > 0 && (
-              <div className="space-y-3">
+              <div id="section-completed" className="space-y-3">
                 <h2 className="flex items-center gap-2 font-heading font-bold text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4" />
                   CONCLUÍDOS ({categorized.completed.length})

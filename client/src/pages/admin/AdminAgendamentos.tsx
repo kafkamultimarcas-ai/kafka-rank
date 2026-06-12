@@ -292,6 +292,24 @@ function formatDateShort(ts: number | string | Date | null) {
           <DispatchAgendamentos onClose={() => setShowDispatch(false)} />
         )}
 
+        {/* Stats - Clicáveis */}
+        <div className="grid grid-cols-3 gap-3">
+          <button onClick={() => setTab('todos')} className={`racing-card p-4 text-center transition-all cursor-pointer ${tab === 'todos' ? 'ring-2 ring-primary' : 'hover:ring-1 hover:ring-primary/50'}`}>
+            <p className="text-2xl font-black text-foreground">{records.length}</p>
+            <p className="text-xs text-muted-foreground">Total</p>
+          </button>
+          <button onClick={() => setTab('pendentes')} className={`racing-card p-4 text-center border-l-4 border-l-cyan-500 transition-all cursor-pointer relative ${tab === 'pendentes' ? 'ring-2 ring-cyan-400' : 'hover:ring-1 hover:ring-cyan-400/50'}`}>
+            <p className="text-2xl font-black text-cyan-400">{pendingAttendance.length}</p>
+            <p className="text-xs text-muted-foreground">Comparecimentos</p>
+            {pendingAttendance.length > 0 && tab !== 'pendentes' && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-cyan-500 rounded-full animate-ping" />}
+          </button>
+          <button onClick={() => setTab('resgate')} className={`racing-card p-4 text-center border-l-4 border-l-red-500 transition-all cursor-pointer relative ${tab === 'resgate' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
+            <p className="text-2xl font-black text-red-400">{rescueRecords.length}</p>
+            <p className="text-xs text-muted-foreground">Resgate (48h+)</p>
+            {rescueRecords.length > 0 && tab !== 'resgate' && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-red-500 rounded-full animate-ping" />}
+          </button>
+        </div>
+
         {/* Tabs */}
         <div className="flex gap-2">
           {([

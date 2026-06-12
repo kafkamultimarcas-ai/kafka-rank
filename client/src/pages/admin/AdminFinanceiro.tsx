@@ -289,9 +289,9 @@ export default function AdminFinanceiro() {
           </div>
         </div>
 
-        {/* Dashboard Cards */}
+        {/* Dashboard Cards - Clicáveis */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="bg-card/50 border-red-500/20">
+          <Card onClick={() => { setTypeFilter('payable'); setStatusFilter('pending'); }} className={`bg-card/50 border-red-500/20 cursor-pointer transition-all ${typeFilter === 'payable' && statusFilter === 'pending' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <TrendingDown className="w-4 h-4 text-red-400" /> A Pagar
@@ -300,7 +300,7 @@ export default function AdminFinanceiro() {
               <div className="text-xs text-muted-foreground mt-1">Total: {formatCurrency(dashboard?.totalPayable || 0)}</div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 border-green-500/20">
+          <Card onClick={() => { setTypeFilter('all'); setStatusFilter('paid'); }} className={`bg-card/50 border-green-500/20 cursor-pointer transition-all ${statusFilter === 'paid' ? 'ring-2 ring-green-400' : 'hover:ring-1 hover:ring-green-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <CheckCircle className="w-4 h-4 text-green-400" /> Pago
@@ -308,7 +308,7 @@ export default function AdminFinanceiro() {
               <div className="text-xl font-bold text-green-400">{formatCurrency(dashboard?.totalPaid || 0)}</div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 border-blue-500/20">
+          <Card onClick={() => { setTypeFilter('receivable'); setStatusFilter('pending'); }} className={`bg-card/50 border-blue-500/20 cursor-pointer transition-all ${typeFilter === 'receivable' && statusFilter === 'pending' ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-blue-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <TrendingUp className="w-4 h-4 text-blue-400" /> A Receber
@@ -317,7 +317,7 @@ export default function AdminFinanceiro() {
               <div className="text-xs text-muted-foreground mt-1">Total: {formatCurrency(dashboard?.totalReceivable || 0)}</div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 border-yellow-500/20">
+          <Card onClick={() => { setTypeFilter('all'); setStatusFilter('overdue'); }} className={`bg-card/50 border-yellow-500/20 cursor-pointer transition-all ${statusFilter === 'overdue' ? 'ring-2 ring-yellow-400' : 'hover:ring-1 hover:ring-yellow-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <AlertTriangle className="w-4 h-4 text-yellow-400" /> Vencidas

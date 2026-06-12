@@ -126,21 +126,21 @@ export default function AdminInventory() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="bg-gray-900/50 border-gray-800">
+          <Card onClick={() => setStatusFilter('all')} className={`bg-gray-900/50 border-gray-800 cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-blue-400/50'}`}>
             <CardContent className="p-4 text-center">
               <Package className="w-5 h-5 mx-auto text-blue-400 mb-1" />
               <p className="text-2xl font-bold text-white">{stats?.total || 0}</p>
               <p className="text-xs text-gray-400">Total</p>
             </CardContent>
           </Card>
-          <Card className="bg-gray-900/50 border-gray-800">
+          <Card onClick={() => setStatusFilter('available')} className={`bg-gray-900/50 border-gray-800 cursor-pointer transition-all ${statusFilter === 'available' ? 'ring-2 ring-emerald-400' : 'hover:ring-1 hover:ring-emerald-400/50'}`}>
             <CardContent className="p-4 text-center">
               <CheckCircle className="w-5 h-5 mx-auto text-emerald-400 mb-1" />
               <p className="text-2xl font-bold text-emerald-400">{stats?.available || 0}</p>
               <p className="text-xs text-gray-400">Disponíveis</p>
             </CardContent>
           </Card>
-          <Card className="bg-gray-900/50 border-gray-800">
+          <Card onClick={() => setStatusFilter('reserved')} className={`bg-gray-900/50 border-gray-800 cursor-pointer transition-all ${statusFilter === 'reserved' ? 'ring-2 ring-amber-400' : 'hover:ring-1 hover:ring-amber-400/50'}`}>
             <CardContent className="p-4 text-center">
               <Clock className="w-5 h-5 mx-auto text-amber-400 mb-1" />
               <p className="text-2xl font-bold text-amber-400">{stats?.reserved || 0}</p>

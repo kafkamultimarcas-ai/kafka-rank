@@ -64,15 +64,15 @@ export default function AdminPvFinanceiro() {
           onToggleAll={() => setShowAllMonths(!showAllMonths)}
         />
 
-        {/* Resumo financeiro */}
+        {/* Resumo financeiro - Clicável */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { key: "pendente", label: "Pendente", value: resumo.pendente, color: "text-yellow-400", border: "border-yellow-500/30" },
-            { key: "autorizado", label: "Autorizado", value: resumo.autorizado, color: "text-green-400", border: "border-green-500/30" },
-            { key: "pago", label: "Pago", value: resumo.pago, color: "text-emerald-400", border: "border-emerald-500/30" },
-            { key: "total", label: "Total Geral", value: totalGeral, color: "text-orange-400", border: "border-orange-500/30" },
+            { key: "pendente", label: "Pendente", value: resumo.pendente, color: "text-yellow-400", border: "border-yellow-500/30", ring: "ring-yellow-400" },
+            { key: "autorizado", label: "Autorizado", value: resumo.autorizado, color: "text-green-400", border: "border-green-500/30", ring: "ring-green-400" },
+            { key: "pago", label: "Pago", value: resumo.pago, color: "text-emerald-400", border: "border-emerald-500/30", ring: "ring-emerald-400" },
+            { key: "todos", label: "Total Geral", value: totalGeral, color: "text-orange-400", border: "border-orange-500/30", ring: "ring-orange-400" },
           ].map((s) => (
-            <Card key={s.key} className={`${s.border} border-l-4`}>
+            <Card key={s.key} onClick={() => setFilter(s.key)} className={`${s.border} border-l-4 cursor-pointer transition-all ${filter === s.key ? `ring-2 ${s.ring}` : `hover:ring-1 ${s.ring}/50`}`}>
               <CardContent className="p-4 text-center">
                 <div className="text-xs text-muted-foreground mb-1">{s.label}</div>
                 <div className={`text-xl font-bold ${s.color}`}>{formatCurrency(s.value)}</div>
