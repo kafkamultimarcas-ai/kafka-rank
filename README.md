@@ -125,96 +125,255 @@ kafka-rank/
 
 ---
 
-## Pré-requisitos
+## Guia Completo: Rodar o Projeto Localmente (Passo a Passo)
 
-- **Node.js** >= 22.x
-- **pnpm** >= 9.x
-- **MySQL 8** (ou TiDB Cloud)
-- **Conta Z-API** (para WhatsApp) — opcional
+Este guia assume que você está em um Mac ou Linux. No Windows, use WSL2.
 
 ---
 
-## Instalação e Configuração
+### Pré-requisitos
 
-### 1. Clonar o repositório
+Instale antes de começar:
+
+| Ferramenta | Versão | Como instalar |
+|---|---|---|
+| **Node.js** | >= 22.x | `nvm install 22` ou [nodejs.org](https://nodejs.org) |
+| **pnpm** | >= 9.x | `npm install -g pnpm` |
+| **MySQL 8** | 8.0+ | Docker (recomendado) ou instalação local |
+| **Git** | qualquer | `sudo apt install git` ou `brew install git` |
+
+---
+
+### Passo 1: Clonar o repositório
 
 ```bash
 git clone https://github.com/kafkamultimarcas-ai/kafka-rank.git
 cd kafka-rank
 ```
 
-### 2. Instalar dependências
+---
+
+### Passo 2: Instalar dependências
 
 ```bash
 pnpm install
 ```
 
-### 3. Configurar variáveis de ambiente
+Isso instala frontend e backend de uma vez (monorepo com workspace único).
 
-Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
+---
+
+### Passo 3: Subir o banco de dados (MySQL via Docker)
+
+A forma mais fácil é usar Docker. Se não tem Docker, instale: [docker.com](https://www.docker.com/get-started)
+
+```bash
+# Subir MySQL 8 com Docker (porta 3306)
+docker run -d \
+  --name kafka-mysql \
+  -e MYSQL_ROOT_PASSWORD=root123 \
+  -e MYSQL_DATABASE=kafka_rank \
+  -p 3306:3306 \
+  mysql:8.0 \
+  --default-authentication-plugin=mysql_native_password
+```
+
+Aguarde ~10 segundos para o MySQL iniciar. Verifique:
+
+```bash
+docker logs kafka-mysql 2>&1 | grep "ready for connections"
+```
+
+**Alternativa sem Docker (MySQL local):**
+```bash
+# Se já tem MySQL instalado localmente:
+mysql -u root -p -e "CREATE DATABASE kafka_rank;"
+```
+
+**Alternativa com TiDB Cloud (produção):**
+Use a connection string fornecida pelo TiDB Cloud diretamente no `.env`.
+
+---
+
+### Passo 4: Configurar variáveis de ambiente
+
+Crie o arquivo `.env` na raiz do projeto:
+
+```bash
+cp .env.example .env   # se existir
+# ou crie manualmente:
+touch .env
+```
+
+Preencha o `.env` com o seguinte conteúdo:
 
 ```env
-# === OBRIGATÓRIAS ===
+# ============================================
+# OBRIGATÓRIAS (sistema não roda sem estas)
+# ============================================
 
-# Banco de dados MySQL (TiDB ou MySQL 8 local)
-DATABASE_URL="mysql://usuario:senha@host:porta/database?ssl={\"rejectUnauthorized\":true}"
+# Banco de dados MySQL
+# Se usou Docker acima:
+DATABASE_URL="mysql://root:root123@localhost:3306/kafka_rank"
+# Se usa TiDB Cloud:
+# DATABASE_URL="mysql://user:pass@host:4000/db?ssl={\"rejectUnauthorized\":true}"
 
-# Segredo para assinar cookies JWT
-JWT_SECRET="sua-chave-secreta-aleatoria-aqui"
+# Segredo para JWT (gere um aleatório)
+JWT_SECRET="minha-chave-secreta-super-segura-aqui-123"
 
-# OAuth (Manus Auth) - necessário para login
+# OAuth (Manus Auth) - necessário para login funcionar
 VITE_APP_ID="seu-app-id"
 OAUTH_SERVER_URL="https://api.manus.im"
 VITE_OAUTH_PORTAL_URL="https://id.manus.im"
 
-# Dono do sistema
+# Dono do sistema (primeiro admin)
 OWNER_OPEN_ID="open-id-do-owner"
 OWNER_NAME="Nome do Owner"
 
-# === OPCIONAIS (funcionalidades extras) ===
+# ============================================
+# OPCIONAIS (funcionalidades extras)
+# ============================================
 
-# Z-API (WhatsApp Business)
-ZAPI_INSTANCE_ID="sua-instancia"
-ZAPI_TOKEN="seu-token"
-ZAPI_CLIENT_TOKEN="seu-client-token"
+# Z-API (WhatsApp Business) - só se for testar WhatsApp
+ZAPI_INSTANCE_ID=""
+ZAPI_TOKEN=""
+ZAPI_CLIENT_TOKEN=""
 ZAPI_API_URL="https://api.z-api.io"
 
-# LLM (IA Atendente, Mentoria, etc.)
-BUILT_IN_FORGE_API_URL="url-da-api-llm"
-BUILT_IN_FORGE_API_KEY="chave-da-api-llm"
+# LLM / IA (Atendente, Mentoria) - só se for testar IA
+BUILT_IN_FORGE_API_URL=""
+BUILT_IN_FORGE_API_KEY=""
 
-# Push Notifications (Web Push)
-VAPID_PUBLIC_KEY="chave-publica-vapid"
-VAPID_PRIVATE_KEY="chave-privada-vapid"
+# Push Notifications - só se for testar notificações
+VAPID_PUBLIC_KEY=""
+VAPID_PRIVATE_KEY=""
 ```
 
-### 4. Configurar o banco de dados
+---
 
-O schema possui 68 tabelas. Para criar todas:
+### Passo 5: Criar as tabelas no banco de dados
+
+O projeto usa **Drizzle ORM** para gerenciar o schema (68 tabelas). Execute:
 
 ```bash
-# Gerar migrações a partir do schema
+# Gerar os arquivos de migração SQL a partir do schema TypeScript
 pnpm drizzle-kit generate
 
-# Aplicar migrações no banco
+# Aplicar as migrações no banco (cria todas as tabelas)
 pnpm drizzle-kit migrate
 ```
 
-Ou, se preferir aplicar manualmente, os arquivos SQL estão em `drizzle/migrations/`.
+Se der erro de conexão, verifique se o MySQL está rodando:
+```bash
+docker ps  # deve mostrar kafka-mysql rodando
+```
 
-### 5. Rodar em desenvolvimento
+---
+
+### Passo 6: Rodar o projeto em modo desenvolvimento
 
 ```bash
 pnpm dev
 ```
 
-O servidor inicia em `http://localhost:3000` com hot-reload (Vite HMR para frontend, tsx watch para backend).
+Isso inicia **frontend + backend** juntos em um único processo:
+- Frontend (React + Vite) com Hot Module Replacement
+- Backend (Express + tRPC) com auto-reload via `tsx watch`
+- Tudo na porta **http://localhost:3000**
 
-### 6. Build para produção
+O terminal vai mostrar:
+```
+Server running on http://localhost:3000/
+```
+
+Abra no navegador: **http://localhost:3000**
+
+---
+
+### Passo 7: Build para produção (opcional)
 
 ```bash
+# Compilar frontend (Vite) e backend (esbuild)
 pnpm build
+
+# Iniciar servidor de produção
 pnpm start
+```
+
+Em produção, o servidor serve os arquivos estáticos do frontend e a API no mesmo processo.
+
+---
+
+### Passo 8: Rodar os testes
+
+```bash
+# Executar todos os testes
+pnpm test
+
+# Executar em modo watch (re-roda ao salvar)
+pnpm vitest
+
+# Executar um teste específico
+pnpm vitest run server/auth.logout.test.ts
+```
+
+---
+
+### Passo 9: Verificar tipos TypeScript
+
+```bash
+pnpm check
+```
+
+Se não mostrar erros, está tudo certo.
+
+---
+
+### Resumo dos Comandos (Cola Rápida)
+
+```bash
+# Setup completo (copie e cole tudo de uma vez):
+git clone https://github.com/kafkamultimarcas-ai/kafka-rank.git
+cd kafka-rank
+pnpm install
+docker run -d --name kafka-mysql -e MYSQL_ROOT_PASSWORD=root123 -e MYSQL_DATABASE=kafka_rank -p 3306:3306 mysql:8.0 --default-authentication-plugin=mysql_native_password
+sleep 15  # esperar MySQL iniciar
+# Criar .env (edite com suas credenciais)
+echo 'DATABASE_URL="mysql://root:root123@localhost:3306/kafka_rank"' > .env
+echo 'JWT_SECRET="dev-secret-123"' >> .env
+pnpm drizzle-kit generate
+pnpm drizzle-kit migrate
+pnpm dev
+```
+
+---
+
+### Troubleshooting
+
+| Problema | Solução |
+|---|---|
+| `Error: DATABASE_URL is required` | Verifique se o `.env` existe e tem `DATABASE_URL` |
+| `ECONNREFUSED 127.0.0.1:3306` | MySQL não está rodando. `docker start kafka-mysql` |
+| `Access denied for user` | Senha errada no `DATABASE_URL`. Verifique no Docker |
+| `pnpm: command not found` | `npm install -g pnpm` |
+| `node: command not found` | Instale Node.js 22+ via nvm: `nvm install 22` |
+| Porta 3000 ocupada | Mate o processo: `lsof -ti:3000 \| xargs kill` |
+| Login não funciona | Precisa das credenciais OAuth (VITE_APP_ID, etc.) |
+| WhatsApp não funciona | Precisa configurar Z-API com instância ativa |
+
+---
+
+### Parar e limpar o ambiente
+
+```bash
+# Parar o servidor dev
+Ctrl+C
+
+# Parar o MySQL Docker
+docker stop kafka-mysql
+
+# Remover o container MySQL (perde os dados locais)
+docker rm kafka-mysql
 ```
 
 ---
