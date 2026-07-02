@@ -26,9 +26,11 @@ import { whatsappRouter } from "./routers/whatsappRouter";
 import { managerMentorRouter } from "./routers/managerMentorRouter";
 import { superAdminRouter } from "./routers/superAdminRouter";
 import { tenantPublicRouter } from "./routers/tenantPublicRouter";
+import { tenantAuthRouter } from "./routers/tenantAuthRouter";
 import { vehicleCostRouter } from "./routers/vehicleCostRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
+import { buildCurrentTenantPath, buildSellerTenantPath } from "./tenantUrls";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
@@ -46,6 +48,7 @@ export const appRouter = router({
   system: systemRouter,
   fichas: fichaRouter,
   tenantPublic: tenantPublicRouter,
+  tenantAuth: tenantAuthRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -160,7 +163,7 @@ export const appRouter = router({
       ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
       // Gerar JWT e setar cookie com sellerId + username para dupla verificação
       const token = jwt.sign(
-        { sellerId: seller.id, username: seller.username },
+        { sellerId: seller.id, username: seller.username, tenantId: (seller as any).tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
@@ -233,7 +236,7 @@ export const appRouter = router({
       ctx.res.clearCookie('seller_session', { ...cookieOptions, maxAge: -1 });
       // Auto-login
       const token = jwt.sign(
-        { sellerId: seller.id, username: input.username },
+        { sellerId: seller.id, username: input.username, tenantId: ctx.tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: '30d' }
       );
@@ -800,7 +803,7 @@ export const appRouter = router({
             type: 'sale_from_appointment',
             title: 'Seu agendamento virou venda!',
             message: `O cliente ${sdrRecord.customerName || input.customerPhone} que você agendou foi atendido por ${seller.name} e fechou a compra de ${input.vehicleModel}!`,
-            actionUrl: '/minha-area',
+            actionUrl: await buildSellerTenantPath(sdrRecord.sellerId, `/minha-area/${sdrRecord.sellerId}`),
           });
         }
       }
@@ -818,7 +821,7 @@ export const appRouter = router({
         type: 'pending_sale',
         title: 'Nova venda para aprovar!',
         message: `${seller.name} registrou: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''} | ${leadLabel}${sdrInfo}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       // Push notification para admin/gerente
       sendPushPendingSale(seller.name, input.vehicleModel, 'Venda').catch(console.error);
@@ -946,7 +949,7 @@ export const appRouter = router({
             title: '\u274c Venda Rejeitada',
             body: `Sua venda de ${sale.vehicleModel || 've\u00edculo'} foi rejeitada.`,
             tag: `sale-rejected-${input.id}`,
-            data: { type: 'sale_rejected', url: `/minha-area/${sale.sellerId}` },
+            data: { type: 'sale_rejected', url: await buildSellerTenantPath(sale.sellerId, `/minha-area/${sale.sellerId}`) },
           }).catch(console.error);
         }
       }
@@ -1110,14 +1113,14 @@ export const appRouter = router({
         type: 'action_plan',
         title: 'Novo Plano de Ação!',
         message: `Você recebeu um novo plano de ação: "${input.title}". Acesse sua área para conferir.`,
-        actionUrl: `/minha-area/${input.sellerId}`,
+        actionUrl: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`),
       });
       // Push notification para o vendedor
       sendPushToSeller(input.sellerId, {
         title: '📋 Novo Plano de Ação!',
         body: `Você recebeu: "${input.title}". Confira na sua área!`,
         tag: `action-plan-${input.sellerId}`,
-        data: { type: 'action_plan', url: `/minha-area/${input.sellerId}` },
+        data: { type: 'action_plan', url: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`) },
         requireInteraction: true,
       }).catch(console.error);
       return { id, message: `Plano enviado para ${seller?.nickname || seller?.name || 'vendedor'}!` };
@@ -1172,13 +1175,13 @@ export const appRouter = router({
         type: 'action_plan',
         title: 'Novo Plano de Ação (IA)!',
         message: `Você recebeu um plano de ação personalizado: "${parsed.title}". Acesse sua área para conferir.`,
-        actionUrl: `/minha-area/${input.sellerId}`,
+        actionUrl: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`),
       });
       sendPushToSeller(input.sellerId, {
         title: '🤖 Plano de Ação Personalizado!',
         body: `Novo plano gerado para você: "${parsed.title}". Confira!`,
         tag: `action-plan-ai-${input.sellerId}`,
-        data: { type: 'action_plan', url: `/minha-area/${input.sellerId}` },
+        data: { type: 'action_plan', url: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`) },
         requireInteraction: true,
       }).catch(console.error);
       return { id, title: parsed.title, content: parsed.content };
@@ -1345,7 +1348,7 @@ export const appRouter = router({
         type: 'pending_fei',
         title: 'Novo F&I para aprovar!',
         message: `${seller.name}: Banco ${input.bankName} | ${input.returnType}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       sendPushPendingRecord(seller.name, 'F&I', `Banco ${input.bankName} | ${input.returnType}`).catch(console.error);
       return { id, message: "F&I registrado! Aguardando aprovação." };
@@ -1367,7 +1370,7 @@ export const appRouter = router({
           title: '\u2705 F&I Aprovado!',
           body: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi aprovado! +${record.points} pts`,
           tag: `fei-approved-${record.id}`,
-          data: { type: 'fei_approved', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'fei_approved', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
           vibrate: [200, 100, 200],
         }).catch(console.error);
       }
@@ -1412,7 +1415,7 @@ export const appRouter = router({
             title: '\u274c F&I Rejeitado',
             body: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi rejeitado.`,
             tag: `fei-rejected-${record.id}`,
-            data: { type: 'fei_rejected', url: `/minha-area/${record.sellerId}` },
+            data: { type: 'fei_rejected', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
           }).catch(console.error);
         }
       }
@@ -1551,7 +1554,7 @@ export const appRouter = router({
         type: 'pending_consignment',
         title: 'Nova consignação para aprovar!',
         message: `${seller.name}: ${input.vehicleModel} | Dono: ${input.ownerName} | Placa: ${input.vehiclePlate}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       sendPushPendingRecord(seller.name, 'Consignação', `${input.vehicleModel} | Dono: ${input.ownerName}`).catch(console.error);
       return { id, message: `Consignação registrada! Aguardando aprovação. O carro precisa ficar 7 dias no pátio para contar pontos.${warningMsg}` };
@@ -1577,7 +1580,7 @@ export const appRouter = router({
             ? `Sua consignação de ${result.vehicleModel} foi aprovada e já conta pontos!`
             : `Sua consignação de ${result.vehicleModel} foi aprovada. Pontos após 7 dias.`,
           tag: `consignment-approved-${input.id}`,
-          data: { type: 'consignment_approved', url: `/minha-area/${result.sellerId}` },
+          data: { type: 'consignment_approved', url: await buildSellerTenantPath(result.sellerId, `/minha-area/${result.sellerId}`) },
           vibrate: [200, 100, 200],
         }).catch(console.error);
       }
@@ -1626,7 +1629,7 @@ export const appRouter = router({
           title: '\u274c Consignação Rejeitada',
           body: `Sua consignação de ${record.vehicleModel} foi rejeitada.${reasonMsg}`,
           tag: `consignment-rejected-${input.id}`,
-          data: { type: 'consignment_rejected', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'consignment_rejected', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
         }).catch(console.error);
       }
       return { success: true };
@@ -1705,7 +1708,7 @@ export const appRouter = router({
         type: 'pending_dispatch',
         title: 'Novo despachante para aprovar!',
         message: `${seller.name}: ${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       sendPushPendingRecord(seller.name, 'Despachante', `${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`).catch(console.error);
       return { id, message: "Registro de despachante enviado! Aguardando aprovação." };
@@ -1728,7 +1731,7 @@ export const appRouter = router({
           title: '\u2705 Documento Aprovado!',
           body: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos.`,
           tag: `dispatch-approved-${input.id}`,
-          data: { type: 'dispatch_approved', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'dispatch_approved', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
           vibrate: [200, 100, 200],
         }).catch(console.error);
       }
@@ -1771,7 +1774,7 @@ export const appRouter = router({
           title: '\u274c Documento Rejeitado',
           body: `Seu registro de ${record.documentType} foi rejeitado.`,
           tag: `dispatch-rejected-${input.id}`,
-          data: { type: 'dispatch_rejected', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'dispatch_rejected', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
         }).catch(console.error);
       }
       return { success: true };
@@ -2669,7 +2672,7 @@ export const appRouter = router({
       }
       // Gerar JWT e setar cookie
       const token = jwt.sign(
-        { managerId: manager.id, username: manager.username },
+        { managerId: manager.id, username: manager.username, tenantId: (manager as any).tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
@@ -3032,7 +3035,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           type: 'docs_complete',
           title: 'Documentos completos para transfer\u00eancia!',
           message: `Vendedor enviou CNH e Comprovante para ${result.vehicleModel || 've\u00edculo'} - Pronto para despachante!`,
-          actionUrl: '/admin/documentos',
+          actionUrl: await buildCurrentTenantPath('/admin/documentos'),
         });
       }
       return { success: true, docStatus: result.docStatus };
@@ -3054,7 +3057,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           type: 'docs_complete',
           title: 'Documentos completos para transfer\u00eancia!',
           message: `Vendedor enviou CNH e Comprovante para ${result.vehicleModel || 've\u00edculo'} - Pronto para despachante!`,
-          actionUrl: '/admin/documentos',
+          actionUrl: await buildCurrentTenantPath('/admin/documentos'),
         });
       }
       return { success: true, docStatus: result.docStatus };
@@ -3485,8 +3488,8 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       date: z.number(),
       month: z.number(),
       year: z.number(),
-    })).mutation(async ({ input }) => {
-      await db.createSellerAdvance({ ...input, tenantId: 1 });
+    })).mutation(async ({ input, ctx }) => {
+      await db.createSellerAdvance({ ...input, tenantId: ctx.tenantId });
       return { success: true };
     }),
 
@@ -3527,8 +3530,8 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       startDate: z.number(),
       endDate: z.number(),
       inventoryId: z.number().optional(), // ID do veículo no estoque
-    })).mutation(async ({ input }) => {
-      await db.createBonusVehicle({ ...input, active: true, tenantId: 1 });
+    })).mutation(async ({ input, ctx }) => {
+      await db.createBonusVehicle({ ...input, active: true, tenantId: ctx.tenantId });
       return { success: true };
     }),
 

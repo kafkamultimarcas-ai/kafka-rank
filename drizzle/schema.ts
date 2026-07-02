@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, bigint, decimal } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, bigint, decimal, uniqueIndex, index } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -11,7 +11,9 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_users_tenant").on(table.tenantId),
+}));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -41,7 +43,9 @@ export const sellers = mysqlTable("sellers", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantUsernameIdx: uniqueIndex("sellers_tenant_username_idx").on(table.tenantId, table.username),
+}));
 
 export type Seller = typeof sellers.$inferSelect;
 export type InsertSeller = typeof sellers.$inferInsert;
@@ -55,7 +59,9 @@ export const managerPermissions = mysqlTable("manager_permissions", {
   canEdit: boolean("canEdit").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_manager_permissions_tenant").on(table.tenantId),
+}));
 
 export type ManagerPermission = typeof managerPermissions.$inferSelect;
 export type InsertManagerPermission = typeof managerPermissions.$inferInsert;
@@ -75,7 +81,9 @@ export const competitions = mysqlTable("competitions", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_competitions_tenant").on(table.tenantId),
+}));
 
 export type Competition = typeof competitions.$inferSelect;
 export type InsertCompetition = typeof competitions.$inferInsert;
@@ -88,7 +96,9 @@ export const teams = mysqlTable("teams", {
   color: varchar("color", { length: 20 }).default("#3B82F6").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_teams_tenant").on(table.tenantId),
+}));
 
 export type Team = typeof teams.$inferSelect;
 export type InsertTeam = typeof teams.$inferInsert;
@@ -102,7 +112,9 @@ export const competitionParticipants = mysqlTable("competition_participants", {
   points: int("points").default(0).notNull(),
   salesCount: int("salesCount").default(0).notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_competition_participants_tenant").on(table.tenantId),
+}));
 
 export type CompetitionParticipant = typeof competitionParticipants.$inferSelect;
 export type InsertCompetitionParticipant = typeof competitionParticipants.$inferInsert;
@@ -127,7 +139,9 @@ export const sales = mysqlTable("sales", {
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_sales_tenant").on(table.tenantId),
+}));
 
 export type Sale = typeof sales.$inferSelect;
 export type InsertSale = typeof sales.$inferInsert;
@@ -152,7 +166,9 @@ export const feiRecords = mysqlTable("fei_records", {
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_fei_records_tenant").on(table.tenantId),
+}));
 
 export type FeiRecord = typeof feiRecords.$inferSelect;
 export type InsertFeiRecord = typeof feiRecords.$inferInsert;
@@ -168,7 +184,9 @@ export const feiAuditLogs = mysqlTable("fei_audit_logs", {
   newValue: text("newValue"),
   reason: text("reason"),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_fei_audit_logs_tenant").on(table.tenantId),
+}));
 
 export type FeiAuditLog = typeof feiAuditLogs.$inferSelect;
 export type InsertFeiAuditLog = typeof feiAuditLogs.$inferInsert;
@@ -182,7 +200,9 @@ export const sellerPermissions = mysqlTable("seller_permissions", {
   canEdit: boolean("canEdit").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_seller_permissions_tenant").on(table.tenantId),
+}));
 
 export type SellerPermission = typeof sellerPermissions.$inferSelect;
 export type InsertSellerPermission = typeof sellerPermissions.$inferInsert;
@@ -213,7 +233,9 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_consignment_records_tenant").on(table.tenantId),
+}));
 
 export type ConsignmentRecord = typeof consignmentRecords.$inferSelect;
 export type InsertConsignmentRecord = typeof consignmentRecords.$inferInsert;
@@ -238,7 +260,9 @@ export const dispatchRecords = mysqlTable("dispatch_records", {
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_dispatch_records_tenant").on(table.tenantId),
+}));
 
 export type DispatchRecord = typeof dispatchRecords.$inferSelect;
 export type InsertDispatchRecord = typeof dispatchRecords.$inferInsert;
@@ -255,7 +279,9 @@ export const trainings = mysqlTable("trainings", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_trainings_tenant").on(table.tenantId),
+}));
 
 export type Training = typeof trainings.$inferSelect;
 export type InsertTraining = typeof trainings.$inferInsert;
@@ -271,7 +297,9 @@ export const actionPlans = mysqlTable("action_plans", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_action_plans_tenant").on(table.tenantId),
+}));
 
 export type ActionPlan = typeof actionPlans.$inferSelect;
 export type InsertActionPlan = typeof actionPlans.$inferInsert;
@@ -285,7 +313,9 @@ export const motivationalQuotes = mysqlTable("motivational_quotes", {
   generatedAt: timestamp("generatedAt").defaultNow().notNull(),
   active: boolean("active").default(true).notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_motivational_quotes_tenant").on(table.tenantId),
+}));
 
 export type MotivationalQuote = typeof motivationalQuotes.$inferSelect;
 export type InsertMotivationalQuote = typeof motivationalQuotes.$inferInsert;
@@ -302,7 +332,9 @@ export const notifications = mysqlTable("notifications", {
   actionUrl: varchar("actionUrl", { length: 500 }), // URL para ação direta
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_notifications_tenant").on(table.tenantId),
+}));
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
@@ -314,7 +346,9 @@ export const appSettings = mysqlTable("app_settings", {
   settingValue: text("settingValue").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_app_settings_tenant").on(table.tenantId),
+}));
 
 export type AppSetting = typeof appSettings.$inferSelect;
 export type InsertAppSetting = typeof appSettings.$inferInsert;
@@ -343,7 +377,9 @@ export const sdrRecords = mysqlTable("sdr_records", {
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_sdr_records_tenant").on(table.tenantId),
+}));
 
 export type SdrRecord = typeof sdrRecords.$inferSelect;
 export type InsertSdrRecord = typeof sdrRecords.$inferInsert;
@@ -370,7 +406,9 @@ export const goals = mysqlTable("goals", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_goals_tenant").on(table.tenantId),
+}));
 
 export type Goal = typeof goals.$inferSelect;
 export type InsertGoal = typeof goals.$inferInsert;
@@ -378,14 +416,16 @@ export type InsertGoal = typeof goals.$inferInsert;
 // Gerentes (login por senha separado)
 export const managers = mysqlTable("managers", {
   id: int("id").autoincrement().primaryKey(),
-  username: varchar("username", { length: 100 }).notNull().unique(),
+  username: varchar("username", { length: 100 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantUsernameIdx: uniqueIndex("managers_tenant_username_idx").on(table.tenantId, table.username),
+}));
 
 export type Manager = typeof managers.$inferSelect;
 export type InsertManager = typeof managers.$inferInsert;
@@ -399,7 +439,9 @@ export const pushSubscriptions = mysqlTable("push_subscriptions", {
   sellerId: int("sellerId"), // opcional: associar a um vendedor
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_push_subscriptions_tenant").on(table.tenantId),
+}));
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
@@ -409,7 +451,7 @@ export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
 // Admins (login próprio, independente do Manus OAuth)
 export const admins = mysqlTable("admins", {
   id: int("id").autoincrement().primaryKey(),
-  username: varchar("username", { length: 100 }).notNull().unique(),
+  username: varchar("username", { length: 100 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }),
@@ -422,7 +464,9 @@ export const admins = mysqlTable("admins", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantUsernameIdx: uniqueIndex("admins_tenant_username_idx").on(table.tenantId, table.username),
+}));
 
 export type Admin = typeof admins.$inferSelect;
 export type InsertAdmin = typeof admins.$inferInsert;
@@ -460,10 +504,77 @@ export const crmLeads = mysqlTable("crm_leads", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_leads_tenant").on(table.tenantId),
+}));
 
 export type CrmLead = typeof crmLeads.$inferSelect;
 export type InsertCrmLead = typeof crmLeads.$inferInsert;
+
+// Credit Applications - fichas de crédito submetidas ao F&I (criadas manualmente ou pelo Atendente IA)
+export const creditApplications = mysqlTable("credit_applications", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  sellerId: int("sellerId"),
+  customerName: varchar("customerName", { length: 255 }),
+  customerCpf: varchar("customerCpf", { length: 14 }),
+  customerRg: varchar("customerRg", { length: 20 }),
+  customerBirthDate: varchar("customerBirthDate", { length: 10 }),
+  customerPhone: varchar("customerPhone", { length: 20 }),
+  customerEmail: varchar("customerEmail", { length: 320 }),
+  customerAddress: text("customerAddress"),
+  customerIncome: int("customerIncome").default(0),
+  customerEmployer: varchar("customerEmployer", { length: 255 }),
+  customerEmploymentTime: varchar("customerEmploymentTime", { length: 100 }),
+  vehicleInterest: varchar("vehicleInterest", { length: 255 }),
+  downPayment: int("downPayment").default(0),
+  tradeInVehicle: varchar("tradeInVehicle", { length: 255 }),
+  tradeInPlate: varchar("tradeInPlate", { length: 10 }),
+  tradeInKm: int("tradeInKm").default(0),
+  tradeInValue: int("tradeInValue").default(0),
+  financingTerm: int("financingTerm").default(48),
+  financingValue: int("financingValue").default(0),
+  status: mysqlEnum("status", ["pending", "analyzing", "approved", "rejected", "cancelled"]).default("pending").notNull(),
+  feiNotes: text("feiNotes"),
+  bankPreference: varchar("bankPreference", { length: 100 }),
+  feiAnalyzedAt: bigint("feiAnalyzedAt", { mode: "number" }),
+  aiCollected: boolean("aiCollected").default(false),
+  aiCollectedAt: bigint("aiCollectedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: bigint("updatedAt", { mode: "number" }),
+  tenantId: int("tenantId").notNull().default(1),
+}, (table) => ({
+  tenantIdx: index("idx_credit_applications_tenant").on(table.tenantId),
+  leadIdx: index("idx_credit_applications_lead").on(table.leadId),
+}));
+
+export type CreditApplication = typeof creditApplications.$inferSelect;
+export type InsertCreditApplication = typeof creditApplications.$inferInsert;
+
+// AI Appointments - agendamentos criados pelo Atendente IA (visita presencial ou videochamada)
+export const aiAppointments = mysqlTable("ai_appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  sellerId: int("sellerId"),
+  customerName: varchar("customerName", { length: 255 }),
+  customerPhone: varchar("customerPhone", { length: 20 }),
+  scheduledDate: bigint("scheduledDate", { mode: "number" }).notNull(),
+  scheduledTime: varchar("scheduledTime", { length: 10 }),
+  vehicleInterest: varchar("vehicleInterest", { length: 255 }),
+  purpose: varchar("purpose", { length: 50 }).default("visita").notNull(), // visita, videochamada
+  status: mysqlEnum("status", ["pending", "confirmed", "attended", "no_show", "cancelled"]).default("pending").notNull(),
+  aiCreated: boolean("aiCreated").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+}, (table) => ({
+  tenantIdx: index("idx_ai_appointments_tenant").on(table.tenantId),
+  leadIdx: index("idx_ai_appointments_lead").on(table.leadId),
+}));
+
+export type AiAppointment = typeof aiAppointments.$inferSelect;
+export type InsertAiAppointment = typeof aiAppointments.$inferInsert;
 
 // CRM Pipeline Stages - etapas configuráveis por departamento
 export const crmPipelineStages = mysqlTable("crm_pipeline_stages", {
@@ -476,7 +587,9 @@ export const crmPipelineStages = mysqlTable("crm_pipeline_stages", {
   isFinal: boolean("isFinal").default(false).notNull(), // etapa final (venda fechada, convertido, etc.)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_pipeline_stages_tenant").on(table.tenantId),
+}));
 
 export type CrmPipelineStage = typeof crmPipelineStages.$inferSelect;
 export type InsertCrmPipelineStage = typeof crmPipelineStages.$inferInsert;
@@ -491,7 +604,9 @@ export const crmActivities = mysqlTable("crm_activities", {
   metadata: text("metadata"), // JSON com dados extras (ex: etapa anterior/nova, resultado da ligação)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_activities_tenant").on(table.tenantId),
+}));
 
 export type CrmActivity = typeof crmActivities.$inferSelect;
 export type InsertCrmActivity = typeof crmActivities.$inferInsert;
@@ -516,7 +631,9 @@ export const crmInventory = mysqlTable("crm_inventory", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_inventory_tenant").on(table.tenantId),
+}));
 
 export type CrmInventory = typeof crmInventory.$inferSelect;
 export type InsertCrmInventory = typeof crmInventory.$inferInsert;
@@ -531,7 +648,9 @@ export const crmInventoryAlerts = mysqlTable("crm_inventory_alerts", {
   dismissed: boolean("dismissed").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_inventory_alerts_tenant").on(table.tenantId),
+}));
 
 export type CrmInventoryAlert = typeof crmInventoryAlerts.$inferSelect;
 export type InsertCrmInventoryAlert = typeof crmInventoryAlerts.$inferInsert;
@@ -548,7 +667,9 @@ export const crmIntegrations = mysqlTable("crm_integrations", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_integrations_tenant").on(table.tenantId),
+}));
 
 export type CrmIntegration = typeof crmIntegrations.$inferSelect;
 export type InsertCrmIntegration = typeof crmIntegrations.$inferInsert;
@@ -567,7 +688,9 @@ export const crmCampaigns = mysqlTable("crm_campaigns", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_campaigns_tenant").on(table.tenantId),
+}));
 
 export type CrmCampaign = typeof crmCampaigns.$inferSelect;
 export type InsertCrmCampaign = typeof crmCampaigns.$inferInsert;
@@ -582,7 +705,9 @@ export const crmMessageTemplates = mysqlTable("crm_message_templates", {
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_message_templates_tenant").on(table.tenantId),
+}));
 
 export type CrmMessageTemplate = typeof crmMessageTemplates.$inferSelect;
 export type InsertCrmMessageTemplate = typeof crmMessageTemplates.$inferInsert;
@@ -599,7 +724,9 @@ export const crmFollowUpTasks = mysqlTable("crm_follow_up_tasks", {
   completedAt: bigint("completedAt", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_follow_up_tasks_tenant").on(table.tenantId),
+}));
 
 export type CrmFollowUpTask = typeof crmFollowUpTasks.$inferSelect;
 export type InsertCrmFollowUpTask = typeof crmFollowUpTasks.$inferInsert;
@@ -613,7 +740,9 @@ export const crmLeadDistribution = mysqlTable("crm_lead_distribution", {
   lastAssignedSellerId: int("lastAssignedSellerId"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_lead_distribution_tenant").on(table.tenantId),
+}));
 
 export type CrmLeadDistribution = typeof crmLeadDistribution.$inferSelect;
 export type InsertCrmLeadDistribution = typeof crmLeadDistribution.$inferInsert;
@@ -630,7 +759,9 @@ export const finCategories = mysqlTable("fin_categories", {
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_fin_categories_tenant").on(table.tenantId),
+}));
 export type FinCategory = typeof finCategories.$inferSelect;
 export type InsertFinCategory = typeof finCategories.$inferInsert;
 
@@ -661,7 +792,9 @@ export const finTransactions = mysqlTable("fin_transactions", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_fin_transactions_tenant").on(table.tenantId),
+}));
 export type FinTransaction = typeof finTransactions.$inferSelect;
 export type InsertFinTransaction = typeof finTransactions.$inferInsert;
 
@@ -678,7 +811,9 @@ export const pvOficinas = mysqlTable("pv_oficinas", {
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_pv_oficinas_tenant").on(table.tenantId),
+}));
 export type PvOficina = typeof pvOficinas.$inferSelect;
 export type InsertPvOficina = typeof pvOficinas.$inferInsert;
 
@@ -711,7 +846,9 @@ export const pvChamados = mysqlTable("pv_chamados", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_pv_chamados_tenant").on(table.tenantId),
+}));
 export type PvChamado = typeof pvChamados.$inferSelect;
 export type InsertPvChamado = typeof pvChamados.$inferInsert;
 
@@ -729,7 +866,9 @@ export const pvGastos = mysqlTable("pv_gastos", {
   pagoEm: bigint("pagoEm", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_pv_gastos_tenant").on(table.tenantId),
+}));
 export type PvGasto = typeof pvGastos.$inferSelect;
 export type InsertPvGasto = typeof pvGastos.$inferInsert;
 
@@ -742,7 +881,9 @@ export const pvHistorico = mysqlTable("pv_historico", {
   usuario: varchar("usuario", { length: 255 }).notNull(), // quem fez a ação
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_pv_historico_tenant").on(table.tenantId),
+}));
 export type PvHistorico = typeof pvHistorico.$inferSelect;
 export type InsertPvHistorico = typeof pvHistorico.$inferInsert;
 
@@ -767,7 +908,9 @@ export const pvOrcamentos = mysqlTable("pv_orcamentos", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_pv_orcamentos_tenant").on(table.tenantId),
+}));
 export type PvOrcamento = typeof pvOrcamentos.$inferSelect;
 export type InsertPvOrcamento = typeof pvOrcamentos.$inferInsert;
 
@@ -782,7 +925,9 @@ export const pvOrcamentoItens = mysqlTable("pv_orcamento_itens", {
   valorTotal: decimal("valorTotal", { precision: 12, scale: 2 }).notNull(), // qtd * valorUnitario
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_pv_orcamento_itens_tenant").on(table.tenantId),
+}));
 export type PvOrcamentoItem = typeof pvOrcamentoItens.$inferSelect;
 export type InsertPvOrcamentoItem = typeof pvOrcamentoItens.$inferInsert;
 
@@ -802,7 +947,9 @@ export const mktStrategies = mysqlTable("mkt_strategies", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_mkt_strategies_tenant").on(table.tenantId),
+}));
 export type MktStrategy = typeof mktStrategies.$inferSelect;
 export type InsertMktStrategy = typeof mktStrategies.$inferInsert;
 
@@ -819,7 +966,9 @@ export const mktTasks = mysqlTable("mkt_tasks", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_mkt_tasks_tenant").on(table.tenantId),
+}));
 export type MktTask = typeof mktTasks.$inferSelect;
 export type InsertMktTask = typeof mktTasks.$inferInsert;
 
@@ -848,7 +997,9 @@ export const iamConfig = mysqlTable("iam_config", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   updatedBy: varchar("updatedBy", { length: 255 }),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_iam_config_tenant").on(table.tenantId),
+}));
 export type IamConfig = typeof iamConfig.$inferSelect;
 export type InsertIamConfig = typeof iamConfig.$inferInsert;
 
@@ -880,7 +1031,9 @@ export const saleDocuments = mysqlTable("sale_documents", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_sale_documents_tenant").on(table.tenantId),
+}));
 export type SaleDocument = typeof saleDocuments.$inferSelect;
 export type InsertSaleDocument = typeof saleDocuments.$inferInsert;
 
@@ -940,7 +1093,9 @@ export const fichasFinanciamento = mysqlTable("fichas_financiamento", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_fichas_financiamento_tenant").on(table.tenantId),
+}));
 export type FichaFinanciamento = typeof fichasFinanciamento.$inferSelect;
 export type InsertFichaFinanciamento = typeof fichasFinanciamento.$inferInsert;
 
@@ -959,7 +1114,9 @@ export const fichaBancos = mysqlTable("ficha_bancos", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_ficha_bancos_tenant").on(table.tenantId),
+}));
 export type FichaBanco = typeof fichaBancos.$inferSelect;
 export type InsertFichaBanco = typeof fichaBancos.$inferInsert;
 
@@ -997,7 +1154,9 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_inventory_vehicles_tenant").on(table.tenantId),
+}));
 export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
 export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
 
@@ -1013,7 +1172,9 @@ export const inventorySyncLogs = mysqlTable("inventory_sync_logs", {
   duration: int("duration").default(0), // duração em ms
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_inventory_sync_logs_tenant").on(table.tenantId),
+}));
 export type InventorySyncLog = typeof inventorySyncLogs.$inferSelect;
 export type InsertInventorySyncLog = typeof inventorySyncLogs.$inferInsert;
 
@@ -1027,7 +1188,9 @@ export const crmBulkSendLogs = mysqlTable("crm_bulk_send_logs", {
   errors: text("errors"),
   createdAt: bigint("createdAt", { mode: "number" }),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_bulk_send_logs_tenant").on(table.tenantId),
+}));
 export type CrmBulkSendLog = typeof crmBulkSendLogs.$inferSelect;
 
 // CRM Messages - histórico de mensagens WhatsApp por lead
@@ -1045,7 +1208,9 @@ export const crmMessages = mysqlTable("crm_messages", {
   timestamp: bigint("timestamp", { mode: "number" }).notNull(), // timestamp da mensagem
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_crm_messages_tenant").on(table.tenantId),
+}));
 export type CrmMessage = typeof crmMessages.$inferSelect;
 export type InsertCrmMessage = typeof crmMessages.$inferInsert;
 
@@ -1068,7 +1233,9 @@ export const fuelRecords = mysqlTable("fuel_records", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_fuel_records_tenant").on(table.tenantId),
+}));
 export type FuelRecord = typeof fuelRecords.$inferSelect;
 export type InsertFuelRecord = typeof fuelRecords.$inferInsert;
 
@@ -1091,7 +1258,9 @@ export const managerTasks = mysqlTable("manager_tasks", {
   metadata: text("metadata"), // JSON com dados extras (ex: % queda, lead ID)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_manager_tasks_tenant").on(table.tenantId),
+}));
 export type ManagerTask = typeof managerTasks.$inferSelect;
 export type InsertManagerTask = typeof managerTasks.$inferInsert;
 
@@ -1111,7 +1280,9 @@ export const managerAlerts = mysqlTable("manager_alerts", {
   metadata: text("metadata"), // JSON
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_manager_alerts_tenant").on(table.tenantId),
+}));
 export type ManagerAlert = typeof managerAlerts.$inferSelect;
 export type InsertManagerAlert = typeof managerAlerts.$inferInsert;
 
@@ -1128,7 +1299,9 @@ export const managerMentorMessages = mysqlTable("manager_mentor_messages", {
   metadata: text("metadata"), // JSON com contexto usado para gerar
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_manager_mentor_messages_tenant").on(table.tenantId),
+}));
 export type ManagerMentorMessage = typeof managerMentorMessages.$inferSelect;
 export type InsertManagerMentorMessage = typeof managerMentorMessages.$inferInsert;
 
@@ -1152,7 +1325,9 @@ export const bracketMatches = mysqlTable("bracket_matches", {
   finishedAt: bigint("finishedAt", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_bracket_matches_tenant").on(table.tenantId),
+}));
 export type BracketMatch = typeof bracketMatches.$inferSelect;
 export type InsertBracketMatch = typeof bracketMatches.$inferInsert;
 
@@ -1249,7 +1424,9 @@ export const monthlySnapshots = mysqlTable("monthly_snapshots", {
   totalLeads: int("totalLeads").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_monthly_snapshots_tenant").on(table.tenantId),
+}));
 export type MonthlySnapshot = typeof monthlySnapshots.$inferSelect;
 export type InsertMonthlySnapshot = typeof monthlySnapshots.$inferInsert;
 
@@ -1270,7 +1447,9 @@ export const competitionSnapshots = mysqlTable("competition_snapshots", {
   championSellerId: int("championSellerId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_competition_snapshots_tenant").on(table.tenantId),
+}));
 export type CompetitionSnapshot = typeof competitionSnapshots.$inferSelect;
 export type InsertCompetitionSnapshot = typeof competitionSnapshots.$inferInsert;
 
@@ -1313,7 +1492,9 @@ export const aiConversationLogs = mysqlTable("ai_conversation_logs", {
   // Timestamps
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_ai_conversation_logs_tenant").on(table.tenantId),
+}));
 export type AiConversationLog = typeof aiConversationLogs.$inferSelect;
 export type InsertAiConversationLog = typeof aiConversationLogs.$inferInsert;
 
@@ -1328,7 +1509,9 @@ export const feiraoEditions = mysqlTable("feirao_editions", {
   notes: text("notes"), // observações do feirão
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_feirao_editions_tenant").on(table.tenantId),
+}));
 export type FeiraoEdition = typeof feiraoEditions.$inferSelect;
 export type InsertFeiraoEdition = typeof feiraoEditions.$inferInsert;
 
@@ -1356,7 +1539,9 @@ export const vehicleCosts = mysqlTable("vehicle_costs", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_vehicle_costs_tenant").on(table.tenantId),
+}));
 export type VehicleCost = typeof vehicleCosts.$inferSelect;
 export type InsertVehicleCost = typeof vehicleCosts.$inferInsert;
 
@@ -1371,7 +1556,9 @@ export const vehicleCostItems = mysqlTable("vehicle_cost_items", {
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_vehicle_cost_items_tenant").on(table.tenantId),
+}));
 export type VehicleCostItem = typeof vehicleCostItems.$inferSelect;
 export type InsertVehicleCostItem = typeof vehicleCostItems.$inferInsert;
 
@@ -1387,7 +1574,9 @@ export const sellerAdvances = mysqlTable("seller_advances", {
   createdBy: int("createdBy"), // admin/gerente que registrou
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_seller_advances_tenant").on(table.tenantId),
+}));
 
 export type SellerAdvance = typeof sellerAdvances.$inferSelect;
 export type InsertSellerAdvance = typeof sellerAdvances.$inferInsert;
@@ -1403,7 +1592,9 @@ export const commissionRules = mysqlTable("commission_rules", {
   bonusDescription: varchar("bonusDescription", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_commission_rules_tenant").on(table.tenantId),
+}));
 
 export type CommissionRule = typeof commissionRules.$inferSelect;
 export type InsertCommissionRule = typeof commissionRules.$inferInsert;
@@ -1422,7 +1613,9 @@ export const bonusVehicles = mysqlTable("bonus_vehicles", {
   createdBy: int("createdBy"), // admin/gerente
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_bonus_vehicles_tenant").on(table.tenantId),
+}));
 
 export type BonusVehicle = typeof bonusVehicles.$inferSelect;
 export type InsertBonusVehicle = typeof bonusVehicles.$inferInsert;
@@ -1446,7 +1639,9 @@ export const sellerBonuses = mysqlTable("seller_bonuses", {
   rejectionReason: varchar("rejectionReason", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-});
+}, (table) => ({
+  tenantIdx: index("idx_seller_bonuses_tenant").on(table.tenantId),
+}));
 
 export type SellerBonus = typeof sellerBonuses.$inferSelect;
 export type InsertSellerBonus = typeof sellerBonuses.$inferInsert;

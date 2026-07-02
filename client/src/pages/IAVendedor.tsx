@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useState, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { toast } from "sonner";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import {
   Bot, Camera, Send, ArrowLeft, X, Loader2,
   Sparkles, Brain, Target, Zap, Copy, Check,
@@ -64,6 +65,7 @@ const CATEGORY_PROMPTS: Record<string, string> = {
 };
 
 export default function IAVendedor() {
+  const tenantSlug = getCurrentTenantSlug();
   const { sellerId } = useParams<{ sellerId: string }>();
   const [, navigate] = useLocation();
   const sid = Number(sellerId);
@@ -251,7 +253,7 @@ export default function IAVendedor() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-gradient-to-r from-violet-950 via-purple-950 to-indigo-950 border-b border-purple-500/20 px-4 py-3 shadow-lg shadow-purple-500/5">
         <div className="flex items-center gap-3">
-          <button onClick={() => { if (window.history.length > 1) { window.history.back(); } else { navigate(sid ? `/minha-area/${sid}` : '/'); } }} className="text-purple-300 hover:text-white transition-colors">
+          <button onClick={() => { if (window.history.length > 1) { window.history.back(); } else { navigate(sid ? buildTenantPath(tenantSlug, `/minha-area/${sid}`) : buildTenantPath(tenantSlug, "/")); } }} className="text-purple-300 hover:text-white transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2.5">

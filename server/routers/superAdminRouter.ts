@@ -1,11 +1,14 @@
 ﻿import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, withRetry } from "../db";
-import { tenants, superAdmins, sellers, admins, sales, crmLeads, competitions, crmPipelineStages, finCategories } from "../../drizzle/schema";
+import { tenants, superAdmins, sellers, admins, sales, crmLeads, competitions, crmPipelineStages, finCategories, crmMessages, crmIntegrations } from "../../drizzle/schema";
+import * as zapi from "../zapi-service";
 import { eq, sql, desc, and, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { getPublicTenantBySlug } from "../tenantService";
+import { getPublicTenantBySlug, clearTenantLimitsCache } from "../tenantService";
+import { encryptSecret } from "../_core/secretCrypto";
+import { clearCredentialsCache as clearZapiCredentialsCache } from "../zapi-service";
 
 // Super admin JWT secret (separate from regular auth)
 const SUPER_SECRET = process.env.JWT_SECRET ? process.env.JWT_SECRET + "_super" : "super_secret_key";
@@ -101,12 +104,16 @@ export const superAdminRouter = router({
       const salesMap = new Map((salesCounts as any[]).map((r: any) => [r.tenantId, Number(r.count)]));
       const leadMap = new Map((leadCounts as any[]).map((r: any) => [r.tenantId, Number(r.count)]));
 
-      const tenantsWithStats = (allTenants as any[]).map((t: any) => ({
-        ...t,
-        sellerCount: sellerMap.get(t.id) || 0,
-        salesThisMonth: salesMap.get(t.id) || 0,
-        leadCount: leadMap.get(t.id) || 0,
-      }));
+      const tenantsWithStats = (allTenants as any[]).map((t: any) => {
+        const { zapiToken, zapiClientToken, ...tSafe } = t;
+        return {
+          ...tSafe,
+          zapiConfigured: !!zapiToken,
+          sellerCount: sellerMap.get(t.id) || 0,
+          salesThisMonth: salesMap.get(t.id) || 0,
+          leadCount: leadMap.get(t.id) || 0,
+        };
+      });
 
       return {
         totalTenants: (allTenants as any[]).length,
@@ -174,6 +181,17 @@ export const superAdminRouter = router({
       );
 
       const tenantId = (result as any).insertId;
+
+      // Provisiona a linha de config do Atendente IA para esta loja (best-effort — a tabela
+      // não é rastreada pelo Drizzle, então só garantimos a coluna tenantId; os demais campos
+      // ficam com os defaults da tabela). Sem essa linha, a loja só herda os defaults do código
+      // até salvar suas próprias configurações pela primeira vez.
+      try {
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`INSERT INTO crm_ai_global_config (tenantId) VALUES (${tenantId})`);
+      } catch (err) {
+        console.warn(`[SuperAdmin] Não foi possível pré-criar crm_ai_global_config para o tenant ${tenantId}:`, err);
+      }
 
       // Create admin for the new tenant
       const hash = await bcrypt.hash(input.adminPassword, 10);
@@ -304,11 +322,19 @@ export const superAdminRouter = router({
         if (v !== undefined) cleanUpdates[k] = v;
       }
 
+      // Credenciais Z-API são criptografadas em repouso (nunca gravar em texto plano)
+      if (cleanUpdates.zapiToken) cleanUpdates.zapiToken = encryptSecret(cleanUpdates.zapiToken);
+      if (cleanUpdates.zapiClientToken) cleanUpdates.zapiClientToken = encryptSecret(cleanUpdates.zapiClientToken);
+
       if (Object.keys(cleanUpdates).length > 0) {
         await withRetry(() =>
           db.update(tenants).set(cleanUpdates).where(eq(tenants.id, tenantId))
         );
       }
+
+      // Invalida caches para que a mudança tenha efeito imediato (não esperar TTL)
+      clearTenantLimitsCache(tenantId);
+      clearZapiCredentialsCache(tenantId);
 
       return { success: true };
     }),
@@ -355,10 +381,67 @@ export const superAdminRouter = router({
         db.select({ count: count() }).from(sellers).where(and(eq(sellers.tenantId, input.tenantId), eq(sellers.active, true)))
       );
 
+      const { zapiToken, zapiClientToken, ...tenantSafe } = tenant;
       return {
-        ...tenant,
+        ...tenantSafe,
+        zapiConfigured: !!zapiToken,
         adminCount: Number((adminCount as any)?.[0]?.count || 0),
         sellerCount: Number((sellerCount as any)?.[0]?.count || 0),
+      };
+    }),
+
+  // ========== TENANT HEALTH (status operacional) ==========
+  getTenantHealth: publicProcedure
+    .input(z.object({ token: z.string(), tenantId: z.number() }))
+    .query(async ({ input }) => {
+      const payload = verifySuperToken(input.token);
+      if (!payload) throw new Error("Não autorizado");
+
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const [tenant] = await withRetry(() =>
+        db.select({
+          maxSellers: tenants.maxSellers,
+          maxAdmins: tenants.maxAdmins,
+          zapiInstanceId: tenants.zapiInstanceId,
+        }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1)
+      );
+      if (!tenant) throw new Error("Loja não encontrada");
+
+      const [sellerCountRow] = await withRetry(() =>
+        db.select({ count: count() }).from(sellers).where(and(eq(sellers.tenantId, input.tenantId), eq(sellers.active, true)))
+      );
+      const [adminCountRow] = await withRetry(() =>
+        db.select({ count: count() }).from(admins).where(and(eq(admins.tenantId, input.tenantId), eq(admins.active, true)))
+      );
+      const [activeIntegrationsRow] = await withRetry(() =>
+        db.select({ count: count() }).from(crmIntegrations).where(and(eq(crmIntegrations.tenantId, input.tenantId), eq(crmIntegrations.active, true)))
+      );
+      const [lastMessage] = await withRetry(() =>
+        db.select({ timestamp: crmMessages.timestamp, direction: crmMessages.direction })
+          .from(crmMessages)
+          .innerJoin(crmLeads, eq(crmMessages.leadId, crmLeads.id))
+          .where(eq(crmLeads.tenantId, input.tenantId))
+          .orderBy(desc(crmMessages.timestamp))
+          .limit(1)
+      );
+
+      const zapiStatus = tenant.zapiInstanceId
+        ? await zapi.getStatus(input.tenantId)
+        : { connected: false, smartphoneConnected: false, error: "Z-API não configurado para esta loja" };
+
+      return {
+        sellers: { active: Number(sellerCountRow?.count || 0), max: tenant.maxSellers },
+        admins: { active: Number(adminCountRow?.count || 0), max: tenant.maxAdmins },
+        activeIntegrations: Number(activeIntegrationsRow?.count || 0),
+        whatsapp: {
+          configured: !!tenant.zapiInstanceId,
+          connected: zapiStatus.connected,
+          smartphoneConnected: zapiStatus.smartphoneConnected,
+          error: zapiStatus.error || null,
+          lastMessageAt: lastMessage?.timestamp ? Number(lastMessage.timestamp) : null,
+        },
       };
     }),
 

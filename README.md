@@ -184,6 +184,24 @@ Aguarde ~10 segundos para o MySQL iniciar. Verifique:
 docker logs kafka-mysql 2>&1 | grep "ready for connections"
 ```
 
+**Se a porta 3306 já estiver em uso** (comum quando há outro projeto com MySQL/Docker rodando na máquina — confira com `docker ps`), suba numa porta diferente e ajuste o `DATABASE_URL` no `.env` de acordo:
+
+```bash
+docker run -d \
+  --name kafka-mysql \
+  -e MYSQL_ROOT_PASSWORD=root123 \
+  -e MYSQL_DATABASE=kafka_rank \
+  -p 3307:3306 \
+  mysql:8.0 \
+  --default-authentication-plugin=mysql_native_password
+```
+
+```env
+DATABASE_URL="mysql://root:root123@localhost:3307/kafka_rank"
+```
+
+Se você já tinha um container `kafka-mysql` parado com dados (`docker ps -a`) e só precisa liberar a porta, não é preciso apagá-lo: crie o novo container com outro nome (`--name kafka-mysql-local`, por exemplo) reaproveitando o volume de dados do container antigo (`docker inspect kafka-mysql --format '{{json .Mounts}}'` mostra o nome do volume) com `-v <nome-do-volume>:/var/lib/mysql` no comando acima.
+
 **Alternativa sem Docker (MySQL local):**
 ```bash
 # Se já tem MySQL instalado localmente:
@@ -355,6 +373,7 @@ pnpm dev
 | `Error: DATABASE_URL is required` | Verifique se o `.env` existe e tem `DATABASE_URL` |
 | `ECONNREFUSED 127.0.0.1:3306` | MySQL não está rodando. `docker start kafka-mysql` |
 | `Access denied for user` | Senha errada no `DATABASE_URL`. Verifique no Docker |
+| Porta 3306 já em uso (`port is already allocated`) | Outro projeto/container está usando a porta. Suba o MySQL numa porta diferente (ex: `3307`) e ajuste o `DATABASE_URL` — ver seção "Passo 3" acima |
 | `pnpm: command not found` | `npm install -g pnpm` |
 | `node: command not found` | Instale Node.js 22+ via nvm: `nvm install 22` |
 | Porta 3000 ocupada | Mate o processo: `lsof -ti:3000 \| xargs kill` |

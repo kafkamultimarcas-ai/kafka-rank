@@ -8,7 +8,7 @@
 import { eq, sql } from "drizzle-orm";
 import { admins, managers, sellers, users } from "../drizzle/schema";
 import { getDb } from "./db";
-import { getTenantBySlug } from "./tenantService";
+import { getDefaultTenantId, getTenantBySlug } from "./tenantService";
 
 const tenantCache = new Map<string, { tenantId: number; expiresAt: number }>();
 const tenantSlugCache = new Map<string, { tenantId: number; slug: string; expiresAt: number }>();
@@ -82,10 +82,10 @@ async function resolveTenantBySlugCached(slug: string): Promise<{ tenantId: numb
 
 /**
  * Resolve tenantId from user context.
- * Returns 1 (legacy default) if tenant cannot be determined.
+ * Falls back to the first active tenant only for legacy routes without slug.
  */
 export async function resolveTenantId(user: any): Promise<number> {
-  if (!user) return 1;
+  if (!user) return getDefaultTenantId();
 
   const cacheKey = `${user.openId || ""}_${user.id || ""}`;
   const cached = tenantCache.get(cacheKey);
@@ -94,9 +94,9 @@ export async function resolveTenantId(user: any): Promise<number> {
   }
 
   const db = await getDb();
-  if (!db) return 1;
+  if (!db) return getDefaultTenantId();
 
-  let tenantId = 1;
+  let tenantId = await getDefaultTenantId();
 
   try {
     if (user.id < -1000000) {
@@ -132,8 +132,8 @@ export async function resolveTenantId(user: any): Promise<number> {
       if (oauthUser) tenantId = oauthUser.tenantId;
     }
   } catch (err) {
-    console.warn("[Tenant] Failed to resolve tenantId, defaulting to 1:", err);
-    tenantId = 1;
+    console.warn("[Tenant] Failed to resolve tenantId, using legacy fallback tenant:", err);
+    tenantId = await getDefaultTenantId();
   }
 
   tenantCache.set(cacheKey, { tenantId, expiresAt: Date.now() + CACHE_TTL });
@@ -183,7 +183,7 @@ export async function resolveTenantContext(
   }
 
   return {
-    tenantId: 1,
+    tenantId: await getDefaultTenantId(),
     tenantSlug: null,
     source: "default",
   };
@@ -202,4 +202,14 @@ export async function setTenantSession(tenantId: number): Promise<void> {
 export function clearTenantCache() {
   tenantCache.clear();
   tenantSlugCache.clear();
+}
+
+/**
+ * Valida se o tenantId embutido em um token/sessão bate com o tenant resolvido
+ * para a request atual (via URL/slug). Tokens legados sem tenantId (emitidos antes
+ * dessa checagem existir) são tolerados até expirarem naturalmente.
+ */
+export function assertTenantMatch(tokenTenantId: number | null | undefined, requestTenantId: number): boolean {
+  if (tokenTenantId === null || tokenTenantId === undefined) return true;
+  return tokenTenantId === requestTenantId;
 }

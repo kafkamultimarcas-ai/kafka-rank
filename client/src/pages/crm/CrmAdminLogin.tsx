@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from "react";
-import { useTenant } from "@/contexts/TenantContext";
+import { useEffect, useState } from "react";
+import { useTenant, useBranding } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
+import { getTenantLoginPath } from "@/lib/tenant";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Lock, User, LogIn, Eye, EyeOff, Shield, Loader2, KeyRound, ArrowLeft, CheckCircle2 } from "lucide-react";
 
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 const ADMIN_TOKEN_KEY = "crm_admin_token";
 
 export function useAdminAuth() {
@@ -28,7 +28,9 @@ type LoginStep = "credentials" | "change_password";
 export default function CrmAdminLogin() {
   const [, navigate] = useLocation();
   const { tenant, tenantSlug, isLoading: tenantLoading } = useTenant();
+  const { logoUrl, name: brandName } = useBranding();
   const tenantAdminPath = tenantSlug ? `/t/${tenantSlug}/crm/admin` : "/crm/admin";
+  const tenantLoginPath = getTenantLoginPath(tenantSlug);
   const [step, setStep] = useState<LoginStep>("credentials");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -37,37 +39,11 @@ export default function CrmAdminLogin() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [token, setToken] = useState("");
-  const [autoLoginFailed, setAutoLoginFailed] = useState(false);
-  const autoLoginTriedRef = useRef(false);
 
-  // Auto-login mutation (for Manus owner)
-  const autoLoginMutation = trpc.adminAuth.autoLogin.useMutation({
-    onSuccess: (data) => {
-      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
-      toast.success(`Bem-vindo, ${data.admin.name}!`);
-      navigate(tenantAdminPath, { replace: true });
-    },
-    onError: () => {
-      setAutoLoginFailed(true);
-    },
-  });
-
-  // Auto-login on page load
   useEffect(() => {
-    if (tenantSlug && tenantLoading) return;
-    if (tenantSlug && !tenant) return;
-    if (autoLoginTriedRef.current) return;
-    autoLoginTriedRef.current = true;
-    const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
-    if (existingToken) {
-      // Only navigate if not already on admin page to prevent loops
-      if (!window.location.pathname.startsWith(tenantAdminPath) || /\/login$/.test(window.location.pathname)) {
-        navigate(tenantAdminPath, { replace: true });
-      }
-      return;
-    }
-    autoLoginMutation.mutate();
-  }, [autoLoginMutation, navigate, tenant, tenantLoading, tenantAdminPath, tenantSlug]);
+    if (!tenantSlug || tenantLoading || !tenant) return;
+    navigate(tenantLoginPath, { replace: true });
+  }, [navigate, tenant, tenantLoading, tenantLoginPath, tenantSlug]);
 
   // Login direto com usuário + senha
   const loginMutation = trpc.adminAuth.login.useMutation({
@@ -145,13 +121,12 @@ export default function CrmAdminLogin() {
     );
   }
 
-  // Show loading while trying auto-login
-  if (!autoLoginFailed && autoLoginMutation.isPending) {
+  if (tenantSlug && tenant) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
-          <p className="text-gray-400 text-sm">Entrando automaticamente...</p>
+          <p className="text-gray-400 text-sm">Redirecionando para o login oficial da loja...</p>
         </div>
       </div>
     );
@@ -168,7 +143,7 @@ export default function CrmAdminLogin() {
                 <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-3">
                   <Shield className="w-8 h-8 text-primary" />
                 </div>
-                <img src={LOGO_URL} alt="Kafka Rank" className="h-10 w-auto mb-2" />
+                <img src={logoUrl} alt={brandName} className="h-10 w-auto mb-2" />
                 <h1 className="text-lg font-black text-white tracking-wider uppercase">
                   Painel Admin
                 </h1>
@@ -317,7 +292,7 @@ export default function CrmAdminLogin() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-600 mt-4">
-          Kafka Rank &copy; {new Date().getFullYear()} &mdash; Painel Administrativo
+          {brandName} &copy; {new Date().getFullYear()} &mdash; Painel Administrativo
         </p>
       </div>
     </div>

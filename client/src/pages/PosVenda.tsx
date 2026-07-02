@@ -3,8 +3,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { Wrench, ArrowLeft, Plus, Phone, Car, User, AlertTriangle, MapPin, Clock, ChevronDown, ChevronUp, FileText, MessageCircle, PhoneCall, X, Search } from "lucide-react";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
   aberto: { label: "Aberto", color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/40", emoji: "🔵" },
@@ -20,6 +19,7 @@ function formatDate(d: any) {
 }
 
 export default function PosVenda() {
+  const { logoUrl } = useBranding();
   const [, navigate] = useLocation();
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const [showForm, setShowForm] = useState(false);
@@ -98,7 +98,7 @@ export default function PosVenda() {
             >
               <Plus className="h-3.5 w-3.5" /> Novo
             </button>
-            <img src={LOGO_URL} alt="Kafka" className="h-7 w-7 rounded-lg" />
+            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
           </div>
         </div>
       </header>

@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
 import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 function formatPrice(v: number | null | undefined) {
   if (!v) return "Consulte";
@@ -58,6 +57,7 @@ function isIOS() {
 }
 
 export default function Estoque() {
+  const { logoUrl, name: brandName } = useBranding();
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("available");
@@ -92,7 +92,7 @@ export default function Estoque() {
 
   const sendViaWhatsApp = (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
-    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *Kafka Multimarcas*`;
+    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *${brandName}*`;
     const encoded = encodeURIComponent(text);
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
@@ -257,7 +257,7 @@ export default function Estoque() {
             <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="gap-1.5 -ml-2">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={LOGO_URL} alt="Kafka" className="h-7 w-7 rounded-lg" />
+            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
             <div>
               <span className="font-heading font-bold text-sm text-foreground">ESTOQUE</span>
               <span className="text-xs text-muted-foreground ml-2">{vehicles?.length || 0} veículos</span>

@@ -8,6 +8,8 @@ import { invokeLLM } from "./_core/llm";
 import * as zapi from "./zapi-service";
 import { sendPushNewLead, sendPushLeadTransferred } from "./pushService";
 import { createNotification } from "./db";
+import { withTenantAsync, getCurrentTenantId } from "./tenantDb";
+import { getTenantBySlug } from "./tenantService";
 
 // ===== META GRAPH API HELPER =====
 async function fetchMetaLeadData(leadgenId: string, pageAccessToken: string): Promise<{ name: string; phone: string | null; email: string | null; fields: Record<string, string> } | null> {
@@ -68,18 +70,24 @@ function verifyMetaSignature(payload: string, signature: string, appSecret: stri
  *   GET  /api/webhooks/docs                — API documentation
  */
 
-async function validateToken(req: Request, res: Response): Promise<boolean> {
+/**
+ * Resolve a loja dona do token de API (busca global, sem depender de contexto de
+ * tenant já aberto) e retorna o tenantId dela. Envia a resposta de erro e retorna
+ * null quando o token é ausente/inválido — o chamador deve checar por null e
+ * abortar (return) sem prosseguir.
+ */
+async function resolveTenantFromToken(req: Request, res: Response): Promise<number | null> {
   const token = req.headers["x-api-token"] as string;
   if (!token) {
     res.status(401).json({ error: "Token de API obrigatorio. Envie no header x-api-token." });
-    return false;
+    return null;
   }
-  const integration = await crmDb.getIntegrationByToken(token);
+  const integration = await crmDb.getIntegrationByTokenGlobal(token);
   if (!integration || !integration.active) {
     res.status(403).json({ error: "Token invalido ou integracao desativada." });
-    return false;
+    return null;
   }
-  return true;
+  return integration.tenantId;
 }
 
 // Auto-assign lead to next seller via round-robin
@@ -87,27 +95,28 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
   try {
     const database = await getDb();
     if (!database) return { sellerId: null, sellerName: null };
+    const tenantId = getCurrentTenantId();
 
     // Always use pre_vendas distribution config - leads go to SDRs first
     const sdrDept = "pre_vendas";
     const [config] = await database.select().from(crmLeadDistribution)
-      .where(eq(crmLeadDistribution.department, sdrDept)).limit(1);
+      .where(and(eq(crmLeadDistribution.tenantId, tenantId), eq(crmLeadDistribution.department, sdrDept))).limit(1);
     
     // If no SDR distribution config, try the original department
     if (!config || !config.enabled) {
       const [fallbackConfig] = await database.select().from(crmLeadDistribution)
-        .where(eq(crmLeadDistribution.department, department)).limit(1);
+        .where(and(eq(crmLeadDistribution.tenantId, tenantId), eq(crmLeadDistribution.department, department))).limit(1);
       if (!fallbackConfig || !fallbackConfig.enabled) return { sellerId: null, sellerName: null };
       
       // Fallback: use original department but only SDR sellers (exclude gerentes)
       const sdrSellers = await database.select().from(sellers)
-        .where(and(eq(sellers.department, "pre_vendas"), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
+        .where(and(eq(sellers.tenantId, tenantId), eq(sellers.department, "pre_vendas"), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
         .orderBy(asc(sellers.id));
       
       // If no SDRs, fall back to department sellers (exclude gerentes)
       const targetSellers = sdrSellers.length > 0 ? sdrSellers : 
         await database.select().from(sellers)
-          .where(and(eq(sellers.department, department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
+          .where(and(eq(sellers.tenantId, tenantId), eq(sellers.department, department), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
           .orderBy(asc(sellers.id));
       
       if (targetSellers.length === 0) return { sellerId: null, sellerName: null };
@@ -123,7 +132,7 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
       await crmDb.updateLead(leadId, { sellerId: nextSeller.id });
       await database.update(crmLeadDistribution)
         .set({ lastAssignedSellerId: nextSeller.id })
-        .where(eq(crmLeadDistribution.department, department));
+        .where(and(eq(crmLeadDistribution.tenantId, tenantId), eq(crmLeadDistribution.department, department)));
       
       // Notify seller about new lead
       const leadData = await crmDb.getLeadById(leadId);
@@ -141,7 +150,7 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
 
     // Primary: distribute to SDR sellers only (exclude gerentes)
     const sdrSellers = await database.select().from(sellers)
-      .where(and(eq(sellers.department, sdrDept), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
+      .where(and(eq(sellers.tenantId, tenantId), eq(sellers.department, sdrDept), eq(sellers.active, true), ne(sellers.sellerRole, "gerente")))
       .orderBy(asc(sellers.id));
 
     if (sdrSellers.length === 0) return { sellerId: null, sellerName: null };
@@ -157,7 +166,7 @@ async function autoAssignLead(leadId: number, department: string): Promise<{ sel
     await crmDb.updateLead(leadId, { sellerId: nextSeller.id });
     await database.update(crmLeadDistribution)
       .set({ lastAssignedSellerId: nextSeller.id })
-      .where(eq(crmLeadDistribution.department, sdrDept));
+      .where(and(eq(crmLeadDistribution.tenantId, tenantId), eq(crmLeadDistribution.department, sdrDept)));
 
     // Notify seller about new lead
     const leadInfo = await crmDb.getLeadById(leadId);
@@ -282,7 +291,9 @@ export function registerWebhookRoutes(app: Express) {
   // ===== GENERIC LEAD CREATION (with token) =====
   app.post("/api/webhooks/lead", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
+      const tenantId = await resolveTenantFromToken(req, res);
+      if (tenantId === null) return;
+      await withTenantAsync(tenantId, async () => {
 
       const { name, phone, email, vehicleInterest, vehiclePlate, source, department, notes, sellerId, score, utmSource, utmMedium, utmCampaign } = req.body;
 
@@ -341,6 +352,7 @@ export function registerWebhookRoutes(app: Express) {
         matchingVehicles,
         message: `Lead '${name}' criado com sucesso.`,
       });
+      });
     } catch (err: any) {
       console.error("Webhook lead error:", err);
       res.status(500).json({ error: "Erro interno ao criar lead.", details: err.message });
@@ -350,7 +362,9 @@ export function registerWebhookRoutes(app: Express) {
   // ===== BULK LEAD CREATION =====
   app.post("/api/webhooks/leads/bulk", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
+      const tenantId = await resolveTenantFromToken(req, res);
+      if (tenantId === null) return;
+      await withTenantAsync(tenantId, async () => {
 
       const { leads } = req.body;
       if (!Array.isArray(leads) || leads.length === 0) {
@@ -401,6 +415,7 @@ export function registerWebhookRoutes(app: Express) {
         failed: results.filter(r => !r.success).length,
         results,
       });
+      });
     } catch (err: any) {
       console.error("Webhook bulk lead error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
@@ -408,6 +423,16 @@ export function registerWebhookRoutes(app: Express) {
   });
 
   // ===== META LEAD ADS (Instagram/Facebook) =====
+  // Resolve o tenant do webhook Meta/Google pelo query param ?tenant=slug (configurado
+  // na URL de callback cadastrada em cada plataforma). Sem o param, cai no tenant
+  // padrão (1) para preservar o comportamento da loja legada.
+  async function resolveTenantFromQuerySlug(req: Request): Promise<number> {
+    const slug = (req.query.tenant as string) || "";
+    if (!slug) return 1;
+    const tenant = await getTenantBySlug(slug);
+    return tenant?.id || 1;
+  }
+
   // Verification endpoint for Meta webhook setup
   app.get("/api/webhooks/meta/verify", async (req: Request, res: Response) => {
     const mode = req.query["hub.mode"];
@@ -416,7 +441,8 @@ export function registerWebhookRoutes(app: Express) {
 
     if (mode === "subscribe" && token) {
       // Validate verify_token against stored config
-      const metaIntegration = await crmDb.getIntegrationByType("facebook");
+      const tenantId = await resolveTenantFromQuerySlug(req);
+      const metaIntegration = await withTenantAsync(tenantId, () => crmDb.getIntegrationByType("facebook"));
       if (metaIntegration?.config) {
         try {
           const config = JSON.parse(metaIntegration.config);
@@ -436,6 +462,8 @@ export function registerWebhookRoutes(app: Express) {
 
   // Receive leads from Meta Lead Ads
   app.post("/api/webhooks/meta/leadgen", async (req: Request, res: Response) => {
+    const tenantId = await resolveTenantFromQuerySlug(req);
+    await withTenantAsync(tenantId, async () => {
     try {
       const body = req.body;
 
@@ -572,10 +600,13 @@ export function registerWebhookRoutes(app: Express) {
       // Still respond 200 to prevent Meta from retrying
       res.status(200).json({ success: false, error: err.message });
     }
+    });
   });
 
   // ===== GOOGLE ADS LEAD FORM =====
   app.post("/api/webhooks/google/lead", async (req: Request, res: Response) => {
+    const tenantId = await resolveTenantFromQuerySlug(req);
+    await withTenantAsync(tenantId, async () => {
     try {
       // Google Ads sends lead form data via webhook
       // Format varies: direct from Google or via Zapier/Make
@@ -622,12 +653,15 @@ export function registerWebhookRoutes(app: Express) {
       console.error("Google Ads webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
     }
+    });
   });
 
   // ===== GENERIC WEBHOOK (any platform, chatbot, Manychat, etc) =====
   app.post("/api/webhooks/generic", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
+      const tenantId = await resolveTenantFromToken(req, res);
+      if (tenantId === null) return;
+      await withTenantAsync(tenantId, async () => {
 
       const body = req.body;
 
@@ -678,6 +712,7 @@ export function registerWebhookRoutes(app: Express) {
         assignedSellerId: assignment.sellerId,
         message: `Lead '${name}' criado com sucesso.`,
       });
+      });
     } catch (err: any) {
       console.error("Generic webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
@@ -687,7 +722,9 @@ export function registerWebhookRoutes(app: Express) {
   // ===== EMAIL PARSER (OLX, Webmotors, SóCarrão, iCarros) =====
   app.post("/api/webhooks/email-parser", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
+      const tenantId = await resolveTenantFromToken(req, res);
+      if (tenantId === null) return;
+      await withTenantAsync(tenantId, async () => {
 
       const { subject, body: emailBody, from: senderEmail, html } = req.body;
 
@@ -735,6 +772,7 @@ export function registerWebhookRoutes(app: Express) {
         assignedTo: assignment.sellerName,
         message: `Lead parseado do email (${source}) com sucesso.`,
       });
+      });
     } catch (err: any) {
       console.error("Email parser webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
@@ -743,12 +781,17 @@ export function registerWebhookRoutes(app: Express) {
 
   // ===== WIDGET / LANDING PAGE FORM (NO auth required) =====
   app.post("/api/webhooks/widget/lead", async (req: Request, res: Response) => {
-    try {
-      // CORS headers for widget embeds
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+    // CORS headers for widget embeds
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
 
+    const requestedSlug = (req.body?.tenantSlug as string) || "";
+    const tenant = requestedSlug ? await getTenantBySlug(requestedSlug) : null;
+    const tenantId = tenant?.id || 1;
+
+    await withTenantAsync(tenantId, async () => {
+    try {
       const { name, phone, email, vehicleInterest, notes, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, pageUrl, formId } = req.body;
 
       if (!name) {
@@ -810,6 +853,7 @@ export function registerWebhookRoutes(app: Express) {
       console.error("Widget lead error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
     }
+    });
   });
 
   // CORS preflight for widget
@@ -822,7 +866,11 @@ export function registerWebhookRoutes(app: Express) {
 
   // ===== WHATSAPP WEBHOOK =====
   // Accepts both Z-API format (phone, text.message, momment) and generic format (from, message, timestamp)
-  app.post("/api/webhooks/whatsapp", async (req: Request, res: Response) => {
+  // Tenantizado por path: /api/webhooks/whatsapp/:tenantSlug identifica a loja (configurar essa
+  // URL na instancia Z-API de cada loja). A rota legada /api/webhooks/whatsapp (sem slug) continua
+  // existindo e aponta pro tenant padrao (1), preservando a instancia ja configurada da loja atual.
+  async function handleWhatsappWebhook(req: Request, res: Response, tenantId: number) {
+    await withTenantAsync(tenantId, async () => {
     try {
       // WhatsApp webhook does NOT require x-api-token auth
       // Z-API sends messages directly without custom headers
@@ -1098,7 +1146,7 @@ export function registerWebhookRoutes(app: Express) {
 
                 // Check GLOBAL AI toggle - if attendant is disabled globally, stop ALL auto-replies
                 try {
-                  const globalToggle = await dbConn.execute(sql`SELECT attendantEnabled FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+                  const globalToggle = await dbConn.execute(sql`SELECT attendantEnabled FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
                   const gtRaw = globalToggle as any;
                   const gtRows = Array.isArray(gtRaw?.[0]) ? gtRaw[0] : gtRaw;
                   if (gtRows && gtRows.length > 0 && !gtRows[0].attendantEnabled) {
@@ -1135,7 +1183,7 @@ export function registerWebhookRoutes(app: Express) {
                 }
 
                 // Load global config for working hours, limits, personality (but NOT as master switch)
-                const globalCheck = await dbConn.execute(sql`SELECT autoReplyEnabled, workingHoursEnabled, workingHoursStart, workingHoursEnd, maxMessagesEnabled, maxMessagesPerLead, personality FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+                const globalCheck = await dbConn.execute(sql`SELECT autoReplyEnabled, workingHoursEnabled, workingHoursStart, workingHoursEnd, maxMessagesEnabled, maxMessagesPerLead, personality FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
                 const globalRaw = globalCheck as any;
                 const globalRows = Array.isArray(globalRaw?.[0]) ? globalRaw[0] : globalRaw;
                 const globalCfg = globalRows?.[0] || {};
@@ -1171,7 +1219,7 @@ export function registerWebhookRoutes(app: Express) {
                 let globalAiMode = 'normal';
                 let feiraoCtx = '';
                 try {
-                  const modeCfg = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+                  const modeCfg = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
                   const modeRaw = modeCfg as any;
                   const modeRows = Array.isArray(modeRaw?.[0]) ? modeRaw[0] : modeRaw;
                   if (modeRows && modeRows.length > 0) {
@@ -1307,12 +1355,28 @@ export function registerWebhookRoutes(app: Express) {
       console.error("WhatsApp webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
     }
+    });
+  }
+
+  app.post("/api/webhooks/whatsapp", async (req: Request, res: Response) => {
+    await handleWhatsappWebhook(req, res, 1);
+  });
+
+  app.post("/api/webhooks/whatsapp/:tenantSlug", async (req: Request, res: Response) => {
+    const tenant = await getTenantBySlug(req.params.tenantSlug);
+    if (!tenant) {
+      res.status(404).json({ error: "Loja nao encontrada." });
+      return;
+    }
+    await handleWhatsappWebhook(req, res, tenant.id);
   });
 
   // ===== SIG WEB SYNC =====
   app.post("/api/webhooks/sig/sale", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
+      const tenantId = await resolveTenantFromToken(req, res);
+      if (tenantId === null) return;
+      await withTenantAsync(tenantId, async () => {
 
       const { leadId, vehicleModel, saleValue, sigId } = req.body;
 
@@ -1330,6 +1394,7 @@ export function registerWebhookRoutes(app: Express) {
       }
 
       res.json({ success: true, message: "Venda sincronizada com sucesso." });
+      });
     } catch (err: any) {
       console.error("SIG webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
@@ -1339,7 +1404,9 @@ export function registerWebhookRoutes(app: Express) {
   // ===== SIG WEB INVENTORY SYNC =====
   app.post("/api/webhooks/sig/inventory", async (req: Request, res: Response) => {
     try {
-      if (!(await validateToken(req, res))) return;
+      const tenantId = await resolveTenantFromToken(req, res);
+      if (tenantId === null) return;
+      await withTenantAsync(tenantId, async () => {
 
       const { brand, model, year, plate, color, mileage, fuelType, transmission, price, costPrice, status } = req.body;
 
@@ -1365,6 +1432,7 @@ export function registerWebhookRoutes(app: Express) {
         inventoryId: id,
         matchingLeads: matchingLeads.length,
         message: `Veiculo '${brand} ${model}' adicionado ao estoque.`,
+      });
       });
     } catch (err: any) {
       console.error("SIG inventory webhook error:", err);
@@ -1554,8 +1622,8 @@ export function registerWebhookRoutes(app: Express) {
       ],
       widget: {
         description: "Codigo JavaScript para colar em qualquer landing page. O formulario captura automaticamente UTM parameters da URL.",
-        embedCode: `<script src="https://kafkarank.com/api/webhooks/widget.js" data-kafka-crm></script>`,
-        note: "O widget cria um botao flutuante e formulario de contato. Captura UTMs automaticamente.",
+        embedCode: `<script src="https://kafkarank.com/api/webhooks/widget.js" data-kafka-crm data-tenant="SEU_SLUG_DE_LOJA"></script>`,
+        note: "O widget cria um botao flutuante e formulario de contato. Captura UTMs automaticamente. O atributo data-tenant identifica a loja dona do lead — sem ele, o lead cai na loja padrao.",
       },
     });
   });
@@ -1683,7 +1751,8 @@ function getWidgetScript(): string {
       utmCampaign: utm.utmCampaign || undefined,
       utmContent: utm.utmContent || undefined,
       utmTerm: utm.utmTerm || undefined,
-      pageUrl: utm.pageUrl
+      pageUrl: utm.pageUrl,
+      tenantSlug: document.querySelector('[data-kafka-crm]')?.getAttribute('data-tenant') || undefined
     };
 
     fetch(window.kafkaCrmApiUrl || (document.querySelector('[data-kafka-crm]')?.src?.replace('/api/webhooks/widget.js', '') || '') + '/api/webhooks/widget/lead', {

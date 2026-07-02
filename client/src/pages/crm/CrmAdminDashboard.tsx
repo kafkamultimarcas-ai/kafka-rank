@@ -18,6 +18,8 @@ import {
   ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
+import { useBranding } from "@/contexts/TenantContext";
+import { getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -43,6 +45,7 @@ type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
   const { admin, isLoading, isAuthenticated, logout } = useAdminAuth();
+  const tenantSlug = getCurrentTenantSlug();
   const [activeView, setActiveView] = useState<AdminView>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,13 +53,13 @@ export default function CrmAdminDashboard() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      // Only navigate if not already on login page to prevent loops
-      if (window.location.pathname !== "/crm/admin/login") {
-        navigate("/crm/admin/login", { replace: true });
+      const loginPath = getTenantLoginPath(tenantSlug);
+      if (window.location.pathname !== loginPath) {
+        navigate(loginPath, { replace: true });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, navigate, tenantSlug]);
 
   if (isLoading) {
     return (
@@ -1108,6 +1111,7 @@ function InventoryView() {
 
 // ===== CAMPAIGNS VIEW =====
 function CampaignsView() {
+  const { name: brandName } = useBranding();
   const [activeTab, setActiveTab] = useState<"campaigns" | "responses" | "import">("campaigns");
   const [showCreate, setShowCreate] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);

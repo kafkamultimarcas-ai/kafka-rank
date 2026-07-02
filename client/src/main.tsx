@@ -6,7 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
-import { getCurrentTenantSlug } from "./lib/tenant";
+import { getCurrentTenantSlug, getTenantLoginPath } from "./lib/tenant";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -31,7 +31,13 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  if (window.location.pathname.startsWith("/super-admin")) {
+    window.location.href = "/super-admin";
+    return;
+  }
+
+  const tenantSlug = getCurrentTenantSlug();
+  window.location.href = tenantSlug ? getTenantLoginPath(tenantSlug) : getLoginUrl();
 };
 
 queryClient.getQueryCache().subscribe(event => {

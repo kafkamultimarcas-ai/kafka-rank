@@ -259,7 +259,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Store className="w-5 h-5 text-red-500" /> Nova Loja
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">âœ•</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">×</button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -517,7 +517,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
           <div className="flex items-center gap-2">
             <StatusBadge status={tenant.status || "trial"} />
             <PlanBadge plan={tenant.plan || "trial"} />
-            <button onClick={onClose} className="text-gray-400 hover:text-white ml-2">âœ•</button>
+            <button onClick={onClose} className="text-gray-400 hover:text-white ml-2">×</button>
           </div>
         </div>
 
@@ -689,7 +689,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                         >
                           OK
                         </button>
-                        <button onClick={() => { setResetPwAdmin(null); setNewPw(""); }} className="text-xs text-gray-400">âœ•</button>
+                        <button onClick={() => { setResetPwAdmin(null); setNewPw(""); }} className="text-xs text-gray-400">×</button>
                       </div>
                     ) : (
                       <button onClick={() => setResetPwAdmin(a.id)} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
+import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
 import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, Eye, EyeOff, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -69,11 +70,20 @@ const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 
+function TenantLoginRedirect({ tenantSlug }: { tenantSlug: string }) {
+  useEffect(() => {
+    window.location.replace(getTenantLoginPath(tenantSlug));
+  }, [tenantSlug]);
+
+  return <DashboardLayoutSkeleton />;
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const tenantSlug = getCurrentTenantSlug();
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -100,6 +110,9 @@ export default function DashboardLayout({
   const isSellerGerente = sellerQuery.data && sellerQuery.data.sellerRole === 'gerente';
 
   if (!isOwner && !isManager && !isSellerGerente) {
+    if (tenantSlug) {
+      return <TenantLoginRedirect tenantSlug={tenantSlug} />;
+    }
     return <ManagerLoginScreen />;
   }
 
@@ -126,6 +139,7 @@ export default function DashboardLayout({
         showOwnerItems={showOwnerItems}
         isManager={!!isManager || !!isSellerGerente}
         isSellerGerente={!!isSellerGerente}
+        tenantSlug={tenantSlug}
       >
         {children}
       </DashboardLayoutContent>
@@ -240,9 +254,10 @@ type DashboardLayoutContentProps = {
   showOwnerItems: boolean;
   isManager: boolean;
   isSellerGerente?: boolean;
+  tenantSlug: string | null;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager, isSellerGerente }: DashboardLayoutContentProps) {
+function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager, isSellerGerente, tenantSlug }: DashboardLayoutContentProps) {
   const { logout: oauthLogout } = useAuth();
   const managerLogout = trpc.managers.logout.useMutation();
   const sellerLogout = trpc.sellers.logout.useMutation();
@@ -253,7 +268,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const allItems = showOwnerItems ? [...menuItems, ...ownerOnlyItems] : menuItems;
-  const activeMenuItem = allItems.find(item => item.path === location);
+  const activeMenuItem = allItems.find(item => buildTenantPath(tenantSlug, item.path) === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -287,12 +302,15 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
       await sellerLogout.mutateAsync();
       await utils.sellers.me.invalidate();
       toast.success("Logout realizado!");
-      window.location.href = "/";
+      window.location.href = getTenantLoginPath(tenantSlug);
     } else if (isManager) {
       await managerLogout.mutateAsync();
       await utils.managers.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("Logout realizado!");
+      if (tenantSlug) {
+        window.location.href = getTenantLoginPath(tenantSlug);
+      }
     } else {
       await oauthLogout();
     }
@@ -326,7 +344,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
             <SidebarMenu className="px-2 py-1">
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setLocation("/")}
+                  onClick={() => setLocation(tenantSlug ? buildTenantPath(tenantSlug, "/admin") : "/")}
                   tooltip="Tela Inicial"
                   className="h-10 transition-all font-normal"
                 >
@@ -336,12 +354,13 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
               </SidebarMenuItem>
               <div className="my-2 border-t border-border" />
               {allItems.map(item => {
-                const isActive = location === item.path;
+                const itemPath = buildTenantPath(tenantSlug, item.path);
+                const isActive = location === itemPath;
                 return (
-                  <SidebarMenuItem key={item.path}>
+                  <SidebarMenuItem key={itemPath}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => setLocation(item.path)}
+                      onClick={() => setLocation(itemPath)}
                       tooltip={item.label}
                       className={`h-10 transition-all font-normal`}
                     >

@@ -18,6 +18,7 @@ import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { inventoryVehicles } from "../drizzle/schema";
 import { like, or, and, eq, gte, lte, between } from "drizzle-orm";
+import { getCurrentTenantId } from "./tenantDb";
 
 // ===== TYPES =====
 interface AttendantConfig {
@@ -83,7 +84,7 @@ export async function getAttendantConfig(): Promise<AttendantConfig | null> {
   const dbConn = await getDb();
   if (!dbConn) return null;
   try {
-    const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+    const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
     const rawRows = result as any;
     const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
     if (rows && rows.length > 0) {
@@ -312,9 +313,9 @@ export async function createCreditApplication(leadId: number, data: CollectedDat
       return exRows[0].id;
     }
 
-    const result = await dbConn.execute(sql`INSERT INTO credit_applications 
-      (leadId, customerName, customerCpf, customerRg, customerBirthDate, customerPhone, customerEmail, customerAddress, customerIncome, customerEmployer, customerEmploymentTime, vehicleInterest, downPayment, tradeInVehicle, tradeInPlate, tradeInKm, financingTerm, aiCollected, aiCollectedAt, updatedAt)
-      VALUES (${leadId}, ${data.customerName || null}, ${data.customerCpf || null}, ${data.customerRg || null}, ${data.customerBirthDate || null}, ${data.customerPhone || null}, ${data.customerEmail || null}, ${data.customerAddress || null}, ${data.customerIncome || 0}, ${data.customerEmployer || null}, ${data.customerEmploymentTime || null}, ${data.vehicleInterest || null}, ${data.downPayment || 0}, ${data.tradeInVehicle || null}, ${data.tradeInPlate || null}, ${data.tradeInKm || 0}, ${data.financingTerm || 48}, 1, ${Date.now()}, ${Date.now()})`);
+    const result = await dbConn.execute(sql`INSERT INTO credit_applications
+      (leadId, customerName, customerCpf, customerRg, customerBirthDate, customerPhone, customerEmail, customerAddress, customerIncome, customerEmployer, customerEmploymentTime, vehicleInterest, downPayment, tradeInVehicle, tradeInPlate, tradeInKm, financingTerm, aiCollected, aiCollectedAt, updatedAt, tenantId)
+      VALUES (${leadId}, ${data.customerName || null}, ${data.customerCpf || null}, ${data.customerRg || null}, ${data.customerBirthDate || null}, ${data.customerPhone || null}, ${data.customerEmail || null}, ${data.customerAddress || null}, ${data.customerIncome || 0}, ${data.customerEmployer || null}, ${data.customerEmploymentTime || null}, ${data.vehicleInterest || null}, ${data.downPayment || 0}, ${data.tradeInVehicle || null}, ${data.tradeInPlate || null}, ${data.tradeInKm || 0}, ${data.financingTerm || 48}, 1, ${Date.now()}, ${Date.now()}, ${getCurrentTenantId()})`);
     const insertResult = result as any;
     const insertId = insertResult?.[0]?.insertId || insertResult?.insertId;
     if (insertId) {
@@ -346,9 +347,9 @@ export async function createAiAppointment(leadId: number, data: CollectedData): 
         }
       } catch { /* use default */ }
     }
-    const result = await dbConn.execute(sql`INSERT INTO ai_appointments 
-      (leadId, customerName, customerPhone, scheduledDate, scheduledTime, vehicleInterest, purpose, status, aiCreated, notes)
-      VALUES (${leadId}, ${data.customerName || null}, ${data.customerPhone || null}, ${scheduledTimestamp}, ${data.scheduledTime || '10:00'}, ${data.vehicleInterest || null}, 'visita', 'pending', 1, ${'Agendamento feito pela IA Atendente'})`);
+    const result = await dbConn.execute(sql`INSERT INTO ai_appointments
+      (leadId, customerName, customerPhone, scheduledDate, scheduledTime, vehicleInterest, purpose, status, aiCreated, notes, tenantId)
+      VALUES (${leadId}, ${data.customerName || null}, ${data.customerPhone || null}, ${scheduledTimestamp}, ${data.scheduledTime || '10:00'}, ${data.vehicleInterest || null}, 'visita', 'pending', 1, ${'Agendamento feito pela IA Atendente'}, ${getCurrentTenantId()})`);
     const insertResult = result as any;
     const insertId = insertResult?.[0]?.insertId || insertResult?.insertId;
     if (insertId) {

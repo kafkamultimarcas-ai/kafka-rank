@@ -12,8 +12,7 @@ import {
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 type TabKey = "ranking" | "conferencia" | "todos";
 
@@ -24,6 +23,7 @@ const PODIUM_COLORS = [
 ];
 
 export default function RankingFeirao() {
+  const { logoUrl } = useBranding();
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState<TabKey>("ranking");
   const [search, setSearch] = useState("");
@@ -207,7 +207,7 @@ export default function RankingFeirao() {
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={LOGO_URL} alt="Kafka" className="h-7 w-7 rounded" />
+            <img src={logoUrl} alt="" className="h-7 w-7 rounded" />
             <div className="flex items-center gap-2">
               <Flame className="h-5 w-5 text-orange-500" />
               <span className="font-heading font-bold text-sm text-foreground">FEIRÃO KAFKA</span>

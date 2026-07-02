@@ -39,8 +39,7 @@ import {
   Printer,
   Bot,
 } from "lucide-react";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
@@ -112,6 +111,7 @@ const VISUAL_STATUS_CONFIG: Record<AppointmentStatus, { label: string; border: s
 };
 
 export default function MeusAgendamentos() {
+  const { logoUrl, name: brandName } = useBranding();
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
   const [, setLocation] = useLocation();
@@ -288,6 +288,7 @@ export default function MeusAgendamentos() {
       sellerMap,
       title: `Agendamentos - ${sellerName}`,
       sellerName,
+      brandName,
     });
     if (success) toast.success('PDF baixado com sucesso!');
   };
@@ -950,7 +951,7 @@ export default function MeusAgendamentos() {
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={LOGO_URL} alt="Kafka Rank" className="h-7 w-7 rounded" />
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded" />
             <span className="font-heading font-bold text-sm text-foreground">AGENDAMENTOS</span>
           </div>
           <div className="flex items-center gap-2">

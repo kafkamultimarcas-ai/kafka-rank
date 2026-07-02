@@ -7,3 +7,24 @@ export function getCurrentTenantSlug(): string | null {
   if (typeof window === "undefined") return null;
   return getTenantSlugFromPath(window.location.pathname);
 }
+
+export function buildTenantPath(tenantSlug: string | null | undefined, pathname: string): string {
+  if (!pathname.startsWith("/")) {
+    pathname = `/${pathname}`;
+  }
+
+  if (!tenantSlug) return pathname;
+  if (pathname.startsWith(`/t/${tenantSlug}/`) || pathname === `/t/${tenantSlug}`) {
+    return pathname;
+  }
+
+  if (pathname === "/" || pathname === "/404" || pathname.startsWith("/super-admin")) {
+    return pathname;
+  }
+
+  return `/t/${tenantSlug}${pathname}`;
+}
+
+export function getTenantLoginPath(tenantSlug: string | null | undefined): string {
+  return tenantSlug ? `/t/${tenantSlug}/login` : "/login-vendedor";
+}

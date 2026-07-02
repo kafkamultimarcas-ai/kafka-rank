@@ -15,6 +15,7 @@ import {
 import { getDb } from "./db";
 
 import { getCurrentTenantId } from "./tenantDb";
+import { getTenantLimits } from "./tenantService";
 
 // ===== ADMINS =====
 
@@ -35,12 +36,21 @@ export async function getAdminById(id: number) {
 export async function createAdmin(data: { username: string; passwordHash: string; name: string; role?: "owner" | "admin"; permissions?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const tenantId = getCurrentTenantId();
+  const limits = await getTenantLimits(tenantId);
+  if (limits) {
+    const [{ count }] = await db.select({ count: sql<number>`COUNT(*)` }).from(admins).where(and(eq(admins.tenantId, tenantId), eq(admins.active, true)));
+    if (Number(count) >= limits.maxAdmins) {
+      throw new Error(`Limite de administradores do plano atingido (${limits.maxAdmins}). Fale com o suporte para aumentar seu plano.`);
+    }
+  }
   const result = await db.insert(admins).values({
     username: data.username,
     passwordHash: data.passwordHash,
     name: data.name,
     role: data.role || "admin",
     permissions: data.permissions || JSON.stringify({vendas:true,pre_vendas:false,consignacao:false,fei:false,marketing:false,financeiro:false,estoque:false,configuracoes:false,gerenciar_admins:false}),
+    tenantId,
   });
   return Number(result[0].insertId);
 }
@@ -361,6 +371,20 @@ export async function getIntegrationByToken(token: string) {
   const db = await getDb();
   if (!db) return null;
   const rows = await db.select().from(crmIntegrations).where(and(eq(crmIntegrations.tenantId, getCurrentTenantId()),
+    eq(crmIntegrations.apiToken, token), eq(crmIntegrations.active, true)
+  )).limit(1);
+  return rows[0] || null;
+}
+
+/**
+ * Busca uma integração pelo token SEM filtrar por tenant atual — usada nos webhooks
+ * públicos (fora do contexto tRPC/ALS) para descobrir a qual loja o token pertence
+ * antes de abrir o contexto de tenant correto.
+ */
+export async function getIntegrationByTokenGlobal(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(crmIntegrations).where(and(
     eq(crmIntegrations.apiToken, token), eq(crmIntegrations.active, true)
   )).limit(1);
   return rows[0] || null;

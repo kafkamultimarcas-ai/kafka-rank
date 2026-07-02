@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X, User } from "lucide-react";
+import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -145,6 +146,7 @@ function VehicleSelector({ value, onChange }: { value: string; onChange: (model:
 }
 
 export default function RegisterSale() {
+  const tenantSlug = getCurrentTenantSlug();
   const [category, setCategory] = useState<Category>("vendas");
   const [sellerId, setSellerId] = useState<string>("");
   const [competitionId, setCompetitionId] = useState<string>("");
@@ -477,7 +479,7 @@ export default function RegisterSale() {
                   <div>
                     <p className="text-orange-400 font-bold text-sm">Documentos Necessários!</p>
                     <p className="text-gray-400 text-xs mt-1">Após a aprovação, envie a <strong className="text-white">CNH</strong> e o <strong className="text-white">Comprovante de Residência</strong> do cliente na sua <strong className="text-white">Minha Área</strong> para o despachante iniciar a transferência.</p>
-                    <Link href={sellerId ? `/minha-area/${sellerId}` : '/login-vendedor'}>
+                    <Link href={sellerId ? buildTenantPath(tenantSlug, `/minha-area/${sellerId}`) : getTenantLoginPath(tenantSlug)}>
                       <button className="mt-3 flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors">
                         <Upload className="w-3.5 h-3.5" /> Ir para Minha Área e enviar docs
                       </button>
@@ -493,14 +495,14 @@ export default function RegisterSale() {
                 REGISTRAR OUTRO
               </Button>
               {sellerId && category === "vendas" && (
-                <Link href={`/minha-area/${sellerId}`}>
+                <Link href={buildTenantPath(tenantSlug, `/minha-area/${sellerId}`)}>
                   <Button variant="outline" className="w-full border-orange-600 text-orange-400 hover:bg-orange-600/10 font-bold">
                     <FileText className="w-4 h-4 mr-2" />
                     ENVIAR DOCUMENTOS
                   </Button>
                 </Link>
               )}
-              <Link href="/">
+              <Link href={buildTenantPath(tenantSlug, "/")}>
                 <Button variant="outline" className="w-full border-gray-700 text-gray-300 hover:bg-gray-800">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   VOLTAR AO RANKING

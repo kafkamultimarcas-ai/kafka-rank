@@ -9,9 +9,10 @@ if (!databaseUrl) {
 }
 
 const DEMO = {
+  defaultPassword: "senha123",
   superAdmin: {
     username: "superadmin",
-    password: "super123",
+    password: "senha123",
     name: "Super Admin Local",
     email: "super@local.test",
   },
@@ -47,7 +48,7 @@ const DEMO = {
   },
   admin: {
     username: "admin-lojademo",
-    password: "admin123",
+    password: "senha123",
     name: "Admin Demo",
     email: "admin@loja-demo.local",
     phone: "(47) 98888-0001",
@@ -55,13 +56,13 @@ const DEMO = {
   },
   managerUser: {
     username: "gerente-lojademo",
-    password: "gerente123",
+    password: "senha123",
     name: "Gerente Demo",
   },
   sellers: [
     {
       username: "vendedor-lojademo",
-      password: "seller123",
+      password: "senha123",
       name: "Vendedor Demo",
       nickname: "Vendedor",
       email: "vendedor@loja-demo.local",
@@ -71,7 +72,7 @@ const DEMO = {
     },
     {
       username: "gerente-seller-lojademo",
-      password: "gerente123",
+      password: "senha123",
       name: "Gerente Painel Demo",
       nickname: "Gerente",
       email: "gerente-painel@loja-demo.local",
@@ -81,7 +82,7 @@ const DEMO = {
     },
     {
       username: "financeiro-lojademo",
-      password: "finance123",
+      password: "senha123",
       name: "Financeiro Demo",
       nickname: "Financeiro",
       email: "financeiro@loja-demo.local",
@@ -91,7 +92,7 @@ const DEMO = {
     },
     {
       username: "posvenda-lojademo",
-      password: "pos12345",
+      password: "senha123",
       name: "Pós-venda Demo",
       nickname: "Pós-venda",
       email: "posvenda@loja-demo.local",

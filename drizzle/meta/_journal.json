@@ -449,6 +449,34 @@
       "when": 1782952418643,
       "tag": "0063_useful_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "5",
+      "when": 1782974127371,
+      "tag": "0064_ai_config_tenant_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "5",
+      "when": 1782974832101,
+      "tag": "0065_username_tenant_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "5",
+      "when": 1782994131249,
+      "tag": "0066_add_tenant_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "5",
+      "when": 1783001679280,
+      "tag": "0067_groovy_next_avengers",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,9 @@ import { getTenantSlugFromPath } from "@/lib/tenant";
 import React, { createContext, useContext, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 
+export const DEFAULT_LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+export const DEFAULT_APP_NAME = "Kafka Rank";
+
 type TenantContextValue = {
   tenantSlug: string | null;
   tenant: {
@@ -46,7 +49,11 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.style.removeProperty("--tenant-secondary");
     }
-  }, [data?.primaryColor, data?.secondaryColor]);
+
+    if (data?.name) {
+      document.title = data.name;
+    }
+  }, [data?.primaryColor, data?.secondaryColor, data?.name]);
 
   const value = useMemo<TenantContextValue>(() => ({
     tenantSlug,
@@ -63,4 +70,13 @@ export function useTenant() {
     throw new Error("useTenant must be used within TenantProvider");
   }
   return context;
+}
+
+/** Nome e logo da loja atual, com fallback para a marca padrão (Kafka Rank) quando não há tenant resolvido. */
+export function useBranding() {
+  const { tenant } = useTenant();
+  return {
+    name: tenant?.name || DEFAULT_APP_NAME,
+    logoUrl: tenant?.logoUrl || DEFAULT_LOGO_URL,
+  };
 }

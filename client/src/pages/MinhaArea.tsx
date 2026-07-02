@@ -30,6 +30,7 @@ import { useMemo, useState, useCallback, useRef } from "react";
 import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gradient: string }> = {
   vendas: { label: "Vendas", color: "text-red-400", icon: Car, gradient: "from-red-600/20 to-red-500/10 border-red-500/30" },
@@ -130,6 +131,7 @@ function FinanceiroStatsCards() {
 }
 
 export default function MinhaArea() {
+  const tenantSlug = getCurrentTenantSlug();
   const [, navigate] = useLocation();
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
@@ -450,7 +452,7 @@ export default function MinhaArea() {
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-gray-400 mb-4">Você precisa fazer login para acessar esta área.</p>
-          <Button onClick={() => window.location.href = "/"} className="bg-red-600 hover:bg-red-500">
+          <Button onClick={() => window.location.href = buildTenantPath(tenantSlug, "/")} className="bg-red-600 hover:bg-red-500">
             Fazer Login
           </Button>
         </div>
@@ -463,7 +465,7 @@ export default function MinhaArea() {
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-400 mb-4">Você não tem permissão para acessar os dados deste colaborador.</p>
-          <Button onClick={() => navigate(`/minha-area/${sellerSession.id}`)} className="bg-red-600 hover:bg-red-500">
+          <Button onClick={() => navigate(buildTenantPath(tenantSlug, `/minha-area/${sellerSession.id}`))} className="bg-red-600 hover:bg-red-500">
             Ir para minha área
           </Button>
         </div>
@@ -830,7 +832,7 @@ export default function MinhaArea() {
             </div>
             {/* Botão Busca Geral Cross-Setor */}
             <button
-              onClick={() => navigate('/busca-veiculo')}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/busca-veiculo"))}
               className="w-full bg-gradient-to-r from-red-600/10 to-red-500/5 border border-red-500/30 rounded-xl p-3 flex items-center gap-3 hover:border-red-500/60 transition-all"
             >
               <Search className="w-5 h-5 text-red-400" />
@@ -1291,7 +1293,7 @@ export default function MinhaArea() {
           {dept === 'financeiro' && (
             <>
               <button
-                onClick={() => navigate('/financeiro')}
+                onClick={() => navigate(buildTenantPath(tenantSlug, "/financeiro"))}
                 className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
               >
                 <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1303,7 +1305,7 @@ export default function MinhaArea() {
                 </div>
               </button>
               <button
-                onClick={() => navigate('/financeiro?tab=gasolina')}
+                onClick={() => navigate(buildTenantPath(tenantSlug, "/financeiro?tab=gasolina"))}
                 className="w-full bg-gradient-to-r from-amber-600/20 to-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-amber-500/60 transition-all"
               >
                 <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
@@ -1315,7 +1317,7 @@ export default function MinhaArea() {
                 </div>
               </button>
               <button
-                onClick={() => navigate('/financeiro?tab=pos-venda')}
+                onClick={() => navigate(buildTenantPath(tenantSlug, "/financeiro?tab=pos-venda"))}
                 className="w-full bg-gradient-to-r from-orange-600/20 to-orange-500/10 border border-orange-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-orange-500/60 transition-all"
               >
                 <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
@@ -1332,7 +1334,7 @@ export default function MinhaArea() {
           {/* Agendamentos - para Vendas e Pré-Vendas */}
           {(dept === "vendas" || dept === "pre_vendas") && (
             <button
-              onClick={() => navigate(`/agendamentos/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/agendamentos/${sellerId}`))}
               className="w-full bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -1358,7 +1360,7 @@ export default function MinhaArea() {
           {/* Feirão - para Vendas e Pré-Vendas */}
           {(dept === "vendas" || dept === "pre_vendas") && (
             <button
-              onClick={() => navigate("/feirao")}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/feirao"))}
               className="w-full bg-gradient-to-r from-red-600/20 to-orange-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-red-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -1379,7 +1381,7 @@ export default function MinhaArea() {
           {/* Central de Resultados */}
           {dept === "vendas" && (
             <button
-              onClick={() => navigate(`/meus-resultados/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/meus-resultados/${sellerId}`))}
               className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center">
@@ -1396,7 +1398,7 @@ export default function MinhaArea() {
           {/* Carros Bônus & Campanhas */}
           {dept === "vendas" && (
             <button
-              onClick={() => navigate(`/carros-bonus/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/carros-bonus/${sellerId}`))}
               className="w-full bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-yellow-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center">
@@ -1413,7 +1415,7 @@ export default function MinhaArea() {
           {/* Registrar - botão específico por setor (não mostrar para financeiro) */}
           {dept !== 'financeiro' && (
           <button
-            onClick={() => navigate("/registrar-venda")}
+            onClick={() => navigate(buildTenantPath(tenantSlug, "/registrar-venda"))}
             className={`w-full bg-gradient-to-r ${deptInfo.gradient} rounded-xl p-4 flex items-center gap-4 hover:opacity-80 transition-all`}
           >
             <div className={`w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center`}>
@@ -1486,7 +1488,7 @@ export default function MinhaArea() {
           {/* Ficha de Financiamento / Mesa de Crédito */}
           {(dept === "vendas") && (
             <button
-              onClick={() => navigate("/ficha-financiamento")}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/ficha-financiamento"))}
               className="w-full bg-gradient-to-r from-blue-600/20 to-indigo-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -1500,7 +1502,7 @@ export default function MinhaArea() {
           )}
           {(dept === "fei") && (
             <button
-              onClick={() => navigate("/mesa-credito")}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/mesa-credito"))}
               className="w-full bg-gradient-to-r from-blue-600/20 to-indigo-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">

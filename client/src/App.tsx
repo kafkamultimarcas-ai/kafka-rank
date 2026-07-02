@@ -98,29 +98,57 @@ function Router() {
         <Route path="/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/t/:slug/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/admin" component={AdminDashboard} />
+        <Route path="/t/:slug/admin" component={AdminDashboard} />
         <Route path="/admin/vendedores" component={AdminSellers} />
+        <Route path="/t/:slug/admin/vendedores" component={AdminSellers} />
         <Route path="/admin/competicoes" component={AdminCompetitions} />
+        <Route path="/t/:slug/admin/competicoes" component={AdminCompetitions} />
         <Route path="/admin/vendas" component={AdminSales} />
+        <Route path="/t/:slug/admin/vendas" component={AdminSales} />
         <Route path="/admin/treinamentos" component={AdminTrainings} />
+        <Route path="/t/:slug/admin/treinamentos" component={AdminTrainings} />
         <Route path="/admin/planos" component={AdminActionPlans} />
+        <Route path="/t/:slug/admin/planos" component={AdminActionPlans} />
         <Route path="/admin/configuracoes" component={AdminSettings} />
+        <Route path="/t/:slug/admin/configuracoes" component={AdminSettings} />
         <Route path="/admin/aprovacoes" component={AdminApprovals} />
+        <Route path="/t/:slug/admin/aprovacoes" component={AdminApprovals} />
         <Route path="/admin/metas" component={AdminGoals} />
+        <Route path="/t/:slug/admin/metas" component={AdminGoals} />
         <Route path="/admin/agendamentos" component={AdminAgendamentos} />
+        <Route path="/t/:slug/admin/agendamentos" component={AdminAgendamentos} />
         <Route path="/admin/gerentes" component={AdminGerentes} />
+        <Route path="/t/:slug/admin/gerentes" component={AdminGerentes} />
         <Route path="/admin/fei" component={AdminFei} />
+        <Route path="/t/:slug/admin/fei" component={AdminFei} />
         <Route path="/admin/pos-venda" component={AdminPosVenda} />
+        <Route path="/t/:slug/admin/pos-venda" component={AdminPosVenda} />
         <Route path="/admin/pv-financeiro" component={AdminPvFinanceiro} />
+        <Route path="/t/:slug/admin/pv-financeiro" component={AdminPvFinanceiro} />
         <Route path="/admin/marketing" component={AdminMarketing} />
+        <Route path="/t/:slug/admin/marketing" component={AdminMarketing} />
         <Route path="/admin/financeiro" component={AdminFinanceiro} />
+        <Route path="/t/:slug/admin/financeiro" component={AdminFinanceiro} />
         <Route path="/admin/meta-integration" component={AdminMetaIntegration} />
+        <Route path="/t/:slug/admin/meta-integration" component={AdminMetaIntegration} />
         <Route path="/admin/iam" component={AdminIAM} />
+        <Route path="/t/:slug/admin/iam" component={AdminIAM} />
         <Route path="/admin/documentos" component={AdminDocumentos} />
+        <Route path="/t/:slug/admin/documentos" component={AdminDocumentos} />
         <Route path="/admin/estoque" component={AdminInventory} />
+        <Route path="/t/:slug/admin/estoque" component={AdminInventory} />
         <Route path="/admin/virada-mes" component={AdminMonthTurnover} />
+        <Route path="/t/:slug/admin/virada-mes" component={AdminMonthTurnover} />
         <Route path="/admin/custo-veiculo" component={AdminVehicleCosts} />
+        <Route path="/t/:slug/admin/custo-veiculo" component={AdminVehicleCosts} />
         <Route path="/admin/custo-veiculo/:id" component={AdminVehicleCosts} />
+        <Route path="/t/:slug/admin/custo-veiculo/:id" component={AdminVehicleCosts} />
         <Route path="/admin/aniversariantes" component={Aniversariantes} />
+        <Route path="/t/:slug/admin/aniversariantes" component={Aniversariantes} />
+        <Route path="/admin/bonus-veiculos" component={AdminBonusVehicles} />
+        <Route path="/t/:slug/admin/bonus-veiculos" component={AdminBonusVehicles} />
+        <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
+        <Route path="/t/:slug/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />
@@ -145,8 +173,6 @@ function Router() {
         <Route path="/feirao" component={RankingFeirao} />
         <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
         <Route path="/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
-        <Route path="/admin/bonus-veiculos" component={AdminBonusVehicles} />
-        <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         <Route path="/busca-veiculo" component={VehicleSearch} />
         <Route path="/gerente" component={GerentePanel} />
         <Route path="/t/:slug/gerente" component={GerentePanel} />

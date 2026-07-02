@@ -39,10 +39,16 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const secure = isSecureRequest(req);
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // SameSite=None exige Secure — navegadores descartam o cookie silenciosamente se
+    // Secure estiver ausente. Em HTTP puro (dev local) isso derrubava toda sessão de
+    // vendedor/gerente logo após o login. Lax funciona para navegação same-origin (é
+    // o caso aqui, multi-tenant por path e não por subdomínio) e não exige Secure.
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }

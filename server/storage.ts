@@ -2,6 +2,7 @@
 // Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
 
 import { ENV } from './_core/env';
+import { getCurrentTenantId } from './tenantDb';
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
@@ -67,13 +68,24 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
+/**
+ * Prefixa a chave de upload com o tenant atual (`t/<tenantId>/...`). Sem isso, chaves
+ * construídas a partir de IDs sequenciais (sellerId, vehicleId) são previsíveis o
+ * suficiente para que alguém monte a chave de um arquivo de outra loja — documentos
+ * sensíveis (CNH, comprovante de residência) incluídos. Só afeta uploads novos; arquivos
+ * já existentes continuam acessíveis pela URL já salva no banco.
+ */
+function withTenantPrefix(relKey: string): string {
+  return `t/${getCurrentTenantId()}/${normalizeKey(relKey)}`;
+}
+
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
   const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
+  const key = withTenantPrefix(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
   const response = await fetch(uploadUrl, {

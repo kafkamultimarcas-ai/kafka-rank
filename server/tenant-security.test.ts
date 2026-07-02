@@ -138,7 +138,7 @@ describe("Multi-Tenant Context & Middleware", () => {
       path.join(__dirname, "_core/context.ts"), "utf-8"
     );
     expect(contextContent).toContain("tenantId");
-    expect(contextContent).toContain("resolveTenantId");
+    expect(contextContent).toContain("resolveTenantContext");
   });
 
   it("trpc.ts should have tenant middleware with AsyncLocalStorage", () => {

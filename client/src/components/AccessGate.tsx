@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Lock, LogIn, User, Eye, EyeOff, UserPlus, ArrowLeft, Flag, Shield, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
+import { useBranding } from "@/contexts/TenantContext";
+import { buildTenantPath, getTenantLoginPath, getTenantSlugFromPath } from "@/lib/tenant";
 
 // Routes that bypass the access gate (public pages, admin, TV, etc.)
 const BYPASS_ROUTES = [
@@ -16,7 +17,7 @@ const BYPASS_ROUTES = [
 ];
 
 function isTenantBypassRoute(pathname: string): boolean {
-  return /^\/t\/[a-z0-9-]+\/(?:login|admin\/login|crm\/admin\/login|crm\/admin)(?:\/|$)/i.test(pathname);
+  return /^\/t\/[a-z0-9-]+\/(?:login|admin|crm|gerente|pos-venda|financeiro|minha-area)(?:\/|$)/i.test(pathname);
 }
 
 const DEPARTMENT_OPTIONS = [
@@ -46,18 +47,21 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const { user: adminUser, loading: adminLoading } = useAuth();
   const { data: sellerSession, isLoading: sellerLoading } = trpc.sellers.me.useQuery();
   const { data: allSellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+  const { logoUrl, name: brandName } = useBranding();
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
+  const currentTenantSlug = getTenantSlugFromPath(currentPath);
 
   const loginMutation = trpc.sellers.login.useMutation({
     onSuccess: (data: any) => {
       toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
       if (data.sellerRole === 'gerente') {
-        window.location.href = '/gerente';
+        window.location.href = buildTenantPath(currentTenantSlug, "/gerente");
       } else {
         window.location.reload();
       }
     },
     onError: (err) => {
-      toast.error(err.message || "Usuario ou senha invalidos");
+      toast.error(err.message || "Usuário ou senha inválidos");
     },
   });
 
@@ -65,7 +69,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     onSuccess: (data: any) => {
       toast.success(`Login criado com sucesso! Bem-vindo, ${data.nickname || data.name}!`);
       if (data.sellerRole === 'gerente') {
-        window.location.href = '/gerente';
+        window.location.href = buildTenantPath(currentTenantSlug, "/gerente");
       } else {
         window.location.reload();
       }
@@ -80,8 +84,6 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     if (!allSellers) return [];
     return allSellers.filter(s => !s.username);
   }, [allSellers]);
-
-  const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
 
   // Bypass for public routes
   if (BYPASS_ROUTES.some(route => currentPath.startsWith(route)) || isTenantBypassRoute(currentPath)) {
@@ -113,7 +115,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      toast.error("Preencha usuario e senha");
+      toast.error("Preencha usuário e senha");
       return;
     }
     loginMutation.mutate({ username: username.trim(), password: password.trim() });
@@ -130,7 +132,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
       return;
     }
     if (!newUsername.trim() || newUsername.trim().length < 3) {
-      toast.error("Usuario deve ter pelo menos 3 caracteres");
+      toast.error("Usuário deve ter pelo menos 3 caracteres");
       return;
     }
     if (!newPassword.trim() || newPassword.trim().length < 4) {
@@ -138,7 +140,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("As senhas nao coincidem");
+      toast.error("As senhas não coincidem");
       return;
     }
     firstAccessMutation.mutate({
@@ -150,17 +152,15 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     });
   };
 
-  const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-8 shadow-2xl backdrop-blur-md">
           {/* Logo */}
           <div className="flex flex-col items-center mb-6">
-            <img src={LOGO_URL} alt="Kafka Rank" className="h-16 w-auto mb-3" />
+            <img src={logoUrl} alt={brandName} className="h-16 w-auto mb-3" />
             <h1 className="text-xl font-black text-white tracking-wider uppercase font-heading">
-              KAFKA RANK
+              {brandName}
             </h1>
           </div>
 
@@ -237,11 +237,11 @@ export default function AccessGate({ children }: { children: ReactNode }) {
                 )}
 
                 <button
-                  onClick={() => window.location.href = getLoginUrl()}
+                  onClick={() => { window.location.href = getTenantLoginPath(currentTenantSlug); }}
                   className="w-full text-xs text-gray-600 hover:text-gray-400 flex items-center justify-center gap-1 py-1"
                 >
                   <Shield className="w-3 h-3" />
-                  Area do Gerente
+                  Área da Loja
                 </button>
               </div>
             </>
@@ -372,7 +372,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
 
           <div className="mt-4 space-y-1">
             <p className="text-[10px] text-gray-600 text-center">
-              Acesso exclusivo para equipe Kafka Multimarcas.
+              Acesso exclusivo para equipe {brandName}.
             </p>
             <p className="text-[10px] text-gray-600 text-center">
               Cada colaborador tem acesso apenas aos seus proprios dados.

@@ -1,7 +1,8 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Request } from "express";
 import { createServer } from "http";
 import net from "net";
+import { sql } from "drizzle-orm";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { ipKeyGenerator } from "express-rate-limit";
@@ -10,6 +11,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerWebhookRoutes } from "../webhooks";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { extractTenantSlugFromRequest } from "../tenantMiddleware";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -38,6 +40,24 @@ async function startServer() {
   // Trust proxy (necessário para rate limiting correto atrás de proxy/load balancer)
   app.set('trust proxy', 1);
 
+  // ===== HEALTHCHECK =====
+  // Endpoint simples para infra de deploy/load balancer, sem passar por rate limit,
+  // helmet ou cliente tRPC. Verifica conectividade real com o banco.
+  app.get("/health", async (_req, res) => {
+    try {
+      const { getDb } = await import("../db");
+      const db = await getDb();
+      if (!db) {
+        res.status(503).json({ status: "error", db: "unavailable" });
+        return;
+      }
+      await db.execute(sql`SELECT 1`);
+      res.status(200).json({ status: "ok", db: "connected" });
+    } catch (error) {
+      res.status(503).json({ status: "error", db: "unavailable" });
+    }
+  });
+
   // ===== SECURITY HEADERS (Helmet) =====
   app.use(helmet({
     contentSecurityPolicy: false, // Desabilitado para não quebrar Vite/React em dev
@@ -56,30 +76,39 @@ async function startServer() {
   });
   app.use("/api/", apiLimiter);
 
-  // Rate limit para login: 10 tentativas por 15 minutos por IP (anti brute force)
+  // Chave composta por loja + IP: evita que uma loja "barulhenta" (ou vários usuários atrás
+  // do mesmo IP/proxy de uma loja) consuma a cota de outra loja atrás do mesmo IP compartilhado.
+  const tenantAwareKey = (req: Request) => {
+    const slug = extractTenantSlugFromRequest(req) || "no-tenant";
+    return `${slug}:${ipKeyGenerator(req.ip ?? "unknown")}`;
+  };
+
+  // Rate limit para login: 10 tentativas por 15 minutos por loja+IP (anti brute force)
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Muitas tentativas de login. Tente novamente em 15 minutos." },
-    keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
+    keyGenerator: tenantAwareKey,
   });
-  // Aplicar rate limit de login nas rotas de autenticação
-  app.use("/api/trpc/sellerSession.login", loginLimiter);
+  // Aplicar rate limit de login nas rotas de autenticação (nomes reais dos procedures)
+  app.use("/api/trpc/sellers.login", loginLimiter);
+  app.use("/api/trpc/sellers.firstAccess", loginLimiter);
   app.use("/api/trpc/managers.login", loginLimiter);
   app.use("/api/trpc/access.verify", loginLimiter);
   app.use("/api/trpc/superAdmin.login", loginLimiter);
-  app.use("/api/trpc/crmAdmin.login", loginLimiter);
-  app.use("/api/trpc/sellerSession.register", loginLimiter);
+  app.use("/api/trpc/adminAuth.login", loginLimiter);
+  app.use("/api/trpc/tenantAuth.login", loginLimiter);
 
-  // Rate limit para webhooks públicos: 30 por minuto por IP (anti spam)
+  // Rate limit para webhooks públicos: 30 por minuto por loja+IP (anti spam)
   const webhookLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 30,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Rate limit excedido para webhooks." },
+    keyGenerator: tenantAwareKey,
   });
   app.use("/api/webhooks/widget", webhookLimiter);
 

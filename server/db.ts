@@ -200,7 +200,15 @@ export async function updateSellerLastAccess(id: number) {
 export async function createSeller(data: InsertSeller) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(sellers).values({...data, tenantId: getCurrentTenantId()});
+  const tenantId = getCurrentTenantId();
+  const limits = await getTenantLimits(tenantId);
+  if (limits) {
+    const [{ count }] = await db.select({ count: sql<number>`COUNT(*)` }).from(sellers).where(and(eq(sellers.tenantId, tenantId), eq(sellers.active, true)));
+    if (Number(count) >= limits.maxSellers) {
+      throw new Error(`Limite de vendedores do plano atingido (${limits.maxSellers}). Fale com o suporte para aumentar seu plano.`);
+    }
+  }
+  const result = await db.insert(sellers).values({...data, tenantId});
   return result[0].insertId;
 }
 
@@ -1852,7 +1860,15 @@ export async function setAppSetting(key: string, value: string) {
 export async function createManager(data: { username: string; passwordHash: string; name: string }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  const result = await db.insert(managers).values({...data, tenantId: getCurrentTenantId()});
+  const tenantId = getCurrentTenantId();
+  const limits = await getTenantLimits(tenantId);
+  if (limits) {
+    const [{ count }] = await db.select({ count: sql<number>`COUNT(*)` }).from(managers).where(and(eq(managers.tenantId, tenantId), eq(managers.active, true)));
+    if (Number(count) >= limits.maxAdmins) {
+      throw new Error(`Limite de administradores do plano atingido (${limits.maxAdmins}). Fale com o suporte para aumentar seu plano.`);
+    }
+  }
+  const result = await db.insert(managers).values({...data, tenantId});
   return result[0].insertId;
 }
 
@@ -2349,6 +2365,7 @@ export async function deleteMktTask(id: number) {
 import { iamConfig, InsertIamConfig } from "../drizzle/schema";
 
 import { getCurrentTenantId } from "./tenantDb";
+import { getTenantLimits } from "./tenantService";
 
 export async function getIamConfig() {
   const db = await getDb();
@@ -3790,9 +3807,9 @@ export async function autoLaunchBonus(saleId: number, sellerId: number, vehicleP
     status: 'pending',
     month: now.getMonth() + 1,
     year: now.getFullYear(),
-    tenantId: 1,
+    tenantId: getCurrentTenantId(),
   };
-  
+
   return createSellerBonus(bonus);
 }
 
