@@ -1,10 +1,11 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, withRetry } from "../db";
 import { tenants, superAdmins, sellers, admins, sales, crmLeads, competitions, crmPipelineStages, finCategories } from "../../drizzle/schema";
 import { eq, sql, desc, and, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { getPublicTenantBySlug } from "../tenantService";
 
 // Super admin JWT secret (separate from regular auth)
 const SUPER_SECRET = process.env.JWT_SECRET ? process.env.JWT_SECRET + "_super" : "super_secret_key";
@@ -223,6 +224,51 @@ export const superAdminRouter = router({
       return { tenantId, slug: input.slug, message: `Loja "${input.name}" criada com sucesso!` };
     }),
 
+  checkAvailability: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      slug: z.string().min(2).regex(/^[a-z0-9-]+$/).optional(),
+      adminUsername: z.string().min(3).optional(),
+      tenantId: z.number().optional(),
+    }))
+    .query(async ({ input }) => {
+      const payload = verifySuperToken(input.token);
+      if (!payload) throw new Error("Não autorizado");
+
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const normalizedSlug = input.slug?.trim().toLowerCase();
+      const normalizedAdminUsername = input.adminUsername?.trim().toLowerCase();
+
+      let slugAvailable = true;
+      let adminUsernameAvailable = true;
+
+      if (normalizedSlug) {
+        const slugRows = await withRetry(() =>
+          db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, normalizedSlug)).limit(1)
+        );
+        slugAvailable = (slugRows as any[]).length === 0;
+      }
+
+      if (normalizedAdminUsername) {
+        const adminRows = await withRetry(() =>
+          db.select({ id: admins.id, tenantId: admins.tenantId })
+            .from(admins)
+            .where(eq(admins.username, normalizedAdminUsername))
+            .limit(1)
+        );
+
+        const existingAdmin = (adminRows as any[])?.[0];
+        adminUsernameAvailable = !existingAdmin || (input.tenantId !== undefined && existingAdmin.tenantId === input.tenantId);
+      }
+
+      return {
+        slug: normalizedSlug ? { value: normalizedSlug, available: slugAvailable } : null,
+        adminUsername: normalizedAdminUsername ? { value: normalizedAdminUsername, available: adminUsernameAvailable } : null,
+      };
+    }),
+
   updateTenant: publicProcedure
     .input(z.object({
       token: z.string(),
@@ -361,25 +407,7 @@ export const superAdminRouter = router({
   getTenantBySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return null;
-
-      const [rows] = await withRetry(() =>
-        db.select({
-          id: tenants.id,
-          name: tenants.name,
-          slug: tenants.slug,
-          logoUrl: tenants.logoUrl,
-          primaryColor: tenants.primaryColor,
-          secondaryColor: tenants.secondaryColor,
-          status: tenants.status,
-        }).from(tenants).where(eq(tenants.slug, input.slug)).limit(1)
-      );
-
-      const tenant = (rows as any)?.[0] || rows;
-      if (!tenant?.id || tenant.status === "cancelled") return null;
-
-      return tenant;
+      return getPublicTenantBySlug(input.slug.trim().toLowerCase());
     }),
 
   // ========== LIST ALL TENANTS (for login selector) ==========
@@ -405,3 +433,5 @@ export const superAdminRouter = router({
     return rows;
   }),
 });
+
+

@@ -15,6 +15,10 @@ const BYPASS_ROUTES = [
   "/super-admin",
 ];
 
+function isTenantBypassRoute(pathname: string): boolean {
+  return /^\/t\/[a-z0-9-]+\/(?:login|admin\/login|crm\/admin\/login|crm\/admin)(?:\/|$)/i.test(pathname);
+}
+
 const DEPARTMENT_OPTIONS = [
   { value: "vendas", label: "Vendas" },
   { value: "pre_vendas", label: "Pré-Vendas / SDR" },
@@ -80,7 +84,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
 
   // Bypass for public routes
-  if (BYPASS_ROUTES.some(route => currentPath.startsWith(route))) {
+  if (BYPASS_ROUTES.some(route => currentPath.startsWith(route)) || isTenantBypassRoute(currentPath)) {
     return <>{children}</>;
   }
 

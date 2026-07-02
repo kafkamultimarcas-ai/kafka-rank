@@ -155,6 +155,7 @@ describe("Multi-Tenant Context & Middleware", () => {
       path.join(__dirname, "_core/context.ts"), "utf-8"
     );
     expect(contextContent).toContain("tenantId: number");
+    expect(contextContent).toContain("tenantSlug: string | null");
   });
 
   it("tenantDb.ts should export getCurrentTenantId function", () => {
@@ -170,6 +171,8 @@ describe("Multi-Tenant Context & Middleware", () => {
       path.join(__dirname, "tenantMiddleware.ts"), "utf-8"
     );
     expect(tenantMiddlewareContent).toContain("export async function resolveTenantId");
+    expect(tenantMiddlewareContent).toContain("extractTenantSlugFromRequest");
+    expect(tenantMiddlewareContent).toContain("resolveTenantContext");
   });
 });
 

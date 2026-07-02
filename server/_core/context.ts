@@ -6,19 +6,22 @@ import { ENV } from "./env";
 import { getManagerById, getSellerById } from "../db";
 import { getAdminById } from "../crmDb";
 import { parse as parseCookieHeader } from "cookie";
-import { resolveTenantId } from "../tenantMiddleware";
+import { resolveTenantContext } from "../tenantMiddleware";
+import { withTenantAsync } from "../tenantDb";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: (User & { sellerRole?: string }) | null;
   tenantId: number;
+  tenantSlug: string | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
   let user: (User & { sellerRole?: string }) | null = null;
+  const requestTenantResolution = await resolveTenantContext(opts.req, null);
 
   // 1) Try OAuth session first (owner/admin)
   try {
@@ -34,7 +37,7 @@ export async function createContext(
         const managerToken = cookies.manager_session;
       if (managerToken) {
         const payload = jwt.verify(managerToken, ENV.cookieSecret) as { managerId: number; username: string };
-        const manager = await getManagerById(payload.managerId);
+        const manager = await withTenantAsync(requestTenantResolution.tenantId, () => getManagerById(payload.managerId));
         if (manager && manager.active) {
           // Create a virtual user object with admin role so adminProcedure works
           user = {
@@ -63,7 +66,7 @@ export async function createContext(
         const token = authHeader.slice(7);
         const payload = jwt.verify(token, ENV.cookieSecret) as { adminId: number; role: string; type: string };
         if (payload.type === "admin_auth" && payload.adminId) {
-          const admin = await getAdminById(payload.adminId);
+          const admin = await withTenantAsync(requestTenantResolution.tenantId, () => getAdminById(payload.adminId));
           if (admin && admin.active) {
             user = {
               id: -(2000000 + admin.id),
@@ -91,7 +94,7 @@ export async function createContext(
         const sellerToken = cookies2.seller_session;
       if (sellerToken) {
         const payload = jwt.verify(sellerToken, ENV.cookieSecret) as { sellerId: number; username: string };
-        const seller = await getSellerById(payload.sellerId);
+        const seller = await withTenantAsync(requestTenantResolution.tenantId, () => getSellerById(payload.sellerId));
         if (seller && seller.active) {
           // Create a virtual user object - gerente gets special flag
           user = {
@@ -113,13 +116,15 @@ export async function createContext(
     }
   }
 
-  // Resolve tenantId from authenticated user
-  const tenantId = await resolveTenantId(user);
+  const tenantResolution = requestTenantResolution.tenantSlug
+    ? requestTenantResolution
+    : await resolveTenantContext(opts.req, user);
 
   return {
     req: opts.req,
     res: opts.res,
     user,
-    tenantId,
+    tenantId: tenantResolution.tenantId,
+    tenantSlug: tenantResolution.tenantSlug,
   };
 }

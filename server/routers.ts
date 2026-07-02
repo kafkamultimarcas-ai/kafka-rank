@@ -25,6 +25,7 @@ import { inventoryRouter } from "./routers/inventoryRouter";
 import { whatsappRouter } from "./routers/whatsappRouter";
 import { managerMentorRouter } from "./routers/managerMentorRouter";
 import { superAdminRouter } from "./routers/superAdminRouter";
+import { tenantPublicRouter } from "./routers/tenantPublicRouter";
 import { vehicleCostRouter } from "./routers/vehicleCostRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
@@ -44,6 +45,7 @@ async function getPrivacySellerId(ctx: any): Promise<number | null> {
 export const appRouter = router({
   system: systemRouter,
   fichas: fichaRouter,
+  tenantPublic: tenantPublicRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

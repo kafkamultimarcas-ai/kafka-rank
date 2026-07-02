@@ -1,31 +1,33 @@
 import { useState } from "react";
-import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLocation } from "wouter";
+import { useTenant } from "@/contexts/TenantContext";
+import { trpc } from "@/lib/trpc";
+import { ArrowLeft, Lock, LogIn, User } from "lucide-react";
 import { toast } from "sonner";
-import { Lock, User, LogIn, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
 export default function SellerLogin() {
   const [, navigate] = useLocation();
+  const { tenant, tenantSlug, isLoading: tenantLoading } = useTenant();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const loginMutation = trpc.sellers.login.useMutation({
     onSuccess: (data: any) => {
       toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
-      // Redirecionar baseado no departamento
-      const dept = data.department || 'vendas';
-      if (dept === 'pos_venda') {
-        navigate('/pos-venda');
-      } else if (dept === 'financeiro') {
-        navigate('/financeiro');
-      } else if (data.sellerRole === 'gerente') {
-        navigate('/gerente');
+      const tenantBase = tenantSlug ? `/t/${tenantSlug}` : "";
+      const dept = data.department || "vendas";
+      if (dept === "pos_venda") {
+        navigate(`${tenantBase}/pos-venda`);
+      } else if (dept === "financeiro") {
+        navigate(`${tenantBase}/financeiro`);
+      } else if (data.sellerRole === "gerente") {
+        navigate(`${tenantBase}/gerente`);
       } else {
-        navigate(`/minha-area/${data.sellerId}`);
+        navigate(`${tenantBase}/minha-area/${data.sellerId}`);
       }
     },
     onError: (err) => {
@@ -42,15 +44,38 @@ export default function SellerLogin() {
     loginMutation.mutate({ username: username.trim(), password: password.trim() });
   };
 
+  if (tenantSlug && tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <p className="text-sm text-gray-400">Carregando loja...</p>
+      </div>
+    );
+  }
+
+  if (tenantSlug && !tenant) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-gray-800 bg-gray-900/80 p-8 text-center text-gray-300">
+          <h1 className="text-lg font-bold text-white">Loja não encontrada</h1>
+          <p className="mt-2 text-sm text-gray-400">
+            O link acessado não corresponde a uma loja ativa.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const logoUrl = tenant?.logoUrl || LOGO_URL;
+  const title = tenant?.name || "Minha Área";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-8 shadow-2xl backdrop-blur-md">
-          {/* Logo */}
           <div className="flex flex-col items-center mb-6">
-            <img src={LOGO_URL} alt="Kafka Rank" className="h-16 w-auto mb-3" />
+            <img src={logoUrl} alt={title} className="h-16 w-auto mb-3" />
             <h1 className="text-xl font-black text-white tracking-wider uppercase">
-              Minha Área
+              {title}
             </h1>
             <p className="text-sm text-gray-400 mt-1 text-center">
               Faça login para acessar seus dados e registros
@@ -94,7 +119,7 @@ export default function SellerLogin() {
             >
               {loginMutation.isPending ? (
                 <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span> Entrando...
+                  <span className="animate-spin">...</span> Entrando...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
@@ -114,8 +139,7 @@ export default function SellerLogin() {
           </div>
 
           <p className="text-xs text-gray-600 text-center mt-4">
-            Peça seu login ao gerente ou administrador.
-            Cada colaborador tem acesso apenas aos seus próprios dados.
+            Peça seu login ao gerente ou administrador. Cada colaborador tem acesso apenas aos seus próprios dados.
           </p>
         </div>
       </div>

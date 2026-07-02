@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { TenantProvider } from "./contexts/TenantContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AccessGate from "./components/AccessGate";
 import LiveAlerts from "./components/LiveAlerts";
@@ -93,7 +94,9 @@ function Router() {
         <Route path="/tv" component={TVMode} />
         <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
         <Route path="/login-vendedor" component={SellerLogin} />
+        <Route path="/t/:slug/login" component={SellerLogin} />
         <Route path="/minha-area/:sellerId" component={MinhaArea} />
+        <Route path="/t/:slug/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/vendedores" component={AdminSellers} />
         <Route path="/admin/competicoes" component={AdminCompetitions} />
@@ -123,9 +126,13 @@ function Router() {
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />
         <Route path="/crm/pipeline" component={CrmPipeline} />
         <Route path="/crm/admin/login" component={CrmAdminLogin} />
+        <Route path="/t/:slug/admin/login" component={CrmAdminLogin} />
+        <Route path="/t/:slug/crm/admin/login" component={CrmAdminLogin} />
         <Route path="/crm/admin" component={CrmAdminDashboard} />
+        <Route path="/t/:slug/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
         <Route path="/pos-venda" component={PosVenda} />
+        <Route path="/t/:slug/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
@@ -134,6 +141,7 @@ function Router() {
         <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
+        <Route path="/t/:slug/financeiro" component={FinanceiroPage} />
         <Route path="/feirao" component={RankingFeirao} />
         <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
         <Route path="/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
@@ -141,6 +149,7 @@ function Router() {
         <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         <Route path="/busca-veiculo" component={VehicleSearch} />
         <Route path="/gerente" component={GerentePanel} />
+        <Route path="/t/:slug/gerente" component={GerentePanel} />
         <Route path="/super-admin" component={SuperAdmin} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
@@ -152,15 +161,17 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
-          <Toaster position="top-right" duration={3000} closeButton richColors toastOptions={{ style: { zIndex: 99999 } }} />
-          <AccessGate>
-            <LiveAlerts />
-            <Router />
-          </AccessGate>
-        </TooltipProvider>
-      </ThemeProvider>
+      <TenantProvider>
+        <ThemeProvider defaultTheme="dark">
+          <TooltipProvider>
+            <Toaster position="top-right" duration={3000} closeButton richColors toastOptions={{ style: { zIndex: 99999 } }} />
+            <AccessGate>
+              <LiveAlerts />
+              <Router />
+            </AccessGate>
+          </TooltipProvider>
+        </ThemeProvider>
+      </TenantProvider>
     </ErrorBoundary>
   );
 }

@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Building2, Users, ShoppingCart, TrendingUp, Plus, Search,
   Settings, LogOut, Eye, Edit, Trash2, Shield, Crown,
   Store, MapPin, Phone, Mail, Palette, Zap, BarChart3,
-  ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle,
+  ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle, EyeOff,
   Key, RefreshCw
 } from "lucide-react";
 
@@ -132,6 +132,51 @@ function PlanBadge({ plan }: { plan: string }) {
   );
 }
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  if (!digits) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function normalizeUsername(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function getAvailabilityMessage(value: string, available: boolean, type: "slug" | "username") {
+  if (!value) return null;
+  if (available) {
+    return type === "slug"
+      ? "Slug disponível para uso."
+      : "Login disponível para o admin da loja.";
+  }
+
+  return type === "slug"
+    ? "Esse slug já está em uso por outra loja."
+    : "Esse login já está em uso. Escolha outro.";
+}
+
 // ===== CREATE TENANT MODAL =====
 function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState({
@@ -140,6 +185,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
     maxSellers: 10, maxAdmins: 2,
     adminUsername: "", adminPassword: "", adminName: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const createMut = trpc.superAdmin.createTenant.useMutation({
     onSuccess: (data) => {
@@ -150,7 +196,61 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
     onError: (err) => toast.error(err.message),
   });
 
-  const slugify = (text: string) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const trimmedName = form.name.trim();
+  const trimmedSlug = slugify(form.slug);
+  const trimmedPhone = form.phone.trim();
+  const trimmedEmail = form.email.trim();
+  const trimmedAdminName = form.adminName.trim();
+  const normalizedAdminUsername = normalizeUsername(form.adminUsername);
+  const trimmedAdminPassword = form.adminPassword.trim();
+  const phoneDigits = trimmedPhone.replace(/\D/g, "");
+  const [debouncedSlug, setDebouncedSlug] = useState(trimmedSlug);
+  const [debouncedAdminUsername, setDebouncedAdminUsername] = useState(normalizedAdminUsername);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSlug(trimmedSlug), 350);
+    return () => window.clearTimeout(timer);
+  }, [trimmedSlug]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedAdminUsername(normalizedAdminUsername), 350);
+    return () => window.clearTimeout(timer);
+  }, [normalizedAdminUsername]);
+
+  const nameIsValid = trimmedName.length >= 2;
+  const slugIsValid = trimmedSlug.length >= 2;
+  const phoneIsValid = !trimmedPhone || phoneDigits.length === 10 || phoneDigits.length === 11;
+  const emailIsValid = !trimmedEmail || isValidEmail(trimmedEmail);
+  const adminNameIsValid = trimmedAdminName.length >= 2;
+  const usernameIsValid = normalizedAdminUsername.length >= 3;
+  const passwordIsValid = trimmedAdminPassword.length >= 4;
+  const availabilityQuery = trpc.superAdmin.checkAvailability.useQuery(
+    {
+      token,
+      slug: debouncedSlug || undefined,
+      adminUsername: debouncedAdminUsername || undefined,
+    },
+    {
+      enabled: slugIsValid || usernameIsValid,
+      retry: false,
+    }
+  );
+
+  const slugAvailability = availabilityQuery.data?.slug;
+  const usernameAvailability = availabilityQuery.data?.adminUsername;
+  const slugAvailable = !slugIsValid || debouncedSlug !== trimmedSlug ? true : slugAvailability?.available !== false;
+  const adminUsernameAvailable = !usernameIsValid || debouncedAdminUsername !== normalizedAdminUsername ? true : usernameAvailability?.available !== false;
+  const canSubmit =
+    !createMut.isPending &&
+    nameIsValid &&
+    slugIsValid &&
+    phoneIsValid &&
+    emailIsValid &&
+    adminNameIsValid &&
+    usernameIsValid &&
+    passwordIsValid &&
+    slugAvailable &&
+    adminUsernameAvailable;
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -159,7 +259,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Store className="w-5 h-5 text-red-500" /> Nova Loja
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">âœ•</button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -172,9 +272,11 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value, slug: slugify(e.target.value) })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-11 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="Ex: Auto Center Premium"
+                  autoFocus
                 />
+                {!nameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um nome com pelo menos 2 caracteres.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Slug (URL) *</label>
@@ -183,16 +285,29 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   onChange={(e) => setForm({ ...form, slug: slugify(e.target.value) })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="auto-center-premium"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
+                <p className="mt-1 text-[11px] text-gray-400">Link da loja: `http://localhost:3000/t/{trimmedSlug || "sua-loja"}/login`</p>
+                <p className="mt-1 text-[11px] text-gray-500">Esse será o acesso principal da equipe comercial da loja.</p>
+                {slugIsValid && debouncedSlug === trimmedSlug && slugAvailability && (
+                  <p className={`mt-1 text-[11px] ${slugAvailability.available ? "text-emerald-400" : "text-amber-400"}`}>
+                    {getAvailabilityMessage(slugAvailability.value, slugAvailability.available, "slug")}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Telefone</label>
                 <input
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="(47) 99999-0000"
+                  inputMode="tel"
+                  autoComplete="tel"
                 />
+                {!phoneIsValid && <p className="mt-1 text-[11px] text-amber-400">Use 10 ou 11 d&iacute;gitos.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Email</label>
@@ -201,7 +316,12 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="contato@loja.com"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
                 />
+                {!emailIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um email v&aacute;lido.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Cidade</label>
@@ -272,26 +392,48 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   onChange={(e) => setForm({ ...form, adminName: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="João Silva"
+                  autoComplete="name"
                 />
+                {!adminNameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe o nome do admin responsável.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Login *</label>
                 <input
                   value={form.adminUsername}
-                  onChange={(e) => setForm({ ...form, adminUsername: e.target.value })}
+                  onChange={(e) => setForm({ ...form, adminUsername: normalizeUsername(e.target.value) })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="admin"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="username"
                 />
+                <p className="mt-1 text-[11px] text-gray-500">Use letras min&uacute;sculas, n&uacute;meros, ponto, h&iacute;fen ou underscore.</p>
+                {usernameIsValid && debouncedAdminUsername === normalizedAdminUsername && usernameAvailability && (
+                  <p className={`mt-1 text-[11px] ${usernameAvailability.available ? "text-emerald-400" : "text-amber-400"}`}>
+                    {getAvailabilityMessage(usernameAvailability.value, usernameAvailability.available, "username")}
+                  </p>
+                )}
               </div>
-              <div>
+              <div className="relative">
                 <label className="text-xs text-gray-500 mb-1 block">Senha *</label>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={form.adminPassword}
                   onChange={(e) => setForm({ ...form, adminPassword: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-11 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="Mínimo 4 caracteres"
+                  autoComplete="new-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-[29px] text-gray-400 transition-colors hover:text-white"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <p className="mt-1 text-[11px] text-gray-500">Recomendação: pelo menos 8 caracteres com letras e números.</p>
               </div>
             </div>
           </div>
@@ -302,8 +444,20 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
             Cancelar
           </button>
           <button
-            onClick={() => createMut.mutate({ ...form, token })}
-            disabled={createMut.isPending || !form.name || !form.slug || !form.adminUsername || !form.adminPassword || !form.adminName}
+            onClick={() => createMut.mutate({
+              ...form,
+              token,
+              name: trimmedName,
+              slug: trimmedSlug,
+              phone: trimmedPhone,
+              email: trimmedEmail,
+              city: form.city.trim(),
+              state: form.state.trim().toUpperCase(),
+              adminName: trimmedAdminName,
+              adminUsername: normalizedAdminUsername,
+              adminPassword: trimmedAdminPassword,
+            })}
+            disabled={!canSubmit}
             className="px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-lg transition-all disabled:opacity-50"
           >
             {createMut.isPending ? "Criando..." : "Criar Loja"}
@@ -342,6 +496,14 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
     });
   }, [tenant]);
 
+  const editPhone = (editForm.phone || "").trim();
+  const editPhoneDigits = editPhone.replace(/\D/g, "");
+  const editPhoneIsValid = !editPhone || editPhoneDigits.length === 10 || editPhoneDigits.length === 11;
+  const editEmail = (editForm.email || "").trim();
+  const editEmailIsValid = !editEmail || isValidEmail(editEmail);
+  const editNameIsValid = (editForm.name || "").trim().length >= 2;
+  const canSaveTenant = editNameIsValid && editPhoneIsValid && editEmailIsValid && !updateMut.isPending;
+
   if (!tenant) return null;
 
   return (
@@ -355,7 +517,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
           <div className="flex items-center gap-2">
             <StatusBadge status={tenant.status || "trial"} />
             <PlanBadge plan={tenant.plan || "trial"} />
-            <button onClick={onClose} className="text-gray-400 hover:text-white ml-2">✕</button>
+            <button onClick={onClose} className="text-gray-400 hover:text-white ml-2">âœ•</button>
           </div>
         </div>
 
@@ -388,6 +550,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                   <label className="text-xs text-gray-500 mb-1 block">Nome</label>
                   <input value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                  {!editNameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um nome com pelo menos 2 caracteres.</p>}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Status</label>
@@ -416,13 +579,21 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Telefone</label>
-                  <input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  <input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: formatPhone(e.target.value) })}
+                    inputMode="tel"
+                    autoComplete="tel"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                  {!editPhoneIsValid && <p className="mt-1 text-[11px] text-amber-400">Use 10 ou 11 d&iacute;gitos.</p>}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Email</label>
                   <input value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                  {!editEmailIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um email v&aacute;lido.</p>}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Cidade</label>
@@ -442,8 +613,17 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setEditMode(false)} className="px-4 py-2 text-gray-400 hover:text-white">Cancelar</button>
                 <button
-                  onClick={() => updateMut.mutate({ token, tenantId, ...editForm })}
-                  disabled={updateMut.isPending}
+                  onClick={() => updateMut.mutate({
+                    token,
+                    tenantId,
+                    ...editForm,
+                    name: (editForm.name || "").trim(),
+                    phone: editPhone,
+                    email: editEmail,
+                    city: (editForm.city || "").trim(),
+                    state: (editForm.state || "").trim().toUpperCase(),
+                  })}
+                  disabled={!canSaveTenant}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium disabled:opacity-50"
                 >
                   {updateMut.isPending ? "Salvando..." : "Salvar"}
@@ -509,7 +689,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                         >
                           OK
                         </button>
-                        <button onClick={() => { setResetPwAdmin(null); setNewPw(""); }} className="text-xs text-gray-400">✕</button>
+                        <button onClick={() => { setResetPwAdmin(null); setNewPw(""); }} className="text-xs text-gray-400">âœ•</button>
                       </div>
                     ) : (
                       <button onClick={() => setResetPwAdmin(a.id)} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
@@ -712,3 +892,5 @@ export default function SuperAdmin() {
 
   return <SuperDashboard token={token!} admin={admin} onLogout={logout} />;
 }
+
+

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTenant } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,8 @@ type LoginStep = "credentials" | "change_password";
 
 export default function CrmAdminLogin() {
   const [, navigate] = useLocation();
+  const { tenant, tenantSlug, isLoading: tenantLoading } = useTenant();
+  const tenantAdminPath = tenantSlug ? `/t/${tenantSlug}/crm/admin` : "/crm/admin";
   const [step, setStep] = useState<LoginStep>("credentials");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +45,7 @@ export default function CrmAdminLogin() {
     onSuccess: (data) => {
       localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
       toast.success(`Bem-vindo, ${data.admin.name}!`);
-      navigate("/crm/admin", { replace: true });
+      navigate(tenantAdminPath, { replace: true });
     },
     onError: () => {
       setAutoLoginFailed(true);
@@ -51,19 +54,20 @@ export default function CrmAdminLogin() {
 
   // Auto-login on page load
   useEffect(() => {
+    if (tenantSlug && tenantLoading) return;
+    if (tenantSlug && !tenant) return;
     if (autoLoginTriedRef.current) return;
     autoLoginTriedRef.current = true;
     const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
     if (existingToken) {
       // Only navigate if not already on admin page to prevent loops
-      if (!window.location.pathname.startsWith("/crm/admin") || window.location.pathname === "/crm/admin/login") {
-        navigate("/crm/admin", { replace: true });
+      if (!window.location.pathname.startsWith(tenantAdminPath) || /\/login$/.test(window.location.pathname)) {
+        navigate(tenantAdminPath, { replace: true });
       }
       return;
     }
     autoLoginMutation.mutate();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [autoLoginMutation, navigate, tenant, tenantLoading, tenantAdminPath, tenantSlug]);
 
   // Login direto com usuário + senha
   const loginMutation = trpc.adminAuth.login.useMutation({
@@ -75,7 +79,7 @@ export default function CrmAdminLogin() {
       } else {
         localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
         toast.success(`Bem-vindo, ${data.admin.name}!`);
-        navigate("/crm/admin", { replace: true });
+        navigate(tenantAdminPath, { replace: true });
       }
     },
     onError: (err) => {
@@ -88,7 +92,7 @@ export default function CrmAdminLogin() {
     onSuccess: () => {
       localStorage.setItem(ADMIN_TOKEN_KEY, token);
       toast.success("Senha alterada com sucesso!");
-      navigate("/crm/admin", { replace: true });
+      navigate(tenantAdminPath, { replace: true });
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao alterar senha");
@@ -116,6 +120,30 @@ export default function CrmAdminLogin() {
     }
     changePasswordMutation.mutate({ token, newPassword });
   };
+
+  if (tenantSlug && tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+          <p className="text-gray-400 text-sm">Carregando loja...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (tenantSlug && !tenant) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-2xl border border-gray-800 bg-gray-900/80 p-8 text-center text-gray-300">
+          <h1 className="text-lg font-bold text-white">Loja não encontrada</h1>
+          <p className="mt-2 text-sm text-gray-400">
+            O link acessado não corresponde a uma loja ativa.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading while trying auto-login
   if (!autoLoginFailed && autoLoginMutation.isPending) {

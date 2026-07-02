@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { getCurrentTenantSlug } from "./lib/tenant";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -56,10 +57,15 @@ const trpcClient = trpc.createClient({
       transformer: superjson,
       headers() {
         const adminToken = localStorage.getItem("crm_admin_token");
+        const tenantSlug = getCurrentTenantSlug();
+        const headers: Record<string, string> = {};
         if (adminToken) {
-          return { Authorization: `Bearer ${adminToken}` };
+          headers.Authorization = `Bearer ${adminToken}`;
         }
-        return {};
+        if (tenantSlug) {
+          headers["x-tenant-slug"] = tenantSlug;
+        }
+        return headers;
       },
       fetch(input, init) {
         return globalThis.fetch(input, {
