@@ -21,6 +21,13 @@ function isSecureRequest(req: Request) {
   return protoList.some(proto => proto.trim().toLowerCase() === "https");
 }
 
+// Origem (protocolo+host) da requisição, respeitando proxy reverso — usado pra
+// montar links absolutos em e-mail (ex: link de redefinição de senha).
+export function getRequestOrigin(req: Request): string {
+  const protocol = isSecureRequest(req) ? "https" : "http";
+  return `${protocol}://${req.get("host")}`;
+}
+
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {

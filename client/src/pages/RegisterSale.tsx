@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X, User } from "lucide-react";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { maskCpfCnpj, maskPhone } from "@/lib/masks";
+import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -360,6 +362,9 @@ export default function RegisterSale() {
         case "vendas":
           if (!vehicleModel) { toast.error("Informe o modelo do veículo!"); return; }
           if (!saleLeadSource) { toast.error("Selecione a origem do lead!"); return; }
+          if (customerPhone && !isValidBrazilianPhone(customerPhone)) { toast.error("Telefone do cliente inválido!"); return; }
+          if (saleCustomerCpf && !isValidCpfCnpj(saleCustomerCpf)) { toast.error("CPF do cliente inválido!"); return; }
+          if (saleCustomerEmail && !isValidEmail(saleCustomerEmail)) { toast.error("E-mail do cliente inválido!"); return; }
           result = await registerSale.mutateAsync({
             sellerId: sid, competitionId: cid, vehicleModel,
             vehiclePlate: vehiclePlate || undefined,
@@ -381,6 +386,7 @@ export default function RegisterSale() {
         case "fei":
           if (!feiCustomerName) { toast.error("Informe o nome do cliente!"); return; }
           if (!customerCpf) { toast.error("Informe o CPF do cliente!"); return; }
+          if (!isValidCpfCnpj(customerCpf)) { toast.error("CPF do cliente inválido!"); return; }
           if (!vehiclePlate) { toast.error("Informe a placa do veículo!"); return; }
           if (!bankName || !returnType) { toast.error("Informe o banco e o tipo de retorno!"); return; }
           result = await registerFei.mutateAsync({
@@ -397,6 +403,7 @@ export default function RegisterSale() {
         case "consignacao":
           if (!consignPlate || consignPlate.length < 6) { toast.error("Informe a placa do veículo!"); return; }
           if (!consignModel || !ownerName) { toast.error("Informe o modelo e o nome do dono!"); return; }
+          if (ownerPhone && !isValidBrazilianPhone(ownerPhone)) { toast.error("Telefone do proprietário inválido!"); return; }
           if (checkPlateMutation.data?.blocked) { toast.error(checkPlateMutation.data.message); return; }
           result = await registerConsignment.mutateAsync({
             sellerId: sid, competitionId: cid,
@@ -422,6 +429,8 @@ export default function RegisterSale() {
           break;
         case "pre_vendas":
           if (!customerName) { toast.error("Informe o nome do cliente!"); return; }
+          if (customerPhone && !isValidBrazilianPhone(customerPhone)) { toast.error("Telefone do cliente inválido!"); return; }
+          if (customerEmail && !isValidEmail(customerEmail)) { toast.error("E-mail do cliente inválido!"); return; }
           result = await registerSdr.mutateAsync({
             sellerId: sid, competitionId: cid,
             type: sdrType,
@@ -737,12 +746,12 @@ export default function RegisterSale() {
                       <Phone className="w-4 h-4 text-green-400" />
                       Telefone
                     </Label>
-                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(maskPhone(e.target.value))}
                       placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">CPF</Label>
-                    <Input value={saleCustomerCpf} onChange={e => setSaleCustomerCpf(e.target.value)}
+                    <Input value={saleCustomerCpf} onChange={e => setSaleCustomerCpf(maskCpfCnpj(e.target.value))}
                       placeholder="000.000.000-00" maxLength={14} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                 </div>
@@ -793,7 +802,7 @@ export default function RegisterSale() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">CPF do cliente *</Label>
-                    <Input value={customerCpf} onChange={e => setCustomerCpf(e.target.value)}
+                    <Input value={customerCpf} onChange={e => setCustomerCpf(maskCpfCnpj(e.target.value))}
                       placeholder="000.000.000-00" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">
@@ -897,7 +906,7 @@ export default function RegisterSale() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Telefone do proprietário</Label>
-                  <Input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)}
+                  <Input value={ownerPhone} onChange={e => setOwnerPhone(maskPhone(e.target.value))}
                     placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                 </div>
 
@@ -1003,7 +1012,7 @@ export default function RegisterSale() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">Telefone</Label>
-                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(maskPhone(e.target.value))}
                       placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">

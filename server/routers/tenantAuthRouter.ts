@@ -6,6 +6,7 @@ import { getSessionCookieOptions } from "../_core/cookies";
 import { ENV } from "../_core/env";
 import * as db from "../db";
 import * as crmDb from "../crmDb";
+import { getTenantLimits } from "../tenantService";
 
 type UnifiedLoginResult = {
   userType: "admin" | "manager" | "seller";
@@ -17,6 +18,9 @@ type UnifiedLoginResult = {
   mustChangePassword?: boolean;
   token?: string;
   redirectPath: string;
+  trialEndsAt: number | null;
+  trialExpired: boolean;
+  subscriptionSuspended: boolean;
 };
 
 export const tenantAuthRouter = router({
@@ -29,6 +33,13 @@ export const tenantAuthRouter = router({
     if (!ctx.tenantSlug || ctx.tenantId <= 0) {
       throw new Error("Loja não encontrada. Acesse pelo link da sua loja.");
     }
+
+    const limits = await getTenantLimits(ctx.tenantId);
+    const trialInfo = {
+      trialEndsAt: limits?.trialEndsAt ?? null,
+      trialExpired: limits?.trialExpired ?? false,
+      subscriptionSuspended: limits?.status === "suspended",
+    };
 
     const username = input.username.trim();
 
@@ -50,6 +61,7 @@ export const tenantAuthRouter = router({
           mustChangePassword: (admin as any).mustChangePassword || false,
           token,
           redirectPath: "/crm/admin",
+          ...trialInfo,
         };
       }
     }
@@ -72,6 +84,7 @@ export const tenantAuthRouter = router({
           name: manager.name,
           role: "manager",
           redirectPath: "/gerente",
+          ...trialInfo,
         };
       }
     }
@@ -105,6 +118,7 @@ export const tenantAuthRouter = router({
           department,
           sellerRole: seller.sellerRole || "vendedor",
           redirectPath,
+          ...trialInfo,
         };
       }
     }

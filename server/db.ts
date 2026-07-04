@@ -191,6 +191,16 @@ export async function getSellerByUsername(username: string) {
   return result[0];
 }
 
+export async function getSellerByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(sellers).where(and(
+    eq(sellers.tenantId, getCurrentTenantId()),
+    eq(sellers.email, email)
+  )).limit(1);
+  return result[0];
+}
+
 export async function updateSellerLastAccess(id: number) {
   const db = await getDb();
   if (!db) return;
@@ -1857,7 +1867,7 @@ export async function setAppSetting(key: string, value: string) {
 
 // ===== MANAGERS (Gerentes com login por senha) =====
 
-export async function createManager(data: { username: string; passwordHash: string; name: string }) {
+export async function createManager(data: { username: string; passwordHash: string; name: string; email?: string }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const tenantId = getCurrentTenantId();
@@ -1876,6 +1886,13 @@ export async function getManagerByUsername(username: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.select().from(managers).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.username, username))).limit(1);
+  return result[0] || null;
+}
+
+export async function getManagerByEmail(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.select().from(managers).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.email, email))).limit(1);
   return result[0] || null;
 }
 

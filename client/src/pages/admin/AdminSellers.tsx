@@ -10,6 +10,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Key, Shield, ShieldCheck, Eye, Edit3 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
+import { maskPhone } from "@/lib/masks";
+import { isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 
 const DEPARTMENTS = [
   { value: "vendas", label: "Vendas", color: "bg-blue-500/20 text-blue-400" },
@@ -142,6 +144,8 @@ export default function AdminSellers() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (form.phone && !isValidBrazilianPhone(form.phone)) { toast.error("Telefone inválido"); return; }
+    if (form.email && !isValidEmail(form.email)) { toast.error("E-mail inválido"); return; }
     if (editingSeller) {
       updateSeller.mutate({ id: editingSeller.id, ...form });
     } else {
@@ -254,7 +258,7 @@ export default function AdminSellers() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-foreground">Telefone</Label>
-                      <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(00) 00000-0000" className="bg-input border-border text-foreground" />
+                      <Input value={form.phone} onChange={e => setForm({ ...form, phone: maskPhone(e.target.value) })} placeholder="(00) 00000-0000" className="bg-input border-border text-foreground" />
                     </div>
                     <div>
                       <Label className="text-foreground">Email</Label>

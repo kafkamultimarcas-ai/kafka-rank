@@ -31,19 +31,49 @@ export async function getTenantBySlug(slug: string) {
   return tenant;
 }
 
+export async function getTenantById(tenantId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [tenant] = await db
+    .select({ id: tenants.id, name: tenants.name, slug: tenants.slug })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  return tenant || null;
+}
+
+/** Resolve o tenant dono de um customer do ASAAS — usado pelo webhook de pagamento,
+ * que não carrega nenhum token nosso, só o id do customer no payload. */
+export async function getTenantByAsaasCustomerId(asaasCustomerId: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [tenant] = await db
+    .select({ id: tenants.id, slug: tenants.slug })
+    .from(tenants)
+    .where(eq(tenants.asaasCustomerId, asaasCustomerId))
+    .limit(1);
+
+  return tenant || null;
+}
+
 export type TenantLimits = {
   enabledModules: string[];
   maxSellers: number;
   maxAdmins: number;
   plan: string;
   status: string;
+  trialEndsAt: number | null;
+  trialExpired: boolean;
 };
 
 const tenantLimitsCache = new Map<number, { data: TenantLimits; expiresAt: number }>();
 const LIMITS_CACHE_TTL = 60 * 1000;
 let defaultTenantCache: { tenantId: number; expiresAt: number } | null = null;
 
-/** Lê enabledModules/maxSellers/maxAdmins de um tenant, com cache curto (1min). */
+/** Lê enabledModules/maxSellers/maxAdmins/status de trial de um tenant, com cache curto (1min). */
 export async function getTenantLimits(tenantId: number): Promise<TenantLimits | null> {
   const cached = tenantLimitsCache.get(tenantId);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
@@ -58,6 +88,7 @@ export async function getTenantLimits(tenantId: number): Promise<TenantLimits | 
       maxAdmins: tenants.maxAdmins,
       plan: tenants.plan,
       status: tenants.status,
+      trialEndsAt: tenants.trialEndsAt,
     })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
@@ -72,12 +103,19 @@ export async function getTenantLimits(tenantId: number): Promise<TenantLimits | 
     enabledModules = [];
   }
 
+  // Só considera o trial expirado se a loja ainda estiver marcada como "trial" —
+  // se um admin já migrou o plano manualmente sem limpar trialEndsAt, não bloqueia
+  // por engano quem já é cliente pagante.
+  const trialExpired = tenant.status === "trial" && !!tenant.trialEndsAt && tenant.trialEndsAt < Date.now();
+
   const data: TenantLimits = {
     enabledModules,
     maxSellers: tenant.maxSellers,
     maxAdmins: tenant.maxAdmins,
     plan: tenant.plan,
     status: tenant.status,
+    trialEndsAt: tenant.trialEndsAt ?? null,
+    trialExpired,
   };
   tenantLimitsCache.set(tenantId, { data, expiresAt: Date.now() + LIMITS_CACHE_TTL });
   return data;

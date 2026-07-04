@@ -9,7 +9,12 @@ import * as zapi from "./zapi-service";
 import { sendPushNewLead, sendPushLeadTransferred } from "./pushService";
 import { createNotification } from "./db";
 import { withTenantAsync, getCurrentTenantId } from "./tenantDb";
-import { getTenantBySlug } from "./tenantService";
+import { getTenantBySlug, getTenantByAsaasCustomerId, clearTenantLimitsCache } from "./tenantService";
+import { ENV } from "./_core/env";
+import { subscriptionEvents, tenants } from "../drizzle/schema";
+import { PLAN_CONFIG, type PaidPlanId } from "../shared/plans";
+import { sendSubscriptionConfirmedEmail, sendSubscriptionSuspendedEmail } from "./emailService";
+import { getRequestOrigin } from "./_core/cookies";
 
 // ===== META GRAPH API HELPER =====
 async function fetchMetaLeadData(leadgenId: string, pageAccessToken: string): Promise<{ name: string; phone: string | null; email: string | null; fields: Record<string, string> } | null> {
@@ -1436,6 +1441,121 @@ export function registerWebhookRoutes(app: Express) {
       });
     } catch (err: any) {
       console.error("SIG inventory webhook error:", err);
+      res.status(500).json({ error: "Erro interno.", details: err.message });
+    }
+  });
+
+  // ===== ASAAS — PAGAMENTO/ASSINATURA DA PLATAFORMA =====
+  // Diferente dos outros webhooks deste arquivo: não é por-loja (não tem x-api-token
+  // por tenant), é UM webhook global da conta ASAAS da própria plataforma. O tenant é
+  // resolvido casando o `customer` do payload com `tenants.asaasCustomerId`. Validação
+  // de autenticidade é o header fixo `asaas-access-token` (definido ao cadastrar o
+  // webhook no painel do ASAAS) batendo com ASAAS_WEBHOOK_TOKEN.
+  app.post("/api/webhooks/asaas", async (req: Request, res: Response) => {
+    try {
+      if (!ENV.asaasWebhookToken) {
+        console.warn("[ASAAS webhook] ASAAS_WEBHOOK_TOKEN não configurado — rejeitando.");
+        res.status(503).json({ error: "Integração ASAAS não configurada." });
+        return;
+      }
+      const receivedToken = req.headers["asaas-access-token"] as string;
+      if (!receivedToken || receivedToken !== ENV.asaasWebhookToken) {
+        res.status(401).json({ error: "Token inválido." });
+        return;
+      }
+
+      const event: string = req.body?.event;
+      const payment = req.body?.payment;
+      if (!event || !payment?.customer) {
+        res.status(400).json({ error: "Payload inválido." });
+        return;
+      }
+
+      const db = await getDb();
+      if (!db) { res.status(503).json({ error: "DB indisponível." }); return; }
+
+      const tenant = await getTenantByAsaasCustomerId(payment.customer);
+      if (!tenant) {
+        // Não é erro do ASAAS — pode ser evento de teste/sandbox sem tenant nosso.
+        // Responder 200 pra não gerar retentativa infinita.
+        console.warn(`[ASAAS webhook] Nenhum tenant encontrado pro customer ${payment.customer}.`);
+        res.status(200).json({ received: true, ignored: true });
+        return;
+      }
+
+      await withTenantAsync(tenant.id, async () => {
+        // Idempotência: mesmo evento (mesma cobrança + mesmo tipo) não é reprocessado.
+        const [existing] = await db
+          .select({ id: subscriptionEvents.id })
+          .from(subscriptionEvents)
+          .where(and(
+            eq(subscriptionEvents.tenantId, tenant.id),
+            eq(subscriptionEvents.asaasPaymentId, payment.id),
+            eq(subscriptionEvents.eventType, event),
+          ))
+          .limit(1);
+
+        if (existing) {
+          res.status(200).json({ received: true, duplicate: true });
+          return;
+        }
+
+        await db.insert(subscriptionEvents).values({
+          tenantId: tenant.id,
+          eventType: event,
+          asaasPaymentId: payment.id,
+          asaasSubscriptionId: payment.subscription || null,
+          status: payment.status || null,
+          value: payment.value != null ? String(payment.value) : null,
+          billingType: payment.billingType || null,
+          dueDate: payment.dueDate ? new Date(payment.dueDate).getTime() : null,
+          paymentDate: payment.paymentDate ? new Date(payment.paymentDate).getTime() : null,
+          rawPayload: JSON.stringify(req.body),
+        });
+
+        // Transição de estado: só os dois eventos que realmente mudam se a loja tem
+        // acesso ou não. Os demais eventos ficam só no log, pra auditoria/visibilidade
+        // do Super Admin, sem ação automática (evita reagir errado a eventos raros).
+        if (event === "PAYMENT_CONFIRMED" || event === "PAYMENT_RECEIVED") {
+          const [currentTenant] = await db.select({ plan: tenants.plan, name: tenants.name, email: tenants.email }).from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
+          const plan = (currentTenant?.plan as PaidPlanId) in PLAN_CONFIG ? (currentTenant!.plan as PaidPlanId) : "basic";
+          const planConfig = PLAN_CONFIG[plan];
+          await db.update(tenants).set({
+            status: "active",
+            trialEndsAt: null,
+            maxSellers: planConfig.maxSellers,
+            maxAdmins: planConfig.maxAdmins,
+          }).where(eq(tenants.id, tenant.id));
+          clearTenantLimitsCache(tenant.id);
+
+          if (currentTenant?.email) {
+            await sendSubscriptionConfirmedEmail(currentTenant.email, currentTenant.name || "Kafka Rank", planConfig.name, tenant.id);
+          }
+          await createNotification({
+            sellerId: null, targetType: "admin", type: "subscription_confirmed",
+            title: "Assinatura confirmada", message: `Pagamento aprovado — plano ${planConfig.name} ativo.`,
+            actionUrl: "/assinatura",
+          } as any);
+        } else if (event === "PAYMENT_OVERDUE") {
+          const [currentTenant] = await db.select({ name: tenants.name, email: tenants.email }).from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
+          await db.update(tenants).set({ status: "suspended" }).where(eq(tenants.id, tenant.id));
+          clearTenantLimitsCache(tenant.id);
+
+          if (currentTenant?.email) {
+            const billingUrl = `${getRequestOrigin(req)}/t/${tenant.slug}/assinatura`;
+            await sendSubscriptionSuspendedEmail(currentTenant.email, currentTenant.name || "Kafka Rank", billingUrl, tenant.id);
+          }
+          await createNotification({
+            sellerId: null, targetType: "admin", type: "subscription_suspended",
+            title: "Assinatura em atraso", message: "Não identificamos o pagamento. Regularize pra reativar o acesso.",
+            actionUrl: "/assinatura",
+          } as any);
+        }
+
+        res.status(200).json({ received: true });
+      });
+    } catch (err: any) {
+      console.error("ASAAS webhook error:", err);
       res.status(500).json({ error: "Erro interno.", details: err.message });
     }
   });

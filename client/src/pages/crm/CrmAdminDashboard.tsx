@@ -15,11 +15,12 @@ import {
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
   CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2,
   Shuffle, ArrowRightLeft, Timer, Headphones, Target,
-  ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw
+  ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw,
+  Copy, EyeOff, Facebook, BookOpen
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
 import { useBranding } from "@/contexts/TenantContext";
-import { getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -45,6 +46,7 @@ type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "
 export default function CrmAdminDashboard() {
   const [, navigate] = useLocation();
   const { admin, isLoading, isAuthenticated, logout } = useAdminAuth();
+  const { name: brandName, logoUrl } = useBranding();
   const tenantSlug = getCurrentTenantSlug();
   const [activeView, setActiveView] = useState<AdminView>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -105,11 +107,14 @@ export default function CrmAdminDashboard() {
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-card shrink-0">
         <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary" />
-            <div>
-              <h1 className="text-sm font-bold text-foreground">CRM Gerente</h1>
-              <p className="text-[10px] text-muted-foreground">{admin?.name}</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src={logoUrl} alt={brandName} className="w-9 h-9 rounded-lg object-contain shrink-0 bg-background border border-border" />
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-foreground truncate" title={brandName}>{brandName}</h1>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Shield className="w-3 h-3 text-primary shrink-0" />
+                <span className="truncate">CRM Gerente · {admin?.name}</span>
+              </p>
             </div>
           </div>
         </div>
@@ -139,11 +144,11 @@ export default function CrmAdminDashboard() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col">
             <div className="p-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                <span className="text-sm font-bold text-foreground">CRM Gerente</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <img src={logoUrl} alt={brandName} className="w-7 h-7 rounded-lg object-contain shrink-0 bg-background border border-border" />
+                <span className="text-sm font-bold text-foreground truncate">{brandName}</span>
               </div>
-              <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+              <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5 text-muted-foreground shrink-0" /></button>
             </div>
             <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
               {menuItems.map((item, idx) => {
@@ -1781,6 +1786,7 @@ function getAdminRoleLabel(admin: any): { label: string; color: string } {
 }
 
 function SettingsView() {
+  const [, navigate] = useLocation();
   const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
@@ -2057,7 +2063,13 @@ function SettingsView() {
       <TenantSettingsPanel />
 
       <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-sm font-bold text-foreground mb-2">Integrações</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-bold text-foreground">Integrações</h3>
+          <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/crm/integracoes"))}
+            className="flex items-center gap-1 text-[10px] text-primary hover:underline">
+            <BookOpen className="w-3 h-3" /> Ver documentação completa
+          </button>
+        </div>
         <div className="space-y-2">
           <IntegrationItem name="WhatsApp Business API" status={zapiStatus?.connected ? "ativo" : "desconectado"} description="Envio/recepção de mensagens e disparos em massa" />
           {zapiStatus?.connected && (
@@ -2070,10 +2082,203 @@ function SettingsView() {
               </Button>
             </div>
           )}
-          <IntegrationItem name="SIG Web" status="pendente" description="Integre com seu sistema de gestão para sincronizar vendas" />
-          <IntegrationItem name="OLX / Webmotors" status="pendente" description="Receba leads automaticamente das plataformas de anúncio" />
+          <TokenIntegrationRow type="sig" name="SIG Web" description="Integre com seu sistema de gestão para sincronizar vendas e estoque" endpointLabel="Sincronização de vendas/estoque" endpointPath="/api/webhooks/sig/sale" />
+          <TokenIntegrationRow type="email_parser" name="OLX / Webmotors" description="Receba leads automaticamente das plataformas de anúncio (via encaminhamento de e-mail)" endpointLabel="Parser de e-mail" endpointPath="/api/webhooks/email-parser" />
         </div>
       </div>
+
+      <MetaIntegrationPanel />
+    </div>
+  );
+}
+
+// ===== TOKEN-BASED INTEGRATION ROW (SIG Web, OLX/Webmotors, etc — token gerado por loja) =====
+function TokenIntegrationRow({ type, name, description, endpointLabel, endpointPath }: {
+  type: string; name: string; description: string; endpointLabel: string; endpointPath: string;
+}) {
+  const utils = trpc.useUtils();
+  const { data: integrations } = trpc.crmIntegrations.list.useQuery();
+  const integration = integrations?.find(i => i.type === type);
+  const [expanded, setExpanded] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+
+  const create = trpc.crmIntegrations.create.useMutation({
+    onSuccess: () => { toast.success(`${name} ativado! Copie o token abaixo.`); utils.crmIntegrations.list.invalidate(); setExpanded(true); setShowToken(true); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const update = trpc.crmIntegrations.update.useMutation({
+    onSuccess: () => { utils.crmIntegrations.list.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const remove = trpc.crmIntegrations.delete.useMutation({
+    onSuccess: () => { toast.success("Integração removida."); utils.crmIntegrations.list.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const regenerate = trpc.crmIntegrations.regenerateToken.useMutation({
+    onSuccess: () => { toast.success("Token regenerado! Atualize a configuração na plataforma externa."); utils.crmIntegrations.list.invalidate(); setShowToken(true); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const webhookUrl = `${window.location.origin}${endpointPath}`;
+  const copy = (text: string, label: string) => { navigator.clipboard.writeText(text); toast.success(`${label} copiado!`); };
+
+  const status = !integration ? "pendente" : integration.active ? "ativo" : "inativo";
+  const statusStyle = status === "ativo" ? "bg-green-500/20 text-green-400" : status === "inativo" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400";
+
+  return (
+    <div className="rounded-lg bg-accent/30 border border-border overflow-hidden">
+      <button onClick={() => integration && setExpanded(!expanded)} className={`w-full flex items-center justify-between p-3 text-left ${integration ? "cursor-pointer hover:bg-accent/50" : ""}`}>
+        <div className="min-w-0">
+          <p className="text-sm text-foreground font-medium">{name}</p>
+          <p className="text-[10px] text-muted-foreground">{description}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[10px] px-2 py-0.5 rounded ${statusStyle}`}>{status}</span>
+          {integration && <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />}
+        </div>
+      </button>
+
+      {!integration && (
+        <div className="px-3 pb-3">
+          <Button size="sm" className="w-full" onClick={() => create.mutate({ type, name })} disabled={create.isPending}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            {create.isPending ? "Ativando..." : "Ativar Integração"}
+          </Button>
+        </div>
+      )}
+
+      {integration && expanded && (
+        <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">{endpointLabel} — URL do Webhook</label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] font-mono bg-background border border-border rounded px-2 py-1.5 truncate">{webhookUrl}</code>
+              <button onClick={() => copy(webhookUrl, "URL")} className="p-1.5 rounded hover:bg-accent shrink-0"><Copy className="w-3.5 h-3.5 text-muted-foreground" /></button>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Header <code>x-api-token</code></label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] font-mono bg-background border border-border rounded px-2 py-1.5 truncate">
+                {showToken ? integration.apiToken : "•".repeat(24)}
+              </code>
+              <button onClick={() => setShowToken(!showToken)} className="p-1.5 rounded hover:bg-accent shrink-0">
+                {showToken ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
+              </button>
+              <button onClick={() => copy(integration.apiToken || "", "Token")} className="p-1.5 rounded hover:bg-accent shrink-0"><Copy className="w-3.5 h-3.5 text-muted-foreground" /></button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Este token identifica a sua loja — não compartilhe com outras lojas.</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => update.mutate({ id: integration.id, active: !integration.active })} disabled={update.isPending}>
+              {integration.active ? "Desativar" : "Reativar"}
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => regenerate.mutate({ id: integration.id })} disabled={regenerate.isPending}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1" /> Regenerar Token
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs flex-1 text-destructive hover:text-destructive" onClick={() => { if (confirm(`Remover a integração ${name}? A URL configurada externamente vai parar de funcionar.`)) remove.mutate({ id: integration.id }); }} disabled={remove.isPending}>
+              <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== META ADS (FACEBOOK/INSTAGRAM LEAD ADS) — CONFIG AVANÇADA =====
+function MetaIntegrationPanel() {
+  const utils = trpc.useUtils();
+  const { data: config, refetch } = trpc.crmIntegrations.getMetaConfig.useQuery();
+  const saveConfig = trpc.crmIntegrations.saveMetaConfig.useMutation({
+    onSuccess: () => { toast.success("Configuração do Meta Ads salva!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const testConnection = trpc.crmIntegrations.testMetaConnection.useMutation({
+    onSuccess: (data: any) => { if (data.success) toast.success("Conexão com Meta Ads validada!"); else toast.error(data.error || "Falha na conexão"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const [expanded, setExpanded] = useState(false);
+  const [form, setForm] = useState({ appId: "", appSecret: "", pageAccessToken: "", verifyToken: "", pageId: "" });
+  const [initialized, setInitialized] = useState(false);
+
+  if (config && !initialized) {
+    setForm({ appId: config.appId || "", appSecret: "", pageAccessToken: "", verifyToken: config.verifyToken || "", pageId: config.pageId || "" });
+    setInitialized(true);
+  }
+
+  const isActive = !!(config?.hasAppSecret && config?.hasPageAccessToken);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? "bg-blue-500/20" : "bg-amber-500/20"}`}>
+            <Facebook className={`w-5 h-5 ${isActive ? "text-blue-400" : "text-amber-400"}`} />
+          </div>
+          <div className="text-left">
+            <h3 className="text-sm font-bold text-foreground">Meta Ads (Facebook/Instagram Lead Ads)</h3>
+            <p className="text-[10px] text-muted-foreground">Receba leads direto dos anúncios, sem precisar de Zapier/Make</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] px-2 py-0.5 rounded ${isActive ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
+            {isActive ? "Configurado" : "Pendente"}
+          </span>
+          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <p className="text-[11px] text-blue-300 leading-relaxed">
+              Crie um App em <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a>, conecte sua página e copie as credenciais abaixo. Veja o passo a passo completo na documentação de integrações.
+            </p>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">App ID</label>
+            <Input value={form.appId} onChange={e => setForm({ ...form, appId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 1234567890" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">App Secret</label>
+            <Input value={form.appSecret} type="password" onChange={e => setForm({ ...form, appSecret: e.target.value })}
+              placeholder={config?.hasAppSecret ? "***já configurado*** (deixe vazio para manter)" : "Cole o App Secret aqui"} className="h-9 text-sm font-mono" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Page Access Token</label>
+            <Input value={form.pageAccessToken} type="password" onChange={e => setForm({ ...form, pageAccessToken: e.target.value })}
+              placeholder={config?.hasPageAccessToken ? "***já configurado*** (deixe vazio para manter)" : "Cole o Page Access Token aqui"} className="h-9 text-sm font-mono" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Page ID</label>
+            <Input value={form.pageId} onChange={e => setForm({ ...form, pageId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 987654321" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Verify Token (você escolhe, usado na verificação do webhook)</label>
+            <Input value={form.verifyToken} onChange={e => setForm({ ...form, verifyToken: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: kafka-verify-123" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1" onClick={() => {
+              const updates: any = {};
+              if (form.appId) updates.appId = form.appId;
+              if (form.appSecret) updates.appSecret = form.appSecret;
+              if (form.pageAccessToken) updates.pageAccessToken = form.pageAccessToken;
+              if (form.verifyToken) updates.verifyToken = form.verifyToken;
+              if (form.pageId) updates.pageId = form.pageId;
+              if (Object.keys(updates).length === 0) { toast.error("Preencha pelo menos um campo"); return; }
+              saveConfig.mutate(updates);
+            }} disabled={saveConfig.isPending}>
+              <Save className="w-3.5 h-3.5 mr-1" />
+              {saveConfig.isPending ? "Salvando..." : "Salvar Credenciais"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => testConnection.mutate()} disabled={testConnection.isPending || !isActive}>
+              <Zap className="w-3.5 h-3.5 mr-1" />
+              {testConnection.isPending ? "Testando..." : "Testar Conexão"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2147,9 +2352,14 @@ function IntegrationItem({ name, status, description }: { name: string; status: 
 
 // ===== TENANT SETTINGS PANEL (Dados da Loja + Z-API) =====
 function TenantSettingsPanel() {
+  const utils = trpc.useUtils();
   const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
   const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
-    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); },
+    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const uploadLogo = trpc.crmPerformance.uploadTenantLogo.useMutation({
+    onSuccess: () => { toast.success("Logo atualizada!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const testZapi = trpc.crmPerformance.testZapiConnection.useMutation({
@@ -2159,6 +2369,19 @@ function TenantSettingsPanel() {
     },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Imagem muito grande. Máximo 3MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      uploadLogo.mutate({ base64, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [showZapi, setShowZapi] = useState(false);
   const [showStore, setShowStore] = useState(false);
@@ -2270,6 +2493,26 @@ function TenantSettingsPanel() {
         </button>
         {showStore && (
           <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Logo da Loja</label>
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-xl border border-border bg-background flex items-center justify-center overflow-hidden shrink-0">
+                  {settings?.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo da loja" className="w-full h-full object-contain" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-accent/30 hover:bg-accent/50 text-sm cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploadLogo.isPending ? "Enviando..." : "Enviar nova logo"}
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoChange} disabled={uploadLogo.isPending} />
+                  </label>
+                  <p className="text-[10px] text-muted-foreground mt-1">PNG, JPG, WEBP ou SVG. Máximo 3MB. Se não enviar, a logo padrão é exibida.</p>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Nome da Loja</label>

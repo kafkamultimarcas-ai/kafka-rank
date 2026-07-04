@@ -13,6 +13,7 @@ import * as zapi from "../zapi-service";
 import { sellers } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getCurrentTenantId } from "../tenantDb";
+import { getTenantLimits } from "../tenantService";
 
 // ===== HELPER: Notify seller via WhatsApp when they receive a new lead =====
 async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadPhone: string | null, source: string | null, vehicleInterest: string | null) {
@@ -96,18 +97,22 @@ export const adminAuthRouter = router({
     return { success: true };
   }),
 
-  me: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {
+  me: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input, ctx }) => {
     try {
       const payload = jwt.verify(input.token, ENV.cookieSecret) as any;
       if (payload.type !== "admin_auth") return null;
       const admin = await crmDb.getAdminById(payload.adminId);
       if (!admin || !admin.active) return null;
+      const limits = await getTenantLimits(ctx.tenantId);
       return {
         id: admin.id,
         name: admin.name,
         username: admin.username,
         role: admin.role,
         mustChangePassword: (admin as any).mustChangePassword || false,
+        trialEndsAt: limits?.trialEndsAt ?? null,
+        trialExpired: limits?.trialExpired ?? false,
+        subscriptionSuspended: limits?.status === "suspended",
       };
     } catch {
       return null;
@@ -2216,6 +2221,25 @@ export const crmPerformanceRouter = router({
       zapiClientToken: t.zapiClientToken ? '***configurado***' : '',
       hasZapi: !!(t.zapiInstanceId && t.zapiToken && t.zapiClientToken),
     };
+  }),
+
+  uploadTenantLogo: adminProcedure.input(z.object({
+    base64: z.string().max(4 * 1024 * 1024, 'Arquivo muito grande. Máximo 3MB.'),
+    mimeType: z.string(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB indisponível");
+    const tenantId = getCurrentTenantId();
+    const { tenants } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const ext = input.mimeType.split("/")[1] || "png";
+    const fileKey = `logo/${nanoid(8)}.${ext}`;
+    const buffer = Buffer.from(input.base64, "base64");
+    const { url, key } = await storagePut(fileKey, buffer, input.mimeType);
+    await dbConn.update(tenants).set({ logoUrl: url, logoKey: key }).where(eq(tenants.id, tenantId));
+    return { url };
   }),
 
   updateTenantSettings: adminProcedure.input(z.object({

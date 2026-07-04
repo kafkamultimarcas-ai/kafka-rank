@@ -6,8 +6,9 @@ import {
   Settings, LogOut, Eye, Edit, Trash2, Shield, Crown,
   Store, MapPin, Phone, Mail, Palette, Zap, BarChart3,
   ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle, EyeOff,
-  Key, RefreshCw
+  Key, RefreshCw, X
 } from "lucide-react";
+import { slugify, formatPhone, normalizeUsername, isValidEmail, getAvailabilityMessage } from "@/lib/tenantForm";
 
 // ===== AUTH STATE =====
 function useSuperAuth() {
@@ -130,51 +131,6 @@ function PlanBadge({ plan }: { plan: string }) {
       {plan.toUpperCase()}
     </span>
   );
-}
-
-function slugify(text: string) {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
-function formatPhone(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-
-  if (!digits) return "";
-  if (digits.length <= 2) return `(${digits}`;
-  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-}
-
-function normalizeUsername(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9._-]/g, "");
-}
-
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function getAvailabilityMessage(value: string, available: boolean, type: "slug" | "username") {
-  if (!value) return null;
-  if (available) {
-    return type === "slug"
-      ? "Slug disponível para uso."
-      : "Login disponível para o admin da loja.";
-  }
-
-  return type === "slug"
-    ? "Esse slug já está em uso por outra loja."
-    : "Esse login já está em uso. Escolha outro.";
 }
 
 // ===== CREATE TENANT MODAL =====
@@ -710,12 +666,189 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
   );
 }
 
+// ===== PLATFORM LOG DETAIL MODAL (e-mail ou assinatura) =====
+function PlatformLogDetailModal({ token, logType, logId, onClose }: { token: string; logType: "email" | "subscription"; logId: number; onClose: () => void }) {
+  const { data: log, isLoading } = trpc.platformLogs.getById.useQuery({ token, logType, id: logId });
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">Detalhe do log</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        {isLoading ? (
+          <div className="p-8 text-center text-gray-500 text-sm">Carregando...</div>
+        ) : !log ? (
+          <div className="p-8 text-center text-gray-500 text-sm">Log não encontrado.</div>
+        ) : log.logType === "email" ? (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><span className="text-gray-500 block">Loja</span><span className="text-white">{log.tenantName ? `${log.tenantName} (${log.tenantSlug})` : "—"}</span></div>
+              <div><span className="text-gray-500 block">Tipo</span><span className="text-white">{log.emailType}</span></div>
+              <div><span className="text-gray-500 block">Status</span><span className="text-white">{log.status}</span></div>
+              <div><span className="text-gray-500 block">Destinatário</span><span className="text-white">{log.toEmail}</span></div>
+              <div className="col-span-2"><span className="text-gray-500 block">Assunto</span><span className="text-white">{log.subject}</span></div>
+              <div><span className="text-gray-500 block">ID no provedor</span><span className="text-white">{log.providerId || "—"}</span></div>
+              <div><span className="text-gray-500 block">Enviado em</span><span className="text-white">{new Date(log.createdAt).toLocaleString("pt-BR")}</span></div>
+            </div>
+            {log.errorMessage && (
+              <div>
+                <span className="text-gray-500 text-xs block mb-1">Erro</span>
+                <p className="bg-black/40 border border-red-900 rounded-lg p-3 text-xs text-red-400">{log.errorMessage}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><span className="text-gray-500 block">Loja</span><span className="text-white">{log.tenantName} ({log.tenantSlug})</span></div>
+              <div><span className="text-gray-500 block">Evento</span><span className="text-white">{log.eventType}</span></div>
+              <div><span className="text-gray-500 block">Status</span><span className="text-white">{log.status || "—"}</span></div>
+              <div><span className="text-gray-500 block">Valor</span><span className="text-white">{log.value ? `R$ ${log.value}` : "—"}</span></div>
+              <div><span className="text-gray-500 block">Forma de pagamento</span><span className="text-white">{log.billingType || "—"}</span></div>
+              <div><span className="text-gray-500 block">Cobrança ASAAS</span><span className="text-white">{log.asaasPaymentId || "—"}</span></div>
+              <div><span className="text-gray-500 block">Vencimento</span><span className="text-white">{log.dueDate ? new Date(log.dueDate).toLocaleDateString("pt-BR") : "—"}</span></div>
+              <div><span className="text-gray-500 block">Recebido em</span><span className="text-white">{new Date(log.createdAt).toLocaleString("pt-BR")}</span></div>
+            </div>
+            <div>
+              <span className="text-gray-500 text-xs block mb-1">Payload cru</span>
+              <pre className="bg-black/40 border border-gray-800 rounded-lg p-3 text-[10px] text-gray-300 overflow-x-auto max-h-64 overflow-y-auto">
+                {log.rawPayload ? JSON.stringify(JSON.parse(log.rawPayload), null, 2) : "—"}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== PLATFORM LOGS SECTION (Super Admin) — e-mail + assinatura no mesmo lugar =====
+const LOG_TYPE_OPTIONS: { value: "" | "email" | "subscription"; label: string }[] = [
+  { value: "", label: "Todos os tipos" },
+  { value: "email", label: "E-mail" },
+  { value: "subscription", label: "Assinatura" },
+];
+const LOGS_PAGE_SIZE = 20;
+
+function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[] }) {
+  const [tenantFilter, setTenantFilter] = useState<string>("");
+  const [logTypeFilter, setLogTypeFilter] = useState<"" | "email" | "subscription">("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [page, setPage] = useState(0);
+  const [detail, setDetail] = useState<{ logType: "email" | "subscription"; id: number } | null>(null);
+
+  const { data, isLoading } = trpc.platformLogs.list.useQuery({
+    token,
+    tenantId: tenantFilter ? Number(tenantFilter) : undefined,
+    logType: logTypeFilter || undefined,
+    status: statusFilter || undefined,
+    startDate: startDate ? new Date(startDate).getTime() : undefined,
+    endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
+    limit: LOGS_PAGE_SIZE,
+    offset: page * LOGS_PAGE_SIZE,
+  });
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / LOGS_PAGE_SIZE)) : 1;
+
+  const selectClass = "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-red-500";
+  const resetPage = () => setPage(0);
+
+  return (
+    <div className="bg-gray-900/80 border border-gray-800 rounded-xl">
+      <div className="p-4 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Key className="w-5 h-5 text-red-500" /> Logs da Plataforma
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={tenantFilter} onChange={(e) => { setTenantFilter(e.target.value); resetPage(); }} className={selectClass}>
+            <option value="">Todas as lojas</option>
+            {tenants.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <select value={logTypeFilter} onChange={(e) => { setLogTypeFilter(e.target.value as any); resetPage(); }} className={selectClass}>
+            {LOG_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectClass}>
+            <option value="">Todos os status</option>
+            <option value="sent">E-mail: enviado</option>
+            <option value="failed">E-mail: falhou</option>
+            <option value="CONFIRMED">Assinatura: CONFIRMED</option>
+            <option value="RECEIVED">Assinatura: RECEIVED</option>
+            <option value="OVERDUE">Assinatura: OVERDUE</option>
+            <option value="PENDING">Assinatura: PENDING</option>
+          </select>
+          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); resetPage(); }} className={selectClass} title="Data início" />
+          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); resetPage(); }} className={selectClass} title="Data fim" />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="p-8 text-center text-gray-500 text-sm">Carregando...</div>
+      ) : !data || data.items.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          <Key className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Nenhum log encontrado com esses filtros.</p>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500 text-xs">
+                  <th className="text-left px-4 py-2 font-medium">Tipo</th>
+                  <th className="text-left px-4 py-2 font-medium">Loja</th>
+                  <th className="text-left px-4 py-2 font-medium">Evento</th>
+                  <th className="text-left px-4 py-2 font-medium">Detalhe</th>
+                  <th className="text-left px-4 py-2 font-medium">Status</th>
+                  <th className="text-left px-4 py-2 font-medium">Data</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {data.items.map((item: any) => (
+                  <tr key={`${item.logType}-${item.id}`} onClick={() => setDetail({ logType: item.logType, id: item.id })} className="hover:bg-gray-800/50 cursor-pointer transition-colors">
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${item.logType === "email" ? "bg-blue-500/15 text-blue-400" : "bg-purple-500/15 text-purple-400"}`}>
+                        {item.logType === "email" ? <Mail className="w-3 h-3" /> : <Key className="w-3 h-3" />}
+                        {item.logType === "email" ? "E-mail" : "Assinatura"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-white text-xs font-medium">{item.tenantName || "—"}</div>
+                      <div className="text-gray-500 text-[10px]">{item.tenantSlug}</div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-300 text-xs">{item.title}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{item.detail || "—"}</td>
+                    <td className="px-4 py-3 text-gray-300 text-xs">{item.status || "—"}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800">
+            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="text-xs text-gray-400 disabled:opacity-30 hover:text-white">← Anterior</button>
+            <span className="text-xs text-gray-500">Página {page + 1} de {totalPages} ({data.total} logs)</span>
+            <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="text-xs text-gray-400 disabled:opacity-30 hover:text-white">Próxima →</button>
+          </div>
+        </>
+      )}
+
+      {detail && <PlatformLogDetailModal token={token} logType={detail.logType} logId={detail.id} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
+
 // ===== MAIN DASHBOARD =====
 function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any; onLogout: () => void }) {
   const { data: dashboard, refetch } = trpc.superAdmin.dashboard.useQuery({ token });
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [activeSection, setActiveSection] = useState<"tenants" | "subscriptions">("tenants");
+  const { data: rareEvents } = trpc.platformLogs.getRareEventsCount.useQuery({ token }, { refetchInterval: 60000 });
 
   const filteredTenants = (dashboard?.tenants || []).filter((t: any) =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -738,6 +871,25 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <nav className="flex items-center gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1 mr-2">
+              <button
+                onClick={() => setActiveSection("tenants")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeSection === "tenants" ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                Lojas
+              </button>
+              <button
+                onClick={() => setActiveSection("subscriptions")}
+                className={`relative px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeSection === "subscriptions" ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                Logs
+                {!!rareEvents?.count && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
+                    {rareEvents.count}
+                  </span>
+                )}
+              </button>
+            </nav>
             <span className="text-sm text-gray-400">{admin?.name}</span>
             <button onClick={onLogout} className="text-gray-400 hover:text-red-400 transition-colors">
               <LogOut className="w-5 h-5" />
@@ -746,6 +898,11 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
         </div>
       </header>
 
+      {activeSection === "subscriptions" ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <PlatformLogsSection token={token} tenants={dashboard?.tenants || []} />
+        </div>
+      ) : (
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -874,6 +1031,7 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
           </div>
         </div>
       </div>
+      )}
 
       {/* Modals */}
       {showCreate && <CreateTenantModal token={token} onClose={() => setShowCreate(false)} onCreated={() => refetch()} />}

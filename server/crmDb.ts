@@ -26,6 +26,13 @@ export async function getAdminByUsername(username: string) {
   return rows[0] || null;
 }
 
+export async function getAdminByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(admins).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.email, email))).limit(1);
+  return rows[0] || null;
+}
+
 export async function getAdminById(id: number) {
   const db = await getDb();
   if (!db) return null;

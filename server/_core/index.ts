@@ -101,6 +101,30 @@ async function startServer() {
   app.use("/api/trpc/adminAuth.login", loginLimiter);
   app.use("/api/trpc/tenantAuth.login", loginLimiter);
 
+  // Rate limit pro "esqueci minha senha": 5 pedidos por hora por loja+IP — evita
+  // que alguém use o formulário pra floodar caixa de entrada de e-mail alheio.
+  const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitos pedidos de redefinição de senha. Tente novamente mais tarde." },
+    keyGenerator: tenantAwareKey,
+  });
+  app.use("/api/trpc/passwordReset.requestReset", passwordResetLimiter);
+
+  // Rate limit para cadastro self-service de loja: 5 por hora por IP (anti abuso —
+  // ainda não existe tenant nem CAPTCHA nesse ponto, só o honeypot do formulário)
+  const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hora
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitos cadastros a partir deste IP. Tente novamente mais tarde." },
+    keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? "unknown"),
+  });
+  app.use("/api/trpc/publicSignup.create", signupLimiter);
+
   // Rate limit para webhooks públicos: 30 por minuto por loja+IP (anti spam)
   const webhookLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -111,6 +135,19 @@ async function startServer() {
     keyGenerator: tenantAwareKey,
   });
   app.use("/api/webhooks/widget", webhookLimiter);
+
+  // Rate limit pro webhook do ASAAS: não é por loja (vem da conta da plataforma,
+  // não de um tenant específico), então é só por IP. Generoso o bastante pra não
+  // atrapalhar picos de retentativa do próprio ASAAS em caso de erro transitório.
+  const asaasWebhookLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Rate limit excedido." },
+    keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? "unknown"),
+  });
+  app.use("/api/webhooks/asaas", asaasWebhookLimiter);
 
   // Rate limit para uploads: 20 por minuto por IP
   const uploadLimiter = rateLimit({
@@ -197,6 +234,7 @@ async function startServer() {
     // Start inventory sync from kafkamultimarcas.com.br every 15 minutes
     import("../inventory-scraper").then(m => m.startInventorySync(15)).catch(e => console.error("[Inventory Sync] Failed to start:", e));
     import("../alert-checker").then(m => m.startAlertChecker(2)).catch(e => console.error("[Alert Checker] Failed to start:", e));
+    import("../trialReminderJob").then(m => m.startTrialReminderScheduler()).catch(e => console.error("[Trial Reminder] Failed to start:", e));
   });
 }
 

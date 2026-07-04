@@ -14,10 +14,12 @@ const BYPASS_ROUTES = [
   "/tv",
   "/admin",
   "/super-admin",
+  "/comercial",
+  "/assinatura",
 ];
 
 function isTenantBypassRoute(pathname: string): boolean {
-  return /^\/t\/[a-z0-9-]+\/(?:login|admin|crm|gerente|pos-venda|financeiro|minha-area)(?:\/|$)/i.test(pathname);
+  return /^\/t\/[a-z0-9-]+\/(?:login|admin|crm|gerente|pos-venda|financeiro|minha-area|assinatura|esqueci-senha|redefinir-senha)(?:\/|$)/i.test(pathname);
 }
 
 const DEPARTMENT_OPTIONS = [

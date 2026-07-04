@@ -188,10 +188,17 @@ describe("Multi-Tenant Super Admin", () => {
   });
 
   it("super admin login should use separate JWT secret", () => {
+    // A constante SUPER_SECRET foi extraída pra server/superAdminAuth.ts (reaproveitada
+    // também por subscriptionLogsRouter.ts) — o router só importa verifySuperToken/signSuperToken.
     const routerContent = fs.readFileSync(
       path.join(__dirname, "routers/superAdminRouter.ts"), "utf-8"
     );
-    expect(routerContent).toContain("SUPER_SECRET");
+    expect(routerContent).toContain("verifySuperToken");
+
+    const authContent = fs.readFileSync(
+      path.join(__dirname, "superAdminAuth.ts"), "utf-8"
+    );
+    expect(authContent).toContain("SUPER_SECRET");
   });
 
   it("super admin should use bcrypt for password hashing", () => {

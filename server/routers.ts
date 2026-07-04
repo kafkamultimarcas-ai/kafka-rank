@@ -14,6 +14,9 @@ const filenameSchema = z.string().max(255).regex(/^[a-zA-Z0-9._\-\s\u00C0-\u024F
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
+import { getTenantLimits, getTenantById } from "./tenantService";
+import { sendUserWelcomeEmail } from "./emailService";
+import { getRequestOrigin } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter, crmAiRouter, aiMetricsRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
@@ -27,6 +30,11 @@ import { managerMentorRouter } from "./routers/managerMentorRouter";
 import { superAdminRouter } from "./routers/superAdminRouter";
 import { tenantPublicRouter } from "./routers/tenantPublicRouter";
 import { tenantAuthRouter } from "./routers/tenantAuthRouter";
+import { passwordResetRouter } from "./routers/passwordResetRouter";
+import { publicSignupRouter } from "./routers/publicSignupRouter";
+import { billingRouter } from "./routers/billingRouter";
+import { subscriptionLogsRouter } from "./routers/subscriptionLogsRouter";
+import { platformLogsRouter } from "./routers/platformLogsRouter";
 import { vehicleCostRouter } from "./routers/vehicleCostRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
@@ -49,6 +57,11 @@ export const appRouter = router({
   fichas: fichaRouter,
   tenantPublic: tenantPublicRouter,
   tenantAuth: tenantAuthRouter,
+  passwordReset: passwordResetRouter,
+  publicSignup: publicSignupRouter,
+  billing: billingRouter,
+  subscriptionLogs: subscriptionLogsRouter,
+  platformLogs: platformLogsRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -72,8 +85,17 @@ export const appRouter = router({
       phone: z.string().optional(),
       email: z.string().optional(),
       department: z.string().optional(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
       const id = await db.createSeller(input);
+
+      if (input.email) {
+        const tenant = await getTenantById(ctx.tenantId);
+        if (tenant) {
+          const loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login`;
+          await sendUserWelcomeEmail(input.email, tenant.name, "vendedor", loginUrl, ctx.tenantId);
+        }
+      }
+
       return { id };
     }),
     update: adminProcedure.input(z.object({
@@ -199,7 +221,13 @@ export const appRouter = router({
               return null;
             }
             await db.updateSellerLastAccess(seller.id);
-            return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department, sellerRole: seller.sellerRole || 'vendedor' };
+            const limits = await getTenantLimits(ctx.tenantId);
+            return {
+              id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl,
+              department: seller.department, sellerRole: seller.sellerRole || 'vendedor',
+              trialEndsAt: limits?.trialEndsAt ?? null, trialExpired: limits?.trialExpired ?? false,
+              subscriptionSuspended: limits?.status === "suspended",
+            };
           }
         }
       } catch (e) {
@@ -2693,7 +2721,12 @@ export const appRouter = router({
       if (!ctx.user) return null;
       // Se o ID é negativo, é um gerente
       if (ctx.user.id < 0) {
-        return { id: -ctx.user.id, name: ctx.user.name, role: "manager" as const };
+        const limits = await getTenantLimits(ctx.tenantId);
+        return {
+          id: -ctx.user.id, name: ctx.user.name, role: "manager" as const,
+          trialEndsAt: limits?.trialEndsAt ?? null, trialExpired: limits?.trialExpired ?? false,
+          subscriptionSuspended: limits?.status === "suspended",
+        };
       }
       return null;
     }),
@@ -2707,11 +2740,21 @@ export const appRouter = router({
       username: z.string().min(3),
       password: z.string().min(4),
       name: z.string().min(1),
-    })).mutation(async ({ input }) => {
+      email: z.string().email().optional(),
+    })).mutation(async ({ input, ctx }) => {
       const existing = await db.getManagerByUsername(input.username);
       if (existing) throw new Error("Usuário já existe");
       const passwordHash = await bcrypt.hash(input.password, 10);
-      const id = await db.createManager({ username: input.username, passwordHash, name: input.name });
+      const id = await db.createManager({ username: input.username, passwordHash, name: input.name, email: input.email });
+
+      if (input.email) {
+        const tenant = await getTenantById(ctx.tenantId);
+        if (tenant) {
+          const loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login`;
+          await sendUserWelcomeEmail(input.email, tenant.name, "gerente", loginUrl, ctx.tenantId);
+        }
+      }
+
       return { id };
     }),
 

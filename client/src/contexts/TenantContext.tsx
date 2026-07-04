@@ -38,16 +38,26 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     if (typeof document === "undefined") return;
 
     const root = document.documentElement;
+    // Sobrescreve os tokens de tema (definidos em index.css) com a cor da loja, quando
+    // configurada. --primary/--secondary alimentam todas as classes utilitárias
+    // (bg-primary, text-primary etc via @theme inline), então isso já propaga para o
+    // app inteiro sem precisar tocar em cada componente.
     if (data?.primaryColor) {
-      root.style.setProperty("--tenant-primary", data.primaryColor);
+      root.style.setProperty("--primary", data.primaryColor);
+      root.style.setProperty("--ring", data.primaryColor);
+      root.style.setProperty("--sidebar-primary", data.primaryColor);
+      root.style.setProperty("--sidebar-ring", data.primaryColor);
     } else {
-      root.style.removeProperty("--tenant-primary");
+      root.style.removeProperty("--primary");
+      root.style.removeProperty("--ring");
+      root.style.removeProperty("--sidebar-primary");
+      root.style.removeProperty("--sidebar-ring");
     }
 
     if (data?.secondaryColor) {
-      root.style.setProperty("--tenant-secondary", data.secondaryColor);
+      root.style.setProperty("--secondary", data.secondaryColor);
     } else {
-      root.style.removeProperty("--tenant-secondary");
+      root.style.removeProperty("--secondary");
     }
 
     if (data?.name) {

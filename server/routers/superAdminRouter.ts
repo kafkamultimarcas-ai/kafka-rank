@@ -5,25 +5,11 @@ import { tenants, superAdmins, sellers, admins, sales, crmLeads, competitions, c
 import * as zapi from "../zapi-service";
 import { eq, sql, desc, and, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { getPublicTenantBySlug, clearTenantLimitsCache } from "../tenantService";
 import { encryptSecret } from "../_core/secretCrypto";
 import { clearCredentialsCache as clearZapiCredentialsCache } from "../zapi-service";
-
-// Super admin JWT secret (separate from regular auth)
-const SUPER_SECRET = process.env.JWT_SECRET ? process.env.JWT_SECRET + "_super" : "super_secret_key";
-
-function signSuperToken(adminId: number, role: string) {
-  return jwt.sign({ superAdminId: adminId, role }, SUPER_SECRET, { expiresIn: "24h" });
-}
-
-function verifySuperToken(token: string): { superAdminId: number; role: string } | null {
-  try {
-    return jwt.verify(token, SUPER_SECRET) as any;
-  } catch {
-    return null;
-  }
-}
+import { provisionTenant, checkSlugAndUsernameAvailability } from "../tenantProvisioning";
+import { signSuperToken, verifySuperToken } from "../superAdminAuth";
 
 export const superAdminRouter = router({
   // ========== AUTH ==========
@@ -149,95 +135,21 @@ export const superAdminRouter = router({
       const payload = verifySuperToken(input.token);
       if (!payload) throw new Error("Não autorizado");
 
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-
-      // Check slug uniqueness
-      const existing = await withRetry(() =>
-        db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, input.slug)).limit(1)
-      );
-      if ((existing as any[]).length > 0) throw new Error("Slug já existe. Escolha outro.");
-
-      // Create tenant
-      const allModules = JSON.stringify(["ranking", "crm", "financeiro", "pos_venda", "consignacao", "mesa_credito", "marketing", "estoque", "iam", "treinamentos", "competicoes", "mata_mata"]);
-      const trialEnds = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days trial
-
-      const [result] = await withRetry(() =>
-        db.insert(tenants).values({
-          name: input.name,
-          slug: input.slug,
-          phone: input.phone || "",
-          email: input.email || "",
-          city: input.city || "",
-          state: input.state || "",
-          address: input.address || "",
-          plan: input.plan,
-          maxSellers: input.maxSellers,
-          maxAdmins: input.maxAdmins,
-          enabledModules: allModules,
-          status: input.plan === "trial" ? "trial" : "active",
-          trialEndsAt: input.plan === "trial" ? trialEnds : null,
-        })
-      );
-
-      const tenantId = (result as any).insertId;
-
-      // Provisiona a linha de config do Atendente IA para esta loja (best-effort — a tabela
-      // não é rastreada pelo Drizzle, então só garantimos a coluna tenantId; os demais campos
-      // ficam com os defaults da tabela). Sem essa linha, a loja só herda os defaults do código
-      // até salvar suas próprias configurações pela primeira vez.
-      try {
-        const { sql } = await import("drizzle-orm");
-        await db.execute(sql`INSERT INTO crm_ai_global_config (tenantId) VALUES (${tenantId})`);
-      } catch (err) {
-        console.warn(`[SuperAdmin] Não foi possível pré-criar crm_ai_global_config para o tenant ${tenantId}:`, err);
-      }
-
-      // Create admin for the new tenant
-      const hash = await bcrypt.hash(input.adminPassword, 10);
-      await withRetry(() =>
-        db.insert(admins).values({
-          username: input.adminUsername,
-          passwordHash: hash,
-          name: input.adminName,
-          role: "owner",
-          active: true,
-          tenantId,
-        })
-      );
-
-      // Create default pipeline stages for the new tenant
-      const defaultStages = [
-        { department: "vendas", name: "Novo", displayOrder: 1, color: "#3B82F6", isDefault: true, isFinal: false },
-        { department: "vendas", name: "Contato", displayOrder: 2, color: "#F59E0B", isDefault: false, isFinal: false },
-        { department: "vendas", name: "Agendado", displayOrder: 3, color: "#8B5CF6", isDefault: false, isFinal: false },
-        { department: "vendas", name: "Negociação", displayOrder: 4, color: "#EC4899", isDefault: false, isFinal: false },
-        { department: "vendas", name: "Fechado", displayOrder: 5, color: "#10B981", isDefault: false, isFinal: true },
-      ];
-
-      for (const stage of defaultStages) {
-        await withRetry(() =>
-          db.insert(crmPipelineStages).values({ ...stage, tenantId } as any)
-        ).catch(() => {});
-      }
-
-      // Create default financial categories
-      const defaultCategories = [
-        { name: "Aluguel", type: "expense" as const, color: "#EF4444" },
-        { name: "Energia", type: "expense" as const, color: "#F59E0B" },
-        { name: "Água", type: "expense" as const, color: "#3B82F6" },
-        { name: "Internet", type: "expense" as const, color: "#8B5CF6" },
-        { name: "Salários", type: "expense" as const, color: "#EC4899" },
-        { name: "Comissões", type: "expense" as const, color: "#10B981" },
-        { name: "Venda de Veículo", type: "income" as const, color: "#22C55E" },
-        { name: "Financiamento", type: "income" as const, color: "#06B6D4" },
-      ];
-
-      for (const cat of defaultCategories) {
-        await withRetry(() =>
-          db.insert(finCategories).values({ ...cat, tenantId } as any)
-        ).catch(() => {});
-      }
+      const { tenantId } = await provisionTenant({
+        name: input.name,
+        slug: input.slug,
+        phone: input.phone,
+        email: input.email,
+        city: input.city,
+        state: input.state,
+        address: input.address,
+        plan: input.plan,
+        maxSellers: input.maxSellers,
+        maxAdmins: input.maxAdmins,
+        adminUsername: input.adminUsername,
+        adminPassword: input.adminPassword,
+        adminName: input.adminName,
+      });
 
       return { tenantId, slug: input.slug, message: `Loja "${input.name}" criada com sucesso!` };
     }),
@@ -253,38 +165,11 @@ export const superAdminRouter = router({
       const payload = verifySuperToken(input.token);
       if (!payload) throw new Error("Não autorizado");
 
-      const db = await getDb();
-      if (!db) throw new Error("Database not available");
-
-      const normalizedSlug = input.slug?.trim().toLowerCase();
-      const normalizedAdminUsername = input.adminUsername?.trim().toLowerCase();
-
-      let slugAvailable = true;
-      let adminUsernameAvailable = true;
-
-      if (normalizedSlug) {
-        const slugRows = await withRetry(() =>
-          db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, normalizedSlug)).limit(1)
-        );
-        slugAvailable = (slugRows as any[]).length === 0;
-      }
-
-      if (normalizedAdminUsername) {
-        const adminRows = await withRetry(() =>
-          db.select({ id: admins.id, tenantId: admins.tenantId })
-            .from(admins)
-            .where(eq(admins.username, normalizedAdminUsername))
-            .limit(1)
-        );
-
-        const existingAdmin = (adminRows as any[])?.[0];
-        adminUsernameAvailable = !existingAdmin || (input.tenantId !== undefined && existingAdmin.tenantId === input.tenantId);
-      }
-
-      return {
-        slug: normalizedSlug ? { value: normalizedSlug, available: slugAvailable } : null,
-        adminUsername: normalizedAdminUsername ? { value: normalizedAdminUsername, available: adminUsernameAvailable } : null,
-      };
+      return checkSlugAndUsernameAvailability({
+        slug: input.slug,
+        adminUsername: input.adminUsername,
+        tenantId: input.tenantId,
+      });
     }),
 
   updateTenant: publicProcedure

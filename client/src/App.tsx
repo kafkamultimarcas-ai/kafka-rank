@@ -6,6 +6,7 @@ import { TenantProvider } from "./contexts/TenantContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AccessGate from "./components/AccessGate";
 import LiveAlerts from "./components/LiveAlerts";
+import TrialExpiredGate from "./components/TrialExpiredGate";
 import { lazy, Suspense } from "react";
 import { Flag } from "lucide-react";
 
@@ -46,6 +47,8 @@ const RegisterSale = lazy(() => import("./pages/RegisterSale"));
 const TVMode = lazy(() => import("./pages/TVMode"));
 const MeusAgendamentos = lazy(() => import("./pages/MeusAgendamentos"));
 const SellerLogin = lazy(() => import("./pages/SellerLogin"));
+const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
+const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
 const MinhaArea = lazy(() => import("./pages/MinhaArea"));
 const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
@@ -57,6 +60,7 @@ const GerentePanel = lazy(() => import("./pages/GerentePanel"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
+const AssinaturaPage = lazy(() => import("./pages/Assinatura"));
 const CentralResultados = lazy(() => import("./pages/CentralResultados"));
 const AdminBonusVehicles = lazy(() => import("./pages/admin/AdminBonusVehicles"));
 const FinanceiroVendedores = lazy(() => import("./pages/admin/FinanceiroVendedores"));
@@ -70,6 +74,10 @@ const CrmPipeline = lazy(() => import("./pages/crm/CrmPipeline"));
 const CrmAdminLogin = lazy(() => import("./pages/crm/CrmAdminLogin"));
 const CrmAdminDashboard = lazy(() => import("./pages/crm/CrmAdminDashboard"));
 const IntegrationDocs = lazy(() => import("./pages/crm/IntegrationDocs"));
+const ComercialHome = lazy(() => import("./pages/public/ComercialHome"));
+const ComercialCadastro = lazy(() => import("./pages/public/ComercialCadastro"));
+const ComercialTermos = lazy(() => import("./pages/public/ComercialLegal").then(m => ({ default: m.ComercialTermos })));
+const ComercialPrivacidade = lazy(() => import("./pages/public/ComercialLegal").then(m => ({ default: m.ComercialPrivacidade })));
 
 function PageLoader() {
   return (
@@ -95,6 +103,8 @@ function Router() {
         <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
         <Route path="/login-vendedor" component={SellerLogin} />
         <Route path="/t/:slug/login" component={SellerLogin} />
+        <Route path="/t/:slug/esqueci-senha" component={EsqueciSenha} />
+        <Route path="/t/:slug/redefinir-senha" component={RedefinirSenha} />
         <Route path="/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/t/:slug/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/admin" component={AdminDashboard} />
@@ -159,6 +169,11 @@ function Router() {
         <Route path="/crm/admin" component={CrmAdminDashboard} />
         <Route path="/t/:slug/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
+        <Route path="/t/:slug/crm/integracoes" component={IntegrationDocs} />
+        <Route path="/comercial" component={ComercialHome} />
+        <Route path="/comercial/cadastro" component={ComercialCadastro} />
+        <Route path="/comercial/termos" component={ComercialTermos} />
+        <Route path="/comercial/privacidade" component={ComercialPrivacidade} />
         <Route path="/pos-venda" component={PosVenda} />
         <Route path="/t/:slug/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
@@ -170,6 +185,8 @@ function Router() {
         <Route path="/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/t/:slug/financeiro" component={FinanceiroPage} />
+        <Route path="/assinatura" component={AssinaturaPage} />
+        <Route path="/t/:slug/assinatura" component={AssinaturaPage} />
         <Route path="/feirao" component={RankingFeirao} />
         <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
         <Route path="/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
@@ -195,6 +212,7 @@ function App() {
               <LiveAlerts />
               <Router />
             </AccessGate>
+            <TrialExpiredGate />
           </TooltipProvider>
         </ThemeProvider>
       </TenantProvider>

@@ -337,6 +337,29 @@ export const notifications = mysqlTable("notifications", {
 }));
 
 export type Notification = typeof notifications.$inferSelect;
+
+// Log de todo e-mail transacional disparado pela plataforma (OTP, redefinição de
+// senha, boas-vindas de cadastro, confirmação/suspensão de assinatura...) — sem
+// tenantId obrigatório porque nem todo e-mail está ligado a uma loja resolvida
+// (ex: OTP de login acontece antes da sessão existir). Consumido pela tela de
+// logs do Super Admin junto com subscription_events (server/routers/platformLogsRouter.ts).
+export const emailLogs = mysqlTable("email_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId"),
+  emailType: varchar("emailType", { length: 50 }).notNull(),
+  toEmail: varchar("toEmail", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["sent", "failed"]).notNull(),
+  providerId: varchar("providerId", { length: 100 }),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_email_logs_tenant").on(table.tenantId),
+  typeIdx: index("idx_email_logs_type").on(table.emailType),
+}));
+
+export type EmailLog = typeof emailLogs.$inferSelect;
+export type InsertEmailLog = typeof emailLogs.$inferInsert;
 export type InsertNotification = typeof notifications.$inferInsert;
 
 // Configurações do app (código de acesso, etc.)
@@ -419,6 +442,7 @@ export const managers = mysqlTable("managers", {
   username: varchar("username", { length: 100 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -470,6 +494,27 @@ export const admins = mysqlTable("admins", {
 
 export type Admin = typeof admins.$inferSelect;
 export type InsertAdmin = typeof admins.$inferInsert;
+
+// Tokens de "esqueci minha senha" — um token bruto é gerado e mandado por
+// e-mail, só o hash SHA-256 dele fica salvo aqui (mesmo princípio de nunca
+// guardar segredo em texto puro que já vale pra passwordHash). userType+userId
+// aponta pra admin/manager/seller dentro do tenant.
+export const passwordResetTokens = mysqlTable("password_reset_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  userType: mysqlEnum("userType", ["admin", "manager", "seller"]).notNull(),
+  userId: int("userId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  expiresAt: bigint("expiresAt", { mode: "number" }).notNull(),
+  usedAt: bigint("usedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_password_reset_tokens_tenant").on(table.tenantId),
+  tokenHashIdx: uniqueIndex("idx_password_reset_tokens_hash").on(table.tokenHash),
+}));
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 
 // CRM Leads - clientes/prospects
 export const crmLeads = mysqlTable("crm_leads", {
@@ -575,6 +620,90 @@ export const aiAppointments = mysqlTable("ai_appointments", {
 
 export type AiAppointment = typeof aiAppointments.$inferSelect;
 export type InsertAiAppointment = typeof aiAppointments.$inferInsert;
+
+// Configuração global do Atendente IA/CRM por loja — uma linha por tenant,
+// criada no provisionamento (server/tenantProvisioning.ts). Manipulada via SQL
+// raw em vários lugares (ai-attendant.ts, crmRouter.ts, webhooks.ts,
+// inactive-dispatch.ts) — modelada aqui pra existir migration/tipo, mesmo sem
+// passar pelo query builder do Drizzle nesses pontos.
+export const crmAiGlobalConfig = mysqlTable("crm_ai_global_config", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1).unique(),
+
+  aiMode: varchar("aiMode", { length: 20 }).default("normal").notNull(),
+  feiraoConfig: text("feiraoConfig"),
+  normalConfig: text("normalConfig"),
+
+  autoReplyEnabled: boolean("autoReplyEnabled").default(true).notNull(),
+  workingHoursEnabled: boolean("workingHoursEnabled").default(false).notNull(),
+  workingHoursStart: int("workingHoursStart").default(8).notNull(),
+  workingHoursEnd: int("workingHoursEnd").default(20).notNull(),
+  maxMessagesEnabled: boolean("maxMessagesEnabled").default(false).notNull(),
+  maxMessagesPerLead: int("maxMessagesPerLead").default(20).notNull(),
+  personality: varchar("personality", { length: 20 }).default("amigavel").notNull(),
+
+  inactiveDispatchEnabled: boolean("inactiveDispatchEnabled").default(false).notNull(),
+  inactiveDispatchHours: int("inactiveDispatchHours").default(24).notNull(),
+  inactiveDispatchMessage: text("inactiveDispatchMessage"),
+  inactiveDispatchMaxPerDay: int("inactiveDispatchMaxPerDay").default(1).notNull(),
+  inactiveDispatchLastRun: bigint("inactiveDispatchLastRun", { mode: "number" }),
+
+  feiraoScheduleStart: bigint("feiraoScheduleStart", { mode: "number" }),
+  feiraoScheduleEnd: bigint("feiraoScheduleEnd", { mode: "number" }),
+  feiraoAutoSchedule: boolean("feiraoAutoSchedule").default(false).notNull(),
+
+  attendantEnabled: boolean("attendantEnabled").default(false).notNull(),
+  attendantMode: varchar("attendantMode", { length: 20 }).default("off_hours").notNull(),
+  attendantPrompt: text("attendantPrompt"),
+  attendantSchedule: text("attendantSchedule"),
+  attendantCollectData: boolean("attendantCollectData").default(true).notNull(),
+  attendantAutoSchedule: boolean("attendantAutoSchedule").default(true).notNull(),
+  attendantAutoFicha: boolean("attendantAutoFicha").default(true).notNull(),
+  attendantAutoDistribute: boolean("attendantAutoDistribute").default(true).notNull(),
+  attendantTankPromo: boolean("attendantTankPromo").default(true).notNull(),
+  attendantMaxMessages: int("attendantMaxMessages").default(0).notNull(),
+
+  updatedAt: bigint("updatedAt", { mode: "number" }),
+});
+
+export type CrmAiGlobalConfig = typeof crmAiGlobalConfig.$inferSelect;
+export type InsertCrmAiGlobalConfig = typeof crmAiGlobalConfig.$inferInsert;
+
+// Log de alterações na config do Atendente IA/CRM (quem mudou o quê e quando),
+// consumido por getAiConfigLog em crmRouter.ts.
+export const crmAiConfigLog = mysqlTable("crm_ai_config_log", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  adminId: int("adminId"),
+  adminName: varchar("adminName", { length: 255 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  field: varchar("field", { length: 100 }),
+  oldValue: text("oldValue"),
+  newValue: text("newValue"),
+  details: text("details"),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_crm_ai_config_log_tenant").on(table.tenantId),
+}));
+
+export type CrmAiConfigLog = typeof crmAiConfigLog.$inferSelect;
+export type InsertCrmAiConfigLog = typeof crmAiConfigLog.$inferInsert;
+
+// Log de disparo automático pra leads inativos (evita duplicar envio no mesmo
+// dia/janela), consumido por server/inactive-dispatch.ts.
+export const crmAiInactiveDispatchLog = mysqlTable("crm_ai_inactive_dispatch_log", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+  sentAt: bigint("sentAt", { mode: "number" }).notNull(),
+  message: text("message"),
+}, (table) => ({
+  tenantIdx: index("idx_crm_ai_inactive_dispatch_log_tenant").on(table.tenantId),
+  leadIdx: index("idx_crm_ai_inactive_dispatch_log_lead").on(table.leadId),
+}));
+
+export type CrmAiInactiveDispatchLog = typeof crmAiInactiveDispatchLog.$inferSelect;
+export type InsertCrmAiInactiveDispatchLog = typeof crmAiInactiveDispatchLog.$inferInsert;
 
 // CRM Pipeline Stages - etapas configuráveis por departamento
 export const crmPipelineStages = mysqlTable("crm_pipeline_stages", {
@@ -1364,8 +1493,12 @@ export const tenants = mysqlTable("tenants", {
   // Status
   status: mysqlEnum("tenant_status", ["active", "suspended", "cancelled", "trial"]).default("trial").notNull(),
   trialEndsAt: bigint("trialEndsAt", { mode: "number" }), // quando o trial expira
-  // Dados de pagamento/assinatura
-  subscriptionId: varchar("subscriptionId", { length: 255 }), // ID da assinatura (Stripe, etc.)
+  // Dias de aviso de trial já enviados (ex: "5,3") — idempotência do job diário
+  // de lembrete (server/trialReminderJob.ts), pra não mandar o mesmo aviso duas vezes.
+  trialReminderDaysSent: varchar("trialReminderDaysSent", { length: 50 }),
+  // Dados de pagamento/assinatura (ASAAS)
+  asaasCustomerId: varchar("asaasCustomerId", { length: 100 }), // ID do customer no ASAAS
+  subscriptionId: varchar("subscriptionId", { length: 255 }), // ID da assinatura no ASAAS
   monthlyPrice: int("monthlyPrice").default(0), // preço mensal em centavos
   // Timestamps
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1373,6 +1506,29 @@ export const tenants = mysqlTable("tenants", {
 });
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = typeof tenants.$inferInsert;
+
+// Log de eventos de assinatura/pagamento da loja com a PLATAFORMA (via ASAAS) —
+// não confundir com fin_transactions, que é o financeiro interno de cada loja com
+// os próprios clientes dela. Alimentado pelo webhook do ASAAS + ações manuais.
+export const subscriptionEvents = mysqlTable("subscription_events", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull(),
+  eventType: varchar("eventType", { length: 100 }).notNull(), // ex: PAYMENT_CONFIRMED, PAYMENT_OVERDUE
+  asaasPaymentId: varchar("asaasPaymentId", { length: 100 }), // id da cobrança no ASAAS (idempotência)
+  asaasSubscriptionId: varchar("asaasSubscriptionId", { length: 100 }),
+  status: varchar("status", { length: 50 }), // status da cobrança no momento do evento
+  value: decimal("value", { precision: 12, scale: 2 }),
+  billingType: varchar("billingType", { length: 30 }), // BOLETO, PIX, CREDIT_CARD
+  dueDate: bigint("dueDate", { mode: "number" }),
+  paymentDate: bigint("paymentDate", { mode: "number" }),
+  rawPayload: text("rawPayload"), // JSON cru do webhook, pra auditoria/debug
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_subscription_events_tenant").on(table.tenantId),
+  paymentIdx: index("idx_subscription_events_payment").on(table.asaasPaymentId),
+}));
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+export type InsertSubscriptionEvent = typeof subscriptionEvents.$inferInsert;
 
 // Super Admins - acesso ao portal master (gerencia todas as lojas)
 export const superAdmins = mysqlTable("super_admins", {

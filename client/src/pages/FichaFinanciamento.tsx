@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Link, useLocation } from "wouter";
+import { maskCpfCnpj, maskPhone } from "@/lib/masks";
+import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 import {
   ArrowLeft, Car, User, FileText, Phone, Mail, MapPin, Briefcase, Users,
   Camera, CheckCircle2, Loader2, CreditCard, Building2, Upload, ChevronDown, ChevronUp
@@ -114,6 +116,10 @@ export default function FichaFinanciamento() {
     if (!sellerId) { toast.error("Selecione o vendedor!"); return; }
     if (!nomeCompleto) { toast.error("Informe o nome do cliente!"); return; }
     if (!cpf) { toast.error("Informe o CPF!"); return; }
+    if (!isValidCpfCnpj(cpf)) { toast.error("CPF inválido!"); return; }
+    if (email && !isValidEmail(email)) { toast.error("E-mail inválido!"); return; }
+    if (telefone && !isValidBrazilianPhone(telefone)) { toast.error("Telefone inválido!"); return; }
+    if (referenciaTelefone && !isValidBrazilianPhone(referenciaTelefone)) { toast.error("Telefone da referência inválido!"); return; }
 
     try {
       const result = await createFicha.mutateAsync({
@@ -280,7 +286,7 @@ export default function FichaFinanciamento() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-gray-300 text-sm font-semibold">CPF *</Label>
-              <Input value={cpf} onChange={e => setCpf(e.target.value)}
+              <Input value={cpf} onChange={e => setCpf(maskCpfCnpj(e.target.value))}
                 placeholder="000.000.000-00" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
             </div>
             <div className="space-y-2">
@@ -333,7 +339,7 @@ export default function FichaFinanciamento() {
               <Label className="text-gray-300 text-sm font-semibold flex items-center gap-1">
                 <Phone className="w-3 h-3" /> Telefone
               </Label>
-              <Input value={telefone} onChange={e => setTelefone(e.target.value)}
+              <Input value={telefone} onChange={e => setTelefone(maskPhone(e.target.value))}
                 placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
             </div>
             <div className="space-y-2">
@@ -392,7 +398,7 @@ export default function FichaFinanciamento() {
             </div>
             <div className="space-y-2">
               <Label className="text-gray-300 text-sm font-semibold">Telefone</Label>
-              <Input value={referenciaTelefone} onChange={e => setReferenciaTelefone(e.target.value)}
+              <Input value={referenciaTelefone} onChange={e => setReferenciaTelefone(maskPhone(e.target.value))}
                 placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
             </div>
           </div>
