@@ -2306,3 +2306,7 @@
 - [x] Cards clicáveis no Admin Vendas (total, aprovadas, pendentes → expandir lista)
 - [x] Cards clicáveis na MinhaArea (resumo do setor → expandir detalhes)
 - [x] Varredura geral de usabilidade: facilitar navegação e acesso rápido
+
+## Bugs Reportados (01/07/2026)
+- [ ] Tela de competição não aparece para o vendedor logado (dev)
+- [ ] Varredura geral de bugs no sistema
