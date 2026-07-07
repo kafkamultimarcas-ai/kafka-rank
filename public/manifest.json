@@ -1,0 +1,16 @@
+{
+  "name": "Kafka Rank",
+  "short_name": "Kafka Rank",
+  "description": "Kafka Rank - competição e operação comercial por loja",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#e8461c",
+  "icons": [
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-EnFS9DEmks7vQ4SZGVGZXb.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

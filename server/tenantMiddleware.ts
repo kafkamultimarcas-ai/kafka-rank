@@ -1,83 +1,192 @@
 /**
  * Multi-Tenant Middleware
- * 
- * Resolves tenantId from the authenticated user and injects it into the tRPC context.
- * Also provides a tenant-scoped database proxy that automatically filters all queries.
- * 
- * ARCHITECTURE:
- * - Every user (seller, manager, admin, OAuth owner) belongs to a tenant
- * - The tenantId is resolved from the user's record in the database
- * - A MySQL session variable `@tenantId` is set for every request
- * - All queries are automatically filtered by tenantId using MySQL views (future)
- * - For now, we use a runtime proxy that wraps getDb() to inject WHERE clauses
+ *
+ * Resolves tenant context from the request boundary first and falls back to the
+ * authenticated user only when no explicit tenant slug is available.
  */
 
-import { getDb } from "./db";
-import { sellers, managers, admins, users } from "../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
+import { admins, managers, sellers, users } from "../drizzle/schema";
+import { getDb } from "./db";
+import { getDefaultTenantId, getTenantBySlug } from "./tenantService";
+import type { AuthActor } from "./_core/context";
 
-// In-memory cache: openId/loginKey → tenantId (expires after 5 min)
 const tenantCache = new Map<string, { tenantId: number; expiresAt: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const tenantSlugCache = new Map<string, { tenantId: number; slug: string; expiresAt: number }>();
+const CACHE_TTL = 5 * 60 * 1000;
+
+export type TenantResolutionSource = "slug_header" | "path" | "referer" | "user" | "default";
+
+export type TenantResolution = {
+  tenantId: number;
+  tenantSlug: string | null;
+  source: TenantResolutionSource;
+};
+
+export function extractTenantSlugFromPathname(pathname: string | undefined | null): string | null {
+  if (!pathname) return null;
+
+  const appMatch = pathname.match(/^\/t\/([a-z0-9-]+)(?:\/|$)/i);
+  if (appMatch?.[1]) {
+    return appMatch[1].toLowerCase();
+  }
+
+  const apiMatch = pathname.match(/^\/api\/t\/([a-z0-9-]+)(?:\/|$)/i);
+  if (apiMatch?.[1]) {
+    return apiMatch[1].toLowerCase();
+  }
+
+  return null;
+}
+
+export function extractTenantSlugFromRequest(req: {
+  headers?: Record<string, unknown>;
+  originalUrl?: string;
+  url?: string;
+}): string | null {
+  const rawHeader = req.headers?.["x-tenant-slug"];
+  const headerSlug = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+  if (typeof headerSlug === "string" && headerSlug.trim()) {
+    return headerSlug.trim().toLowerCase();
+  }
+
+  const pathnameSlug = extractTenantSlugFromPathname(req.originalUrl || req.url);
+  if (pathnameSlug) return pathnameSlug;
+
+  const rawReferer = req.headers?.referer;
+  const referer = Array.isArray(rawReferer) ? rawReferer[0] : rawReferer;
+  if (typeof referer === "string" && referer.trim()) {
+    try {
+      return extractTenantSlugFromPathname(new URL(referer).pathname);
+    } catch {
+      return extractTenantSlugFromPathname(referer);
+    }
+  }
+
+  return null;
+}
+
+async function resolveTenantBySlugCached(slug: string): Promise<{ tenantId: number; slug: string } | null> {
+  const normalizedSlug = slug.trim().toLowerCase();
+  const cached = tenantSlugCache.get(normalizedSlug);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { tenantId: cached.tenantId, slug: cached.slug };
+  }
+
+  const tenant = await getTenantBySlug(normalizedSlug);
+  if (!tenant) return null;
+
+  const resolved = { tenantId: tenant.id, slug: tenant.slug };
+  tenantSlugCache.set(normalizedSlug, { ...resolved, expiresAt: Date.now() + CACHE_TTL });
+  return resolved;
+}
 
 /**
  * Resolve tenantId from user context.
- * Returns 1 (Kafka default) if tenant cannot be determined.
+ * Falls back to the first active tenant only for legacy routes without slug.
  */
-export async function resolveTenantId(user: any): Promise<number> {
-  if (!user) return 1;
+export async function resolveTenantId(user: AuthActor | null): Promise<number> {
+  if (!user) return getDefaultTenantId();
 
-  // Build cache key
-  const cacheKey = `${user.openId || ''}_${user.id || ''}`;
+  const cacheKey = `${user.openId || ""}_${user.id || ""}`;
   const cached = tenantCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.tenantId;
   }
 
   const db = await getDb();
-  if (!db) return 1;
+  if (!db) return getDefaultTenantId();
 
-  let tenantId = 1;
+  let tenantId = await getDefaultTenantId();
 
   try {
-    // Seller login (id < -1000000)
-    if (user.id < -1000000) {
-      const sellerId = -(user.id + 1000000);
-      const [seller] = await db.select({ tenantId: sellers.tenantId }).from(sellers).where(eq(sellers.id, sellerId)).limit(1);
+    if (user.actorType === "seller") {
+      const [seller] = await db
+        .select({ tenantId: sellers.tenantId })
+        .from(sellers)
+        .where(eq(sellers.id, user.id))
+        .limit(1);
       if (seller) tenantId = seller.tenantId;
-    }
-    // CRM Admin login (id < -2000000) — check this before manager since range overlaps
-    else if (user.loginMethod === 'crm_admin') {
-      const adminId = -(user.id + 2000000);
-      const [admin] = await db.select({ tenantId: admins.tenantId }).from(admins).where(eq(admins.id, adminId)).limit(1);
+    } else if (user.actorType === "crm_admin") {
+      const [admin] = await db
+        .select({ tenantId: admins.tenantId })
+        .from(admins)
+        .where(eq(admins.id, user.id))
+        .limit(1);
       if (admin) tenantId = admin.tenantId;
-    }
-    // Manager login (id < 0 and id > -1000000)
-    else if (user.id < 0 && user.id > -1000000) {
-      const managerId = -user.id;
-      const [manager] = await db.select({ tenantId: managers.tenantId }).from(managers).where(eq(managers.id, managerId)).limit(1);
+    } else if (user.actorType === "manager") {
+      const [manager] = await db
+        .select({ tenantId: managers.tenantId })
+        .from(managers)
+        .where(eq(managers.id, user.id))
+        .limit(1);
       if (manager) tenantId = manager.tenantId;
-    }
-    // OAuth owner - check users table
-    else if (user.openId) {
-      const [u] = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.openId, user.openId)).limit(1);
-      if (u) tenantId = u.tenantId;
+    } else if (user.actorType === "oauth" && user.openId) {
+      const [oauthUser] = await db
+        .select({ tenantId: users.tenantId })
+        .from(users)
+        .where(eq(users.openId, user.openId))
+        .limit(1);
+      if (oauthUser) tenantId = oauthUser.tenantId;
     }
   } catch (err) {
-    console.warn("[Tenant] Failed to resolve tenantId, defaulting to 1:", err);
-    tenantId = 1;
+    console.warn("[Tenant] Failed to resolve tenantId, using legacy fallback tenant:", err);
+    tenantId = await getDefaultTenantId();
   }
 
-  // Cache result
   tenantCache.set(cacheKey, { tenantId, expiresAt: Date.now() + CACHE_TTL });
-
   return tenantId;
 }
 
-/**
- * Set the MySQL session variable @tenantId for the current connection.
- * This can be used by MySQL views or triggers for automatic filtering.
- */
+export async function resolveTenantContext(
+  req: { headers?: Record<string, unknown>; originalUrl?: string; url?: string },
+  user: AuthActor | null
+): Promise<TenantResolution> {
+  const requestedSlug = extractTenantSlugFromRequest(req);
+  if (requestedSlug) {
+    const tenant = await resolveTenantBySlugCached(requestedSlug);
+    if (tenant) {
+      const source: TenantResolutionSource = req.headers?.["x-tenant-slug"]
+        ? "slug_header"
+        : extractTenantSlugFromPathname(req.originalUrl || req.url)
+          ? "path"
+          : "referer";
+
+      return {
+        tenantId: tenant.tenantId,
+        tenantSlug: tenant.slug,
+        source,
+      };
+    }
+
+    const source: TenantResolutionSource = req.headers?.["x-tenant-slug"]
+      ? "slug_header"
+      : extractTenantSlugFromPathname(req.originalUrl || req.url)
+        ? "path"
+        : "referer";
+
+    return {
+      tenantId: -1,
+      tenantSlug: requestedSlug,
+      source,
+    };
+  }
+
+  if (user) {
+    return {
+      tenantId: await resolveTenantId(user),
+      tenantSlug: null,
+      source: "user",
+    };
+  }
+
+  return {
+    tenantId: await getDefaultTenantId(),
+    tenantSlug: null,
+    source: "default",
+  };
+}
+
 export async function setTenantSession(tenantId: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
@@ -88,9 +197,17 @@ export async function setTenantSession(tenantId: number): Promise<void> {
   }
 }
 
-/**
- * Clear the tenant cache (useful for testing)
- */
 export function clearTenantCache() {
   tenantCache.clear();
+  tenantSlugCache.clear();
+}
+
+/**
+ * Valida se o tenantId embutido em um token/sessão bate com o tenant resolvido
+ * para a request atual (via URL/slug). Tokens legados sem tenantId (emitidos antes
+ * dessa checagem existir) são tolerados até expirarem naturalmente.
+ */
+export function assertTenantMatch(tokenTenantId: number | null | undefined, requestTenantId: number): boolean {
+  if (tokenTenantId === null || tokenTenantId === undefined) return true;
+  return tokenTenantId === requestTenantId;
 }

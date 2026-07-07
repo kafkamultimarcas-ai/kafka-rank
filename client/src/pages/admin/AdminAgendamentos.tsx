@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { exportAgendamentosPDF } from "@/lib/pdfExport";
 import DispatchAgendamentos from "./DispatchAgendamentos";
+import { useBranding } from "@/contexts/TenantContext";
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
@@ -31,6 +32,7 @@ const ATTENDANCE_LABELS: Record<string, { label: string; color: string; icon: an
 type TabType = "todos" | "pendentes" | "resgate";
 
 export default function AdminAgendamentos() {
+  const { name: brandName } = useBranding();
   const [tab, setTab] = useState<TabType>("todos");
   const [search, setSearch] = useState("");
   const [sellerFilter, setSellerFilter] = useState<number | "all">("all");
@@ -237,6 +239,7 @@ function formatDateShort(ts: number | string | Date | null) {
       records: rescueAndActive,
       sellerMap,
       title: "Relatório de Agendamentos",
+      brandName,
     });
     if (success) toast.success("PDF baixado com sucesso!");
   }

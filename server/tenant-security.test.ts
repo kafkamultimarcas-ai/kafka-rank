@@ -138,7 +138,7 @@ describe("Multi-Tenant Context & Middleware", () => {
       path.join(__dirname, "_core/context.ts"), "utf-8"
     );
     expect(contextContent).toContain("tenantId");
-    expect(contextContent).toContain("resolveTenantId");
+    expect(contextContent).toContain("resolveTenantContext");
   });
 
   it("trpc.ts should have tenant middleware with AsyncLocalStorage", () => {
@@ -155,6 +155,7 @@ describe("Multi-Tenant Context & Middleware", () => {
       path.join(__dirname, "_core/context.ts"), "utf-8"
     );
     expect(contextContent).toContain("tenantId: number");
+    expect(contextContent).toContain("tenantSlug: string | null");
   });
 
   it("tenantDb.ts should export getCurrentTenantId function", () => {
@@ -170,6 +171,8 @@ describe("Multi-Tenant Context & Middleware", () => {
       path.join(__dirname, "tenantMiddleware.ts"), "utf-8"
     );
     expect(tenantMiddlewareContent).toContain("export async function resolveTenantId");
+    expect(tenantMiddlewareContent).toContain("extractTenantSlugFromRequest");
+    expect(tenantMiddlewareContent).toContain("resolveTenantContext");
   });
 });
 
@@ -185,10 +188,17 @@ describe("Multi-Tenant Super Admin", () => {
   });
 
   it("super admin login should use separate JWT secret", () => {
+    // A constante SUPER_SECRET foi extraída pra server/superAdminAuth.ts (reaproveitada
+    // também por subscriptionLogsRouter.ts) — o router só importa verifySuperToken/signSuperToken.
     const routerContent = fs.readFileSync(
       path.join(__dirname, "routers/superAdminRouter.ts"), "utf-8"
     );
-    expect(routerContent).toContain("SUPER_SECRET");
+    expect(routerContent).toContain("verifySuperToken");
+
+    const authContent = fs.readFileSync(
+      path.join(__dirname, "superAdminAuth.ts"), "utf-8"
+    );
+    expect(authContent).toContain("SUPER_SECRET");
   });
 
   it("super admin should use bcrypt for password hashing", () => {

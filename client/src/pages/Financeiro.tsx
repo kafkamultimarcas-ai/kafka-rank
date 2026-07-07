@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
   aberto: { label: "Aberto", color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/40", emoji: "🔵" },
@@ -42,6 +41,7 @@ function formatCurrency(value: string | number) {
 type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios";
 
 export default function Financeiro() {
+  const { logoUrl } = useBranding();
   const [, navigate] = useLocation();
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
   const { data: sellerSession } = trpc.sellers.me.useQuery();
@@ -81,7 +81,7 @@ export default function Financeiro() {
             >
               <LogOut className="h-3.5 w-3.5" /> Sair
             </button>
-            <img src={LOGO_URL} alt="Kafka" className="h-7 w-7 rounded-lg" />
+            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
           </div>
         </div>
       </header>
@@ -827,6 +827,7 @@ function ContasTab() {
 
 // ===== RELATÓRIOS TAB =====
 function RelatoriosTab() {
+  const { name: brandName } = useBranding();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -958,7 +959,7 @@ function RelatoriosTab() {
         </tr>`).join("")}
       </table>
       
-      <p style="margin-top:40px;text-align:center;color:#999;font-size:11px;">Kafka Rank — Sistema de Gestão</p>
+      <p style="margin-top:40px;text-align:center;color:#999;font-size:11px;">${brandName} — Sistema de Gestão</p>
       </body></html>
     `;
     const printWindow = window.open("", "_blank");

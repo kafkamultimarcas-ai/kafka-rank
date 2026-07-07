@@ -4,8 +4,7 @@ import { ArrowLeft, Trophy, Zap, Target, Award, Swords, Crown, Shield, Flame, Ca
 import { Button } from "@/components/ui/button";
 import { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 const CAR_COLORS = [
   "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6",
@@ -217,6 +216,7 @@ function RaceCar({ seller, points, maxPoints, rank, color, animate }: {
 
 // ===== MAIN COMPONENT =====
 export default function RaceTrack() {
+  const { logoUrl } = useBranding();
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const competitionId = parseInt(params.id || "0");
@@ -350,7 +350,7 @@ export default function RaceTrack() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <img src={LOGO_URL} alt="" className="h-7 w-7 rounded shrink-0" />
+            <img src={logoUrl} alt="" className="h-7 w-7 rounded shrink-0" />
             <div className="min-w-0">
               <h1 className="font-heading font-bold text-sm text-foreground truncate">{competition.name}</h1>
               <p className="text-[10px] text-muted-foreground">

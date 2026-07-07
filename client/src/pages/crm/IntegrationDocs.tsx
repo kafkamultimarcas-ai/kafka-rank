@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 import {
   ArrowLeft, Copy, ExternalLink, Globe, Instagram, Facebook,
   Mail, MessageCircle, Webhook, Code, FileText, ChevronDown, ChevronRight,
-  Zap, Target, CheckCircle2
+  Zap, Target, CheckCircle2, Database, Eye, EyeOff
 } from "lucide-react";
 
 const API_BASE = window.location.origin;
@@ -48,13 +50,18 @@ function Section({ title, icon: Icon, color, children, defaultOpen = false }: {
 
 export default function IntegrationDocs() {
   const [, navigate] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
+  const { data: integrations } = trpc.crmIntegrations.list.useQuery();
+  const [revealedId, setRevealedId] = useState<number | null>(null);
+
+  const copy = (text: string, label: string) => { navigator.clipboard.writeText(text); toast.success(`${label} copiado!`); };
 
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => navigate("/crm/admin")} className="p-1.5 hover:bg-accent rounded-lg">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, "/crm/admin"))} className="p-1.5 hover:bg-accent rounded-lg">
             <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
           <div>
@@ -65,6 +72,27 @@ export default function IntegrationDocs() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
+        {/* Tokens já configurados desta loja */}
+        {integrations && integrations.length > 0 && (
+          <div className="bg-card border border-border rounded-xl p-4">
+            <h3 className="text-sm font-bold text-foreground mb-2">Seus tokens configurados</h3>
+            <div className="space-y-2">
+              {integrations.map(i => (
+                <div key={i.id} className="flex items-center gap-2 bg-background rounded-lg border border-border p-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-foreground truncate">{i.name} <span className="text-[10px] text-muted-foreground">({i.type})</span></p>
+                    <code className="text-[10px] font-mono text-muted-foreground">{revealedId === i.id ? i.apiToken : "•".repeat(20)}</code>
+                  </div>
+                  <button onClick={() => setRevealedId(revealedId === i.id ? null : i.id)} className="p-1.5 rounded hover:bg-accent shrink-0">
+                    {revealedId === i.id ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </button>
+                  <button onClick={() => copy(i.apiToken || "", "Token")} className="p-1.5 rounded hover:bg-accent shrink-0"><Copy className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Quick overview */}
         <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/20 rounded-xl p-4">
           <h2 className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
@@ -199,6 +227,49 @@ export default function IntegrationDocs() {
               <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
               <p className="text-[10px] text-muted-foreground">
                 <strong className="text-green-400">Não precisa de token!</strong> O widget é público e funciona em qualquer site.
+              </p>
+            </div>
+          </div>
+        </Section>
+
+        {/* ===== SIG WEB ===== */}
+        <Section title="SIG Web (sistema de gestão)" icon={Database} color="bg-cyan-500">
+          <div className="mt-3 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Sincronize vendas e estoque do seu sistema de gestão SIG Web com o CRM. Ative a integração em <strong className="text-foreground">Ajustes → Integrações → SIG Web</strong> para gerar o token da sua loja.
+            </p>
+
+            <h4 className="text-xs font-bold text-foreground">Sincronizar venda (fecha o lead automaticamente)</h4>
+            <CopyBlock code={`${API_BASE}/api/webhooks/sig/sale`} label="URL do Webhook" />
+            <p className="text-[10px] text-muted-foreground">Header obrigatório:</p>
+            <CopyBlock code={`x-api-token: SEU_TOKEN_AQUI`} label="Header de autenticação" />
+            <CopyBlock code={JSON.stringify({
+              leadId: 123,
+              vehicleModel: "HB20 2023",
+              saleValue: 75000,
+              sigId: "SIG-000123"
+            }, null, 2)} label="Corpo do webhook (JSON)" />
+
+            <h4 className="text-xs font-bold text-foreground mt-4">Sincronizar estoque (adiciona veículo e avisa leads interessados)</h4>
+            <CopyBlock code={`${API_BASE}/api/webhooks/sig/inventory`} label="URL do Webhook" />
+            <p className="text-[10px] text-muted-foreground">Header obrigatório:</p>
+            <CopyBlock code={`x-api-token: SEU_TOKEN_AQUI`} label="Header de autenticação" />
+            <CopyBlock code={JSON.stringify({
+              brand: "Hyundai",
+              model: "HB20",
+              year: 2023,
+              plate: "ABC1D23",
+              color: "Prata",
+              mileage: 12000,
+              fuelType: "Flex",
+              transmission: "Automático",
+              price: 75000,
+              costPrice: 68000
+            }, null, 2)} label="Corpo do webhook (JSON)" />
+
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+              <p className="text-[10px] text-muted-foreground">
+                <strong className="text-blue-400">Dica:</strong> peça pro suporte do SIG Web (ou pra área de TI de vocês) configurar o envio automático desses dados via webhook usando essas URLs e o token da sua loja. Campos <code className="bg-accent px-1 rounded">brand</code> e <code className="bg-accent px-1 rounded">model</code> são obrigatórios na sincronização de estoque.
               </p>
             </div>
           </div>
@@ -382,13 +453,12 @@ export default function IntegrationDocs() {
             <Zap className="w-4 h-4 text-amber-400" /> Como gerar o Token de API
           </h3>
           <ol className="space-y-2 text-xs text-muted-foreground">
-            <li className="flex gap-2"><span className="text-primary font-bold">1.</span> Acesse o <strong className="text-foreground">Painel Admin</strong> do CRM</li>
-            <li className="flex gap-2"><span className="text-primary font-bold">2.</span> Vá em <strong className="text-foreground">Integrações</strong></li>
-            <li className="flex gap-2"><span className="text-primary font-bold">3.</span> Clique em <strong className="text-foreground">"Nova Integração"</strong></li>
-            <li className="flex gap-2"><span className="text-primary font-bold">4.</span> Escolha o tipo (ex: "webhook") e dê um nome (ex: "Zapier OLX")</li>
-            <li className="flex gap-2"><span className="text-primary font-bold">5.</span> O token será gerado automaticamente. Copie e use no header <code className="bg-accent px-1 rounded text-foreground">x-api-token</code></li>
+            <li className="flex gap-2"><span className="text-primary font-bold">1.</span> Acesse o <strong className="text-foreground">Painel Admin</strong> do CRM → <strong className="text-foreground">Ajustes</strong></li>
+            <li className="flex gap-2"><span className="text-primary font-bold">2.</span> Na seção <strong className="text-foreground">Integrações</strong>, clique em <strong className="text-foreground">"Ativar Integração"</strong> em SIG Web ou OLX/Webmotors</li>
+            <li className="flex gap-2"><span className="text-primary font-bold">3.</span> O token é gerado automaticamente. Clique para revelar e copiar, e use no header <code className="bg-accent px-1 rounded text-foreground">x-api-token</code></li>
+            <li className="flex gap-2"><span className="text-primary font-bold">4.</span> Para outras plataformas (ManyChat, n8n, webhook genérico), use a API direta com o mesmo token — veja seção "API Direta" acima</li>
           </ol>
-          <Button onClick={() => navigate("/crm/admin")} size="sm" className="mt-3 racing-gradient text-white">
+          <Button onClick={() => navigate(buildTenantPath(tenantSlug, "/crm/admin"))} size="sm" className="mt-3 racing-gradient text-white">
             Ir para Integrações
           </Button>
         </div>
@@ -410,6 +480,8 @@ export default function IntegrationDocs() {
                 <tr><td className="p-2 text-blue-400 font-medium">Facebook Ads</td><td className="p-2 text-muted-foreground">/api/webhooks/meta/leadgen</td><td className="p-2 text-green-400">Não</td></tr>
                 <tr><td className="p-2 text-emerald-400 font-medium">Google Ads</td><td className="p-2 text-muted-foreground">/api/webhooks/google/lead</td><td className="p-2 text-green-400">Não</td></tr>
                 <tr><td className="p-2 text-indigo-400 font-medium">Landing Page</td><td className="p-2 text-muted-foreground">/api/webhooks/widget/lead</td><td className="p-2 text-green-400">Não</td></tr>
+                <tr><td className="p-2 text-cyan-400 font-medium">SIG Web (venda)</td><td className="p-2 text-muted-foreground">/api/webhooks/sig/sale</td><td className="p-2 text-amber-400">Sim</td></tr>
+                <tr><td className="p-2 text-cyan-400 font-medium">SIG Web (estoque)</td><td className="p-2 text-muted-foreground">/api/webhooks/sig/inventory</td><td className="p-2 text-amber-400">Sim</td></tr>
                 <tr><td className="p-2 text-orange-400 font-medium">OLX/Webmotors/etc</td><td className="p-2 text-muted-foreground">/api/webhooks/email-parser</td><td className="p-2 text-amber-400">Sim</td></tr>
                 <tr><td className="p-2 text-green-400 font-medium">WhatsApp</td><td className="p-2 text-muted-foreground">/api/webhooks/whatsapp</td><td className="p-2 text-amber-400">Sim</td></tr>
                 <tr><td className="p-2 text-blue-300 font-medium">ManyChat/Chatbot</td><td className="p-2 text-muted-foreground">/api/webhooks/generic</td><td className="p-2 text-amber-400">Sim</td></tr>

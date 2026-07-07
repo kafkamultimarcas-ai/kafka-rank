@@ -1,9 +1,10 @@
 import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db";
-import { inventoryVehicles, inventorySyncLogs } from "../../drizzle/schema";
+import { inventoryVehicles, inventorySyncLogs, tenants } from "../../drizzle/schema";
 import { eq, desc, and, like, or, sql } from "drizzle-orm";
 import { syncInventory } from "../inventory-scraper";
+import { getCurrentTenantId } from "../tenantDb";
 
 export const inventoryRouter = router({
   // List all vehicles with optional filters
@@ -23,7 +24,7 @@ export const inventoryRouter = router({
       const db = await getDb();
       if (!db) return [];
 
-      const conditions: any[] = [];
+      const conditions: any[] = [eq(inventoryVehicles.tenantId, getCurrentTenantId())];
 
       if (input?.status && input.status !== "all") {
         conditions.push(eq(inventoryVehicles.status, input.status as any));
@@ -58,11 +59,7 @@ export const inventoryRouter = router({
         conditions.push(sql`${inventoryVehicles.year} <= ${input.maxYear}`);
       }
 
-      const query = conditions.length > 0
-        ? db.select().from(inventoryVehicles).where(and(...conditions)).orderBy(desc(inventoryVehicles.createdAt))
-        : db.select().from(inventoryVehicles).orderBy(desc(inventoryVehicles.createdAt));
-
-      return query;
+      return db.select().from(inventoryVehicles).where(and(...conditions)).orderBy(desc(inventoryVehicles.createdAt));
     }),
 
   // Get a single vehicle by ID
@@ -71,7 +68,9 @@ export const inventoryRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return null;
-      const result = await db.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.id)).limit(1);
+      const result = await db.select().from(inventoryVehicles)
+        .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+        .limit(1);
       return result[0] || null;
     }),
 
@@ -82,7 +81,7 @@ export const inventoryRouter = router({
     const result = await db
       .select({ brand: inventoryVehicles.brand, count: sql<number>`count(*)` })
       .from(inventoryVehicles)
-      .where(eq(inventoryVehicles.status, "available"))
+      .where(and(eq(inventoryVehicles.status, "available"), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
       .groupBy(inventoryVehicles.brand)
       .orderBy(desc(sql`count(*)`));
     return result;
@@ -99,6 +98,7 @@ export const inventoryRouter = router({
         avgPrice: sql<number>`AVG(${inventoryVehicles.price})`,
       })
       .from(inventoryVehicles)
+      .where(eq(inventoryVehicles.tenantId, getCurrentTenantId()))
       .groupBy(inventoryVehicles.status);
 
     const stats = { total: 0, available: 0, reserved: 0, sold: 0, avgPrice: 0 };
@@ -116,7 +116,12 @@ export const inventoryRouter = router({
 
   // Admin: trigger manual sync
   sync: adminProcedure.mutation(async () => {
-    const result = await syncInventory();
+    const db = await getDb();
+    if (!db) throw new Error("DB not available");
+    const tenantId = getCurrentTenantId();
+    const [tenant] = await db.select({ inventoryUrl: tenants.inventoryUrl }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    if (!tenant?.inventoryUrl) throw new Error("URL de estoque não configurada para esta loja");
+    const result = await syncInventory(tenantId, tenant.inventoryUrl);
     return result;
   }),
 
@@ -124,7 +129,9 @@ export const inventoryRouter = router({
   syncLogs: adminProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
-    return db.select().from(inventorySyncLogs).orderBy(desc(inventorySyncLogs.createdAt)).limit(20);
+    return db.select().from(inventorySyncLogs)
+      .where(eq(inventorySyncLogs.tenantId, getCurrentTenantId()))
+      .orderBy(desc(inventorySyncLogs.createdAt)).limit(20);
   }),
 
   // Admin: mark vehicle as reserved
@@ -133,7 +140,9 @@ export const inventoryRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB not available");
-      await db.update(inventoryVehicles).set({ status: "reserved" }).where(eq(inventoryVehicles.id, input.id));
+      const [result] = await db.update(inventoryVehicles).set({ status: "reserved" })
+        .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+      if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
       return { success: true };
     }),
 
@@ -143,11 +152,12 @@ export const inventoryRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB not available");
-      await db.update(inventoryVehicles).set({
+      const [result] = await db.update(inventoryVehicles).set({
         status: "sold",
         soldBySellerId: input.sellerId,
         soldAt: Date.now(),
-      }).where(eq(inventoryVehicles.id, input.id));
+      }).where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+      if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
       return { success: true };
     }),
 
@@ -157,11 +167,12 @@ export const inventoryRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB not available");
-      await db.update(inventoryVehicles).set({
+      const [result] = await db.update(inventoryVehicles).set({
         status: "available",
         soldBySellerId: null,
         soldAt: null,
-      }).where(eq(inventoryVehicles.id, input.id));
+      }).where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+      if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
       return { success: true };
     }),
 
