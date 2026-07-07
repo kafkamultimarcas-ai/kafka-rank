@@ -11,4 +11,11 @@ export const ENV = {
   zapiToken: process.env.ZAPI_TOKEN ?? "",
   zapiApiUrl: process.env.ZAPI_API_URL ?? "https://api.z-api.io",
   zapiClientToken: process.env.ZAPI_CLIENT_TOKEN ?? "",
+  asaasApiUrl: process.env.ASAAS_API_URL ?? "https://api-sandbox.asaas.com/v3",
+  asaasApiKey: process.env.ASAAS_API_KEY ?? "",
+  asaasWebhookToken: process.env.ASAAS_WEBHOOK_TOKEN ?? "",
+  // Origem pública da aplicação — usada só por jobs em background (ex: aviso de
+  // trial acabando) que precisam montar link absoluto sem ter uma request HTTP
+  // de onde derivar o host, diferente de getRequestOrigin(req).
+  appUrl: process.env.APP_URL ?? "http://localhost:3000",
 };

@@ -135,6 +135,7 @@ describe("sellers.firstAccess", () => {
       active: true,
       username: null,
       passwordHash: null,
+      inviteToken: "valid-invite-token",
     });
     (db.getSellerByUsername as any).mockResolvedValue(null);
     (db.updateSeller as any).mockResolvedValue(undefined);
@@ -144,6 +145,7 @@ describe("sellers.firstAccess", () => {
 
     const result = await caller.sellers.firstAccess({
       sellerId: 5,
+      inviteToken: "valid-invite-token",
       username: "newseller",
       password: "mypass",
       department: "vendas",
@@ -153,11 +155,34 @@ describe("sellers.firstAccess", () => {
     expect(result.sellerId).toBe(5);
     expect(cookies).toHaveLength(1);
     expect(cookies[0].name).toBe("seller_session");
-    // Verify updateSeller was called with department
+    // Verify updateSeller was called with department e limpando o token (uso único)
     expect(db.updateSeller).toHaveBeenCalledWith(5, expect.objectContaining({
       username: "newseller",
       department: "vendas",
+      inviteToken: null,
     }));
+  });
+
+  it("rejects first access with wrong invite token", async () => {
+    (db.getSellerByIdInternal as any).mockResolvedValue({
+      id: 5,
+      name: "New Seller",
+      active: true,
+      username: null,
+      passwordHash: null,
+      inviteToken: "correct-token",
+    });
+    const { ctx } = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.sellers.firstAccess({
+        sellerId: 5,
+        inviteToken: "wrong-token",
+        username: "newseller",
+        password: "mypass",
+      })
+    ).rejects.toThrow("Código de convite inválido");
   });
 
   it("rejects first access for seller that already has login", async () => {
@@ -174,6 +199,7 @@ describe("sellers.firstAccess", () => {
     await expect(
       caller.sellers.firstAccess({
         sellerId: 5,
+        inviteToken: "any-token",
         username: "newuser",
         password: "mypass",
       })
@@ -187,6 +213,7 @@ describe("sellers.firstAccess", () => {
       active: true,
       username: null,
       passwordHash: null,
+      inviteToken: "valid-invite-token",
     });
     (db.getSellerByUsername as any).mockResolvedValue({
       id: 3,
@@ -198,6 +225,7 @@ describe("sellers.firstAccess", () => {
     await expect(
       caller.sellers.firstAccess({
         sellerId: 5,
+        inviteToken: "valid-invite-token",
         username: "taken",
         password: "mypass",
       })
@@ -218,6 +246,7 @@ describe("sellers.firstAccess", () => {
     await expect(
       caller.sellers.firstAccess({
         sellerId: 5,
+        inviteToken: "any-token",
         username: "newuser",
         password: "mypass",
       })

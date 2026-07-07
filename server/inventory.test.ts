@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock the inventory scraper
 vi.mock("./inventory-scraper", () => ({
   syncInventory: vi.fn(() => Promise.resolve({ found: 93, added: 0, updated: 93, removed: 0, error: null })),
+  syncAllTenants: vi.fn(() => Promise.resolve()),
   startInventorySync: vi.fn(),
 }));
 
@@ -95,12 +96,70 @@ describe("Inventory Scraper", () => {
 
   it("syncInventory should return expected result shape", async () => {
     const { syncInventory } = await import("./inventory-scraper");
-    const result = await syncInventory();
+    const result = await syncInventory(1, "https://example.com");
     expect(result).toHaveProperty("found");
     expect(result).toHaveProperty("added");
     expect(result).toHaveProperty("updated");
     expect(result).toHaveProperty("removed");
     expect(typeof result.found).toBe("number");
+  });
+
+  it("should export syncAllTenants function", async () => {
+    const { syncAllTenants } = await import("./inventory-scraper");
+    expect(syncAllTenants).toBeDefined();
+    expect(typeof syncAllTenants).toBe("function");
+  });
+});
+
+describe("Inventory Multi-Tenant Isolation (static checks)", () => {
+  const fs = require("fs");
+  const path = require("path");
+  const scraperSrc = fs.readFileSync(path.join(__dirname, "inventory-scraper.ts"), "utf-8");
+  const routerSrc = fs.readFileSync(path.join(__dirname, "routers/inventoryRouter.ts"), "utf-8");
+  const schemaSrc = fs.readFileSync(path.join(__dirname, "../drizzle/schema.ts"), "utf-8");
+  const whatsappRouterSrc = fs.readFileSync(path.join(__dirname, "routers/whatsappRouter.ts"), "utf-8");
+  const webhooksSrc = fs.readFileSync(path.join(__dirname, "webhooks.ts"), "utf-8");
+
+  it("scraper notifies matching leads (crmInventoryAlerts) when a new vehicle is inserted", () => {
+    expect(scraperSrc).toContain("notifyMatchingLeads(tenantId, Number(insertResult.insertId)");
+    expect(scraperSrc).toContain("crmDb.getLeadsByVehicleInterest(");
+    expect(scraperSrc).toContain("crmDb.createInventoryAlert(");
+  });
+
+  it("configureWebhook builds the Z-API webhook URL with the current tenant's slug instead of the tenant-1-only legacy URL", () => {
+    const match = whatsappRouterSrc.match(/configureWebhook:[\s\S]*?\}\),/);
+    expect(match, 'procedure "configureWebhook" not found').toBeTruthy();
+    expect(match![0]).toContain("getCurrentTenantSlug");
+    expect(match![0]).toContain("/api/webhooks/whatsapp/${tenantSlug}");
+  });
+
+  it("SIG inventory webhook writes into inventoryVehicles, not the orphaned crm_inventory table", () => {
+    const match = webhooksSrc.match(/app\.post\("\/api\/webhooks\/sig\/inventory"[\s\S]*?\n  \}\);/);
+    expect(match, "sig/inventory handler not found").toBeTruthy();
+    expect(match![0]).toContain("dbConn.insert(inventoryVehicles)");
+    expect(match![0]).not.toContain("crmDb.createInventoryItem");
+  });
+
+  it("syncInventory should receive tenantId and baseUrl as parameters (no hardcoded single-store URL)", () => {
+    expect(scraperSrc).toMatch(/export async function syncInventory\(\s*tenantId:\s*number,\s*baseUrl:\s*string/);
+    expect(scraperSrc).not.toContain('const BASE_URL = "https://www.kafkamultimarcas.com.br"');
+  });
+
+  it("scraper should scope the externalId lookup and the sold-marking query by tenantId", () => {
+    expect(scraperSrc).toContain("eq(inventoryVehicles.tenantId, tenantId)");
+  });
+
+  it("inventoryVehicles should have a unique index on (tenantId, externalId)", () => {
+    expect(schemaSrc).toMatch(/uniqueIndex\(.*\)\.on\(table\.tenantId,\s*table\.externalId\)/);
+  });
+
+  it("every inventoryRouter procedure should reference getCurrentTenantId() at least once", () => {
+    const names = ["list", "getById", "brands", "stats", "sync", "syncLogs", "reserve", "markSold", "markAvailable"];
+    for (const name of names) {
+      expect(routerSrc, `procedure "${name}" missing`).toContain(`  ${name}:`);
+    }
+    const occurrences = (routerSrc.match(/getCurrentTenantId\(\)/g) || []).length;
+    expect(occurrences).toBeGreaterThanOrEqual(names.length);
   });
 });
 

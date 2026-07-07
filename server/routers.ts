@@ -14,6 +14,9 @@ const filenameSchema = z.string().max(255).regex(/^[a-zA-Z0-9._\-\s\u00C0-\u024F
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { invokeLLM } from "./_core/llm";
+import { getTenantLimits, getTenantById } from "./tenantService";
+import { sendUserWelcomeEmail } from "./emailService";
+import { getRequestOrigin } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter, crmAiRouter, aiMetricsRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
@@ -25,25 +28,32 @@ import { inventoryRouter } from "./routers/inventoryRouter";
 import { whatsappRouter } from "./routers/whatsappRouter";
 import { managerMentorRouter } from "./routers/managerMentorRouter";
 import { superAdminRouter } from "./routers/superAdminRouter";
+import { tenantPublicRouter } from "./routers/tenantPublicRouter";
+import { tenantAuthRouter } from "./routers/tenantAuthRouter";
+import { passwordResetRouter } from "./routers/passwordResetRouter";
+import { publicSignupRouter } from "./routers/publicSignupRouter";
+import { billingRouter } from "./routers/billingRouter";
+import { subscriptionLogsRouter } from "./routers/subscriptionLogsRouter";
+import { platformLogsRouter } from "./routers/platformLogsRouter";
 import { vehicleCostRouter } from "./routers/vehicleCostRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
+import { buildCurrentTenantPath, buildSellerTenantPath } from "./tenantUrls";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
-
-// Helper: retorna sellerId logado ou null se for gerente/admin (que vê tudo)
-async function getPrivacySellerId(ctx: any): Promise<number | null> {
-  if (!ctx.user || (ctx.user as any).loginMethod !== 'seller_password') return null;
-  const sellerId = -(ctx.user.id + 1000000);
-  const seller = await db.getSellerById(sellerId);
-  if (seller && seller.sellerRole === 'gerente') return null; // gerente vê tudo
-  return sellerId;
-}
+import { getPrivacySellerId } from "./authHelpers";
 
 export const appRouter = router({
   system: systemRouter,
   fichas: fichaRouter,
+  tenantPublic: tenantPublicRouter,
+  tenantAuth: tenantAuthRouter,
+  passwordReset: passwordResetRouter,
+  publicSignup: publicSignupRouter,
+  billing: billingRouter,
+  subscriptionLogs: subscriptionLogsRouter,
+  platformLogs: platformLogsRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -67,9 +77,23 @@ export const appRouter = router({
       phone: z.string().optional(),
       email: z.string().optional(),
       department: z.string().optional(),
-    })).mutation(async ({ input }) => {
-      const id = await db.createSeller(input);
-      return { id };
+    })).mutation(async ({ input, ctx }) => {
+      // Token de uso único pro vendedor criar o próprio login (ver sellers.firstAccess) —
+      // sem isso, qualquer um que descobrisse o sellerId (via sellers.list, pública)
+      // conseguiria criar login pra outra pessoa antes dela mesma fazer isso.
+      const inviteToken = nanoid(24);
+      const id = await db.createSeller({ ...input, inviteToken });
+
+      let loginUrl: string | null = null;
+      if (input.email) {
+        const tenant = await getTenantById(ctx.tenantId);
+        if (tenant) {
+          loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login?invite=${inviteToken}`;
+          await sendUserWelcomeEmail(input.email, tenant.name, "vendedor", loginUrl, ctx.tenantId);
+        }
+      }
+
+      return { id, inviteToken, loginUrl };
     }),
     update: adminProcedure.input(z.object({
       id: z.number(),
@@ -158,7 +182,7 @@ export const appRouter = router({
       ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
       // Gerar JWT e setar cookie com sellerId + username para dupla verificação
       const token = jwt.sign(
-        { sellerId: seller.id, username: seller.username },
+        { sellerId: seller.id, username: seller.username, tenantId: (seller as any).tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
@@ -194,7 +218,13 @@ export const appRouter = router({
               return null;
             }
             await db.updateSellerLastAccess(seller.id);
-            return { id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl, department: seller.department, sellerRole: seller.sellerRole || 'vendedor' };
+            const limits = await getTenantLimits(ctx.tenantId);
+            return {
+              id: seller.id, name: seller.name, nickname: seller.nickname, photoUrl: seller.photoUrl,
+              department: seller.department, sellerRole: seller.sellerRole || 'vendedor',
+              trialEndsAt: limits?.trialEndsAt ?? null, trialExpired: limits?.trialExpired ?? false,
+              subscriptionSuspended: limits?.status === "suspended",
+            };
           }
         }
       } catch (e) {
@@ -210,7 +240,7 @@ export const appRouter = router({
     // Primeiro acesso: vendedor cria seu próprio login
     firstAccess: publicProcedure.input(z.object({
       sellerId: z.number(),
-      accessCode: z.string().optional(), // mantido para compatibilidade, não usado
+      inviteToken: z.string().min(1, 'Código de convite obrigatório'),
       username: z.string().min(3),
       password: z.string().min(4),
       department: z.string().optional(),
@@ -218,11 +248,17 @@ export const appRouter = router({
       const seller = await db.getSellerByIdInternal(input.sellerId);
       if (!seller || !seller.active) throw new Error('Vendedor não encontrado ou inativo');
       if (seller.username && seller.passwordHash) throw new Error('Este vendedor já possui login. Use a tela de login.');
+      // SECURITY: exige o código de convite gerado pelo admin ao cadastrar o vendedor —
+      // sem isso, qualquer pessoa que soubesse o sellerId (lista pública) poderia
+      // criar login pra outra pessoa. Ver server/routers.ts sellers.create.
+      if (!seller.inviteToken || seller.inviteToken !== input.inviteToken) {
+        throw new Error('Código de convite inválido. Peça o link correto pro seu gerente/admin.');
+      }
       // Verificar username único
       const existing = await db.getSellerByUsername(input.username);
       if (existing) throw new Error('Este nome de usuário já está em uso');
       const passwordHash = await bcrypt.hash(input.password, 10);
-      const updateData: any = { username: input.username, passwordHash };
+      const updateData: any = { username: input.username, passwordHash, inviteToken: null };
       if (input.department) updateData.department = input.department;
       await db.updateSeller(input.sellerId, updateData);
       await db.updateSellerLastAccess(input.sellerId);
@@ -231,7 +267,7 @@ export const appRouter = router({
       ctx.res.clearCookie('seller_session', { ...cookieOptions, maxAge: -1 });
       // Auto-login
       const token = jwt.sign(
-        { sellerId: seller.id, username: input.username },
+        { sellerId: seller.id, username: input.username, tenantId: ctx.tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: '30d' }
       );
@@ -302,8 +338,8 @@ export const appRouter = router({
       mimeType: z.string(),
     })).mutation(async ({ input, ctx }) => {
       let sellerId: number | null = null;
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        sellerId = -((ctx.user as any).id + 1000000);
+      if (ctx.user && ctx.user.actorType === 'seller') {
+        sellerId = ctx.user.id;
       }
       if (!sellerId) {
         try {
@@ -736,7 +772,7 @@ export const appRouter = router({
       return { id, consignmentMatch };
     }),
     // Vendedor registra venda (fica pendente de aprovação)
-    registerBySeller: publicProcedure.input(z.object({
+    registerBySeller: protectedProcedure.input(z.object({
       sellerId: z.number(),
       competitionId: z.number().optional(),
       vehicleModel: z.string().min(1),
@@ -750,7 +786,12 @@ export const appRouter = router({
       customerCpf: z.string().optional(),
       customerBirthday: z.string().optional(),
       retroDate: z.string().optional(), // Data retroativa YYYY-MM-DD
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode registrar vendas como você mesmo');
+      }
+      input.sellerId = privacySellerId ?? input.sellerId;
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
       
@@ -798,7 +839,7 @@ export const appRouter = router({
             type: 'sale_from_appointment',
             title: 'Seu agendamento virou venda!',
             message: `O cliente ${sdrRecord.customerName || input.customerPhone} que você agendou foi atendido por ${seller.name} e fechou a compra de ${input.vehicleModel}!`,
-            actionUrl: '/minha-area',
+            actionUrl: await buildSellerTenantPath(sdrRecord.sellerId, `/minha-area/${sdrRecord.sellerId}`),
           });
         }
       }
@@ -816,7 +857,7 @@ export const appRouter = router({
         type: 'pending_sale',
         title: 'Nova venda para aprovar!',
         message: `${seller.name} registrou: ${input.vehicleModel}${input.value ? ` - R$ ${input.value.toLocaleString("pt-BR")}` : ''} | ${leadLabel}${sdrInfo}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       // Push notification para admin/gerente
       sendPushPendingSale(seller.name, input.vehicleModel, 'Venda').catch(console.error);
@@ -944,7 +985,7 @@ export const appRouter = router({
             title: '\u274c Venda Rejeitada',
             body: `Sua venda de ${sale.vehicleModel || 've\u00edculo'} foi rejeitada.`,
             tag: `sale-rejected-${input.id}`,
-            data: { type: 'sale_rejected', url: `/minha-area/${sale.sellerId}` },
+            data: { type: 'sale_rejected', url: await buildSellerTenantPath(sale.sellerId, `/minha-area/${sale.sellerId}`) },
           }).catch(console.error);
         }
       }
@@ -1108,14 +1149,14 @@ export const appRouter = router({
         type: 'action_plan',
         title: 'Novo Plano de Ação!',
         message: `Você recebeu um novo plano de ação: "${input.title}". Acesse sua área para conferir.`,
-        actionUrl: `/minha-area/${input.sellerId}`,
+        actionUrl: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`),
       });
       // Push notification para o vendedor
       sendPushToSeller(input.sellerId, {
         title: '📋 Novo Plano de Ação!',
         body: `Você recebeu: "${input.title}". Confira na sua área!`,
         tag: `action-plan-${input.sellerId}`,
-        data: { type: 'action_plan', url: `/minha-area/${input.sellerId}` },
+        data: { type: 'action_plan', url: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`) },
         requireInteraction: true,
       }).catch(console.error);
       return { id, message: `Plano enviado para ${seller?.nickname || seller?.name || 'vendedor'}!` };
@@ -1170,13 +1211,13 @@ export const appRouter = router({
         type: 'action_plan',
         title: 'Novo Plano de Ação (IA)!',
         message: `Você recebeu um plano de ação personalizado: "${parsed.title}". Acesse sua área para conferir.`,
-        actionUrl: `/minha-area/${input.sellerId}`,
+        actionUrl: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`),
       });
       sendPushToSeller(input.sellerId, {
         title: '🤖 Plano de Ação Personalizado!',
         body: `Novo plano gerado para você: "${parsed.title}". Confira!`,
         tag: `action-plan-ai-${input.sellerId}`,
-        data: { type: 'action_plan', url: `/minha-area/${input.sellerId}` },
+        data: { type: 'action_plan', url: await buildSellerTenantPath(input.sellerId, `/minha-area/${input.sellerId}`) },
         requireInteraction: true,
       }).catch(console.error);
       return { id, title: parsed.title, content: parsed.content };
@@ -1233,8 +1274,12 @@ export const appRouter = router({
       const count = await db.countUnreadAdminNotifications();
       return { count };
     }),
-    unreadCountSeller: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
-      const count = await db.countUnreadSellerNotifications(input.sellerId);
+    unreadCountSeller: protectedProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar suas próprias notificações');
+      }
+      const count = await db.countUnreadSellerNotifications(privacySellerId ?? input.sellerId);
       return { count };
     }),
     markRead: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
@@ -1343,7 +1388,7 @@ export const appRouter = router({
         type: 'pending_fei',
         title: 'Novo F&I para aprovar!',
         message: `${seller.name}: Banco ${input.bankName} | ${input.returnType}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       sendPushPendingRecord(seller.name, 'F&I', `Banco ${input.bankName} | ${input.returnType}`).catch(console.error);
       return { id, message: "F&I registrado! Aguardando aprovação." };
@@ -1365,7 +1410,7 @@ export const appRouter = router({
           title: '\u2705 F&I Aprovado!',
           body: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi aprovado! +${record.points} pts`,
           tag: `fei-approved-${record.id}`,
-          data: { type: 'fei_approved', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'fei_approved', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
           vibrate: [200, 100, 200],
         }).catch(console.error);
       }
@@ -1410,7 +1455,7 @@ export const appRouter = router({
             title: '\u274c F&I Rejeitado',
             body: `Seu registro F&I (${record.bankName} - ${record.returnType}) foi rejeitado.`,
             tag: `fei-rejected-${record.id}`,
-            data: { type: 'fei_rejected', url: `/minha-area/${record.sellerId}` },
+            data: { type: 'fei_rejected', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
           }).catch(console.error);
         }
       }
@@ -1449,12 +1494,14 @@ export const appRouter = router({
     })).query(async ({ input }) => {
       const { inventoryVehicles } = await import("../drizzle/schema");
       const { getDb } = await import("./db");
-      const { eq, like } = await import("drizzle-orm");
+      const { eq, like, and } = await import("drizzle-orm");
+      const { getCurrentTenantId } = await import("./tenantDb");
       const dbConn = await getDb();
       if (!dbConn) return { found: false, brand: null, model: null, year: null, fipePrice: null, version: null };
       const plate = input.plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
       // Try exact match first
-      const rows = await dbConn.select().from(inventoryVehicles).where(like(inventoryVehicles.plate, `%${plate}%`));
+      const rows = await dbConn.select().from(inventoryVehicles)
+        .where(and(like(inventoryVehicles.plate, `%${plate}%`), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
       const found = rows.find((v: any) => {
         const vPlate = (v.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
         return vPlate === plate;
@@ -1549,7 +1596,7 @@ export const appRouter = router({
         type: 'pending_consignment',
         title: 'Nova consignação para aprovar!',
         message: `${seller.name}: ${input.vehicleModel} | Dono: ${input.ownerName} | Placa: ${input.vehiclePlate}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       sendPushPendingRecord(seller.name, 'Consignação', `${input.vehicleModel} | Dono: ${input.ownerName}`).catch(console.error);
       return { id, message: `Consignação registrada! Aguardando aprovação. O carro precisa ficar 7 dias no pátio para contar pontos.${warningMsg}` };
@@ -1575,7 +1622,7 @@ export const appRouter = router({
             ? `Sua consignação de ${result.vehicleModel} foi aprovada e já conta pontos!`
             : `Sua consignação de ${result.vehicleModel} foi aprovada. Pontos após 7 dias.`,
           tag: `consignment-approved-${input.id}`,
-          data: { type: 'consignment_approved', url: `/minha-area/${result.sellerId}` },
+          data: { type: 'consignment_approved', url: await buildSellerTenantPath(result.sellerId, `/minha-area/${result.sellerId}`) },
           vibrate: [200, 100, 200],
         }).catch(console.error);
       }
@@ -1624,7 +1671,7 @@ export const appRouter = router({
           title: '\u274c Consignação Rejeitada',
           body: `Sua consignação de ${record.vehicleModel} foi rejeitada.${reasonMsg}`,
           tag: `consignment-rejected-${input.id}`,
-          data: { type: 'consignment_rejected', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'consignment_rejected', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
         }).catch(console.error);
       }
       return { success: true };
@@ -1703,7 +1750,7 @@ export const appRouter = router({
         type: 'pending_dispatch',
         title: 'Novo despachante para aprovar!',
         message: `${seller.name}: ${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`,
-        actionUrl: '/admin/aprovacoes',
+        actionUrl: await buildCurrentTenantPath('/admin/aprovacoes'),
       });
       sendPushPendingRecord(seller.name, 'Despachante', `${input.documentType} | Placa: ${input.vehiclePlate || 'N/I'}`).catch(console.error);
       return { id, message: "Registro de despachante enviado! Aguardando aprovação." };
@@ -1726,7 +1773,7 @@ export const appRouter = router({
           title: '\u2705 Documento Aprovado!',
           body: `Seu registro de ${record.documentType} foi aprovado! +${totalPts} pontos.`,
           tag: `dispatch-approved-${input.id}`,
-          data: { type: 'dispatch_approved', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'dispatch_approved', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
           vibrate: [200, 100, 200],
         }).catch(console.error);
       }
@@ -1769,7 +1816,7 @@ export const appRouter = router({
           title: '\u274c Documento Rejeitado',
           body: `Seu registro de ${record.documentType} foi rejeitado.`,
           tag: `dispatch-rejected-${input.id}`,
-          data: { type: 'dispatch_rejected', url: `/minha-area/${record.sellerId}` },
+          data: { type: 'dispatch_rejected', url: await buildSellerTenantPath(record.sellerId, `/minha-area/${record.sellerId}`) },
         }).catch(console.error);
       }
       return { success: true };
@@ -2667,7 +2714,7 @@ export const appRouter = router({
       }
       // Gerar JWT e setar cookie
       const token = jwt.sign(
-        { managerId: manager.id, username: manager.username },
+        { managerId: manager.id, username: manager.username, tenantId: (manager as any).tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
@@ -2686,9 +2733,13 @@ export const appRouter = router({
     // Verificar se está logado como gerente
     me: publicProcedure.query(async ({ ctx }) => {
       if (!ctx.user) return null;
-      // Se o ID é negativo, é um gerente
-      if (ctx.user.id < 0) {
-        return { id: -ctx.user.id, name: ctx.user.name, role: "manager" as const };
+      if (ctx.user.actorType === "manager") {
+        const limits = await getTenantLimits(ctx.tenantId);
+        return {
+          id: ctx.user.id, name: ctx.user.name, role: "manager" as const,
+          trialEndsAt: limits?.trialEndsAt ?? null, trialExpired: limits?.trialExpired ?? false,
+          subscriptionSuspended: limits?.status === "suspended",
+        };
       }
       return null;
     }),
@@ -2702,11 +2753,21 @@ export const appRouter = router({
       username: z.string().min(3),
       password: z.string().min(4),
       name: z.string().min(1),
-    })).mutation(async ({ input }) => {
+      email: z.string().email().optional(),
+    })).mutation(async ({ input, ctx }) => {
       const existing = await db.getManagerByUsername(input.username);
       if (existing) throw new Error("Usuário já existe");
       const passwordHash = await bcrypt.hash(input.password, 10);
-      const id = await db.createManager({ username: input.username, passwordHash, name: input.name });
+      const id = await db.createManager({ username: input.username, passwordHash, name: input.name, email: input.email });
+
+      if (input.email) {
+        const tenant = await getTenantById(ctx.tenantId);
+        if (tenant) {
+          const loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login`;
+          await sendUserWelcomeEmail(input.email, tenant.name, "gerente", loginUrl, ctx.tenantId);
+        }
+      }
+
       return { id };
     }),
 
@@ -3005,22 +3066,39 @@ Adapte o formato conforme o assunto, mas sempre inclua:
   // ===== DOCUMENTOS DE VENDA (Vendedor ↔ Despachante) =====
   saleDocuments: router({
     // Vendedor: listar seus documentos de venda
-    myDocs: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
-      return db.listSaleDocumentsBySeller(input.sellerId);
+    myDocs: protectedProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode acessar seus pr\u00f3prios documentos');
+      }
+      return db.listSaleDocumentsBySeller(privacySellerId ?? input.sellerId);
     }),
     // Vendedor: contar documentos pendentes
-    pendingCount: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
-      return db.countPendingDocsBySeller(input.sellerId);
+    pendingCount: protectedProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode acessar seus pr\u00f3prios documentos');
+      }
+      return db.countPendingDocsBySeller(privacySellerId ?? input.sellerId);
     }),
     // Vendedor: upload de CNH
-    uploadCnh: publicProcedure.input(z.object({
+    uploadCnh: protectedProcedure.input(z.object({
       id: z.number(),
       sellerId: z.number(),
       base64: base64Schema,
       filename: z.string(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      const effectiveSellerId = privacySellerId ?? input.sellerId;
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode enviar documentos como voc\u00ea mesmo');
+      }
+      const doc = await db.getSaleDocumentById(input.id);
+      if (!doc || doc.sellerId !== effectiveSellerId) {
+        throw new Error('Documento n\u00e3o encontrado ou n\u00e3o pertence a este vendedor');
+      }
       const buffer = Buffer.from(input.base64, 'base64');
-      const key = `sale-docs/${input.sellerId}/cnh-${Date.now()}-${input.filename}`;
+      const key = `sale-docs/${effectiveSellerId}/cnh-${Date.now()}-${input.filename}`;
       const { url } = await storagePut(key, buffer, 'image/jpeg');
       const result = await db.uploadSaleDocCnh(input.id, url, key);
       // Se ficou completo, notificar despachante
@@ -3030,20 +3108,29 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           type: 'docs_complete',
           title: 'Documentos completos para transfer\u00eancia!',
           message: `Vendedor enviou CNH e Comprovante para ${result.vehicleModel || 've\u00edculo'} - Pronto para despachante!`,
-          actionUrl: '/admin/documentos',
+          actionUrl: await buildCurrentTenantPath('/admin/documentos'),
         });
       }
       return { success: true, docStatus: result.docStatus };
     }),
     // Vendedor: upload de Comprovante de Resid\u00eancia
-    uploadComprovante: publicProcedure.input(z.object({
+    uploadComprovante: protectedProcedure.input(z.object({
       id: z.number(),
       sellerId: z.number(),
       base64: base64Schema,
       filename: z.string(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      const effectiveSellerId = privacySellerId ?? input.sellerId;
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode enviar documentos como voc\u00ea mesmo');
+      }
+      const doc = await db.getSaleDocumentById(input.id);
+      if (!doc || doc.sellerId !== effectiveSellerId) {
+        throw new Error('Documento n\u00e3o encontrado ou n\u00e3o pertence a este vendedor');
+      }
       const buffer = Buffer.from(input.base64, 'base64');
-      const key = `sale-docs/${input.sellerId}/comprovante-${Date.now()}-${input.filename}`;
+      const key = `sale-docs/${effectiveSellerId}/comprovante-${Date.now()}-${input.filename}`;
       const { url } = await storagePut(key, buffer, 'image/jpeg');
       const result = await db.uploadSaleDocComprovante(input.id, url, key);
       if (result.docStatus === 'completo') {
@@ -3052,7 +3139,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           type: 'docs_complete',
           title: 'Documentos completos para transfer\u00eancia!',
           message: `Vendedor enviou CNH e Comprovante para ${result.vehicleModel || 've\u00edculo'} - Pronto para despachante!`,
-          actionUrl: '/admin/documentos',
+          actionUrl: await buildCurrentTenantPath('/admin/documentos'),
         });
       }
       return { success: true, docStatus: result.docStatus };
@@ -3324,11 +3411,16 @@ Adapte o formato conforme o assunto, mas sempre inclua:
   // ===== CENTRAL DE RESULTADOS (VENDEDOR) =====
   sellerResults: router({
     // Dashboard completo do vendedor
-    getDashboard: publicProcedure.input(z.object({
+    getDashboard: protectedProcedure.input(z.object({
       sellerId: z.number(),
       month: z.number().min(1).max(12).optional(),
       year: z.number().optional(),
-    })).query(async ({ input }) => {
+    })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar seus próprios resultados');
+      }
+      input.sellerId = privacySellerId ?? input.sellerId;
       const now = new Date();
       const month = input.month || (now.getMonth() + 1);
       const year = input.year || now.getFullYear();
@@ -3483,8 +3575,8 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       date: z.number(),
       month: z.number(),
       year: z.number(),
-    })).mutation(async ({ input }) => {
-      await db.createSellerAdvance({ ...input, tenantId: 1 });
+    })).mutation(async ({ input, ctx }) => {
+      await db.createSellerAdvance({ ...input, tenantId: ctx.tenantId });
       return { success: true };
     }),
 
@@ -3496,12 +3588,16 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     }),
 
     // Listar vales
-    listAdvances: publicProcedure.input(z.object({
+    listAdvances: protectedProcedure.input(z.object({
       sellerId: z.number(),
       month: z.number(),
       year: z.number(),
-    })).query(async ({ input }) => {
-      return db.getSellerAdvances(input.sellerId, input.month, input.year);
+    })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar seus próprios vales');
+      }
+      return db.getSellerAdvances(privacySellerId ?? input.sellerId, input.month, input.year);
     }),
 
     // Regras de comissão
@@ -3525,8 +3621,8 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       startDate: z.number(),
       endDate: z.number(),
       inventoryId: z.number().optional(), // ID do veículo no estoque
-    })).mutation(async ({ input }) => {
-      await db.createBonusVehicle({ ...input, active: true, tenantId: 1 });
+    })).mutation(async ({ input, ctx }) => {
+      await db.createBonusVehicle({ ...input, active: true, tenantId: ctx.tenantId });
       return { success: true };
     }),
 

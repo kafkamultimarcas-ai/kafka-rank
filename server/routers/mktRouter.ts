@@ -1,8 +1,12 @@
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { router, moduleRequiredProcedure, protectedModuleRequiredProcedure } from "../_core/trpc";
 import { z } from "zod";
 import * as db from "../db";
 
 // ===== MARKETING ROUTER =====
+// Gated pelo módulo "marketing" de tenants.enabledModules
+
+const publicProcedure = moduleRequiredProcedure("marketing");
+const protectedProcedure = protectedModuleRequiredProcedure("marketing");
 
 export const mktStrategiesRouter = router({
   list: publicProcedure.query(async () => {

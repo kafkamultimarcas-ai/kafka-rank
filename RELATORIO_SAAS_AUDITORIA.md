@@ -1,5 +1,7 @@
 # Relatório de Auditoria SaaS - Kafka Rank
 
+> ⚠️ **Desatualizado**: este documento é anterior à branch `feat/multi-tenant`. Os itens críticos apontados aqui (tenantId no JWT, Z-API global, hardcode "kafka") já foram resolvidos nessa branch — ver [`docs/multi-tenant/09-analise-prontidao-vendas.md`](docs/multi-tenant/09-analise-prontidao-vendas.md) pro estado atual reconciliado.
+
 **Data:** 03/04/2026  
 **Versão:** fb9b15ca → b96d9fe1  
 **Objetivo:** Avaliar a prontidão do sistema para implantação multi-loja (SaaS)

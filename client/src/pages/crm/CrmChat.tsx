@@ -10,6 +10,7 @@ import {
   Volume2, Download, Play, File, Mic, Square, Copy, Check, Eye, Printer
 } from "lucide-react";
 import { ChannelIcon } from "@/components/ChannelIcon";
+import { useBranding } from "@/contexts/TenantContext";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -260,6 +261,7 @@ function LeadList({
   filterScore: string | null;
   setFilterScore: (s: string | null) => void;
 }) {
+  const { name: brandName } = useBranding();
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printDateFrom, setPrintDateFrom] = useState("");
   const [printDateTo, setPrintDateTo] = useState("");
@@ -741,14 +743,14 @@ function LeadList({
                     .btn:hover { background: #2d2d4e; }
                     </style></head><body>
                     <div class="header">
-                      <div><h1>📋 Lista de Ligação - Kafka Multimarcas</h1>
+                      <div><h1>📋 Lista de Ligação - ${brandName}</h1>
                       <p class="subtitle">Gerada em ${dateStr} às ${timeStr} | ${printLeads.length} contatos${periodLabel ? " | " + periodLabel : ""}</p></div>
                       <button class="btn no-print" onclick="window.print()">🖨️ Imprimir</button>
                     </div>
                     <table><thead><tr>
                       <th>#</th><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Vendedor</th><th>Temp.</th><th>Ligou?</th>
                     </tr></thead><tbody>${rows}</tbody></table>
-                    <p style="margin-top:16px;font-size:10px;color:#999;text-align:center;">Kafka Multimarcas - Sistema CRM | ${dateStr}</p>
+                    <p style="margin-top:16px;font-size:10px;color:#999;text-align:center;">${brandName} - Sistema CRM | ${dateStr}</p>
                   </body></html>`);
                   printWindow.document.close();
                   setShowPrintModal(false);

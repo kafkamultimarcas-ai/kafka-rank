@@ -2,9 +2,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { TenantProvider } from "./contexts/TenantContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import AccessGate from "./components/AccessGate";
 import LiveAlerts from "./components/LiveAlerts";
+import TrialExpiredGate from "./components/TrialExpiredGate";
 import { lazy, Suspense } from "react";
 import { Flag } from "lucide-react";
 
@@ -45,6 +47,8 @@ const RegisterSale = lazy(() => import("./pages/RegisterSale"));
 const TVMode = lazy(() => import("./pages/TVMode"));
 const MeusAgendamentos = lazy(() => import("./pages/MeusAgendamentos"));
 const SellerLogin = lazy(() => import("./pages/SellerLogin"));
+const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
+const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
 const MinhaArea = lazy(() => import("./pages/MinhaArea"));
 const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
@@ -56,6 +60,7 @@ const GerentePanel = lazy(() => import("./pages/GerentePanel"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
+const AssinaturaPage = lazy(() => import("./pages/Assinatura"));
 const CentralResultados = lazy(() => import("./pages/CentralResultados"));
 const AdminBonusVehicles = lazy(() => import("./pages/admin/AdminBonusVehicles"));
 const FinanceiroVendedores = lazy(() => import("./pages/admin/FinanceiroVendedores"));
@@ -69,6 +74,10 @@ const CrmPipeline = lazy(() => import("./pages/crm/CrmPipeline"));
 const CrmAdminLogin = lazy(() => import("./pages/crm/CrmAdminLogin"));
 const CrmAdminDashboard = lazy(() => import("./pages/crm/CrmAdminDashboard"));
 const IntegrationDocs = lazy(() => import("./pages/crm/IntegrationDocs"));
+const ComercialHome = lazy(() => import("./pages/public/ComercialHome"));
+const ComercialCadastro = lazy(() => import("./pages/public/ComercialCadastro"));
+const ComercialTermos = lazy(() => import("./pages/public/ComercialLegal").then(m => ({ default: m.ComercialTermos })));
+const ComercialPrivacidade = lazy(() => import("./pages/public/ComercialLegal").then(m => ({ default: m.ComercialPrivacidade })));
 
 function PageLoader() {
   return (
@@ -93,39 +102,80 @@ function Router() {
         <Route path="/tv" component={TVMode} />
         <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
         <Route path="/login-vendedor" component={SellerLogin} />
+        <Route path="/t/:slug/login" component={SellerLogin} />
+        <Route path="/t/:slug/esqueci-senha" component={EsqueciSenha} />
+        <Route path="/t/:slug/redefinir-senha" component={RedefinirSenha} />
         <Route path="/minha-area/:sellerId" component={MinhaArea} />
+        <Route path="/t/:slug/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/admin" component={AdminDashboard} />
+        <Route path="/t/:slug/admin" component={AdminDashboard} />
         <Route path="/admin/vendedores" component={AdminSellers} />
+        <Route path="/t/:slug/admin/vendedores" component={AdminSellers} />
         <Route path="/admin/competicoes" component={AdminCompetitions} />
+        <Route path="/t/:slug/admin/competicoes" component={AdminCompetitions} />
         <Route path="/admin/vendas" component={AdminSales} />
+        <Route path="/t/:slug/admin/vendas" component={AdminSales} />
         <Route path="/admin/treinamentos" component={AdminTrainings} />
+        <Route path="/t/:slug/admin/treinamentos" component={AdminTrainings} />
         <Route path="/admin/planos" component={AdminActionPlans} />
+        <Route path="/t/:slug/admin/planos" component={AdminActionPlans} />
         <Route path="/admin/configuracoes" component={AdminSettings} />
+        <Route path="/t/:slug/admin/configuracoes" component={AdminSettings} />
         <Route path="/admin/aprovacoes" component={AdminApprovals} />
+        <Route path="/t/:slug/admin/aprovacoes" component={AdminApprovals} />
         <Route path="/admin/metas" component={AdminGoals} />
+        <Route path="/t/:slug/admin/metas" component={AdminGoals} />
         <Route path="/admin/agendamentos" component={AdminAgendamentos} />
+        <Route path="/t/:slug/admin/agendamentos" component={AdminAgendamentos} />
         <Route path="/admin/gerentes" component={AdminGerentes} />
+        <Route path="/t/:slug/admin/gerentes" component={AdminGerentes} />
         <Route path="/admin/fei" component={AdminFei} />
+        <Route path="/t/:slug/admin/fei" component={AdminFei} />
         <Route path="/admin/pos-venda" component={AdminPosVenda} />
+        <Route path="/t/:slug/admin/pos-venda" component={AdminPosVenda} />
         <Route path="/admin/pv-financeiro" component={AdminPvFinanceiro} />
+        <Route path="/t/:slug/admin/pv-financeiro" component={AdminPvFinanceiro} />
         <Route path="/admin/marketing" component={AdminMarketing} />
+        <Route path="/t/:slug/admin/marketing" component={AdminMarketing} />
         <Route path="/admin/financeiro" component={AdminFinanceiro} />
+        <Route path="/t/:slug/admin/financeiro" component={AdminFinanceiro} />
         <Route path="/admin/meta-integration" component={AdminMetaIntegration} />
+        <Route path="/t/:slug/admin/meta-integration" component={AdminMetaIntegration} />
         <Route path="/admin/iam" component={AdminIAM} />
+        <Route path="/t/:slug/admin/iam" component={AdminIAM} />
         <Route path="/admin/documentos" component={AdminDocumentos} />
+        <Route path="/t/:slug/admin/documentos" component={AdminDocumentos} />
         <Route path="/admin/estoque" component={AdminInventory} />
+        <Route path="/t/:slug/admin/estoque" component={AdminInventory} />
         <Route path="/admin/virada-mes" component={AdminMonthTurnover} />
+        <Route path="/t/:slug/admin/virada-mes" component={AdminMonthTurnover} />
         <Route path="/admin/custo-veiculo" component={AdminVehicleCosts} />
+        <Route path="/t/:slug/admin/custo-veiculo" component={AdminVehicleCosts} />
         <Route path="/admin/custo-veiculo/:id" component={AdminVehicleCosts} />
+        <Route path="/t/:slug/admin/custo-veiculo/:id" component={AdminVehicleCosts} />
         <Route path="/admin/aniversariantes" component={Aniversariantes} />
+        <Route path="/t/:slug/admin/aniversariantes" component={Aniversariantes} />
+        <Route path="/admin/bonus-veiculos" component={AdminBonusVehicles} />
+        <Route path="/t/:slug/admin/bonus-veiculos" component={AdminBonusVehicles} />
+        <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
+        <Route path="/t/:slug/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />
         <Route path="/crm/pipeline" component={CrmPipeline} />
         <Route path="/crm/admin/login" component={CrmAdminLogin} />
+        <Route path="/t/:slug/admin/login" component={CrmAdminLogin} />
+        <Route path="/t/:slug/crm/admin/login" component={CrmAdminLogin} />
         <Route path="/crm/admin" component={CrmAdminDashboard} />
+        <Route path="/t/:slug/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
+        <Route path="/t/:slug/crm/integracoes" component={IntegrationDocs} />
+        <Route path="/comercial" component={ComercialHome} />
+        <Route path="/comercial/cadastro" component={ComercialCadastro} />
+        <Route path="/comercial/termos" component={ComercialTermos} />
+        <Route path="/comercial/privacidade" component={ComercialPrivacidade} />
         <Route path="/pos-venda" component={PosVenda} />
+        <Route path="/t/:slug/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
@@ -133,14 +183,17 @@ function Router() {
         <Route path="/ficha-financiamento" component={FichaFinanciamento} />
         <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/estoque" component={Estoque} />
+        <Route path="/t/:slug/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
+        <Route path="/t/:slug/financeiro" component={FinanceiroPage} />
+        <Route path="/assinatura" component={AssinaturaPage} />
+        <Route path="/t/:slug/assinatura" component={AssinaturaPage} />
         <Route path="/feirao" component={RankingFeirao} />
         <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
         <Route path="/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
-        <Route path="/admin/bonus-veiculos" component={AdminBonusVehicles} />
-        <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         <Route path="/busca-veiculo" component={VehicleSearch} />
         <Route path="/gerente" component={GerentePanel} />
+        <Route path="/t/:slug/gerente" component={GerentePanel} />
         <Route path="/super-admin" component={SuperAdmin} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
@@ -152,15 +205,18 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
-          <Toaster position="top-right" duration={3000} closeButton richColors toastOptions={{ style: { zIndex: 99999 } }} />
-          <AccessGate>
-            <LiveAlerts />
-            <Router />
-          </AccessGate>
-        </TooltipProvider>
-      </ThemeProvider>
+      <TenantProvider>
+        <ThemeProvider defaultTheme="dark">
+          <TooltipProvider>
+            <Toaster position="top-right" duration={3000} closeButton richColors toastOptions={{ style: { zIndex: 99999 } }} />
+            <AccessGate>
+              <LiveAlerts />
+              <Router />
+            </AccessGate>
+            <TrialExpiredGate />
+          </TooltipProvider>
+        </ThemeProvider>
+      </TenantProvider>
     </ErrorBoundary>
   );
 }

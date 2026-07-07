@@ -1,8 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Trophy, Zap, Target, Award, X } from "lucide-react";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
 
 const CAR_COLORS = [
   "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6",
@@ -91,6 +90,7 @@ function TheatricalAlert({ alert, onDone }: { alert: AlertType; onDone: () => vo
 }
 
 export default function TVMode() {
+  const { logoUrl, name: brandName } = useBranding();
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" }, { refetchInterval: 10000 });
   const activeComp = competitions?.[0];
   const compId = activeComp?.id || 0;
@@ -200,9 +200,9 @@ export default function TVMode() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-3 bg-black/40 border-b border-white/10">
         <div className="flex items-center gap-4">
-          <img src={LOGO_URL} alt="" className="h-10 w-10 rounded-lg" />
+          <img src={logoUrl} alt="" className="h-10 w-10 rounded-lg" />
           <div>
-            <h1 className="font-heading font-black text-xl tracking-tight">KAFKA RANK</h1>
+            <h1 className="font-heading font-black text-xl tracking-tight">{brandName.toUpperCase()}</h1>
             <p className="text-xs text-white/50">Competição de Vendas — Ao Vivo</p>
           </div>
         </div>

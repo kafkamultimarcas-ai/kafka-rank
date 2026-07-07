@@ -10,6 +10,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Key, Shield, ShieldCheck, Eye, Edit3 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
+import { maskPhone } from "@/lib/masks";
+import { isValidBrazilianPhone, isValidEmail } from "@shared/validators";
+import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 
 const DEPARTMENTS = [
   { value: "vendas", label: "Vendas", color: "bg-blue-500/20 text-blue-400" },
@@ -43,6 +46,7 @@ export default function AdminSellers() {
   // Permissões de gerente
   const [permsDialog, setPermsDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
   const [permsState, setPermsState] = useState<Record<string, { canView: boolean; canEdit: boolean }>>({});
+  const [inviteLinkDialog, setInviteLinkDialog] = useState<{ open: boolean; sellerName: string; link: string }>({ open: false, sellerName: "", link: "" });
 
   const permsQuery = trpc.sellers.getPermissions.useQuery(
     { sellerId: permsDialog.seller?.id || 0 },
@@ -71,7 +75,15 @@ export default function AdminSellers() {
   }, [sellers]);
 
   const createSeller = trpc.sellers.create.useMutation({
-    onSuccess: () => { utils.sellers.list.invalidate(); setDialogOpen(false); resetForm(); toast.success("Colaborador adicionado!"); },
+    onSuccess: (data) => {
+      utils.sellers.list.invalidate();
+      const wasDialogOpenName = form.name;
+      setDialogOpen(false);
+      resetForm();
+      toast.success("Colaborador adicionado!");
+      const link = data.loginUrl || `${window.location.origin}${buildTenantPath(getCurrentTenantSlug(), "/login")}?invite=${data.inviteToken}`;
+      setInviteLinkDialog({ open: true, sellerName: wasDialogOpenName, link });
+    },
     onError: () => toast.error("Erro ao adicionar colaborador."),
   });
 
@@ -142,6 +154,8 @@ export default function AdminSellers() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (form.phone && !isValidBrazilianPhone(form.phone)) { toast.error("Telefone inválido"); return; }
+    if (form.email && !isValidEmail(form.email)) { toast.error("E-mail inválido"); return; }
     if (editingSeller) {
       updateSeller.mutate({ id: editingSeller.id, ...form });
     } else {
@@ -254,7 +268,7 @@ export default function AdminSellers() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-foreground">Telefone</Label>
-                      <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(00) 00000-0000" className="bg-input border-border text-foreground" />
+                      <Input value={form.phone} onChange={e => setForm({ ...form, phone: maskPhone(e.target.value) })} placeholder="(00) 00000-0000" className="bg-input border-border text-foreground" />
                     </div>
                     <div>
                       <Label className="text-foreground">Email</Label>
@@ -650,6 +664,24 @@ export default function AdminSellers() {
                   disabled={setPermsMutation.isPending}
                 >
                   {setPermsMutation.isPending ? "Salvando..." : "Salvar Permissões"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Link de convite (primeiro acesso) do colaborador recém-criado */}
+          <Dialog open={inviteLinkDialog.open} onOpenChange={(open) => setInviteLinkDialog(d => ({ ...d, open }))}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Link de primeiro acesso — {inviteLinkDialog.sellerName}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Envie este link pro colaborador criar o próprio login. Ele é de uso único e só funciona pra essa pessoa.
+              </p>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={inviteLinkDialog.link} className="font-mono text-xs" onFocus={e => e.target.select()} />
+                <Button size="sm" onClick={() => { navigator.clipboard.writeText(inviteLinkDialog.link); toast.success("Link copiado!"); }}>
+                  Copiar
                 </Button>
               </div>
             </DialogContent>

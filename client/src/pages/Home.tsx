@@ -4,14 +4,13 @@ import { trpc } from "@/lib/trpc";
 import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar, Search } from "lucide-react";
 import { useLocation } from "wouter";
 import { useMemo, useState } from "react";
-import { getLoginUrl } from "@/const";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { toast } from "sonner";
 import NotificationCenter from "@/components/NotificationCenter";
 import NewLeadAlert from "@/components/NewLeadAlert";
 import BracketMotivationalAlert from "@/components/BracketMotivationalAlert";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
+import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 
 const CATEGORY_LABELS: Record<string, string> = {
   vendas: "Vendas",
@@ -32,6 +31,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function Home() {
+  const { logoUrl, name: brandName } = useBranding();
   const { user, loading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { data: sellerSession } = trpc.sellers.me.useQuery();
@@ -42,6 +42,13 @@ export default function Home() {
   const { data: quote } = trpc.quotes.latest.useQuery();
   const [now] = useState(() => new Date());
   const { data: goals } = trpc.goals.list.useQuery({ month: now.getMonth() + 1, year: now.getFullYear() });
+  const tenantSlug = getCurrentTenantSlug();
+  const tenantHomePath = buildTenantPath(tenantSlug, "/");
+  const tenantSellerAreaPath = sellerSession
+    ? buildTenantPath(tenantSlug, `/minha-area/${sellerSession.id}`)
+    : getTenantLoginPath(tenantSlug);
+  const tenantCrmPath = buildTenantPath(tenantSlug, "/crm");
+  const tenantPosVendaPath = buildTenantPath(tenantSlug, "/pos-venda");
 
   const activeComps = competitions || [];
   const finishedComps = useMemo(() => (allCompetitions || []).filter(c => c.status === "finished"), [allCompetitions]);
@@ -116,8 +123,8 @@ export default function Home() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="Kafka Rank" className="h-9 w-9 rounded-lg" />
-            <span className="font-heading font-bold text-lg tracking-tight text-foreground">KAFKA RANK</span>
+            <img src={logoUrl} alt={brandName} className="h-9 w-9 rounded-lg" />
+            <span className="font-heading font-bold text-lg tracking-tight text-foreground">{brandName.toUpperCase()}</span>
           </div>
           <div className="flex items-center gap-2">
             {pushSupported && !isSubscribed && permission !== "denied" && (
@@ -152,31 +159,31 @@ export default function Home() {
             </Button>
             {sellerSession ? (
               <>
-                <Button size="sm" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[44px] min-h-[44px]">
+                <Button size="sm" onClick={() => setLocation(tenantSellerAreaPath)} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[44px] min-h-[44px]">
                   <User className="h-5 w-5" />
                   <span className="hidden sm:inline">{sellerSession.nickname || sellerSession.name}</span>
                   <span className="sm:hidden">Eu</span>
                 </Button>
                 {(sellerSession as any).sellerRole === 'gerente' && (
-                  <Button size="sm" onClick={() => setLocation("/gerente")} className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold">
+                  <Button size="sm" onClick={() => setLocation(buildTenantPath(tenantSlug, "/gerente"))} className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold">
                     <Shield className="h-4 w-4" />
                     <span className="hidden sm:inline">Gerente</span>
                   </Button>
                 )}
               </>
             ) : (
-              <Button size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[44px] min-h-[44px]">
+              <Button size="sm" onClick={() => setLocation(getTenantLoginPath(tenantSlug))} className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold min-w-[44px] min-h-[44px]">
                 <LogIn className="h-5 w-5" />
                 <span>Entrar</span>
               </Button>
             )}
             {user?.role === "admin" ? (
-              <Button size="sm" onClick={() => setLocation("/admin")} className="gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
+              <Button size="sm" onClick={() => setLocation(buildTenantPath(tenantSlug, "/admin"))} className="gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white font-bold">
                 <Shield className="h-4 w-4" />
                 <span className="hidden sm:inline">Gerência</span>
               </Button>
             ) : !user && !authLoading ? (
-              <Button variant="ghost" size="sm" onClick={() => window.location.href = getLoginUrl()} className="gap-1.5 text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="sm" onClick={() => { window.location.href = getTenantLoginPath(tenantSlug); }} className="gap-1.5 text-muted-foreground hover:text-foreground">
                 <LogIn className="h-4 w-4" />
               </Button>
             ) : null}
@@ -224,7 +231,7 @@ export default function Home() {
               <Button variant="outline" size="sm" onClick={() => setLocation("/tv")} className="gap-2">
                 <Tv className="h-4 w-4" /> Tela TV
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setLocation("/pos-venda")} className="gap-2 border-orange-600 text-orange-400 hover:bg-orange-600/10">
+              <Button variant="outline" size="sm" onClick={() => setLocation(tenantPosVendaPath)} className="gap-2 border-orange-600 text-orange-400 hover:bg-orange-600/10">
                 <Wrench className="h-4 w-4" /> Pós-Venda
               </Button>
               <Button variant="outline" size="sm" onClick={() => setLocation("/feirao")} className="gap-2 border-red-600 text-red-400 hover:bg-red-600/10">
@@ -237,11 +244,11 @@ export default function Home() {
                 <Search className="h-4 w-4" /> Busca Veículo
               </Button>
               {sellerSession ? (
-                <Button variant="outline" size="sm" onClick={() => setLocation("/crm")} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
+                <Button variant="outline" size="sm" onClick={() => setLocation(tenantCrmPath)} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
                   <LayoutGrid className="h-4 w-4" /> Meus Clientes
                 </Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
+                <Button variant="outline" size="sm" onClick={() => setLocation(getTenantLoginPath(tenantSlug))} className="gap-2 border-green-600 text-green-400 hover:bg-green-600/10">
                   <LayoutGrid className="h-4 w-4" /> Meus Clientes
                 </Button>
               )}
@@ -250,11 +257,11 @@ export default function Home() {
               </Button>
 
               {sellerSession ? (
-                <Button variant="outline" size="sm" onClick={() => setLocation(`/minha-area/${sellerSession.id}`)} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
+                <Button variant="outline" size="sm" onClick={() => setLocation(tenantSellerAreaPath)} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
                   <FileText className="h-4 w-4" /> Meus Docs
                 </Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => setLocation("/login-vendedor")} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
+                <Button variant="outline" size="sm" onClick={() => setLocation(getTenantLoginPath(tenantSlug))} className="gap-2 border-emerald-600 text-emerald-400 hover:bg-emerald-600/10">
                   <FileText className="h-4 w-4" /> Meus Docs
                 </Button>
               )}
@@ -351,7 +358,7 @@ export default function Home() {
                 </div>
                 <p className="text-sm text-muted-foreground mb-4 text-center">Abra chamados para o setor de pós-venda resolver problemas de clientes</p>
                 <Button
-                  onClick={() => setLocation("/pos-venda")}
+                  onClick={() => setLocation(tenantPosVendaPath)}
                   className="w-full gap-2 bg-orange-600 hover:bg-orange-500 text-white font-bold"
                 >
                   <Wrench className="h-4 w-4" /> Acessar Pós-Venda
@@ -1088,17 +1095,17 @@ export default function Home() {
       <footer className="border-t border-border py-8 mt-8">
         <div className="container text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <img src={LOGO_URL} alt="Kafka Rank" className="h-5 w-5 rounded" />
-            <span className="font-heading text-sm font-bold text-foreground">KAFKA RANK</span>
+            <img src={logoUrl} alt={brandName} className="h-5 w-5 rounded" />
+            <span className="font-heading text-sm font-bold text-foreground">{brandName.toUpperCase()}</span>
           </div>
           <p className="text-xs text-muted-foreground">Competição de Vendas — Acelere seus resultados</p>
           <p className="text-xs text-muted-foreground/50 mt-1">v2.0</p>
           {!user && !authLoading && (
             <button
-              onClick={() => window.location.href = getLoginUrl()}
+              onClick={() => { window.location.href = getTenantLoginPath(tenantSlug); }}
               className="mt-4 text-xs text-muted-foreground/50 hover:text-primary transition-colors"
             >
-              Área do Gerente
+              Área da Loja
             </button>
           )}
         </div>

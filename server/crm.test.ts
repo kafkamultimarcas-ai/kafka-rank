@@ -1,13 +1,18 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import * as crmDb from "./crmDb";
 import bcrypt from "bcryptjs";
+import { withTenantAsync } from "./tenantDb";
+
+const TEST_TENANT_ID = 1;
 
 // Helper to create a context without user (public)
 function createPublicContext(): TrpcContext {
   return {
     user: null,
+    tenantId: TEST_TENANT_ID,
+    tenantSlug: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => {} } as unknown as TrpcContext["res"],
   };
@@ -27,6 +32,8 @@ function createAdminContext(): TrpcContext {
       updatedAt: new Date(),
       lastSignedIn: new Date(),
     },
+    tenantId: TEST_TENANT_ID,
+    tenantSlug: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => {} } as unknown as TrpcContext["res"],
   };
@@ -65,16 +72,21 @@ describe("CRM Pipeline", () => {
 
 describe("CRM Admin Auth", () => {
   let testAdminUsername: string;
+  let testAdminId: number;
 
   beforeAll(async () => {
     const hash = await bcrypt.hash("testpass123", 10);
     testAdminUsername = "testadmin_" + Date.now();
-    await crmDb.createAdmin({
+    testAdminId = await withTenantAsync(TEST_TENANT_ID, () => crmDb.createAdmin({
       username: testAdminUsername,
       passwordHash: hash,
       name: "Test Admin",
       role: "admin",
-    });
+    }));
+  });
+
+  afterAll(async () => {
+    if (testAdminId) await withTenantAsync(TEST_TENANT_ID, () => crmDb.deleteAdmin(testAdminId));
   });
 
   it("admin login returns token on valid credentials", async () => {

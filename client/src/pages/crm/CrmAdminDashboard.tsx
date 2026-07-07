@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAdminAuth } from "./CrmAdminLogin";
@@ -15,9 +16,14 @@ import {
   CircleDollarSign, CreditCard, Banknote, Upload, Trash2, Edit, Save,
   CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2,
   Shuffle, ArrowRightLeft, Timer, Headphones, Target,
-  ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw
+  ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw,
+  Copy, EyeOff, Facebook, BookOpen
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
+import AssinaturaContent from "@/components/billing/AssinaturaContent";
+import TrialStatusBanner from "@/components/TrialStatusBanner";
+import { useBranding } from "@/contexts/TenantContext";
+import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -38,25 +44,61 @@ const DEPT_COLORS: Record<string, string> = {
   financeiro: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
 };
 
-type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas" | "ai_metrics";
+type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas" | "ai_metrics" | "assinatura";
+
+function isAdminView(value: string | null): value is AdminView {
+  return value === "dashboard" ||
+    value === "leads" ||
+    value === "chat" ||
+    value === "performance" ||
+    value === "pipeline" ||
+    value === "inventory" ||
+    value === "campaigns" ||
+    value === "marketing" ||
+    value === "settings" ||
+    value === "financial" ||
+    value === "sdr" ||
+    value === "attendant" ||
+    value === "fichas" ||
+    value === "ai_metrics" ||
+    value === "assinatura";
+}
 
 export default function CrmAdminDashboard() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { admin, isLoading, isAuthenticated, logout } = useAdminAuth();
-  const [activeView, setActiveView] = useState<AdminView>("chat");
+  const { name: brandName, logoUrl } = useBranding();
+  const tenantSlug = getCurrentTenantSlug();
+  const currentSearch = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const initialView = currentSearch?.get("view") ?? null;
+  const [activeView, setActiveView] = useState<AdminView>(isAdminView(initialView) ? initialView : "chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      // Only navigate if not already on login page to prevent loops
-      if (window.location.pathname !== "/crm/admin/login") {
-        navigate("/crm/admin/login", { replace: true });
+      const loginPath = getTenantLoginPath(tenantSlug);
+      if (window.location.pathname !== loginPath) {
+        navigate(loginPath, { replace: true });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, navigate, tenantSlug]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.split("?")[1] || "");
+    const nextView = params.get("view");
+    if (isAdminView(nextView) && nextView !== activeView) {
+      setActiveView(nextView);
+      if (nextView !== "leads") setSelectedDept(null);
+      return;
+    }
+
+    if (!nextView && activeView === "assinatura") {
+      setActiveView("chat");
+    }
+  }, [activeView, location]);
 
   if (isLoading) {
     return (
@@ -88,8 +130,26 @@ export default function CrmAdminDashboard() {
     { key: "marketing" as const, icon: BarChart3, label: "Marketing", section: "IA & Marketing" },
     // --- Equipe ---
     { key: "sdr" as const, icon: Headphones, label: "Painel SDR", section: "Equipe" },
+    { key: "assinatura" as const, icon: CircleDollarSign, label: "Assinatura", section: "Equipe" },
     { key: "settings" as const, icon: Settings, label: "Ajustes", section: "Equipe" },
   ];
+
+  const openView = (view: AdminView) => {
+    setActiveView(view);
+    if (view !== "leads") {
+      setSelectedDept(null);
+    }
+
+    const basePath = buildTenantPath(tenantSlug, "/crm/admin");
+    if (view === "assinatura") {
+      navigate(`${basePath}?view=assinatura`, { replace: true });
+      return;
+    }
+
+    if (location !== basePath) {
+      navigate(basePath, { replace: true });
+    }
+  };
 
   // When clicking a department card, navigate to leads filtered by that dept
   const handleDeptClick = (dept: string) => {
@@ -102,11 +162,14 @@ export default function CrmAdminDashboard() {
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-card shrink-0">
         <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-primary" />
-            <div>
-              <h1 className="text-sm font-bold text-foreground">CRM Gerente</h1>
-              <p className="text-[10px] text-muted-foreground">{admin?.name}</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src={logoUrl} alt={brandName} className="w-9 h-9 rounded-lg object-contain shrink-0 bg-background border border-border" />
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold text-foreground truncate" title={brandName}>{brandName}</h1>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <Shield className="w-3 h-3 text-primary shrink-0" />
+                <span className="truncate">CRM Gerente · {admin?.name}</span>
+              </p>
             </div>
           </div>
         </div>
@@ -115,7 +178,7 @@ export default function CrmAdminDashboard() {
             const showSection = idx === 0 || item.section !== menuItems[idx - 1].section;
             return (<div key={item.key}>
               {showSection && <div className={`px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 ${idx > 0 ? 'mt-2 border-t border-border/30 pt-3' : ''}`}>{item.section}</div>}
-              <button onClick={() => { setActiveView(item.key); setSelectedDept(null); }}
+              <button onClick={() => openView(item.key as AdminView)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <item.icon className="w-4 h-4" />
                 {item.label}
@@ -136,18 +199,18 @@ export default function CrmAdminDashboard() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col">
             <div className="p-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                <span className="text-sm font-bold text-foreground">CRM Gerente</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <img src={logoUrl} alt={brandName} className="w-7 h-7 rounded-lg object-contain shrink-0 bg-background border border-border" />
+                <span className="text-sm font-bold text-foreground truncate">{brandName}</span>
               </div>
-              <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+              <button onClick={() => setSidebarOpen(false)}><X className="w-5 h-5 text-muted-foreground shrink-0" /></button>
             </div>
             <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
               {menuItems.map((item, idx) => {
                 const showSection = idx === 0 || item.section !== menuItems[idx - 1].section;
                 return (<div key={item.key}>
                   {showSection && <div className={`px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 ${idx > 0 ? 'mt-2 border-t border-border/30 pt-3' : ''}`}>{item.section}</div>}
-                  <button onClick={() => { setActiveView(item.key); setSelectedDept(null); setSidebarOpen(false); }}
+                  <button onClick={() => { openView(item.key as AdminView); setSidebarOpen(false); }}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                     <item.icon className="w-4 h-4" />
                     {item.label}
@@ -166,6 +229,11 @@ export default function CrmAdminDashboard() {
 
       {/* Main content */}
       <main className="flex-1 min-w-0">
+        <TrialStatusBanner
+          tenantSlug={tenantSlug}
+          trialEndsAt={admin?.trialEndsAt ?? null}
+          subscriptionSuspended={admin?.subscriptionSuspended ?? false}
+        />
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
@@ -206,6 +274,7 @@ export default function CrmAdminDashboard() {
           {activeView === "settings" && <SettingsView />}
           {activeView === "pipeline" && <AdminPipelineView />}
           {activeView === "sdr" && <SDRManagementView />}
+          {activeView === "assinatura" && <AssinaturaContent showLogoutButton={false} />}
           {activeView === "attendant" && <AIAttendantView />}
           {activeView === "ai_metrics" && <AIMetricsDashboard />}
           {activeView === "fichas" && <CreditApplicationsView />}
@@ -1108,6 +1177,7 @@ function InventoryView() {
 
 // ===== CAMPAIGNS VIEW =====
 function CampaignsView() {
+  const { name: brandName } = useBranding();
   const [activeTab, setActiveTab] = useState<"campaigns" | "responses" | "import">("campaigns");
   const [showCreate, setShowCreate] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
@@ -1777,6 +1847,7 @@ function getAdminRoleLabel(admin: any): { label: string; color: string } {
 }
 
 function SettingsView() {
+  const [, navigate] = useLocation();
   const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
@@ -1804,16 +1875,6 @@ function SettingsView() {
       toast.success("Admin atualizado com sucesso!");
     },
     onError: (e: any) => toast.error('Erro: ' + e.message),
-  });
-
-  const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
-  const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
-    onSuccess: () => toast.success("Captura de mensagens enviadas ativada!"),
-    onError: (e: any) => toast.error(e.message),
-  });
-  const configureWebhook = trpc.whatsapp.configureWebhook.useMutation({
-    onSuccess: () => toast.success("Webhook configurado com sucesso!"),
-    onError: (e: any) => toast.error(e.message),
   });
 
   const toggleAdmin = trpc.adminAuth.update.useMutation({
@@ -1856,7 +1917,13 @@ function SettingsView() {
   };
 
   return (
-    <div className="space-y-4">
+    <Tabs defaultValue="ajustes" className="w-full">
+      <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+        <TabsTrigger value="ajustes">Ajustes</TabsTrigger>
+        <TabsTrigger value="integracoes">Integrações</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="ajustes" className="space-y-4 mt-0">
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Administradores do CRM</h3>
         <div className="space-y-2">
@@ -2049,27 +2116,224 @@ function SettingsView() {
       {/* SECURITY: Reset All Seller Passwords */}
       <ResetAllPasswordsSection />
 
-      {/* Tenant Settings (Dados da Loja + Z-API) */}
-      <TenantSettingsPanel />
+      {/* Dados da Loja */}
+      <StoreDataPanel />
+      </TabsContent>
+
+      <TabsContent value="integracoes" className="space-y-4 mt-0">
+      {/* WhatsApp (Z-API) */}
+      <WhatsAppZapiPanel />
+
+      {/* Estoque de Veículos */}
+      <InventoryIntegrationPanel />
 
       <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-sm font-bold text-foreground mb-2">Integrações</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-bold text-foreground">Integrações</h3>
+          <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/crm/integracoes"))}
+            className="flex items-center gap-1 text-[10px] text-primary hover:underline">
+            <BookOpen className="w-3 h-3" /> Ver documentação completa
+          </button>
+        </div>
         <div className="space-y-2">
-          <IntegrationItem name="WhatsApp Business API" status={zapiStatus?.connected ? "ativo" : "desconectado"} description="Envio/recepção de mensagens e disparos em massa" />
-          {zapiStatus?.connected && (
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => configureWebhook.mutate()} disabled={configureWebhook.isPending}>
-                {configureWebhook.isPending ? "Configurando..." : "Reconfigurar Webhook"}
-              </Button>
-              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => enableSentByMe.mutate()} disabled={enableSentByMe.isPending}>
-                {enableSentByMe.isPending ? "Ativando..." : "Ativar Captura Outbound"}
-              </Button>
-            </div>
-          )}
-          <IntegrationItem name="SIG Web" status="pendente" description="Integre com seu sistema de gestão para sincronizar vendas" />
-          <IntegrationItem name="OLX / Webmotors" status="pendente" description="Receba leads automaticamente das plataformas de anúncio" />
+          <TokenIntegrationRow type="sig" name="SIG Web" description="Integre com seu sistema de gestão para sincronizar vendas e estoque" endpointLabel="Sincronização de vendas/estoque" endpointPath="/api/webhooks/sig/sale" />
+          <TokenIntegrationRow type="email_parser" name="OLX / Webmotors" description="Receba leads automaticamente das plataformas de anúncio (via encaminhamento de e-mail)" endpointLabel="Parser de e-mail" endpointPath="/api/webhooks/email-parser" />
         </div>
       </div>
+
+      <MetaIntegrationPanel />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+// ===== TOKEN-BASED INTEGRATION ROW (SIG Web, OLX/Webmotors, etc — token gerado por loja) =====
+function TokenIntegrationRow({ type, name, description, endpointLabel, endpointPath }: {
+  type: string; name: string; description: string; endpointLabel: string; endpointPath: string;
+}) {
+  const utils = trpc.useUtils();
+  const { data: integrations } = trpc.crmIntegrations.list.useQuery();
+  const integration = integrations?.find(i => i.type === type);
+  const [expanded, setExpanded] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+
+  const create = trpc.crmIntegrations.create.useMutation({
+    onSuccess: () => { toast.success(`${name} ativado! Copie o token abaixo.`); utils.crmIntegrations.list.invalidate(); setExpanded(true); setShowToken(true); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const update = trpc.crmIntegrations.update.useMutation({
+    onSuccess: () => { utils.crmIntegrations.list.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const remove = trpc.crmIntegrations.delete.useMutation({
+    onSuccess: () => { toast.success("Integração removida."); utils.crmIntegrations.list.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const regenerate = trpc.crmIntegrations.regenerateToken.useMutation({
+    onSuccess: () => { toast.success("Token regenerado! Atualize a configuração na plataforma externa."); utils.crmIntegrations.list.invalidate(); setShowToken(true); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const webhookUrl = `${window.location.origin}${endpointPath}`;
+  const copy = (text: string, label: string) => { navigator.clipboard.writeText(text); toast.success(`${label} copiado!`); };
+
+  const status = !integration ? "pendente" : integration.active ? "ativo" : "inativo";
+  const statusStyle = status === "ativo" ? "bg-green-500/20 text-green-400" : status === "inativo" ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400";
+
+  return (
+    <div className="rounded-lg bg-accent/30 border border-border overflow-hidden">
+      <button onClick={() => integration && setExpanded(!expanded)} className={`w-full flex items-center justify-between p-3 text-left ${integration ? "cursor-pointer hover:bg-accent/50" : ""}`}>
+        <div className="min-w-0">
+          <p className="text-sm text-foreground font-medium">{name}</p>
+          <p className="text-[10px] text-muted-foreground">{description}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[10px] px-2 py-0.5 rounded ${statusStyle}`}>{status}</span>
+          {integration && <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />}
+        </div>
+      </button>
+
+      {!integration && (
+        <div className="px-3 pb-3">
+          <Button size="sm" className="w-full" onClick={() => create.mutate({ type, name })} disabled={create.isPending}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            {create.isPending ? "Ativando..." : "Ativar Integração"}
+          </Button>
+        </div>
+      )}
+
+      {integration && expanded && (
+        <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">{endpointLabel} — URL do Webhook</label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] font-mono bg-background border border-border rounded px-2 py-1.5 truncate">{webhookUrl}</code>
+              <button onClick={() => copy(webhookUrl, "URL")} className="p-1.5 rounded hover:bg-accent shrink-0"><Copy className="w-3.5 h-3.5 text-muted-foreground" /></button>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Header <code>x-api-token</code></label>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] font-mono bg-background border border-border rounded px-2 py-1.5 truncate">
+                {showToken ? integration.apiToken : "•".repeat(24)}
+              </code>
+              <button onClick={() => setShowToken(!showToken)} className="p-1.5 rounded hover:bg-accent shrink-0">
+                {showToken ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
+              </button>
+              <button onClick={() => copy(integration.apiToken || "", "Token")} className="p-1.5 rounded hover:bg-accent shrink-0"><Copy className="w-3.5 h-3.5 text-muted-foreground" /></button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Este token identifica a sua loja — não compartilhe com outras lojas.</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => update.mutate({ id: integration.id, active: !integration.active })} disabled={update.isPending}>
+              {integration.active ? "Desativar" : "Reativar"}
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => regenerate.mutate({ id: integration.id })} disabled={regenerate.isPending}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1" /> Regenerar Token
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs flex-1 text-destructive hover:text-destructive" onClick={() => { if (confirm(`Remover a integração ${name}? A URL configurada externamente vai parar de funcionar.`)) remove.mutate({ id: integration.id }); }} disabled={remove.isPending}>
+              <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== META ADS (FACEBOOK/INSTAGRAM LEAD ADS) — CONFIG AVANÇADA =====
+function MetaIntegrationPanel() {
+  const utils = trpc.useUtils();
+  const { data: config, refetch } = trpc.crmIntegrations.getMetaConfig.useQuery();
+  const saveConfig = trpc.crmIntegrations.saveMetaConfig.useMutation({
+    onSuccess: () => { toast.success("Configuração do Meta Ads salva!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const testConnection = trpc.crmIntegrations.testMetaConnection.useMutation({
+    onSuccess: (data: any) => { if (data.success) toast.success("Conexão com Meta Ads validada!"); else toast.error(data.error || "Falha na conexão"); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const [expanded, setExpanded] = useState(false);
+  const [form, setForm] = useState({ appId: "", appSecret: "", pageAccessToken: "", verifyToken: "", pageId: "" });
+  const [initialized, setInitialized] = useState(false);
+
+  if (config && !initialized) {
+    setForm({ appId: config.appId || "", appSecret: "", pageAccessToken: "", verifyToken: config.verifyToken || "", pageId: config.pageId || "" });
+    setInitialized(true);
+  }
+
+  const isActive = !!(config?.hasAppSecret && config?.hasPageAccessToken);
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? "bg-blue-500/20" : "bg-amber-500/20"}`}>
+            <Facebook className={`w-5 h-5 ${isActive ? "text-blue-400" : "text-amber-400"}`} />
+          </div>
+          <div className="text-left">
+            <h3 className="text-sm font-bold text-foreground">Meta Ads (Facebook/Instagram Lead Ads)</h3>
+            <p className="text-[10px] text-muted-foreground">Receba leads direto dos anúncios, sem precisar de Zapier/Make</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] px-2 py-0.5 rounded ${isActive ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
+            {isActive ? "Configurado" : "Pendente"}
+          </span>
+          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <p className="text-[11px] text-blue-300 leading-relaxed">
+              Crie um App em <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a>, conecte sua página e copie as credenciais abaixo. Veja o passo a passo completo na documentação de integrações.
+            </p>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">App ID</label>
+            <Input value={form.appId} onChange={e => setForm({ ...form, appId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 1234567890" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">App Secret</label>
+            <Input value={form.appSecret} type="password" onChange={e => setForm({ ...form, appSecret: e.target.value })}
+              placeholder={config?.hasAppSecret ? "***já configurado*** (deixe vazio para manter)" : "Cole o App Secret aqui"} className="h-9 text-sm font-mono" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Page Access Token</label>
+            <Input value={form.pageAccessToken} type="password" onChange={e => setForm({ ...form, pageAccessToken: e.target.value })}
+              placeholder={config?.hasPageAccessToken ? "***já configurado*** (deixe vazio para manter)" : "Cole o Page Access Token aqui"} className="h-9 text-sm font-mono" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Page ID</label>
+            <Input value={form.pageId} onChange={e => setForm({ ...form, pageId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 987654321" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Verify Token (você escolhe, usado na verificação do webhook)</label>
+            <Input value={form.verifyToken} onChange={e => setForm({ ...form, verifyToken: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: kafka-verify-123" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1" onClick={() => {
+              const updates: any = {};
+              if (form.appId) updates.appId = form.appId;
+              if (form.appSecret) updates.appSecret = form.appSecret;
+              if (form.pageAccessToken) updates.pageAccessToken = form.pageAccessToken;
+              if (form.verifyToken) updates.verifyToken = form.verifyToken;
+              if (form.pageId) updates.pageId = form.pageId;
+              if (Object.keys(updates).length === 0) { toast.error("Preencha pelo menos um campo"); return; }
+              saveConfig.mutate(updates);
+            }} disabled={saveConfig.isPending}>
+              <Save className="w-3.5 h-3.5 mr-1" />
+              {saveConfig.isPending ? "Salvando..." : "Salvar Credenciais"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => testConnection.mutate()} disabled={testConnection.isPending || !isActive}>
+              <Zap className="w-3.5 h-3.5 mr-1" />
+              {testConnection.isPending ? "Testando..." : "Testar Conexão"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2127,25 +2391,11 @@ function ResetAllPasswordsSection() {
 
 // AiModeConfig removed - now integrated into AIAttendantView
 
-function IntegrationItem({ name, status, description }: { name: string; status: string; description: string }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border">
-      <div>
-        <p className="text-sm text-foreground font-medium">{name}</p>
-        <p className="text-[10px] text-muted-foreground">{description}</p>
-      </div>
-      <span className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${status === "ativo" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
-        {status}
-      </span>
-    </div>
-  );
-}
-
-// ===== TENANT SETTINGS PANEL (Dados da Loja + Z-API) =====
-function TenantSettingsPanel() {
-  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+// ===== WHATSAPP (Z-API) PANEL =====
+function WhatsAppZapiPanel() {
+  const { data: settings } = trpc.crmPerformance.getTenantSettings.useQuery();
   const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
-    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); },
+    onSuccess: () => { toast.success("Configurações da loja salvas!"); },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const testZapi = trpc.crmPerformance.testZapiConnection.useMutation({
@@ -2155,11 +2405,18 @@ function TenantSettingsPanel() {
     },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
+  const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
+  const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
+    onSuccess: () => toast.success("Captura de mensagens enviadas ativada!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const configureWebhook = trpc.whatsapp.configureWebhook.useMutation({
+    onSuccess: () => toast.success("Webhook configurado com sucesso!"),
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const [showZapi, setShowZapi] = useState(false);
-  const [showStore, setShowStore] = useState(false);
   const [zapiForm, setZapiForm] = useState({ zapiInstanceId: '', zapiToken: '', zapiClientToken: '' });
-  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '', inventoryUrl: '' });
   const [initialized, setInitialized] = useState(false);
 
   if (settings && !initialized) {
@@ -2168,23 +2425,11 @@ function TenantSettingsPanel() {
       zapiToken: '',
       zapiClientToken: '',
     });
-    setStoreForm({
-      name: settings.name || '',
-      phone: settings.phone || '',
-      email: settings.email || '',
-      city: settings.city || '',
-      state: settings.state || '',
-      address: settings.address || '',
-      primaryColor: settings.primaryColor || '#DC2626',
-      secondaryColor: settings.secondaryColor || '#1F2937',
-      inventoryUrl: settings.inventoryUrl || '',
-    });
     setInitialized(true);
   }
 
+  // Z-API WhatsApp Configuration
   return (
-    <div className="space-y-4">
-      {/* Z-API WhatsApp Configuration */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <button onClick={() => setShowZapi(!showZapi)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
           <div className="flex items-center gap-3">
@@ -2246,11 +2491,159 @@ function TenantSettingsPanel() {
                 {testZapi.isPending ? 'Testando...' : 'Testar Conexão'}
               </Button>
             </div>
+            {zapiStatus?.connected && (
+              <div className="flex gap-2 pt-1 border-t border-border/50">
+                <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => configureWebhook.mutate()} disabled={configureWebhook.isPending}>
+                  {configureWebhook.isPending ? "Configurando..." : "Reconfigurar Webhook"}
+                </Button>
+                <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => enableSentByMe.mutate()} disabled={enableSentByMe.isPending}>
+                  {enableSentByMe.isPending ? "Ativando..." : "Ativar Captura Outbound"}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
+  );
+}
 
-      {/* Store Data Configuration */}
+// ===== ESTOQUE (URL de sincronização) PANEL =====
+function InventoryIntegrationPanel() {
+  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+  const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
+    onSuccess: () => { toast.success("URL do estoque salva!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const { data: syncLogs, refetch: refetchLogs } = trpc.inventory.syncLogs.useQuery();
+  const syncNow = trpc.inventory.sync.useMutation({
+    onSuccess: (data) => {
+      if (data.error) toast.error(data.error);
+      else toast.success(`Sincronizado! ${data.added} novo(s), ${data.updated} atualizado(s), ${data.removed} removido(s)`);
+      refetchLogs();
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const [showInventory, setShowInventory] = useState(false);
+  const [inventoryUrl, setInventoryUrl] = useState('');
+  const [initialized, setInitialized] = useState(false);
+
+  if (settings && !initialized) {
+    setInventoryUrl(settings.inventoryUrl || '');
+    setInitialized(true);
+  }
+
+  const lastLog = syncLogs?.[0];
+
+  return (
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <button onClick={() => setShowInventory(!showInventory)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${settings?.inventoryUrl ? 'bg-green-500/20' : 'bg-amber-500/20'}`}>
+              <Car className={`w-5 h-5 ${settings?.inventoryUrl ? 'text-green-400' : 'text-amber-400'}`} />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-bold text-foreground">Estoque de Veículos</h3>
+              <p className="text-[10px] text-muted-foreground">
+                {settings?.inventoryUrl ? 'URL configurada' : 'Configure a URL do site de estoque da sua loja'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] px-2 py-0.5 rounded ${settings?.inventoryUrl ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+              {settings?.inventoryUrl ? 'Configurado' : 'Pendente'}
+            </span>
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${showInventory ? 'rotate-90' : ''}`} />
+          </div>
+        </button>
+        {showInventory && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-[11px] text-blue-300 leading-relaxed">
+                Informe a URL do site onde fica o estoque de veículos da sua loja. O sistema sincroniza automaticamente a cada 15 minutos.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">URL do site de estoque</label>
+              <Input placeholder="https://seusite.com.br" value={inventoryUrl}
+                onChange={e => setInventoryUrl(e.target.value)} className="h-9 text-sm font-mono" />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="flex-1" onClick={() => {
+                if (!inventoryUrl) { toast.error("Informe a URL do estoque"); return; }
+                updateSettings.mutate({ inventoryUrl });
+              }} disabled={updateSettings.isPending}>
+                <Save className="w-3.5 h-3.5 mr-1" />
+                {updateSettings.isPending ? 'Salvando...' : 'Salvar URL'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => syncNow.mutate()} disabled={syncNow.isPending || !settings?.inventoryUrl}>
+                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${syncNow.isPending ? 'animate-spin' : ''}`} />
+                {syncNow.isPending ? 'Sincronizando...' : 'Sincronizar Agora'}
+              </Button>
+            </div>
+            {lastLog && (
+              <div className="pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
+                <span className={lastLog.status === 'success' ? 'text-green-400' : 'text-red-400'}>
+                  {lastLog.status === 'success' ? 'Última sincronização' : 'Falha na sincronização'}
+                </span>
+                {' '}em {new Date(lastLog.createdAt).toLocaleString("pt-BR")}
+                {lastLog.status === 'success'
+                  ? ` — ${lastLog.vehiclesFound} encontrado(s), ${lastLog.vehiclesAdded} novo(s), ${lastLog.vehiclesUpdated} atualizado(s), ${lastLog.vehiclesRemoved} removido(s)`
+                  : lastLog.errorMessage ? ` — ${lastLog.errorMessage}` : ''}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+  );
+}
+
+// ===== STORE DATA PANEL (Dados da Loja) =====
+function StoreDataPanel() {
+  const utils = trpc.useUtils();
+  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+  const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
+    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const uploadLogo = trpc.crmPerformance.uploadTenantLogo.useMutation({
+    onSuccess: () => { toast.success("Logo atualizada!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Imagem muito grande. Máximo 3MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      uploadLogo.mutate({ base64, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const [showStore, setShowStore] = useState(false);
+  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '' });
+  const [initialized, setInitialized] = useState(false);
+
+  if (settings && !initialized) {
+    setStoreForm({
+      name: settings.name || '',
+      phone: settings.phone || '',
+      email: settings.email || '',
+      city: settings.city || '',
+      state: settings.state || '',
+      address: settings.address || '',
+      primaryColor: settings.primaryColor || '#DC2626',
+      secondaryColor: settings.secondaryColor || '#1F2937',
+    });
+    setInitialized(true);
+  }
+
+  // Store Data Configuration
+  return (
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <button onClick={() => setShowStore(!showStore)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
           <div className="flex items-center gap-3">
@@ -2266,6 +2659,26 @@ function TenantSettingsPanel() {
         </button>
         {showStore && (
           <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Logo da Loja</label>
+              <div className="flex items-center gap-3">
+                <div className="w-16 h-16 rounded-xl border border-border bg-background flex items-center justify-center overflow-hidden shrink-0">
+                  {settings?.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo da loja" className="w-full h-full object-contain" />
+                  ) : (
+                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-accent/30 hover:bg-accent/50 text-sm cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploadLogo.isPending ? "Enviando..." : "Enviar nova logo"}
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoChange} disabled={uploadLogo.isPending} />
+                  </label>
+                  <p className="text-[10px] text-muted-foreground mt-1">PNG, JPG, WEBP ou SVG. Máximo 3MB. Se não enviar, a logo padrão é exibida.</p>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Nome da Loja</label>
@@ -2286,10 +2699,6 @@ function TenantSettingsPanel() {
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Estado (UF)</label>
                 <Input value={storeForm.state} onChange={e => setStoreForm({ ...storeForm, state: e.target.value })} className="h-9 text-sm" maxLength={2} placeholder="SP" />
-              </div>
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-1 block">URL do Estoque</label>
-                <Input value={storeForm.inventoryUrl} onChange={e => setStoreForm({ ...storeForm, inventoryUrl: e.target.value })} className="h-9 text-sm" placeholder="https://seusite.com.br/estoque" />
               </div>
             </div>
             <div>
@@ -2325,7 +2734,6 @@ function TenantSettingsPanel() {
           </div>
         )}
       </div>
-    </div>
   );
 }
 

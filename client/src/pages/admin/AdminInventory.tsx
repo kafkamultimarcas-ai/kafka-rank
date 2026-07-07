@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Car, Search, RefreshCw, Loader2, Calendar, Gauge, Fuel, Palette, DollarSign, ExternalLink, ChevronLeft, ChevronRight, Package, CheckCircle, Clock, XCircle, Eye, Tag, TrendingUp } from "lucide-react";
+import { Car, Search, RefreshCw, Loader2, Calendar, Gauge, Fuel, Palette, DollarSign, ExternalLink, ChevronLeft, ChevronRight, Package, CheckCircle, Clock, XCircle, Eye, Tag, TrendingUp, Copy } from "lucide-react";
+import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 
 const PAGE_SIZE = 20;
 
@@ -431,6 +432,18 @@ export default function AdminInventory() {
                 </div>
 
                 <DialogFooter className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    className="border-gray-700"
+                    onClick={() => {
+                      const link = `${window.location.origin}${buildTenantPath(getCurrentTenantSlug(), "/estoque")}?veiculo=${selectedVehicle.id}&utm_source=veiculo&utm_medium=link_direto`;
+                      navigator.clipboard.writeText(link);
+                      toast.success("Link do veículo copiado!");
+                    }}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copiar Link
+                  </Button>
                   {selectedVehicle.externalUrl && (
                     <Button
                       variant="outline"

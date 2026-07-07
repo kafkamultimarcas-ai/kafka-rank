@@ -39,8 +39,8 @@ import {
   Printer,
   Bot,
 } from "lucide-react";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
+import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
@@ -112,6 +112,7 @@ const VISUAL_STATUS_CONFIG: Record<AppointmentStatus, { label: string; border: s
 };
 
 export default function MeusAgendamentos() {
+  const { logoUrl, name: brandName } = useBranding();
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
   const [, setLocation] = useLocation();
@@ -134,6 +135,8 @@ export default function MeusAgendamentos() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<any>({});
 
+  const tenantSlug = getCurrentTenantSlug();
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: appointments, isLoading } = trpc.sdr.myAppointments.useQuery({ sellerId }, { enabled: sellerId > 0, refetchInterval: 10000 });
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
@@ -288,6 +291,7 @@ export default function MeusAgendamentos() {
       sellerMap,
       title: `Agendamentos - ${sellerName}`,
       sellerName,
+      brandName,
     });
     if (success) toast.success('PDF baixado com sucesso!');
   };
@@ -416,6 +420,20 @@ export default function MeusAgendamentos() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Vendedor não encontrado.</p>
+      </div>
+    );
+  }
+
+  // Vendedor logado só pode ver os próprios agendamentos (gerente vê de qualquer um, igual no backend)
+  if (sellerSession && sellerSession.id !== sellerId && sellerSession.sellerRole !== "gerente") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Você não tem permissão para acessar os agendamentos deste colaborador.</p>
+          <Button onClick={() => setLocation(buildTenantPath(tenantSlug, `/agendamentos/${sellerSession.id}`))} className="bg-red-600 hover:bg-red-500">
+            Ir para meus agendamentos
+          </Button>
+        </div>
       </div>
     );
   }
@@ -950,7 +968,7 @@ export default function MeusAgendamentos() {
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={LOGO_URL} alt="Kafka Rank" className="h-7 w-7 rounded" />
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded" />
             <span className="font-heading font-bold text-sm text-foreground">AGENDAMENTOS</span>
           </div>
           <div className="flex items-center gap-2">
