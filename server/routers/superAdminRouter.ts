@@ -8,8 +8,9 @@ import bcrypt from "bcryptjs";
 import { getPublicTenantBySlug, clearTenantLimitsCache } from "../tenantService";
 import { encryptSecret } from "../_core/secretCrypto";
 import { clearCredentialsCache as clearZapiCredentialsCache } from "../zapi-service";
-import { provisionTenant, checkSlugAndUsernameAvailability } from "../tenantProvisioning";
+import { provisionTenant, checkSignupAvailability } from "../tenantProvisioning";
 import { signSuperToken, verifySuperToken } from "../superAdminAuth";
+import { TRIAL_PLAN_LIMITS } from "../../shared/plans";
 
 export const superAdminRouter = router({
   // ========== AUTH ==========
@@ -117,17 +118,16 @@ export const superAdminRouter = router({
     .input(z.object({
       token: z.string(),
       name: z.string().min(2),
-      slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
+      slug: z.string().min(2).regex(/^[a-z0-9-]+$/).optional(),
       phone: z.string().optional(),
       email: z.string().optional(),
       city: z.string().optional(),
       state: z.string().max(2).optional(),
       address: z.string().optional(),
       plan: z.enum(["trial", "basic", "pro", "enterprise"]).default("trial"),
-      maxSellers: z.number().default(10),
-      maxAdmins: z.number().default(2),
-      // Admin credentials for the new tenant
-      adminUsername: z.string().min(3),
+      maxSellers: z.number().default(TRIAL_PLAN_LIMITS.maxSellers),
+      maxAdmins: z.number().default(TRIAL_PLAN_LIMITS.maxAdmins),
+      adminEmail: z.string().email("E-mail do administrador inválido"),
       adminPassword: z.string().min(4),
       adminName: z.string().min(2),
     }))
@@ -135,9 +135,9 @@ export const superAdminRouter = router({
       const payload = verifySuperToken(input.token);
       if (!payload) throw new Error("Não autorizado");
 
-      const { tenantId } = await provisionTenant({
+      const { tenantId, slug } = await provisionTenant({
         name: input.name,
-        slug: input.slug,
+        slug: input.slug || input.name,
         phone: input.phone,
         email: input.email,
         city: input.city,
@@ -146,28 +146,28 @@ export const superAdminRouter = router({
         plan: input.plan,
         maxSellers: input.maxSellers,
         maxAdmins: input.maxAdmins,
-        adminUsername: input.adminUsername,
+        adminEmail: input.adminEmail,
         adminPassword: input.adminPassword,
         adminName: input.adminName,
       });
 
-      return { tenantId, slug: input.slug, message: `Loja "${input.name}" criada com sucesso!` };
+      return { tenantId, slug, message: `Loja "${input.name}" criada com sucesso!` };
     }),
 
   checkAvailability: publicProcedure
     .input(z.object({
       token: z.string(),
       slug: z.string().min(2).regex(/^[a-z0-9-]+$/).optional(),
-      adminUsername: z.string().min(3).optional(),
+      adminEmail: z.string().min(3).optional(),
       tenantId: z.number().optional(),
     }))
     .query(async ({ input }) => {
       const payload = verifySuperToken(input.token);
       if (!payload) throw new Error("Não autorizado");
 
-      return checkSlugAndUsernameAvailability({
+      return checkSignupAvailability({
         slug: input.slug,
-        adminUsername: input.adminUsername,
+        adminEmail: input.adminEmail,
         tenantId: input.tenantId,
       });
     }),

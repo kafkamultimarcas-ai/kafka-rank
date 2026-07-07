@@ -124,26 +124,27 @@ export const adminAuthRouter = router({
   }),
 
   create: adminProcedure.input(z.object({
-    username: z.string().min(3),
+    username: z.string().min(3).optional(),
     password: z.string().min(4),
     name: z.string().min(1),
-    email: z.string().email().optional(),
+    email: z.string().email("E-mail do admin inválido"),
     phone: z.string().optional(),
     role: z.enum(["owner", "admin"]).optional(),
     permissions: z.string().optional(),
     mustChangePassword: z.boolean().optional(),
   })).mutation(async ({ input }) => {
     const hash = await bcrypt.hash(input.password, 10);
+    const username = input.username || input.email.split("@")[0];
     const id = await crmDb.createAdmin({
-      username: input.username,
+      username,
       passwordHash: hash,
       name: input.name,
       role: input.role,
       permissions: input.permissions,
       email: input.email,
       phone: input.phone,
-      mustChangePassword: input.mustChangePassword ?? true, // Default: must change on first login
-    } as any);
+      mustChangePassword: input.mustChangePassword ?? true,
+    });
     return { id };
   }),
 

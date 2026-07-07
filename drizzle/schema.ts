@@ -28,24 +28,25 @@ export const sellers = mysqlTable("sellers", {
   competitionPhotoUrl: text("competitionPhotoUrl"), // foto separada para competição (não altera a principal)
   competitionPhotoKey: varchar("competitionPhotoKey", { length: 500 }),
   phone: varchar("phone", { length: 20 }),
-  email: varchar("email", { length: 320 }),
+  email: varchar("email", { length: 320 }).notNull(),
   department: varchar("department", { length: 100 }).default("vendas"), // vendas, pre_vendas, fei, consignacao, despachante
   active: boolean("active").default(true).notNull(),
   totalSales: int("totalSales").default(0).notNull(),
   totalPoints: int("totalPoints").default(0).notNull(),
   username: varchar("username", { length: 100 }),
   passwordHash: varchar("passwordHash", { length: 255 }),
-  inviteToken: varchar("inviteToken", { length: 64 }), // token de uso único pro vendedor criar seu próprio login (primeiro acesso)
+  inviteToken: varchar("inviteToken", { length: 64 }),
   lastAccess: bigint("lastAccess", { mode: "number" }),
-  sellerRole: varchar("sellerRole", { length: 20 }).default("vendedor"), // vendedor, gerente
-  leadReceiveBlocked: boolean("leadReceiveBlocked").default(false).notNull(), // bloqueado de receber leads
-  leadBanUntil: bigint("leadBanUntil", { mode: "number" }), // timestamp até quando está banido de receber leads
-  leadBanReason: varchar("leadBanReason", { length: 255 }), // motivo do ban
+  sellerRole: varchar("sellerRole", { length: 20 }).default("vendedor"),
+  leadReceiveBlocked: boolean("leadReceiveBlocked").default(false).notNull(),
+  leadBanUntil: bigint("leadBanUntil", { mode: "number" }),
+  leadBanReason: varchar("leadBanReason", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
 }, (table) => ({
   tenantUsernameIdx: uniqueIndex("sellers_tenant_username_idx").on(table.tenantId, table.username),
+  emailIdx: uniqueIndex("sellers_email_idx").on(table.email),
 }));
 
 export type Seller = typeof sellers.$inferSelect;
@@ -443,13 +444,14 @@ export const managers = mysqlTable("managers", {
   username: varchar("username", { length: 100 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 320 }),
+  email: varchar("email", { length: 320 }).notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
 }, (table) => ({
   tenantUsernameIdx: uniqueIndex("managers_tenant_username_idx").on(table.tenantId, table.username),
+  emailIdx: uniqueIndex("managers_email_idx").on(table.email),
 }));
 
 export type Manager = typeof managers.$inferSelect;
@@ -479,7 +481,7 @@ export const admins = mysqlTable("admins", {
   username: varchar("username", { length: 100 }).notNull(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 320 }),
+  email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("admin_phone", { length: 20 }),
   mustChangePassword: boolean("mustChangePassword").default(false).notNull(),
   lastAccess: bigint("admin_lastAccess", { mode: "number" }),
@@ -491,6 +493,7 @@ export const admins = mysqlTable("admins", {
   tenantId: int("tenantId").notNull().default(1),
 }, (table) => ({
   tenantUsernameIdx: uniqueIndex("admins_tenant_username_idx").on(table.tenantId, table.username),
+  emailIdx: uniqueIndex("admins_email_idx").on(table.email),
 }));
 
 export type Admin = typeof admins.$inferSelect;

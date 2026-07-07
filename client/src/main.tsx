@@ -32,7 +32,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!isUnauthorized) return;
 
   if (window.location.pathname.startsWith("/super-admin")) {
-    window.location.href = "/super-admin";
+    window.location.href = "/login";
     return;
   }
 

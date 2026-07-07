@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { buildTenantPath } from "@/lib/tenant";
 import { AlertTriangle, Clock3, CreditCard } from "lucide-react";
 import { useLocation } from "wouter";
+import { TRIAL_PERIOD_DAYS } from "@shared/plans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -65,7 +66,7 @@ export default function TrialStatusBanner({
           <div>
             <p className="font-semibold text-amber-300">Período Trial</p>
             <p className="text-amber-100/90">
-              Faltam {daysLeft} {dayLabel} para acabar seu acesso gratuito de 30 dias.
+              Faltam {daysLeft} {dayLabel} para acabar seu acesso gratuito de {TRIAL_PERIOD_DAYS} dias.
             </p>
           </div>
         </div>

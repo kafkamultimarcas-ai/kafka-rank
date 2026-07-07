@@ -2,12 +2,11 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useBranding } from "@/contexts/TenantContext";
-import { StoreLoginPicker } from "@/components/StoreLoginPicker";
 import {
   Flag, Trophy, MessageCircle, BarChart3, Car, Wallet, Users, Bot,
   CheckCircle2, ArrowRight, Menu, X, Instagram, Facebook, Mail, LogIn, Zap,
 } from "lucide-react";
-import { PLAN_CONFIG, LAUNCH_PROMO_LIMIT, formatCentsToBRL } from "@shared/plans";
+import { PLAN_CONFIG, LAUNCH_PROMO_LIMIT, TRIAL_PERIOD_DAYS, TRIAL_PLAN_LIMITS, formatCentsToBRL } from "@shared/plans";
 
 const PLANS = [
   {
@@ -15,10 +14,10 @@ const PLANS = [
     name: "Trial",
     price: "Grátis",
     originalPrice: null as string | null,
-    period: "por 30 dias",
+    period: `por ${TRIAL_PERIOD_DAYS} dias`,
     highlight: false,
     description: "Para conhecer a plataforma sem compromisso.",
-    features: ["Até 5 vendedores", "1 administrador", "Todos os módulos liberados", "Sem cartão de crédito"],
+    features: [`Até ${TRIAL_PLAN_LIMITS.maxSellers} vendedores`, `1 administrador`, "Todos os módulos liberados", "Sem cartão de crédito"],
     cta: "Começar agora",
   },
   {
@@ -69,27 +68,12 @@ const FEATURES = [
 
 const WHATSAPP_CONTACT = "https://wa.me/5500000000000";
 
-function LoginPrompt({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="racing-card w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-heading text-lg font-bold text-foreground">Entrar na sua loja</h3>
-          <button onClick={onClose} className="rounded-lg p-1 hover:bg-accent">
-            <X className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </div>
-        <StoreLoginPicker title="" description="Selecione sua loja para ir direto para a tela de login dela." />
-      </div>
-    </div>
-  );
-}
-
 export default function ComercialHome() {
   const [, navigate] = useLocation();
   const { name: brandName, logoUrl } = useBranding();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  const goToLogin = () => navigate("/login");
 
   const scrollTo = (id: string) => {
     setMobileMenuOpen(false);
@@ -118,7 +102,7 @@ export default function ComercialHome() {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
-            <Button variant="ghost" onClick={() => setShowLoginPrompt(true)}>
+            <Button variant="ghost" onClick={() => goToLogin()}>
               <LogIn className="mr-1.5 h-4 w-4" /> Entrar
             </Button>
             <Button onClick={() => goToSignup()} className="racing-gradient text-white">
@@ -138,7 +122,7 @@ export default function ComercialHome() {
             <button onClick={() => scrollTo("planos")} className="block w-full py-2 text-left text-sm text-muted-foreground">Planos e Preços</button>
             <button onClick={() => scrollTo("sobre")} className="block w-full py-2 text-left text-sm text-muted-foreground">Quem Somos</button>
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowLoginPrompt(true)}>Entrar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => goToLogin()}>Entrar</Button>
               <Button className="flex-1 racing-gradient text-white" onClick={() => goToSignup()}>Criar loja grátis</Button>
             </div>
           </div>
@@ -163,11 +147,11 @@ export default function ComercialHome() {
               <Button size="lg" onClick={() => goToSignup()} className="racing-gradient glow-orange text-white">
                 Criar loja grátis <ArrowRight className="ml-1.5 h-4 w-4" />
               </Button>
-              <Button size="lg" variant="outline" onClick={() => setShowLoginPrompt(true)}>
+              <Button size="lg" variant="outline" onClick={() => goToLogin()}>
                 Já tenho uma loja
               </Button>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">Trial de 30 dias grátis. Sem cartão de crédito.</p>
+            <p className="mt-4 text-xs text-muted-foreground">Trial de {TRIAL_PERIOD_DAYS} dias grátis. Sem cartão de crédito.</p>
           </div>
         </div>
       </section>
@@ -197,7 +181,7 @@ export default function ComercialHome() {
           <div className="mx-auto mb-6 max-w-xl text-center">
             <h2 className="mb-3 font-heading text-3xl font-bold text-foreground">Planos e Preços</h2>
             <p className="text-muted-foreground">
-              Faça o cadastro agora, entre no trial grátis por 30 dias e depois assine o plano ideal dentro da plataforma.
+              Faça o cadastro agora, entre no trial grátis por {TRIAL_PERIOD_DAYS} dias e depois assine o plano ideal dentro da plataforma.
             </p>
           </div>
 
@@ -292,7 +276,6 @@ export default function ComercialHome() {
         </div>
       </footer>
 
-      {showLoginPrompt && <LoginPrompt onClose={() => setShowLoginPrompt(false)} />}
     </div>
   );
 }

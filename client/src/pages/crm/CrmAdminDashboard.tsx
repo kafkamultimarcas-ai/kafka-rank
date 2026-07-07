@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
-import { useAdminAuth } from "./CrmAdminLogin";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 import {
   LayoutDashboard, Users, SlidersHorizontal, Car, Megaphone, Settings,
   LogOut, Search, Flame, Thermometer, Snowflake, TrendingUp, UserPlus,
@@ -87,7 +87,8 @@ export default function CrmAdminDashboard() {
   }, [isLoading, isAuthenticated, navigate, tenantSlug]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.split("?")[1] || "");
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    const params = new URLSearchParams(search);
     const nextView = params.get("view");
     if (isAdminView(nextView) && nextView !== activeView) {
       setActiveView(nextView);
@@ -2070,13 +2071,23 @@ function SettingsView() {
             </div>
 
             <Button size="sm" onClick={() => {
-              if (!form.name || !form.username || !form.password) { toast.error("Preencha todos os campos"); return; }
-              createAdmin.mutate({
-                name: form.name, username: form.username, password: form.password,
-                email: form.email || undefined, phone: form.phone || undefined,
-                role: form.role as any, permissions: JSON.stringify(form.permissions),
+              if (!form.name || !form.username || !form.password || !form.email) { toast.error("Preencha todos os campos"); return; }
+              const name = form.name!;
+              const username = form.username!;
+              const password = form.password!;
+              const email = form.email!;
+              const { phone, role, permissions } = form;
+              const payload = {
+                name,
+                username,
+                password,
+                email,
+                role: role as any,
+                permissions: JSON.stringify(permissions),
                 mustChangePassword: true,
-              });
+                ...(phone ? { phone } : {}),
+              };
+              createAdmin.mutate(payload);
             }} disabled={createAdmin.isPending} className="w-full racing-gradient text-white">
               {createAdmin.isPending ? "Criando..." : "Criar Admin"}
             </Button>
@@ -3204,8 +3215,18 @@ function SDRManagementView() {
           <div className="flex gap-2 mt-3">
             <Button
               onClick={() => {
-                if (!sdrForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
-                createSeller.mutate({ name: sdrForm.name, nickname: sdrForm.nickname || undefined, phone: sdrForm.phone || undefined, email: sdrForm.email || undefined, department: "pre_vendas" });
+                if (!sdrForm.name.trim() || !sdrForm.email?.trim()) { toast.error("Nome e email são obrigatórios"); return; }
+                const name = sdrForm.name!;
+                const email = sdrForm.email!.trim();
+                const { nickname, phone } = sdrForm;
+                const payload = {
+                  name,
+                  email,
+                  department: "pre_vendas" as const,
+                  ...(nickname ? { nickname } : {}),
+                  ...(phone ? { phone } : {}),
+                };
+                createSeller.mutate(payload);
               }}
               disabled={createSeller.isPending}
               className="bg-purple-600 hover:bg-purple-700 text-white"

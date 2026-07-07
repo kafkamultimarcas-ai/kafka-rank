@@ -6,6 +6,7 @@ import type { TrpcContext } from "./_core/context";
 import { getDb } from "./db";
 import { tenants, admins } from "../drizzle/schema";
 import { getTenantLimits, clearTenantLimitsCache } from "./tenantService";
+import { TRIAL_PERIOD_DAYS } from "../shared/plans";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const createdTenantIds: number[] = [];
@@ -59,7 +60,7 @@ describe("getTenantLimits - trialExpired", () => {
   });
 
   it("não marca trialExpired quando o trial ainda não venceu", async () => {
-    const tenantId = await createTenant({ trialEndsAt: Date.now() + 29 * DAY_MS });
+    const tenantId = await createTenant({ trialEndsAt: Date.now() + (TRIAL_PERIOD_DAYS - 1) * DAY_MS });
     const limits = await getTenantLimits(tenantId);
     expect(limits?.trialExpired).toBe(false);
   });
@@ -91,7 +92,7 @@ describe("tenantAuth.login - trial expirado", () => {
 
   it("devolve trialExpired=false no login quando a loja está dentro do trial", async () => {
     const hash = await bcrypt.hash("senha123", 10);
-    const tenantId = await createTenant({ trialEndsAt: Date.now() + 29 * DAY_MS });
+    const tenantId = await createTenant({ trialEndsAt: Date.now() + (TRIAL_PERIOD_DAYS - 1) * DAY_MS });
     const db = await getDb();
     const username = `admin-trial-ok-${tenantId}`;
     await db!.insert(admins).values({

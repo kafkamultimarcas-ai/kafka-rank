@@ -10,8 +10,6 @@ import TrialExpiredGate from "./components/TrialExpiredGate";
 import { lazy, Suspense } from "react";
 import { Flag } from "lucide-react";
 
-// Eagerly loaded (always needed)
-import Home from "./pages/Home";
 import NotFound from "@/pages/NotFound";
 
 // Lazy loaded pages - code split into separate chunks
@@ -46,7 +44,7 @@ const RaceTrack = lazy(() => import("./pages/RaceTrack"));
 const RegisterSale = lazy(() => import("./pages/RegisterSale"));
 const TVMode = lazy(() => import("./pages/TVMode"));
 const MeusAgendamentos = lazy(() => import("./pages/MeusAgendamentos"));
-const SellerLogin = lazy(() => import("./pages/SellerLogin"));
+const UnifiedLogin = lazy(() => import("./pages/UnifiedLogin"));
 const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
 const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
 const MinhaArea = lazy(() => import("./pages/MinhaArea"));
@@ -71,7 +69,6 @@ const VehicleSearch = lazy(() => import("./pages/VehicleSearch"));
 const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
 const CrmPipeline = lazy(() => import("./pages/crm/CrmPipeline"));
-const CrmAdminLogin = lazy(() => import("./pages/crm/CrmAdminLogin"));
 const CrmAdminDashboard = lazy(() => import("./pages/crm/CrmAdminDashboard"));
 const IntegrationDocs = lazy(() => import("./pages/crm/IntegrationDocs"));
 const ComercialHome = lazy(() => import("./pages/public/ComercialHome"));
@@ -93,7 +90,7 @@ function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={ComercialHome} />
         <Route path="/corrida/:id" component={RaceTrack} />
         <Route path="/competicao/:id" component={CompetitionView} />
         <Route path="/vendedor/:id" component={SellerProfile} />
@@ -101,10 +98,9 @@ function Router() {
         <Route path="/registrar-venda" component={RegisterSale} />
         <Route path="/tv" component={TVMode} />
         <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
-        <Route path="/login-vendedor" component={SellerLogin} />
-        <Route path="/t/:slug/login" component={SellerLogin} />
-        <Route path="/t/:slug/esqueci-senha" component={EsqueciSenha} />
-        <Route path="/t/:slug/redefinir-senha" component={RedefinirSenha} />
+        <Route path="/login" component={UnifiedLogin} />
+        <Route path="/esqueci-senha" component={EsqueciSenha} />
+        <Route path="/redefinir-senha" component={RedefinirSenha} />
         <Route path="/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/t/:slug/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/admin" component={AdminDashboard} />
@@ -163,9 +159,6 @@ function Router() {
         <Route path="/crm" component={CrmCommandCenter} />
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />
         <Route path="/crm/pipeline" component={CrmPipeline} />
-        <Route path="/crm/admin/login" component={CrmAdminLogin} />
-        <Route path="/t/:slug/admin/login" component={CrmAdminLogin} />
-        <Route path="/t/:slug/crm/admin/login" component={CrmAdminLogin} />
         <Route path="/crm/admin" component={CrmAdminDashboard} />
         <Route path="/t/:slug/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />

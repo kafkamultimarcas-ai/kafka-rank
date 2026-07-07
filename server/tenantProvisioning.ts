@@ -1,7 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb, withRetry } from "./db";
 import { tenants, admins, crmPipelineStages, finCategories } from "../drizzle/schema";
 import bcrypt from "bcryptjs";
+import { assertGlobalUsernameAvailable, isGlobalUsernameAvailable, normalizeUsername } from "./usernamePolicy";
+import { assertGlobalEmailAvailable, isGlobalEmailAvailable, normalizeEmail, isValidEmail } from "./emailPolicy";
+import { TRIAL_PERIOD_DAYS } from "../shared/plans";
 
 export type ProvisionTenantInput = {
   name: string;
@@ -14,7 +17,7 @@ export type ProvisionTenantInput = {
   plan: "trial" | "basic" | "pro" | "enterprise";
   maxSellers: number;
   maxAdmins: number;
-  adminUsername: string;
+  adminEmail: string;
   adminPassword: string;
   adminName: string;
 };
@@ -23,7 +26,46 @@ export type ProvisionTenantResult = {
   tenantId: number;
   slug: string;
   adminId: number;
+  adminEmail: string;
+  adminUsername: string;
 };
+
+const slugRe = /^[a-z0-9-]+$/;
+
+export function baseSlugFromName(name: string): string {
+  const normalized = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return normalized || "loja";
+}
+
+async function generateUniqueSlug(base: string): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const clean = base.trim().toLowerCase();
+  const candidate = slugRe.test(clean) ? clean : baseSlugFromName(clean);
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const suffix = attempt === 0 ? "" : `-${attempt + 1}`;
+    const slug = `${candidate}${suffix}`.slice(0, 50);
+    const rows = await withRetry(() => db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug)).limit(1));
+    if ((rows as any[]).length === 0) return slug;
+  }
+  throw new Error("Não foi possível gerar um slug único para a loja");
+}
+
+async function generateUniqueUsername(seed: string): Promise<string> {
+  const base = normalizeUsername(seed).replace(/[^a-z0-9_.-]/g, "").slice(0, 60) || "user";
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const suffix = attempt === 0 ? "" : `${attempt + 1}`;
+    const candidate = `${base}${suffix}`.slice(0, 90);
+    if (await isGlobalUsernameAvailable(candidate)) return candidate;
+  }
+  throw new Error("Não foi possível gerar um usuário único");
+}
 
 /**
  * Cria uma loja nova do zero: tenant, admin dono, estágios de pipeline padrão,
@@ -35,20 +77,17 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Revalida unicidade de slug no momento da escrita (defesa contra corrida além
-  // de qualquer checagem prévia feita pelo chamador).
-  const existing = await withRetry(() =>
-    db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, input.slug)).limit(1)
-  );
-  if ((existing as any[]).length > 0) throw new Error("Slug já existe. Escolha outro.");
+  const adminEmail = await assertGlobalEmailAvailable(input.adminEmail);
+  const slug = input.slug ? await generateUniqueSlug(input.slug) : await generateUniqueSlug(input.name);
+  const adminUsername = await generateUniqueUsername(adminEmail.split("@")[0]);
 
   const allModules = JSON.stringify(["ranking", "crm", "financeiro", "pos_venda", "consignacao", "mesa_credito", "marketing", "estoque", "iam", "treinamentos", "competicoes", "mata_mata"]);
-  const trialEnds = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days trial
+  const trialEnds = Date.now() + TRIAL_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
   const [result] = await withRetry(() =>
     db.insert(tenants).values({
       name: input.name,
-      slug: input.slug,
+      slug,
       phone: input.phone || "",
       email: input.email || "",
       city: input.city || "",
@@ -65,10 +104,6 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
 
   const tenantId = (result as any).insertId;
 
-  // Provisiona a linha de config do Atendente IA para esta loja (best-effort — a tabela
-  // não é rastreada pelo Drizzle, então só garantimos a coluna tenantId; os demais campos
-  // ficam com os defaults da tabela). Sem essa linha, a loja só herda os defaults do código
-  // até salvar suas próprias configurações pela primeira vez.
   try {
     const { sql } = await import("drizzle-orm");
     await db.execute(sql`INSERT INTO crm_ai_global_config (tenantId) VALUES (${tenantId})`);
@@ -79,7 +114,8 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
   const hash = await bcrypt.hash(input.adminPassword, 10);
   const [adminResult] = await withRetry(() =>
     db.insert(admins).values({
-      username: input.adminUsername,
+      username: adminUsername,
+      email: adminEmail,
       passwordHash: hash,
       name: input.adminName,
       role: "owner",
@@ -96,11 +132,8 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
     { department: "vendas", name: "Negociação", displayOrder: 4, color: "#EC4899", isDefault: false, isFinal: false },
     { department: "vendas", name: "Fechado", displayOrder: 5, color: "#10B981", isDefault: false, isFinal: true },
   ];
-
   for (const stage of defaultStages) {
-    await withRetry(() =>
-      db.insert(crmPipelineStages).values({ ...stage, tenantId } as any)
-    ).catch(() => {});
+    await withRetry(() => db.insert(crmPipelineStages).values({ ...stage, tenantId } as any)).catch(() => {});
   }
 
   const defaultCategories = [
@@ -113,37 +146,35 @@ export async function provisionTenant(input: ProvisionTenantInput): Promise<Prov
     { name: "Venda de Veículo", type: "income" as const, color: "#22C55E" },
     { name: "Financiamento", type: "income" as const, color: "#06B6D4" },
   ];
-
   for (const cat of defaultCategories) {
-    await withRetry(() =>
-      db.insert(finCategories).values({ ...cat, tenantId } as any)
-    ).catch(() => {});
+    await withRetry(() => db.insert(finCategories).values({ ...cat, tenantId } as any)).catch(() => {});
   }
 
-  return { tenantId, slug: input.slug, adminId };
+  return { tenantId, slug, adminId, adminEmail, adminUsername };
 }
 
 export type AvailabilityCheckParams = {
   slug?: string;
-  adminUsername?: string;
+  adminEmail?: string;
   tenantId?: number;
 };
 
 export type AvailabilityCheckResult = {
   slug: { value: string; available: boolean } | null;
-  adminUsername: { value: string; available: boolean } | null;
+  adminEmail: { value: string; available: boolean; reason?: string } | null;
 };
 
-/** Checa disponibilidade de slug de loja e/ou username de admin, globalmente. */
-export async function checkSlugAndUsernameAvailability(params: AvailabilityCheckParams): Promise<AvailabilityCheckResult> {
+/** Checa disponibilidade de slug de loja e/ou email de admin, globalmente. */
+export async function checkSignupAvailability(params: AvailabilityCheckParams): Promise<AvailabilityCheckResult> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const normalizedSlug = params.slug?.trim().toLowerCase();
-  const normalizedAdminUsername = params.adminUsername?.trim().toLowerCase();
+  const normalizedEmail = params.adminEmail ? normalizeEmail(params.adminEmail) : undefined;
 
   let slugAvailable = true;
-  let adminUsernameAvailable = true;
+  let emailAvailable = true;
+  let emailReason: string | undefined;
 
   if (normalizedSlug) {
     const slugRows = await withRetry(() =>
@@ -152,20 +183,18 @@ export async function checkSlugAndUsernameAvailability(params: AvailabilityCheck
     slugAvailable = (slugRows as any[]).length === 0;
   }
 
-  if (normalizedAdminUsername) {
-    const adminRows = await withRetry(() =>
-      db.select({ id: admins.id, tenantId: admins.tenantId })
-        .from(admins)
-        .where(eq(admins.username, normalizedAdminUsername))
-        .limit(1)
-    );
-
-    const existingAdmin = (adminRows as any[])?.[0];
-    adminUsernameAvailable = !existingAdmin || (params.tenantId !== undefined && existingAdmin.tenantId === params.tenantId);
+  if (normalizedEmail) {
+    if (!isValidEmail(normalizedEmail)) {
+      emailAvailable = false;
+      emailReason = "invalid";
+    } else {
+      emailAvailable = await isGlobalEmailAvailable(normalizedEmail);
+      if (!emailAvailable) emailReason = "in_use";
+    }
   }
 
   return {
     slug: normalizedSlug ? { value: normalizedSlug, available: slugAvailable } : null,
-    adminUsername: normalizedAdminUsername ? { value: normalizedAdminUsername, available: adminUsernameAvailable } : null,
+    adminEmail: normalizedEmail ? { value: normalizedEmail, available: emailAvailable, reason: emailReason } : null,
   };
 }

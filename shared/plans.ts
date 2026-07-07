@@ -17,26 +17,33 @@ export type PlanConfig = {
   highlight?: boolean;
 };
 
+export const TRIAL_PERIOD_DAYS = 10;
+
+export const TRIAL_PLAN_LIMITS = {
+  maxSellers: 3,
+  maxAdmins: 1,
+} as const;
+
 export const PLAN_CONFIG: Record<PaidPlanId, PlanConfig> = {
   basic: {
     id: "basic",
     name: "Basic",
     monthlyPriceCents: 49900,
     originalPriceCents: 79900,
-    maxSellers: 15,
-    maxAdmins: 2,
+    maxSellers: 5,
+    maxAdmins: 1,
     description: "Para lojas pequenas que já venderam a ideia pro time.",
-    features: ["Até 15 vendedores", "2 administradores", "Todos os módulos", "Suporte por WhatsApp"],
+    features: ["Até 5 vendedores", "1 administrador", "Todos os módulos", "Suporte por WhatsApp"],
   },
   pro: {
     id: "pro",
     name: "Pro",
     monthlyPriceCents: 69900,
     originalPriceCents: 99900,
-    maxSellers: 30,
-    maxAdmins: 5,
+    maxSellers: 15,
+    maxAdmins: 2,
     description: "Para concessionárias com equipe grande e múltiplos setores.",
-    features: ["Até 30 vendedores", "5 administradores", "Todos os módulos", "Prioridade no suporte"],
+    features: ["Até 15 vendedores", "2 administradores", "Todos os módulos", "Prioridade no suporte"],
     highlight: true,
   },
   enterprise: {
@@ -54,6 +61,14 @@ export const PLAN_CONFIG: Record<PaidPlanId, PlanConfig> = {
 };
 
 export const LAUNCH_PROMO_LIMIT = 100;
+
+export function getDefaultPlanLimits(plan: "trial" | PaidPlanId) {
+  if (plan === "trial") return TRIAL_PLAN_LIMITS;
+  return {
+    maxSellers: PLAN_CONFIG[plan].maxSellers,
+    maxAdmins: PLAN_CONFIG[plan].maxAdmins,
+  };
+}
 
 export function formatCentsToBRL(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

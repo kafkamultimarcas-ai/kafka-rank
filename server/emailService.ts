@@ -194,7 +194,7 @@ export async function sendPasswordResetEmail(email: string, resetUrl: string, br
 export async function sendSignupWelcomeEmail(email: string, brandName: string, storeUrl: string, tenantId: number): Promise<boolean> {
   const html = emailShell(brandName, `
     <p style="color: #fff; font-size: 18px; font-weight: 700; margin: 0 0 12px;">Sua loja está pronta! 🎉</p>
-    <p style="color: #a0a0b0; font-size: 15px; margin: 0 0 20px;">Você tem 30 dias grátis pra explorar o ${brandName} com sua equipe.</p>
+    <p style="color: #a0a0b0; font-size: 15px; margin: 0 0 20px;">Você tem 10 dias grátis pra explorar o ${brandName} com sua equipe.</p>
     <a href="${storeUrl}" style="display: inline-block; background: linear-gradient(135deg, #dc2626, #991b1b); color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 15px;">Acessar minha loja</a>
     <p style="color: #555; font-size: 12px; margin: 24px 0 0;">Guarde este e-mail: é ele que confirma que sua loja foi criada com sucesso.</p>
   `);

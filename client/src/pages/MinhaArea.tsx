@@ -31,6 +31,7 @@ import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Bu
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
+import { useBranding } from "@/contexts/TenantContext";
 
 const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gradient: string }> = {
   vendas: { label: "Vendas", color: "text-red-400", icon: Car, gradient: "from-red-600/20 to-red-500/10 border-red-500/30" },
@@ -135,6 +136,7 @@ export default function MinhaArea() {
   const [, navigate] = useLocation();
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
+  const { name: tenantName } = useBranding();
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
@@ -143,6 +145,7 @@ export default function MinhaArea() {
 
   const dept = sellerSession?.department || "vendas";
   const deptInfo = DEPT_CONFIG[dept] || DEPT_CONFIG.vendas;
+  const sellerDisplayName = seller?.nickname || seller?.name || sellerSession?.nickname || sellerSession?.name || "Vendedor";
 
   // Link de vendas rastreável ("meu link") - leva pro estoque público já marcado com este vendedor
   const [linkCopied, setLinkCopied] = useState(false);
@@ -508,7 +511,8 @@ export default function MinhaArea() {
               {uploadingPhoto && <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
             </div>
             <div>
-              <p className="text-white font-bold text-sm">{seller?.nickname || seller?.name}</p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{tenantName}</p>
+              <p className="text-white font-bold text-sm">{sellerDisplayName}</p>
               <p className={`text-xs ${deptInfo.color}`}>{deptInfo.label}</p>
             </div>
           </div>

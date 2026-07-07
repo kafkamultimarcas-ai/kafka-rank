@@ -37,6 +37,8 @@ import {
   vehicleCostItems, InsertVehicleCostItem,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { assertGlobalUsernameAvailable } from "./usernamePolicy";
+import { assertGlobalEmailAvailable } from "./emailPolicy";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -218,14 +220,27 @@ export async function createSeller(data: InsertSeller) {
       throw new Error(`Limite de vendedores do plano atingido (${limits.maxSellers}). Fale com o suporte para aumentar seu plano.`);
     }
   }
-  const result = await db.insert(sellers).values({...data, tenantId});
+  if (!data.email) throw new Error("E-mail do vendedor é obrigatório");
+  const email = await assertGlobalEmailAvailable(data.email);
+  const result = await db.insert(sellers).values({ ...data, email, tenantId });
   return result[0].insertId;
 }
 
 export async function updateSeller(id: number, data: Partial<InsertSeller>) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(sellers).set(data).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, id)));
+  const updateData: Partial<InsertSeller> = { ...data };
+  if (typeof data.username === "string") {
+    updateData.username = await assertGlobalUsernameAvailable(data.username, {
+      allow: [{ ownerType: "seller", ownerId: id }],
+    });
+  }
+  if (typeof data.email === "string") {
+    updateData.email = await assertGlobalEmailAvailable(data.email, {
+      allow: [{ ownerType: "seller", ownerId: id }],
+    });
+  }
+  await db.update(sellers).set(updateData).where(and(eq(sellers.tenantId, getCurrentTenantId()), eq(sellers.id, id)));
 }
 
 export async function deleteSeller(id: number) {
@@ -1867,10 +1882,12 @@ export async function setAppSetting(key: string, value: string) {
 
 // ===== MANAGERS (Gerentes com login por senha) =====
 
-export async function createManager(data: { username: string; passwordHash: string; name: string; email?: string }) {
+export async function createManager(data: { username: string; passwordHash: string; name: string; email: string }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const tenantId = getCurrentTenantId();
+  const username = await assertGlobalUsernameAvailable(data.username);
+  const email = await assertGlobalEmailAvailable(data.email);
   const limits = await getTenantLimits(tenantId);
   if (limits) {
     const [{ count }] = await db.select({ count: sql<number>`COUNT(*)` }).from(managers).where(and(eq(managers.tenantId, tenantId), eq(managers.active, true)));
@@ -1878,7 +1895,7 @@ export async function createManager(data: { username: string; passwordHash: stri
       throw new Error(`Limite de administradores do plano atingido (${limits.maxAdmins}). Fale com o suporte para aumentar seu plano.`);
     }
   }
-  const result = await db.insert(managers).values({...data, tenantId});
+  const result = await db.insert(managers).values({ ...data, email, username, tenantId });
   return result[0].insertId;
 }
 
@@ -1915,10 +1932,16 @@ export async function listManagers() {
   }).from(managers).where(eq(managers.tenantId, getCurrentTenantId())).orderBy(managers.name);
 }
 
-export async function updateManager(id: number, data: { name?: string; passwordHash?: string; active?: boolean }) {
+export async function updateManager(id: number, data: { name?: string; username?: string; passwordHash?: string; active?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
-  await db.update(managers).set(data).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.id, id)));
+  const updateData: Record<string, unknown> = { ...data };
+  if (typeof data.username === "string") {
+    updateData.username = await assertGlobalUsernameAvailable(data.username, {
+      allow: [{ ownerType: "manager", ownerId: id }],
+    });
+  }
+  await db.update(managers).set(updateData).where(and(eq(managers.tenantId, getCurrentTenantId()), eq(managers.id, id)));
 }
 
 export async function deleteManager(id: number) {
