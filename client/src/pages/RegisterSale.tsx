@@ -216,7 +216,18 @@ export default function RegisterSale() {
   const recognitionRef = useRef<any>(null);
 
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
+
+  // Vendedor comum: identidade vem da sessão, não de um dropdown (o backend já
+  // rejeita sellerId diferente do da sessão pra esse tipo de login). Gerente
+  // continua podendo escolher em nome de quem está lançando.
+  const isLockedToSession = !!sellerSession && sellerSession.sellerRole !== "gerente";
+  useEffect(() => {
+    if (isLockedToSession && sellerSession) {
+      setSellerId(String(sellerSession.id));
+    }
+  }, [isLockedToSession, sellerSession]);
 
   const registerSale = trpc.sales.registerBySeller.useMutation();
   const registerFei = trpc.fei.register.useMutation();
@@ -562,31 +573,38 @@ export default function RegisterSale() {
                 <Flag className="w-4 h-4 text-red-400" />
                 Quem é você?
               </Label>
-              <Select value={sellerId} onValueChange={setSellerId}>
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                  <SelectValue placeholder="Selecione seu nome" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {sellers?.filter(s => {
-                    const dept = s.department || 'vendas';
-                    if (category === 'vendas') return dept === 'vendas';
-                    if (category === 'fei') return dept === 'fei';
-                    if (category === 'consignacao') return dept === 'consignacao';
-                    if (category === 'despachante') return dept === 'despachante';
-                    if (category === 'pre_vendas') return dept === 'pre_vendas' || dept === 'vendas';
-                    return true;
-                  }).map(seller => (
-                    <SelectItem key={seller.id} value={seller.id.toString()} className="text-white hover:bg-gray-700">
-                      <div className="flex items-center gap-2">
-                        {seller.photoUrl && (
-                          <img src={seller.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
-                        )}
-                        {seller.name} {seller.nickname ? `(${seller.nickname})` : ''}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isLockedToSession ? (
+                <div className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2.5">
+                  <User className="w-4 h-4 text-red-400 shrink-0" />
+                  <span className="text-white text-sm">Registrando como: <strong>{sellerSession?.name}</strong></span>
+                </div>
+              ) : (
+                <Select value={sellerId} onValueChange={setSellerId}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Selecione seu nome" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    {sellers?.filter(s => {
+                      const dept = s.department || 'vendas';
+                      if (category === 'vendas') return dept === 'vendas';
+                      if (category === 'fei') return dept === 'fei';
+                      if (category === 'consignacao') return dept === 'consignacao';
+                      if (category === 'despachante') return dept === 'despachante';
+                      if (category === 'pre_vendas') return dept === 'pre_vendas' || dept === 'vendas';
+                      return true;
+                    }).map(seller => (
+                      <SelectItem key={seller.id} value={seller.id.toString()} className="text-white hover:bg-gray-700">
+                        <div className="flex items-center gap-2">
+                          {seller.photoUrl && (
+                            <img src={seller.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                          )}
+                          {seller.name} {seller.nickname ? `(${seller.nickname})` : ''}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Foto do selecionado */}

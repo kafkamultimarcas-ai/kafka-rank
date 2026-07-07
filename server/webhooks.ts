@@ -1,11 +1,13 @@
 import type { Express, Request, Response } from "express";
 import crypto from "crypto";
+import { nanoid } from "nanoid";
 import * as crmDb from "./crmDb";
 import { getDb } from "./db";
 import { sellers, crmLeadDistribution, inventoryVehicles, crmMessages } from "../drizzle/schema";
 import { eq, and, asc, like, or, sql, desc, ne } from "drizzle-orm";
 import { invokeLLM } from "./_core/llm";
 import * as zapi from "./zapi-service";
+import { sendPrivateReply as metaMessagingSendPrivateReply } from "./metaMessagingService";
 import { sendPushNewLead, sendPushLeadTransferred } from "./pushService";
 import { createNotification } from "./db";
 import { withTenantAsync, getCurrentTenantId } from "./tenantDb";
@@ -15,6 +17,8 @@ import { subscriptionEvents, tenants } from "../drizzle/schema";
 import { PLAN_CONFIG, type PaidPlanId } from "../shared/plans";
 import { sendSubscriptionConfirmedEmail, sendSubscriptionSuspendedEmail } from "./emailService";
 import { getRequestOrigin } from "./_core/cookies";
+import { logger } from "./_core/logger";
+import { createBillingAlert } from "./billingAlertService";
 
 // ===== META GRAPH API HELPER =====
 async function fetchMetaLeadData(leadgenId: string, pageAccessToken: string): Promise<{ name: string; phone: string | null; email: string | null; fields: Record<string, string> } | null> {
@@ -54,6 +58,188 @@ function verifyMetaSignature(payload: string, signature: string, appSecret: stri
   if (!signature || !appSecret) return false;
   const expectedSig = "sha256=" + crypto.createHmac("sha256", appSecret).update(payload).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
+}
+
+// ===== META MESSENGER/INSTAGRAM DM =====
+// Processa um item de `entry[].messaging[]` (formato unificado da Meta pra
+// Messenger e Instagram DM). Reaproveita o mesmo padrao de dedup/lock/debounce
+// e o mesmo fluxo de criar-ou-atualizar lead usado pelo webhook do WhatsApp,
+// so troca a identidade do contato (phone) pelo PSID/IGSID do remetente.
+async function handleMetaMessagingEvent(messagingEvent: any, source: "instagram" | "messenger"): Promise<void> {
+  const message = messagingEvent?.message;
+  if (!message) return; // postbacks/read receipts sem `message` - fora do escopo do MVP
+
+  const mid = message.mid || null;
+  if (isDuplicate(mid)) return;
+
+  const isEcho = message.is_echo === true;
+  // Em echo (mensagem enviada PELA loja) o "dono da conversa" e o destinatario;
+  // numa mensagem recebida, e o remetente.
+  const contactId: string | undefined = isEcho ? messagingEvent.recipient?.id : messagingEvent.sender?.id;
+  if (!contactId) return;
+
+  let messageType = "text";
+  let messageText = message.text || "";
+  let mediaUrl: string | null = null;
+  const attachment = Array.isArray(message.attachments) ? message.attachments[0] : null;
+  if (attachment) {
+    messageType = attachment.type || "document"; // image, video, audio, file
+    mediaUrl = attachment.payload?.url || null;
+    if (!messageText) messageText = `[${messageType === "image" ? "Foto" : messageType === "video" ? "Video" : messageType === "audio" ? "Audio" : "Midia"} recebida]`;
+  }
+  if (!messageText && !mediaUrl) return;
+
+  const timestamp = typeof messagingEvent.timestamp === "number" ? messagingEvent.timestamp : Date.now();
+
+  // Origem da conversa: link m.me/pagina?ref=X, anuncio CTWA-Instagram/Messenger, ou link de story.
+  // A Meta manda isso em messagingEvent.referral (primeira interacao) ou message.referral.
+  const referral = messagingEvent.referral || message.referral || null;
+
+  // Encontra o lead pelo PSID/IGSID guardado na coluna phone (mesmo padrao do WhatsApp).
+  // Filtro exato depois do LIKE do searchLeads pra evitar falso-positivo de substring.
+  const candidates = await crmDb.searchLeads(contactId);
+  const existingLead = candidates.find((l: any) => l.phone === contactId) || null;
+
+  if (isEcho) {
+    if (!existingLead) return; // enviamos pra um contato sem lead - nada a fazer
+    await crmDb.createMessage({
+      leadId: existingLead.id, phone: contactId, direction: "outbound", messageType,
+      content: messageText || null, mediaUrl, senderName: null, sentBy: null,
+      zapiMessageId: mid, timestamp,
+    });
+    return;
+  }
+
+  const leadSource = source === "instagram" ? "instagram" : "messenger";
+
+  if (existingLead) {
+    await crmDb.createMessage({
+      leadId: existingLead.id, phone: contactId, direction: "inbound", messageType,
+      content: messageText || null, mediaUrl, senderName: null, sentBy: null,
+      zapiMessageId: mid, timestamp,
+    });
+    await crmDb.updateLead(existingLead.id, { lastContactDate: Date.now() });
+
+    // Se um gerente esta segurando o lead, reatribui pra um vendedor (mesma regra do WhatsApp)
+    if (existingLead.sellerId > 0) {
+      try {
+        const dbConn = await getDb();
+        if (dbConn) {
+          const [currentSeller] = await dbConn.select().from(sellers).where(eq(sellers.id, existingLead.sellerId)).limit(1);
+          if (currentSeller?.sellerRole === "gerente") {
+            await crmDb.autoReassignLead(existingLead.id);
+          }
+        }
+      } catch { /* nao bloqueia o fluxo principal */ }
+    }
+
+    const leadIdForAi = existingLead.id;
+    debounceAiReply(leadIdForAi, () => {
+      if (!acquireAiLock(leadIdForAi)) return;
+      (async () => {
+        try {
+          const { handleAttendantMessage, getAttendantConfig, isAttendantActive } = await import("./ai-attendant");
+          const attendantCfg = await getAttendantConfig();
+          if (attendantCfg?.attendantEnabled && isAttendantActive(attendantCfg)) {
+            const result = await handleAttendantMessage(leadIdForAi, messageText, contactId, "meta");
+            if (result.sent) console.log(`[AI Attendant] Handled ${source} DM for lead #${leadIdForAi}, action: ${result.action || "reply"}`);
+          }
+        } catch (err: any) {
+          console.error(`[AI Attendant] Error on ${source} DM lead #${leadIdForAi}:`, err.message);
+        } finally {
+          releaseAiLock(leadIdForAi);
+        }
+      })();
+    });
+    return;
+  }
+
+  // Lead novo
+  const dept = "vendas";
+  const defaultStage = await crmDb.getDefaultStage(dept);
+
+  let vehicleInterestFromRef: string | null = null;
+  let referralNotes = "";
+  if (referral) {
+    referralNotes = `\n[Origem ${source}] ${JSON.stringify(referral)}`;
+    const veiculoMatch = typeof referral.ref === "string" ? referral.ref.match(/^veiculo_(\d+)$/) : null;
+    if (veiculoMatch) {
+      try {
+        const dbConn = await getDb();
+        if (dbConn) {
+          const [vehicle] = await dbConn.select().from(inventoryVehicles)
+            .where(and(eq(inventoryVehicles.id, Number(veiculoMatch[1])), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+            .limit(1);
+          if (vehicle) vehicleInterestFromRef = `${vehicle.brand} ${vehicle.model} (#${vehicle.id})`;
+        }
+      } catch { /* mantem vehicleInterest nulo se falhar */ }
+    }
+  }
+
+  const leadId = await crmDb.createLead({
+    name: `${source === "instagram" ? "Instagram" : "Messenger"} ${contactId}`,
+    phone: contactId,
+    email: null,
+    vehicleInterest: vehicleInterestFromRef,
+    vehiclePlate: null,
+    source: leadSource,
+    department: dept,
+    stage: defaultStage?.name || "Novo Lead",
+    score: "warm",
+    sellerId: 0,
+    notes: (messageText ? `Primeira mensagem: ${messageText.substring(0, 500)}` : "") + referralNotes || null,
+  });
+
+  await crmDb.createMessage({
+    leadId, phone: contactId, direction: "inbound", messageType,
+    content: messageText || null, mediaUrl, senderName: null, sentBy: null,
+    zapiMessageId: mid, timestamp,
+  });
+
+  await autoAssignLead(leadId, dept);
+
+  (async () => {
+    try {
+      const { handleAttendantMessage, getAttendantConfig, isAttendantActive } = await import("./ai-attendant");
+      const attendantCfg = await getAttendantConfig();
+      if (attendantCfg?.attendantEnabled && isAttendantActive(attendantCfg)) {
+        await new Promise(r => setTimeout(r, 2000));
+        const result = await handleAttendantMessage(leadId, messageText, contactId, "meta");
+        if (result.sent) console.log(`[AI Attendant] Handled NEW ${source} lead #${leadId}, action: ${result.action || "reply"}`);
+      }
+    } catch (err: any) {
+      console.error(`[AI Attendant] Error on new ${source} lead #${leadId}:`, err.message);
+    }
+  })();
+}
+
+// Palavras-gatilho padrao usadas quando o tenant nao configurou nenhuma customizada.
+const DEFAULT_COMMENT_TRIGGER_WORDS = ["quero", "preco", "preço", "quanto", "disponivel", "disponível", "informacao", "informação", "valor"];
+
+/**
+ * Processa um comentario em post/anuncio do Facebook/Instagram. Se o texto bater
+ * alguma palavra-gatilho, manda uma Private Reply (abre DM) convidando a conversar.
+ * NAO cria Lead aqui — o Lead nasce naturalmente quando a pessoa responder a DM,
+ * que cai no handleMetaMessagingEvent normal (evita Lead fantasma de quem so comentou
+ * e nunca respondeu no direct).
+ */
+async function handleMetaCommentEvent(value: any, source: "instagram" | "messenger", triggerWords: string[]): Promise<void> {
+  if (value.verb && value.verb !== "add") return; // ignora edicao/remocao de comentario
+  const commentId = value.comment_id || value.id;
+  const text = (value.text || value.message || "").toString();
+  if (!commentId || !text) return;
+
+  const normalized = text.toLowerCase();
+  const matched = triggerWords.some(w => normalized.includes(w.toLowerCase()));
+  if (!matched) return;
+
+  const inviteMessage = "Oi! Te chamei no direct \u{1F609}";
+  const result = await metaMessagingSendPrivateReply(commentId, inviteMessage);
+  if (result.success) {
+    console.log(`[Meta Comment] Private reply enviada pro comentario ${commentId} (${source}): "${text.substring(0, 60)}"`);
+  } else {
+    console.error(`[Meta Comment] Falha ao enviar private reply pro comentario ${commentId}:`, result.error);
+  }
 }
 
 /**
@@ -476,11 +662,17 @@ export function registerWebhookRoutes(app: Express) {
       const metaIntegration = await crmDb.getIntegrationByType("facebook");
       let appSecret = "";
       let pageAccessToken = "";
+      let dmEnabled = false;
+      let commentTriggerWords = DEFAULT_COMMENT_TRIGGER_WORDS;
       if (metaIntegration?.config) {
         try {
           const config = JSON.parse(metaIntegration.config);
           appSecret = config.appSecret || "";
           pageAccessToken = config.pageAccessToken || "";
+          dmEnabled = !!config.dmEnabled;
+          if (Array.isArray(config.commentTriggerWords) && config.commentTriggerWords.length > 0) {
+            commentTriggerWords = config.commentTriggerWords;
+          }
         } catch { /* ignore parse error */ }
       }
 
@@ -492,6 +684,28 @@ export function registerWebhookRoutes(app: Express) {
           console.error("Meta webhook signature verification failed");
           res.status(403).json({ error: "Invalid signature" });
           return;
+        }
+      }
+
+      // Messenger DM: { object: "page", entry: [{ messaging: [{ sender, recipient, message, ... }] }] }
+      if (dmEnabled && body.object === "page" && body.entry) {
+        for (const entry of body.entry) {
+          if (Array.isArray(entry.messaging)) {
+            for (const messagingEvent of entry.messaging) {
+              await handleMetaMessagingEvent(messagingEvent, "messenger");
+            }
+          }
+        }
+      }
+
+      // Instagram DM: { object: "instagram", entry: [{ messaging: [{ sender, recipient, message, ... }] }] }
+      if (dmEnabled && body.object === "instagram" && body.entry) {
+        for (const entry of body.entry) {
+          if (Array.isArray(entry.messaging)) {
+            for (const messagingEvent of entry.messaging) {
+              await handleMetaMessagingEvent(messagingEvent, "instagram");
+            }
+          }
         }
       }
 
@@ -549,6 +763,21 @@ export function registerWebhookRoutes(app: Express) {
                 });
 
                 await autoAssignLead(leadId, dept);
+              } else if (dmEnabled && change.field === "comments") {
+                await handleMetaCommentEvent(change.value, "messenger", commentTriggerWords);
+              }
+            }
+          }
+        }
+      }
+
+      // Comentarios do Instagram: { object: "instagram", entry: [{ changes: [{ field: "comments", value: {...} }] }] }
+      if (dmEnabled && body.object === "instagram" && body.entry) {
+        for (const entry of body.entry) {
+          if (entry.changes) {
+            for (const change of entry.changes) {
+              if (change.field === "comments") {
+                await handleMetaCommentEvent(change.value, "instagram", commentTriggerWords);
               }
             }
           }
@@ -797,7 +1026,7 @@ export function registerWebhookRoutes(app: Express) {
 
     await withTenantAsync(tenantId, async () => {
     try {
-      const { name, phone, email, vehicleInterest, notes, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, pageUrl, formId } = req.body;
+      const { name, phone, email, vehicleInterest, notes, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, pageUrl, formId, sellerId } = req.body;
 
       if (!name) {
         res.status(400).json({ error: "Campo 'name' e obrigatorio." });
@@ -826,6 +1055,21 @@ export function registerWebhookRoutes(app: Express) {
         : utmSource === "instagram" || utmSource === "ig" ? "instagram_ads"
         : "landing_page";
 
+      // Link com ?vendedor=ID aponta direto pro vendedor (pula o round-robin) —
+      // só usa se o vendedor existir, estiver ativo e pertencer a este tenant.
+      let directSellerId: number | null = null;
+      if (sellerId) {
+        try {
+          const database = await getDb();
+          if (database) {
+            const [seller] = await database.select().from(sellers)
+              .where(and(eq(sellers.id, Number(sellerId)), eq(sellers.tenantId, tenantId), eq(sellers.active, true)))
+              .limit(1);
+            if (seller) directSellerId = seller.id;
+          }
+        } catch { /* ignore, cai no auto-assign */ }
+      }
+
       const leadId = await crmDb.createLead({
         name,
         phone: phone || null,
@@ -836,7 +1080,7 @@ export function registerWebhookRoutes(app: Express) {
         department: dept,
         stage: defaultStage?.name || "Novo Lead",
         score: "hot",
-        sellerId: 0,
+        sellerId: directSellerId || 0,
         notes: fullNotes || null,
       });
 
@@ -844,10 +1088,10 @@ export function registerWebhookRoutes(app: Express) {
         leadId,
         sellerId: 0,
         type: "criacao",
-        description: `Lead via landing page/widget${utmSource ? ` (${utmSource})` : ""}`,
+        description: `Lead via landing page/widget${utmSource ? ` (${utmSource})` : ""}${directSellerId ? " (link do vendedor)" : ""}`,
       });
 
-      const assignment = await autoAssignLead(leadId, dept);
+      const assignment = directSellerId ? null : await autoAssignLead(leadId, dept);
 
       res.status(201).json({
         success: true,
@@ -889,6 +1133,16 @@ export function registerWebhookRoutes(app: Express) {
       const isNewsletter = body.isNewsletter === true;
       const isStatusReply = body.isStatusReply === true;
       const senderName = body.senderName || body.chatName || "";
+
+      // Atribuicao de anuncio "Clique para o WhatsApp" (CTWA) da Meta. O nome exato do campo
+      // que o Z-API repassa nao esta documentado publicamente - checamos as variacoes mais
+      // prováveis (a Meta usa "referral" nativamente). Se nenhuma bater, segue sem atribuicao
+      // (comportamento identico ao de hoje). Logamos o payload cru na primeira ocorrencia pra
+      // confirmar o formato real assim que o primeiro clique em anuncio acontecer em producao.
+      const ctwaReferral = body.referral || body.ad_referral || body.adReferral || null;
+      if (ctwaReferral) {
+        console.log(`[WhatsApp CTWA] Referral detectado:`, JSON.stringify(ctwaReferral));
+      }
 
       // Comprehensive message type detection (order matters - check specific types first)
       let messageType = "text";
@@ -1254,7 +1508,7 @@ export function registerWebhookRoutes(app: Express) {
                 if (leadForAi.vehicleInterest) {
                   const search = `%${leadForAi.vehicleInterest}%`;
                   const vehicles = await dbConn.select().from(inventoryVehicles)
-                    .where(and(eq(inventoryVehicles.status, "available"), or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))))
+                    .where(and(eq(inventoryVehicles.tenantId, getCurrentTenantId()), eq(inventoryVehicles.status, "available"), or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))))
                     .limit(5);
                   if (vehicles.length > 0) {
                     vehicleCtx = "\nVE\u00cdCULOS DISPON\u00cdVEIS:\n" + vehicles.map(v => `- ${v.brand} ${v.model} ${v.year || ""} | R$ ${v.price?.toLocaleString("pt-BR") || "N/A"} | ${v.km?.toLocaleString("pt-BR") || "0"} km | ${v.color || ""}`).join("\n");
@@ -1304,18 +1558,22 @@ export function registerWebhookRoutes(app: Express) {
         // Create new lead from WhatsApp (only from inbound messages)
         const dept = "vendas";
         const defaultStage = await crmDb.getDefaultStage(dept);
+        let ctwaNotes = "";
+        if (ctwaReferral) {
+          ctwaNotes = `\n[Anuncio CTWA] ${JSON.stringify(ctwaReferral)}`;
+        }
         const leadId = await crmDb.createLead({
           name: senderName || `WhatsApp ${phone}`,
           phone,
           email: null,
           vehicleInterest: null,
           vehiclePlate: null,
-          source: "whatsapp",
+          source: ctwaReferral ? "whatsapp_ctwa" : "whatsapp",
           department: dept,
           stage: defaultStage?.name || "Novo Lead",
           score: "warm",
           sellerId: 0,
-          notes: messageText ? `Primeira mensagem: ${messageText.substring(0, 500)}` : null,
+          notes: (messageText ? `Primeira mensagem: ${messageText.substring(0, 500)}` : "") + ctwaNotes || null,
         });
         // Save the first message
         await crmDb.createMessage({
@@ -1420,10 +1678,21 @@ export function registerWebhookRoutes(app: Express) {
         return;
       }
 
-      const id = await crmDb.createInventoryItem({
-        brand, model, year, plate, color, mileage, fuelType, transmission,
-        price: price || 0, costPrice, notes: `Sincronizado do SIG Web`,
+      const dbConn = await getDb();
+      if (!dbConn) { res.status(503).json({ error: "DB indisponivel." }); return; }
+
+      const [insertResult] = await dbConn.insert(inventoryVehicles).values({
+        externalId: `sig-${nanoid(10)}`,
+        tenantId,
+        brand, model,
+        year: year ? parseInt(year, 10) : null,
+        plate: plate || null, color: color || null,
+        km: mileage || 0, fuel: fuelType || null, transmission: transmission || null,
+        price: price || 0, status: "available",
+        observation: `Sincronizado do SIG Web`,
+        lastSyncedAt: Date.now(),
       });
+      const id = Number(insertResult.insertId);
 
       // Check for matching leads
       const searchTerm = `${brand} ${model}`;
@@ -1452,20 +1721,24 @@ export function registerWebhookRoutes(app: Express) {
   // de autenticidade é o header fixo `asaas-access-token` (definido ao cadastrar o
   // webhook no painel do ASAAS) batendo com ASAAS_WEBHOOK_TOKEN.
   app.post("/api/webhooks/asaas", async (req: Request, res: Response) => {
+    let resolvedTenantId: number | null = null;
+    let eventCtx: { event?: string; paymentId?: string; subscriptionId?: string } = {};
     try {
       if (!ENV.asaasWebhookToken) {
-        console.warn("[ASAAS webhook] ASAAS_WEBHOOK_TOKEN não configurado — rejeitando.");
+        logger.warn("[ASAAS webhook] ASAAS_WEBHOOK_TOKEN não configurado — rejeitando.");
         res.status(503).json({ error: "Integração ASAAS não configurada." });
         return;
       }
       const receivedToken = req.headers["asaas-access-token"] as string;
       if (!receivedToken || receivedToken !== ENV.asaasWebhookToken) {
+        logger.warn({ ip: req.ip }, "[ASAAS webhook] Token inválido ou ausente.");
         res.status(401).json({ error: "Token inválido." });
         return;
       }
 
       const event: string = req.body?.event;
       const payment = req.body?.payment;
+      eventCtx = { event, paymentId: payment?.id, subscriptionId: payment?.subscription };
       if (!event || !payment?.customer) {
         res.status(400).json({ error: "Payload inválido." });
         return;
@@ -1478,85 +1751,141 @@ export function registerWebhookRoutes(app: Express) {
       if (!tenant) {
         // Não é erro do ASAAS — pode ser evento de teste/sandbox sem tenant nosso.
         // Responder 200 pra não gerar retentativa infinita.
-        console.warn(`[ASAAS webhook] Nenhum tenant encontrado pro customer ${payment.customer}.`);
+        logger.warn({ asaasCustomerId: payment.customer, event }, "[ASAAS webhook] Nenhum tenant encontrado pro customer.");
         res.status(200).json({ received: true, ignored: true });
         return;
       }
+      resolvedTenantId = tenant.id;
+
+      type ActivationInfo =
+        | { kind: "activated"; email: string | null; name: string | null; planName: string }
+        | { kind: "suspended"; email: string | null; name: string | null };
 
       await withTenantAsync(tenant.id, async () => {
-        // Idempotência: mesmo evento (mesma cobrança + mesmo tipo) não é reprocessado.
-        const [existing] = await db
-          .select({ id: subscriptionEvents.id })
-          .from(subscriptionEvents)
-          .where(and(
-            eq(subscriptionEvents.tenantId, tenant.id),
-            eq(subscriptionEvents.asaasPaymentId, payment.id),
-            eq(subscriptionEvents.eventType, event),
-          ))
-          .limit(1);
+        // Idempotência + insert do evento + transição de estado numa única
+        // transação: se qualquer parte falhar no meio (ex: conexão cai logo
+        // depois do insert), tudo desfaz — inclusive o registro de idempotência.
+        // Sem isso, um retry do ASAAS encontraria o evento já gravado e
+        // devolveria "duplicate" sem nunca reprocessar a ativação, deixando o
+        // cliente pago e sem acesso pra sempre (bug real identificado nesta
+        // revisão, não só uma melhoria de logging). O resultado volta como
+        // retorno da transação (em vez de mutar uma variável capturada) pra
+        // não depender de closures pra saber o que aconteceu.
+        const result = await db.transaction(async (tx): Promise<
+          { isDuplicate: true } | { isDuplicate: false; activationInfo: ActivationInfo | null }
+        > => {
+          const [existing] = await tx
+            .select({ id: subscriptionEvents.id })
+            .from(subscriptionEvents)
+            .where(and(
+              eq(subscriptionEvents.tenantId, tenant.id),
+              eq(subscriptionEvents.asaasPaymentId, payment.id),
+              eq(subscriptionEvents.eventType, event),
+            ))
+            .limit(1);
 
-        if (existing) {
+          if (existing) {
+            return { isDuplicate: true };
+          }
+
+          await tx.insert(subscriptionEvents).values({
+            tenantId: tenant.id,
+            eventType: event,
+            asaasPaymentId: payment.id,
+            asaasSubscriptionId: payment.subscription || null,
+            status: payment.status || null,
+            value: payment.value != null ? String(payment.value) : null,
+            billingType: payment.billingType || null,
+            dueDate: payment.dueDate ? new Date(payment.dueDate).getTime() : null,
+            paymentDate: payment.paymentDate ? new Date(payment.paymentDate).getTime() : null,
+            rawPayload: JSON.stringify(req.body),
+          });
+
+          // Transição de estado: só os dois eventos que realmente mudam se a loja tem
+          // acesso ou não. Os demais eventos ficam só no log, pra auditoria/visibilidade
+          // do Super Admin, sem ação automática (evita reagir errado a eventos raros).
+          let activationInfo: ActivationInfo | null = null;
+          if (event === "PAYMENT_CONFIRMED" || event === "PAYMENT_RECEIVED") {
+            const [currentTenant] = await tx.select({ plan: tenants.plan, name: tenants.name, email: tenants.email }).from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
+            const plan = (currentTenant?.plan as PaidPlanId) in PLAN_CONFIG ? (currentTenant!.plan as PaidPlanId) : "basic";
+            const planConfig = PLAN_CONFIG[plan];
+            await tx.update(tenants).set({
+              status: "active",
+              trialEndsAt: null,
+              maxSellers: planConfig.maxSellers,
+              maxAdmins: planConfig.maxAdmins,
+            }).where(eq(tenants.id, tenant.id));
+            activationInfo = { kind: "activated", email: currentTenant?.email ?? null, name: currentTenant?.name ?? null, planName: planConfig.name };
+          } else if (event === "PAYMENT_OVERDUE") {
+            const [currentTenant] = await tx.select({ name: tenants.name, email: tenants.email }).from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
+            await tx.update(tenants).set({ status: "suspended" }).where(eq(tenants.id, tenant.id));
+            activationInfo = { kind: "suspended", email: currentTenant?.email ?? null, name: currentTenant?.name ?? null };
+          }
+
+          return { isDuplicate: false, activationInfo };
+        });
+
+        if (result.isDuplicate) {
           res.status(200).json({ received: true, duplicate: true });
           return;
         }
 
-        await db.insert(subscriptionEvents).values({
-          tenantId: tenant.id,
-          eventType: event,
-          asaasPaymentId: payment.id,
-          asaasSubscriptionId: payment.subscription || null,
-          status: payment.status || null,
-          value: payment.value != null ? String(payment.value) : null,
-          billingType: payment.billingType || null,
-          dueDate: payment.dueDate ? new Date(payment.dueDate).getTime() : null,
-          paymentDate: payment.paymentDate ? new Date(payment.paymentDate).getTime() : null,
-          rawPayload: JSON.stringify(req.body),
-        });
-
-        // Transição de estado: só os dois eventos que realmente mudam se a loja tem
-        // acesso ou não. Os demais eventos ficam só no log, pra auditoria/visibilidade
-        // do Super Admin, sem ação automática (evita reagir errado a eventos raros).
-        if (event === "PAYMENT_CONFIRMED" || event === "PAYMENT_RECEIVED") {
-          const [currentTenant] = await db.select({ plan: tenants.plan, name: tenants.name, email: tenants.email }).from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
-          const plan = (currentTenant?.plan as PaidPlanId) in PLAN_CONFIG ? (currentTenant!.plan as PaidPlanId) : "basic";
-          const planConfig = PLAN_CONFIG[plan];
-          await db.update(tenants).set({
-            status: "active",
-            trialEndsAt: null,
-            maxSellers: planConfig.maxSellers,
-            maxAdmins: planConfig.maxAdmins,
-          }).where(eq(tenants.id, tenant.id));
+        const { activationInfo } = result;
+        if (activationInfo) {
           clearTenantLimitsCache(tenant.id);
-
-          if (currentTenant?.email) {
-            await sendSubscriptionConfirmedEmail(currentTenant.email, currentTenant.name || "Kafka Rank", planConfig.name, tenant.id);
-          }
-          await createNotification({
-            sellerId: null, targetType: "admin", type: "subscription_confirmed",
-            title: "Assinatura confirmada", message: `Pagamento aprovado — plano ${planConfig.name} ativo.`,
-            actionUrl: "/assinatura",
-          } as any);
-        } else if (event === "PAYMENT_OVERDUE") {
-          const [currentTenant] = await db.select({ name: tenants.name, email: tenants.email }).from(tenants).where(eq(tenants.id, tenant.id)).limit(1);
-          await db.update(tenants).set({ status: "suspended" }).where(eq(tenants.id, tenant.id));
-          clearTenantLimitsCache(tenant.id);
-
-          if (currentTenant?.email) {
-            const billingUrl = `${getRequestOrigin(req)}/t/${tenant.slug}/assinatura`;
-            await sendSubscriptionSuspendedEmail(currentTenant.email, currentTenant.name || "Kafka Rank", billingUrl, tenant.id);
-          }
-          await createNotification({
-            sellerId: null, targetType: "admin", type: "subscription_suspended",
-            title: "Assinatura em atraso", message: "Não identificamos o pagamento. Regularize pra reativar o acesso.",
-            actionUrl: "/assinatura",
-          } as any);
         }
 
+        logger.info({ tenantId: tenant.id, ...eventCtx, transition: activationInfo?.kind ?? null }, "[ASAAS webhook] Evento processado");
         res.status(200).json({ received: true });
+
+        // Efeitos "soft" fora da transação: o pagamento já foi processado e o
+        // acesso já foi liberado/suspenso corretamente no banco — se e-mail ou
+        // notificação falharem aqui, não faz sentido devolver erro pro ASAAS
+        // (ele reprocessaria a mesma coisa à toa). Só registra um alerta pra
+        // alguém ficar sabendo.
+        try {
+          if (activationInfo?.kind === "activated") {
+            if (activationInfo.email) {
+              await sendSubscriptionConfirmedEmail(activationInfo.email, activationInfo.name || "Kafka Rank", activationInfo.planName, tenant.id);
+            }
+            await createNotification({
+              sellerId: null, targetType: "admin", type: "subscription_confirmed",
+              title: "Assinatura confirmada", message: `Pagamento aprovado — plano ${activationInfo.planName} ativo.`,
+              actionUrl: "/assinatura",
+            } as any);
+          } else if (activationInfo?.kind === "suspended") {
+            if (activationInfo.email) {
+              const billingUrl = `${getRequestOrigin(req)}/t/${tenant.slug}/assinatura`;
+              await sendSubscriptionSuspendedEmail(activationInfo.email, activationInfo.name || "Kafka Rank", billingUrl, tenant.id);
+            }
+            await createNotification({
+              sellerId: null, targetType: "admin", type: "subscription_suspended",
+              title: "Assinatura em atraso", message: "Não identificamos o pagamento. Regularize pra reativar o acesso.",
+              actionUrl: "/assinatura",
+            } as any);
+          }
+        } catch (softErr: any) {
+          await createBillingAlert({
+            tenantId: tenant.id,
+            severity: "warning",
+            code: "webhook_notification_failed",
+            message: `Falha ao notificar loja após processar evento ${event}: ${softErr.message}`,
+            context: { ...eventCtx },
+          });
+        }
       });
     } catch (err: any) {
-      console.error("ASAAS webhook error:", err);
-      res.status(500).json({ error: "Erro interno.", details: err.message });
+      logger.error({ err: err.message, tenantId: resolvedTenantId, ...eventCtx }, "[ASAAS webhook] Erro ao processar");
+      await createBillingAlert({
+        tenantId: resolvedTenantId,
+        severity: "critical",
+        code: "webhook_processing_failed",
+        message: `Falha ao processar webhook ASAAS: ${err.message}`,
+        context: { ...eventCtx },
+      });
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Erro interno.", details: err.message });
+      }
     }
   });
 

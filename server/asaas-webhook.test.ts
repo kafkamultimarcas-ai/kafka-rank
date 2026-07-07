@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getDb } from "./db";
-import { tenants, subscriptionEvents, admins, emailLogs, notifications } from "../drizzle/schema";
+import { tenants, subscriptionEvents, admins, emailLogs, notifications, billingAlerts } from "../drizzle/schema";
 
 const { TEST_TOKEN } = vi.hoisted(() => ({ TEST_TOKEN: "test-asaas-webhook-token" }));
 
@@ -11,6 +11,18 @@ vi.mock("./_core/env", async () => {
     ENV: { ...actual.ENV, asaasWebhookToken: TEST_TOKEN },
   };
 });
+
+// sendSubscriptionConfirmedEmail continua com o comportamento real por padrão
+// (delega pra `actual`) — só um teste específico sobrescreve com
+// mockRejectedValueOnce pra simular falha no envio.
+vi.mock("./emailService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./emailService")>();
+  return {
+    ...actual,
+    sendSubscriptionConfirmedEmail: vi.fn(actual.sendSubscriptionConfirmedEmail),
+  };
+});
+import { sendSubscriptionConfirmedEmail } from "./emailService";
 
 function fakeRes() {
   const res: any = {
@@ -70,6 +82,7 @@ afterAll(async () => {
   const db = await getDb();
   if (!db || !tenantId) return;
   await db.delete(subscriptionEvents).where(eq(subscriptionEvents.tenantId, tenantId));
+  await db.delete(billingAlerts).where(eq(billingAlerts.tenantId, tenantId));
   await db.delete(emailLogs).where(eq(emailLogs.tenantId, tenantId));
   await db.delete(notifications).where(eq(notifications.tenantId, tenantId));
   await db.delete(admins).where(eq(admins.tenantId, tenantId));
@@ -155,5 +168,79 @@ describe("POST /api/webhooks/asaas", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
     expect(res.body.ignored).toBe(true);
+  });
+
+  it("se a transação falhar no meio, não persiste nada (rollback) e cria alerta crítico", async () => {
+    const handler = await getHandler();
+    const db = await getDb();
+    const transactionSpy = vi.spyOn(db as any, "transaction").mockImplementationOnce(async () => {
+      throw new Error("Falha simulada de conexão no meio da transação");
+    });
+
+    const req = fakeReq({
+      event: "PAYMENT_CONFIRMED",
+      payment: { id: "pay_falha_1", customer: ASAAS_CUSTOMER_ID, status: "CONFIRMED", value: 499, billingType: "PIX" },
+    });
+    const res = fakeRes();
+    await handler(req, res);
+    transactionSpy.mockRestore();
+
+    expect(res.statusCode).toBe(500);
+
+    // Nada foi persistido — nem o evento de idempotência.
+    const events = await db!.select().from(subscriptionEvents)
+      .where(and(eq(subscriptionEvents.tenantId, tenantId), eq(subscriptionEvents.asaasPaymentId, "pay_falha_1")));
+    expect(events).toHaveLength(0);
+
+    // Alerta crítico registrado (substitui o error tracking externo).
+    const [alert] = await db!.select().from(billingAlerts)
+      .where(and(eq(billingAlerts.tenantId, tenantId), eq(billingAlerts.code, "webhook_processing_failed")))
+      .orderBy(desc(billingAlerts.id)).limit(1);
+    expect(alert).toBeDefined();
+    expect(alert.severity).toBe("critical");
+  });
+
+  it("reenviar o mesmo evento depois da falha reprocessa certo (sem duplicate fantasma)", async () => {
+    const handler = await getHandler();
+    const req = fakeReq({
+      event: "PAYMENT_CONFIRMED",
+      payment: { id: "pay_falha_1", customer: ASAAS_CUSTOMER_ID, status: "CONFIRMED", value: 499, billingType: "PIX" },
+    });
+    const res = fakeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.duplicate).toBeUndefined();
+
+    const db = await getDb();
+    const events = await db!.select().from(subscriptionEvents)
+      .where(and(eq(subscriptionEvents.tenantId, tenantId), eq(subscriptionEvents.asaasPaymentId, "pay_falha_1")));
+    expect(events).toHaveLength(1);
+  });
+
+  it("se o e-mail de confirmação falhar, ainda responde 200 (não pede retry) e cria alerta de warning", async () => {
+    const handler = await getHandler();
+    vi.mocked(sendSubscriptionConfirmedEmail).mockRejectedValueOnce(new Error("Falha simulada no Resend"));
+
+    const req = fakeReq({
+      event: "PAYMENT_CONFIRMED",
+      payment: { id: "pay_email_falha_1", customer: ASAAS_CUSTOMER_ID, status: "CONFIRMED", value: 499, billingType: "PIX" },
+    });
+    const res = fakeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+
+    const db = await getDb();
+    // O pagamento já foi processado e a loja ativada mesmo com a falha do e-mail.
+    const events = await db!.select().from(subscriptionEvents)
+      .where(and(eq(subscriptionEvents.tenantId, tenantId), eq(subscriptionEvents.asaasPaymentId, "pay_email_falha_1")));
+    expect(events).toHaveLength(1);
+
+    const [alert] = await db!.select().from(billingAlerts)
+      .where(and(eq(billingAlerts.tenantId, tenantId), eq(billingAlerts.code, "webhook_notification_failed")))
+      .orderBy(desc(billingAlerts.id)).limit(1);
+    expect(alert).toBeDefined();
+    expect(alert.severity).toBe("warning");
   });
 });

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Copy, Check, ExternalLink, Wifi, WifiOff, Eye, EyeOff, RefreshCw } from "lucide-react";
 
@@ -31,6 +32,8 @@ export default function AdminMetaIntegration() {
   const [pageAccessToken, setPageAccessToken] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
   const [pageId, setPageId] = useState("");
+  const [dmEnabled, setDmEnabled] = useState(false);
+  const [commentTriggerWords, setCommentTriggerWords] = useState("");
   const [showSecret, setShowSecret] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -42,6 +45,8 @@ export default function AdminMetaIntegration() {
       setPageAccessToken(metaConfig.pageAccessToken);
       setVerifyToken(metaConfig.verifyToken);
       setPageId(metaConfig.pageId);
+      setDmEnabled(metaConfig.dmEnabled);
+      setCommentTriggerWords(metaConfig.commentTriggerWords);
     }
   }, [metaConfig]);
 
@@ -60,7 +65,7 @@ export default function AdminMetaIntegration() {
   };
 
   const handleSave = () => {
-    saveMutation.mutate({ appId, appSecret, pageAccessToken, verifyToken, pageId });
+    saveMutation.mutate({ appId, appSecret, pageAccessToken, verifyToken, pageId, dmEnabled, commentTriggerWords });
   };
 
   const generateVerifyToken = () => {
@@ -214,6 +219,45 @@ export default function AdminMetaIntegration() {
               <Button variant="outline" size="icon" onClick={() => verifyToken && copyToClipboard(verifyToken, "Verify Token")}>
                 {copied === "Verify Token" ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step 5: Direct Messages */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">5. Mensagens Diretas (Instagram/Messenger)</CardTitle>
+            <CardDescription>
+              Transforma toda DM recebida no Instagram ou Messenger da loja em Lead automaticamente,
+              com resposta do Atendente IA — mesmo comportamento que já existe pro WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Ativar recebimento de DMs</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  A mesma URL de webhook do passo 1 já recebe mensagens — no painel da Meta, em{" "}
+                  <strong>Produtos → Webhooks</strong>, marque também os campos <strong>messages</strong> e{" "}
+                  <strong>messaging_postbacks</strong> na assinatura da Página, e <strong>messages</strong> na
+                  assinatura do Instagram
+                </p>
+              </div>
+              <Switch checked={dmEnabled} onCheckedChange={setDmEnabled} />
+            </div>
+            <div>
+              <Label>Palavras-gatilho para responder comentários</Label>
+              <Input
+                value={commentTriggerWords}
+                onChange={(e) => setCommentTriggerWords(e.target.value)}
+                placeholder="quero, preço, quanto, disponível, informação"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Quando alguém comenta um post/anúncio usando uma dessas palavras, mandamos uma DM
+                convidando pra conversar (Private Reply). Separe por vírgula. Precisa marcar o campo{" "}
+                <strong>comments</strong> na assinatura de Webhooks (Página e Instagram) no painel da Meta.
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -12,12 +12,30 @@ Kafka Rank é uma plataforma SaaS multi-tenant desenvolvida para lojas de veícu
 |---|---|
 | **Frontend** | React 19 + TypeScript 5.9 + Tailwind CSS 4 + shadcn/ui |
 | **Backend** | Node.js 22 + Express 4 + tRPC 11 |
-| **Banco de Dados** | MySQL 8 (TiDB Cloud) com Drizzle ORM |
-| **Autenticação** | OAuth2 (Manus Auth) + JWT Sessions |
-| **Testes** | Vitest (57+ arquivos de teste) |
-| **Comunicação** | Z-API (WhatsApp Business) |
+| **Banco de Dados** | MySQL 8 (TiDB Cloud) com Drizzle ORM — 76 migrations |
+| **Autenticação** | OAuth2 (Manus Auth, dono da plataforma) + JWT por sessão (gerente/vendedor/admin de CRM) |
+| **Multi-Tenant** | Isolamento por loja via `/t/:slug/...`, login único por loja (`/t/:slug/login`) |
+| **Pagamentos** | ASAAS (assinatura, troca de plano, cancelamento, webhook idempotente) |
+| **Observabilidade** | Logger estruturado (pino) + alertas internos de cobrança, sem serviço externo |
+| **Testes** | Vitest (~79 arquivos, ~832 testes) |
+| **Comunicação** | Z-API (WhatsApp Business), credenciais por loja criptografadas |
+| **Gerenciador de pacotes** | pnpm |
 | **Deploy** | Manus Cloud (Autoscale/Serverless) |
 | **Domínio** | [kafkarank.com](https://kafkarank.com) |
+
+> **Documentação completa da transformação multi-tenant/SaaS**: [`docs/multi-tenant/`](docs/multi-tenant/README.md) — arquitetura, planos/pagamentos, e-mails/logs, segurança, e a [análise de prontidão pra vendas](docs/multi-tenant/09-analise-prontidao-vendas.md) (o que falta, em ordem de prioridade, pra vender pra uma loja real).
+
+---
+
+## Status do Projeto
+
+Multi-tenant, autenticação e cobrança já funcionam de ponta a ponta em ambiente de desenvolvimento (testado ao vivo, incluindo dois tenants isolados rodando lado a lado). **Antes de vender pra uma loja real**, o que falta é majoritariamente **validação em ambiente real**, não código novo:
+
+- ⚠️ Trabalho recente ainda não commitado na branch `feat/multi-tenant` — ver `git status`.
+- ⚠️ Termos de Uso / Política de Privacidade são texto-placeholder (`client/src/pages/public/ComercialLegal.tsx` avisa isso explicitamente) — pendência jurídica, não técnica.
+- ⚠️ Migrations, integração ASAAS e e-mail transacional nunca rodaram contra staging/sandbox/Resend reais — só validados em dev local e testes automatizados.
+
+Lista completa, com esforço estimado por item e ordem recomendada: [**`docs/multi-tenant/09-analise-prontidao-vendas.md`**](docs/multi-tenant/09-analise-prontidao-vendas.md).
 
 ---
 
@@ -82,10 +100,14 @@ Kafka Rank é uma plataforma SaaS multi-tenant desenvolvida para lojas de veícu
 - Metas mensais configuráveis
 
 ### Multi-Tenant (SaaS)
-- Isolamento completo de dados por loja
-- Super Admin para gerenciar tenants
-- Configuração independente de WhatsApp por loja
-- Portal de login separado por tenant
+- Isolamento completo de dados por loja (`tenantId` em toda tabela, filtrado automaticamente via `AsyncLocalStorage` — não é responsabilidade de cada query lembrar de filtrar)
+- **Login único por loja**: `https://kafkarank.com/t/<slug-da-loja>/login` — um único formulário, tenta admin → gerente → vendedor nessa ordem; `https://kafkarank.com/super-admin` pro dono da plataforma. São os **únicos** dois pontos de entrada — qualquer outra tela de login foi removida/redirecionada (ver [documento 06](docs/multi-tenant/06-unificacao-login-selecao-loja.md))
+- Cadastro self-service de loja nova (`/comercial/cadastro`) — provisiona tenant + admin dono + seed de CRM numa chamada só
+- "Esqueci minha senha" self-service por loja, com token de uso único
+- Planos (Trial/Basic/Pro/Enterprise) com cobrança recorrente via **ASAAS** — assinar, trocar de plano, cancelar, tudo com proteção contra cobrança duplicada
+- Super Admin (`/super-admin`) — CRUD de lojas, branding, módulos habilitados, limites de plano, logs unificados (e-mail + assinatura + alertas de cobrança numa tela só)
+- Configuração independente de WhatsApp (Z-API) por loja, credenciais criptografadas em repouso (AES-256-GCM)
+- Rate limiting por loja+IP em rotas sensíveis (login, reset de senha, cadastro) — não deixa uma loja "barulhenta" consumir a cota de outra atrás do mesmo IP compartilhado
 
 ---
 
@@ -114,8 +136,8 @@ kafka-rank/
 │   ├── inventory-scraper.ts   # Sincronização de estoque
 │   └── alert-checker.ts       # Verificador de alertas
 ├── drizzle/                   # Schema e migrações do banco
-│   ├── schema.ts              # 68 tabelas definidas
-│   └── migrations/            # SQL de migrações
+│   ├── schema.ts              # ~77 tabelas definidas
+│   └── migrations/            # 76 migrations SQL geradas via drizzle-kit
 ├── shared/                    # Tipos e constantes compartilhados
 ├── package.json
 ├── tsconfig.json
@@ -265,13 +287,23 @@ BUILT_IN_FORGE_API_KEY=""
 # Push Notifications - só se for testar notificações
 VAPID_PUBLIC_KEY=""
 VAPID_PRIVATE_KEY=""
+
+# ASAAS (cobrança/assinatura) - só se for testar fluxo de pagamento
+ASAAS_API_URL="https://api-sandbox.asaas.com/v3"
+ASAAS_API_KEY=""
+ASAAS_WEBHOOK_TOKEN=""
+
+# Resend (e-mail transacional) - sem isso, e-mail cai só no log do console
+RESEND_API_KEY=""
 ```
+
+> Lista completa e comentada de todas as env vars (inclusive as usadas só internamente, como `LOG_LEVEL`): [`.env.example`](.env.example).
 
 ---
 
 ### Passo 5: Criar as tabelas no banco de dados
 
-O projeto usa **Drizzle ORM** para gerenciar o schema (68 tabelas). Execute:
+O projeto usa **Drizzle ORM** para gerenciar o schema (~77 tabelas). Execute:
 
 ```bash
 # Gerar os arquivos de migração SQL a partir do schema TypeScript
@@ -431,17 +463,19 @@ const register = trpc.sales.register.useMutation();
 
 ### Autenticação
 
-- OAuth2 via Manus Auth (login social)
-- JWT armazenado em cookie HttpOnly
-- `protectedProcedure` injeta `ctx.user` automaticamente
-- Roles: `admin` | `user` (extensível)
+Existem **4 tipos de ator autenticado**, cada um numa tabela própria (`users`, `managers`, `sellers`, `admins`), unificados no contexto tRPC (`ctx.user`) através de um campo explícito `actorType: "oauth" | "manager" | "seller" | "crm_admin"` — nunca por inferência de faixa numérica de ID (ver [documento 08](docs/multi-tenant/08-refactor-identidade-actortype.md) pro histórico de por que isso importa: a versão anterior escondia bugs reais de resolução de tenant).
+
+- **Dono da plataforma**: OAuth2 via Manus Auth, JWT em cookie HttpOnly.
+- **Admin/gerente/vendedor de uma loja**: senha própria, um único formulário de login por loja (`/t/:slug/login`, `tenantAuth.login` tenta admin → gerente → vendedor), sessão em cookie HttpOnly (gerente/vendedor) ou token retornado ao cliente (admin de CRM).
+- Todo JWT de sessão de loja carrega `tenantId` embutido, validado (`assertTenantMatch`) contra o tenant resolvido pela URL a cada request — impede um token de uma loja ser usado em outra.
+- `protectedProcedure`/`adminProcedure`/`managerOrAdminProcedure` (`server/_core/trpc.ts`) fazem o gate de permissão a partir de `ctx.user.role`/`actorType`/`sellerRole`.
 
 ### Multi-Tenancy
 
-- Cada loja é um `tenant` com dados isolados
-- Tabela `tenants` armazena configurações por loja (WhatsApp, branding, etc.)
-- Queries filtram automaticamente por `tenantId`
-- Super Admin gerencia todos os tenants
+- Cada loja é um `tenant` com dados isolados; resolução é **por path** (`/t/:slug/...`), não por subdomínio.
+- Tabela `tenants` armazena configurações por loja (WhatsApp, branding, planos, limites, `asaasCustomerId`).
+- Toda query de leitura/escrita nas camadas de dados já filtra por `getCurrentTenantId()` internamente (`AsyncLocalStorage`) — testado automaticamente por uma varredura de schema (`server/tenant-security.test.ts`) que falha se alguém esquecer `tenantId` numa tabela nova.
+- Super Admin gerencia todos os tenants (criar, editar, ver saúde/limites, logs unificados).
 
 ### Integrações
 
@@ -489,11 +523,16 @@ pnpm vitest
 ```
 
 Os testes cobrem:
-- Autenticação e logout
-- CRUD de vendas, agendamentos, F&I, despachante
+- Autenticação e logout, isolamento cross-tenant, IDOR (vendedor não acessa dado de outro vendedor)
+- CRUD de vendas, agendamentos, F&I, despachante, consignação
+- Cobrança (ASAAS: assinar, trocar plano, cancelar, webhook idempotente e transacional)
 - Busca cross-setor por veículo
 - Sincronização de estoque
 - Webhooks
+
+Estado atual (~79 arquivos, ~832 testes): a maioria passa; um pequeno número de suítes falha de forma **flaky** (resultado varia entre execuções — sinal de dependência de estado/timing, não bug confirmado) e `server/zapi.test.ts` falha de forma consistente porque depende de credenciais reais do Z-API não configuradas neste ambiente. Nenhuma falha conhecida está no caminho de auth/tenant/cobrança. Detalhe em [`docs/multi-tenant/09-analise-prontidao-vendas.md`](docs/multi-tenant/09-analise-prontidao-vendas.md).
+
+**Não há CI configurado** (`.github/workflows/` não existe) — os testes só rodam manualmente/local por enquanto.
 
 ---
 
@@ -565,6 +604,7 @@ Para deploy em outros provedores (Railway, Render, etc.), basta configurar as va
 | **CRM** | `crmLeads`, `crmMessages`, `crmActivities`, `crmFollowUpTasks`, `crmPipelineStages`, `crmInventory`, `crmInventoryAlerts`, `crmBulkSendLogs`, `crmCampaigns`, `crmMessageTemplates`, `crmIntegrations`, `crmLeadDistribution` |
 | **Gestão** | `managers`, `managerTasks`, `managerAlerts`, `managerMentorMessages`, `managerPermissions`, `goals`, `actionPlans`, `trainings`, `mktStrategies`, `mktTasks` |
 | **Sistema** | `users`, `tenants`, `admins`, `superAdmins`, `teams`, `notifications`, `pushSubscriptions`, `appSettings`, `iamConfig`, `motivationalQuotes` |
+| **Cobrança/Observabilidade** | `subscriptionEvents` (auditoria de webhook ASAAS), `billingAlerts` (alertas internos de falha de cobrança), `emailLogs`, `passwordResetTokens` |
 
 ---
 

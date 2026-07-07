@@ -667,8 +667,12 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
 }
 
 // ===== PLATFORM LOG DETAIL MODAL (e-mail ou assinatura) =====
-function PlatformLogDetailModal({ token, logType, logId, onClose }: { token: string; logType: "email" | "subscription"; logId: number; onClose: () => void }) {
-  const { data: log, isLoading } = trpc.platformLogs.getById.useQuery({ token, logType, id: logId });
+function PlatformLogDetailModal({ token, logType, logId, onClose, onResolved }: { token: string; logType: "email" | "subscription" | "billing_alert"; logId: number; onClose: () => void; onResolved?: () => void }) {
+  const { data: log, isLoading, refetch } = trpc.platformLogs.getById.useQuery({ token, logType, id: logId });
+  const resolveMut = trpc.platformLogs.resolveBillingAlert.useMutation({
+    onSuccess: () => { toast.success("Alerta marcado como resolvido."); refetch(); onResolved?.(); },
+    onError: (err) => toast.error(err.message || "Erro ao resolver alerta"),
+  });
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -699,6 +703,35 @@ function PlatformLogDetailModal({ token, logType, logId, onClose }: { token: str
               </div>
             )}
           </div>
+        ) : log.logType === "billing_alert" ? (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><span className="text-gray-500 block">Loja</span><span className="text-white">{log.tenantName ? `${log.tenantName} (${log.tenantSlug})` : (log.tenantId ? `#${log.tenantId}` : "—")}</span></div>
+              <div><span className="text-gray-500 block">Severidade</span><span className={log.severity === "critical" ? "text-red-400" : "text-amber-400"}>{log.severity === "critical" ? "Crítico" : "Aviso"}</span></div>
+              <div><span className="text-gray-500 block">Código</span><span className="text-white font-mono">{log.code}</span></div>
+              <div><span className="text-gray-500 block">Status</span><span className="text-white">{log.resolved ? `Resolvido${log.resolvedBy ? ` por ${log.resolvedBy}` : ""}` : "Pendente"}</span></div>
+              <div className="col-span-2"><span className="text-gray-500 block">Mensagem</span><span className="text-white">{log.message}</span></div>
+              <div><span className="text-gray-500 block">Criado em</span><span className="text-white">{new Date(log.createdAt).toLocaleString("pt-BR")}</span></div>
+              {log.resolvedAt && <div><span className="text-gray-500 block">Resolvido em</span><span className="text-white">{new Date(log.resolvedAt).toLocaleString("pt-BR")}</span></div>}
+            </div>
+            {log.context && (
+              <div>
+                <span className="text-gray-500 text-xs block mb-1">Contexto</span>
+                <pre className="bg-black/40 border border-gray-800 rounded-lg p-3 text-[10px] text-gray-300 overflow-x-auto max-h-64 overflow-y-auto">
+                  {JSON.stringify(JSON.parse(log.context), null, 2)}
+                </pre>
+              </div>
+            )}
+            {!log.resolved && (
+              <button
+                onClick={() => resolveMut.mutate({ token, id: log.id })}
+                disabled={resolveMut.isPending}
+                className="w-full bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+              >
+                Marcar resolvido
+              </button>
+            )}
+          </div>
         ) : (
           <div className="p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3 text-xs">
@@ -724,24 +757,25 @@ function PlatformLogDetailModal({ token, logType, logId, onClose }: { token: str
   );
 }
 
-// ===== PLATFORM LOGS SECTION (Super Admin) — e-mail + assinatura no mesmo lugar =====
-const LOG_TYPE_OPTIONS: { value: "" | "email" | "subscription"; label: string }[] = [
+// ===== PLATFORM LOGS SECTION (Super Admin) — e-mail + assinatura + alertas de cobrança no mesmo lugar =====
+const LOG_TYPE_OPTIONS: { value: "" | "email" | "subscription" | "billing_alert"; label: string }[] = [
   { value: "", label: "Todos os tipos" },
   { value: "email", label: "E-mail" },
   { value: "subscription", label: "Assinatura" },
+  { value: "billing_alert", label: "Alerta de Cobrança" },
 ];
 const LOGS_PAGE_SIZE = 20;
 
 function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[] }) {
   const [tenantFilter, setTenantFilter] = useState<string>("");
-  const [logTypeFilter, setLogTypeFilter] = useState<"" | "email" | "subscription">("");
+  const [logTypeFilter, setLogTypeFilter] = useState<"" | "email" | "subscription" | "billing_alert">("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [page, setPage] = useState(0);
-  const [detail, setDetail] = useState<{ logType: "email" | "subscription"; id: number } | null>(null);
+  const [detail, setDetail] = useState<{ logType: "email" | "subscription" | "billing_alert"; id: number } | null>(null);
 
-  const { data, isLoading } = trpc.platformLogs.list.useQuery({
+  const { data, isLoading, refetch } = trpc.platformLogs.list.useQuery({
     token,
     tenantId: tenantFilter ? Number(tenantFilter) : undefined,
     logType: logTypeFilter || undefined,
@@ -753,6 +787,11 @@ function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[]
   });
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / LOGS_PAGE_SIZE)) : 1;
+
+  const resolveMut = trpc.platformLogs.resolveBillingAlert.useMutation({
+    onSuccess: () => { toast.success("Alerta marcado como resolvido."); refetch(); },
+    onError: (err) => toast.error(err.message || "Erro ao resolver alerta"),
+  });
 
   const selectClass = "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-red-500";
   const resetPage = () => setPage(0);
@@ -779,6 +818,8 @@ function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[]
             <option value="RECEIVED">Assinatura: RECEIVED</option>
             <option value="OVERDUE">Assinatura: OVERDUE</option>
             <option value="PENDING">Assinatura: PENDING</option>
+            <option value="critical">Alerta: Crítico</option>
+            <option value="warning">Alerta: Aviso</option>
           </select>
           <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); resetPage(); }} className={selectClass} title="Data início" />
           <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); resetPage(); }} className={selectClass} title="Data fim" />
@@ -804,27 +845,54 @@ function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[]
                   <th className="text-left px-4 py-2 font-medium">Detalhe</th>
                   <th className="text-left px-4 py-2 font-medium">Status</th>
                   <th className="text-left px-4 py-2 font-medium">Data</th>
+                  <th className="text-left px-4 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {data.items.map((item: any) => (
-                  <tr key={`${item.logType}-${item.id}`} onClick={() => setDetail({ logType: item.logType, id: item.id })} className="hover:bg-gray-800/50 cursor-pointer transition-colors">
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${item.logType === "email" ? "bg-blue-500/15 text-blue-400" : "bg-purple-500/15 text-purple-400"}`}>
-                        {item.logType === "email" ? <Mail className="w-3 h-3" /> : <Key className="w-3 h-3" />}
-                        {item.logType === "email" ? "E-mail" : "Assinatura"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-white text-xs font-medium">{item.tenantName || "—"}</div>
-                      <div className="text-gray-500 text-[10px]">{item.tenantSlug}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-300 text-xs">{item.title}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{item.detail || "—"}</td>
-                    <td className="px-4 py-3 text-gray-300 text-xs">{item.status || "—"}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
-                  </tr>
-                ))}
+                {data.items.map((item: any) => {
+                  const typeMeta = item.logType === "email"
+                    ? { icon: <Mail className="w-3 h-3" />, label: "E-mail", className: "bg-blue-500/15 text-blue-400" }
+                    : item.logType === "billing_alert"
+                      ? { icon: <AlertTriangle className="w-3 h-3" />, label: "Alerta", className: item.status === "critical" ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400" }
+                      : { icon: <Key className="w-3 h-3" />, label: "Assinatura", className: "bg-purple-500/15 text-purple-400" };
+                  return (
+                    <tr key={`${item.logType}-${item.id}`} onClick={() => setDetail({ logType: item.logType, id: item.id })} className="hover:bg-gray-800/50 cursor-pointer transition-colors">
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${typeMeta.className}`}>
+                          {typeMeta.icon}
+                          {typeMeta.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-white text-xs font-medium">{item.tenantName || (item.logType === "billing_alert" && item.tenantId ? `#${item.tenantId}` : "—")}</div>
+                        <div className="text-gray-500 text-[10px]">{item.tenantSlug}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300 text-xs font-mono">{item.title}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{item.detail || "—"}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {item.logType === "billing_alert" ? (
+                          <span className={item.status === "critical" ? "text-red-400" : "text-amber-400"}>
+                            {item.status === "critical" ? "Crítico" : "Aviso"}{item.resolved ? " · resolvido" : ""}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">{item.status || "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                      <td className="px-4 py-3 text-right">
+                        {item.logType === "billing_alert" && !item.resolved && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); resolveMut.mutate({ token, id: item.id }); }}
+                            disabled={resolveMut.isPending}
+                            className="text-xs text-green-400 hover:text-green-300 font-semibold whitespace-nowrap"
+                          >
+                            Marcar resolvido
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -836,7 +904,7 @@ function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[]
         </>
       )}
 
-      {detail && <PlatformLogDetailModal token={token} logType={detail.logType} logId={detail.id} onClose={() => setDetail(null)} />}
+      {detail && <PlatformLogDetailModal token={token} logType={detail.logType} logId={detail.id} onClose={() => setDetail(null)} onResolved={() => refetch()} />}
     </div>
   );
 }
@@ -848,6 +916,8 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
   const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [activeSection, setActiveSection] = useState<"tenants" | "subscriptions">("tenants");
+  // Conta eventos raros de assinatura + alertas críticos de cobrança não
+  // resolvidos — os dois viram o mesmo badge na aba "Logs" (tela unificada).
   const { data: rareEvents } = trpc.platformLogs.getRareEventsCount.useQuery({ token }, { refetchInterval: 60000 });
 
   const filteredTenants = (dashboard?.tenants || []).filter((t: any) =>

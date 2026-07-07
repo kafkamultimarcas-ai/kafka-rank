@@ -60,8 +60,19 @@ export default function FichaFinanciamento() {
   const [bancosTentados, setBancosTentados] = useState<string[]>([]);
 
   const { data: sellersList } = trpc.sellers.list.useQuery();
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const createFicha = trpc.fichas.create.useMutation();
   const uploadCnh = trpc.fichas.uploadCnh.useMutation();
+
+  // Vendedor comum: identidade vem da sessão, não de um dropdown (o backend já
+  // rejeita sellerId diferente do da sessão pra esse tipo de login). Gerente
+  // continua podendo escolher em nome de quem está lançando.
+  const isLockedToSession = !!sellerSession && sellerSession.sellerRole !== "gerente";
+  useEffect(() => {
+    if (isLockedToSession && sellerSession) {
+      setSellerId(sellerSession.id);
+    }
+  }, [isLockedToSession, sellerSession]);
 
   // Auto-lookup placa no estoque
   const cleanPlate = placa.replace(/[^A-Za-z0-9]/g, '');
@@ -234,16 +245,23 @@ export default function FichaFinanciamento() {
             <User className="w-4 h-4 text-red-400" />
             Quem é você? *
           </Label>
-          <select
-            value={sellerId || ""}
-            onChange={e => setSellerId(Number(e.target.value))}
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 text-sm"
-          >
-            <option value="">Selecione seu nome...</option>
-            {vendedores.map((s: any) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+          {isLockedToSession ? (
+            <div className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+              <User className="w-4 h-4 text-red-400 shrink-0" />
+              <span className="text-white text-sm">Registrando como: <strong>{sellerSession?.name}</strong></span>
+            </div>
+          ) : (
+            <select
+              value={sellerId || ""}
+              onChange={e => setSellerId(Number(e.target.value))}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 text-sm"
+            >
+              <option value="">Selecione seu nome...</option>
+              {vendedores.map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Seções do formulário */}

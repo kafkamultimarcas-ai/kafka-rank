@@ -58,6 +58,8 @@ Nenhuma dessas chamadas manda senha em texto puro por e-mail — vendedor sempre
 
 ## 5. Log unificado no Super Admin
 
+> **Atualização (leva de trabalho posterior)**: um terceiro `logType` (`billing_alert`) foi adicionado a este mesmo sistema, junto com a correção de um bug real de idempotência no webhook ASAAS e logger estruturado — ver [documento 07](07-observabilidade-alertas-cobranca.md). A primeira tentativa criou uma aba "Alertas" separada; foi revertida a pedido do usuário pra manter tudo nesta mesma tela de Logs.
+
 ### 5.1. Antes desta branch
 A tela do Super Admin só tinha "Logs de Assinaturas" (`subscriptionLogsRouter`), cobrindo só `subscription_events`.
 

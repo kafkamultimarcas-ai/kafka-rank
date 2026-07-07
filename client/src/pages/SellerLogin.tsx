@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTenant } from "@/contexts/TenantContext";
+import { StoreLoginPicker } from "@/components/StoreLoginPicker";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, CheckCircle2, Lock, LogIn, Search, Store, User } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock, LogIn, User } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -12,30 +13,17 @@ const ADMIN_TOKEN_KEY = "crm_admin_token";
 
 type LoginStep = "credentials" | "change_password";
 
-function normalizeStoreSlug(value: string) {
-  const directSlug = value.match(/\/t\/([a-z0-9-]+)(?:\/|$)/i)?.[1];
-  const source = directSlug || value;
-
-  return source
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9-]/g, "");
-}
-
 export default function SellerLogin() {
   const [, navigate] = useLocation();
   const { tenant, tenantSlug, isLoading: tenantLoading } = useTenant();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [storeSlug, setStoreSlug] = useState("");
   const [step, setStep] = useState<LoginStep>("credentials");
   const [pendingAdminToken, setPendingAdminToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const tenantBase = tenantSlug ? `/t/${tenantSlug}` : "";
-  const normalizedStoreSlug = normalizeStoreSlug(storeSlug);
 
   const loginMutation = trpc.tenantAuth.login.useMutation({
     onSuccess: (data) => {
@@ -70,16 +58,6 @@ export default function SellerLogin() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!tenantSlug) {
-      if (normalizedStoreSlug.length < 2) {
-        toast.error("Informe o slug da loja ou cole o link da loja.");
-        return;
-      }
-
-      navigate(`/t/${normalizedStoreSlug}/login`);
-      return;
-    }
 
     if (!username.trim() || !password.trim()) {
       toast.error("Preencha usuário e senha.");
@@ -218,39 +196,9 @@ export default function SellerLogin() {
               <h1 className="text-xl font-black text-white tracking-wider uppercase">
                 Acessar Loja
               </h1>
-              <p className="text-sm text-gray-400 mt-1 text-center">
-                Informe o slug da loja ou cole o link que você recebeu.
-              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
-                  <Store className="w-4 h-4 text-red-400" />
-                  Loja
-                </label>
-                <Input
-                  value={storeSlug}
-                  onChange={(e) => setStoreSlug(e.target.value)}
-                  placeholder="Ex: loja-demo ou https://kafkarank.com/t/loja-demo/login"
-                  className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
-                  autoFocus
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  O acesso oficial de cada loja segue o padrão <span className="text-gray-300">`/t/slug/login`</span>.
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={normalizedStoreSlug.length < 2}
-                className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold py-3 text-base uppercase tracking-wider"
-              >
-                <span className="flex items-center gap-2">
-                  <Search className="w-5 h-5" /> Ir para o login da loja
-                </span>
-              </Button>
-            </form>
+            <StoreLoginPicker title="" description="Selecione sua loja para ir direto para a tela de login dela." />
 
             <div className="mt-4 text-center">
               <button

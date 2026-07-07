@@ -35,6 +35,7 @@ export const sellers = mysqlTable("sellers", {
   totalPoints: int("totalPoints").default(0).notNull(),
   username: varchar("username", { length: 100 }),
   passwordHash: varchar("passwordHash", { length: 255 }),
+  inviteToken: varchar("inviteToken", { length: 64 }), // token de uso único pro vendedor criar seu próprio login (primeiro acesso)
   lastAccess: bigint("lastAccess", { mode: "number" }),
   sellerRole: varchar("sellerRole", { length: 20 }).default("vendedor"), // vendedor, gerente
   leadReceiveBlocked: boolean("leadReceiveBlocked").default(false).notNull(), // bloqueado de receber leads
@@ -1285,6 +1286,7 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   tenantId: int("tenantId").notNull().default(1),
 }, (table) => ({
   tenantIdx: index("idx_inventory_vehicles_tenant").on(table.tenantId),
+  tenantExternalIdx: uniqueIndex("idx_inventory_vehicles_tenant_external").on(table.tenantId, table.externalId),
 }));
 export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
 export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
@@ -1529,6 +1531,27 @@ export const subscriptionEvents = mysqlTable("subscription_events", {
 }));
 export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
 export type InsertSubscriptionEvent = typeof subscriptionEvents.$inferInsert;
+
+// Alertas internos de falhas no caminho crítico de cobrança (webhook ASAAS,
+// chamadas à API do ASAAS) — substitui error tracking externo: fica durável
+// no banco e dispara e-mail pros Super Admins quando severity="critical".
+export const billingAlerts = mysqlTable("billing_alerts", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId"), // nullable: nem sempre dá pra resolver o tenant antes da falha
+  severity: mysqlEnum("severity", ["critical", "warning"]).notNull(),
+  code: varchar("code", { length: 100 }).notNull(), // ex: webhook_processing_failed, asaas_api_error
+  message: text("message").notNull(),
+  context: text("context"), // JSON: paymentId, event, subscriptionId, stack, etc.
+  resolved: boolean("resolved").default(false).notNull(),
+  resolvedAt: bigint("resolvedAt", { mode: "number" }),
+  resolvedBy: varchar("resolvedBy", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  resolvedIdx: index("idx_billing_alerts_resolved").on(table.resolved),
+  tenantIdx: index("idx_billing_alerts_tenant").on(table.tenantId),
+}));
+export type BillingAlert = typeof billingAlerts.$inferSelect;
+export type InsertBillingAlert = typeof billingAlerts.$inferInsert;
 
 // Super Admins - acesso ao portal master (gerencia todas as lojas)
 export const superAdmins = mysqlTable("super_admins", {

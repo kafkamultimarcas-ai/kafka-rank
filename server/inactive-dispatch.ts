@@ -2,10 +2,10 @@ import { getDb } from "./db";
 import * as crmDb from "./crmDb";
 import * as zapi from "./zapi-service";
 import { invokeLLM } from "./_core/llm";
-import { sql } from "drizzle-orm";
-import { crmMessages } from "../drizzle/schema";
+import { sql, or } from "drizzle-orm";
+import { crmMessages, tenants } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { getCurrentTenantId } from "./tenantDb";
+import { getCurrentTenantId, withTenantAsync } from "./tenantDb";
 
 /**
  * Run inactive dispatch: find leads that haven't responded in X hours
@@ -216,4 +216,34 @@ REGRAS:
     console.error("[Inactive Dispatch] Fatal error:", err.message);
     return result;
   }
+}
+
+// Roda a cada X minutos varrendo TODOS os tenants ativos/trial (padrão idêntico ao
+// trialReminderJob.ts) — sem esse loop, runInactiveDispatch() sozinho só enxerga o
+// tenant resolvido no contexto atual (nenhum, fora de uma request), por isso nunca
+// tinha efeito quando chamado fora de um webhook/rota tenantizada.
+let intervalHandle: ReturnType<typeof setInterval> | null = null;
+
+async function runForAllTenants(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const activeTenants = await db.select().from(tenants).where(or(eq(tenants.status, "active"), eq(tenants.status, "trial")));
+  for (const tenant of activeTenants) {
+    try {
+      await withTenantAsync(tenant.id, () => runInactiveDispatch());
+    } catch (err: any) {
+      console.error(`[Inactive Dispatch] Erro no tenant #${tenant.id}:`, err.message);
+    }
+  }
+}
+
+export function startInactiveDispatchScheduler(intervalMinutes: number = 60) {
+  if (intervalHandle) return;
+
+  setTimeout(() => runForAllTenants().catch((err) => console.error("[Inactive Dispatch] Falha na varredura inicial:", err.message)), 30000);
+  intervalHandle = setInterval(() => {
+    runForAllTenants().catch((err) => console.error("[Inactive Dispatch] Falha na varredura:", err.message));
+  }, intervalMinutes * 60 * 1000);
+
+  console.log(`[Inactive Dispatch] Scheduled every ${intervalMinutes} minutes`);
 }

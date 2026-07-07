@@ -17,6 +17,13 @@ Este diretório documenta, por assunto, tudo que foi construído na transformaç
 3. [E-mails, Notificações e Logs](03-emails-notificacoes-logs.md) — e-mails transacionais, sininho in-app, job de trial, tela de logs do Super Admin.
 4. [Segurança e Validação de Dados](04-seguranca-validacao-dados.md) — CPF/CNPJ, telefone, e-mail, rate limiting, criptografia, isolamento cross-tenant.
 5. [Pendências Críticas e Prontidão pra Lançamento](05-pendencias-criticas-lancamento.md) — o que falta, o que é bloqueante, o que é urgente.
+6. [Unificação de Login + Seleção de Loja](06-unificacao-login-selecao-loja.md) — de 5 telas de login pra 2 (`/super-admin` e `/t/:slug/login`), combobox pesquisável de lojas.
+7. [Observabilidade e Alertas de Cobrança](07-observabilidade-alertas-cobranca.md) — logger estruturado, correção de bug de idempotência no webhook ASAAS, alertas internos sem serviço externo.
+8. [Refactor de Identidade: `actorType`](08-refactor-identidade-actortype.md) — remoção do encoding de tipo de ator via ID negativo com offset mágico, dois bugs reais corrigidos.
+9. [**Análise de Prontidão para Vendas**](09-analise-prontidao-vendas.md) — leitura recomendada se a pergunta é "o que falta pra vender de verdade": reconcilia este diretório inteiro + os relatórios da raiz do projeto (vários deles desatualizados) numa lista única de prioridades P0-P3.
+10. [Estoque Multi-Tenant](10-estoque-multitenant.md) — correção de vazamento de dados entre lojas no estoque de veículos (scraper, router, CRM, WhatsApp, IA), URL própria por loja na aba Integrações.
+
+Os documentos 1-5 usam formato de texto corrido por assunto. Os documentos 6 em diante, de uma leva de trabalho posterior, seguem um formato fixo (Análise → Feature → Plano de Implementação → Resultados → Como Testar) — mais fácil de manter atualizado a cada nova demanda.
 
 ## Como este material se relaciona com o resto de `docs/`
 

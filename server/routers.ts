@@ -42,15 +42,7 @@ import { buildCurrentTenantPath, buildSellerTenantPath } from "./tenantUrls";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
-
-// Helper: retorna sellerId logado ou null se for gerente/admin (que vê tudo)
-async function getPrivacySellerId(ctx: any): Promise<number | null> {
-  if (!ctx.user || (ctx.user as any).loginMethod !== 'seller_password') return null;
-  const sellerId = -(ctx.user.id + 1000000);
-  const seller = await db.getSellerById(sellerId);
-  if (seller && seller.sellerRole === 'gerente') return null; // gerente vê tudo
-  return sellerId;
-}
+import { getPrivacySellerId } from "./authHelpers";
 
 export const appRouter = router({
   system: systemRouter,
@@ -86,17 +78,22 @@ export const appRouter = router({
       email: z.string().optional(),
       department: z.string().optional(),
     })).mutation(async ({ input, ctx }) => {
-      const id = await db.createSeller(input);
+      // Token de uso único pro vendedor criar o próprio login (ver sellers.firstAccess) —
+      // sem isso, qualquer um que descobrisse o sellerId (via sellers.list, pública)
+      // conseguiria criar login pra outra pessoa antes dela mesma fazer isso.
+      const inviteToken = nanoid(24);
+      const id = await db.createSeller({ ...input, inviteToken });
 
+      let loginUrl: string | null = null;
       if (input.email) {
         const tenant = await getTenantById(ctx.tenantId);
         if (tenant) {
-          const loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login`;
+          loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login?invite=${inviteToken}`;
           await sendUserWelcomeEmail(input.email, tenant.name, "vendedor", loginUrl, ctx.tenantId);
         }
       }
 
-      return { id };
+      return { id, inviteToken, loginUrl };
     }),
     update: adminProcedure.input(z.object({
       id: z.number(),
@@ -243,7 +240,7 @@ export const appRouter = router({
     // Primeiro acesso: vendedor cria seu próprio login
     firstAccess: publicProcedure.input(z.object({
       sellerId: z.number(),
-      accessCode: z.string().optional(), // mantido para compatibilidade, não usado
+      inviteToken: z.string().min(1, 'Código de convite obrigatório'),
       username: z.string().min(3),
       password: z.string().min(4),
       department: z.string().optional(),
@@ -251,11 +248,17 @@ export const appRouter = router({
       const seller = await db.getSellerByIdInternal(input.sellerId);
       if (!seller || !seller.active) throw new Error('Vendedor não encontrado ou inativo');
       if (seller.username && seller.passwordHash) throw new Error('Este vendedor já possui login. Use a tela de login.');
+      // SECURITY: exige o código de convite gerado pelo admin ao cadastrar o vendedor —
+      // sem isso, qualquer pessoa que soubesse o sellerId (lista pública) poderia
+      // criar login pra outra pessoa. Ver server/routers.ts sellers.create.
+      if (!seller.inviteToken || seller.inviteToken !== input.inviteToken) {
+        throw new Error('Código de convite inválido. Peça o link correto pro seu gerente/admin.');
+      }
       // Verificar username único
       const existing = await db.getSellerByUsername(input.username);
       if (existing) throw new Error('Este nome de usuário já está em uso');
       const passwordHash = await bcrypt.hash(input.password, 10);
-      const updateData: any = { username: input.username, passwordHash };
+      const updateData: any = { username: input.username, passwordHash, inviteToken: null };
       if (input.department) updateData.department = input.department;
       await db.updateSeller(input.sellerId, updateData);
       await db.updateSellerLastAccess(input.sellerId);
@@ -335,8 +338,8 @@ export const appRouter = router({
       mimeType: z.string(),
     })).mutation(async ({ input, ctx }) => {
       let sellerId: number | null = null;
-      if (ctx.user && (ctx.user as any).loginMethod === 'seller_password') {
-        sellerId = -((ctx.user as any).id + 1000000);
+      if (ctx.user && ctx.user.actorType === 'seller') {
+        sellerId = ctx.user.id;
       }
       if (!sellerId) {
         try {
@@ -769,7 +772,7 @@ export const appRouter = router({
       return { id, consignmentMatch };
     }),
     // Vendedor registra venda (fica pendente de aprovação)
-    registerBySeller: publicProcedure.input(z.object({
+    registerBySeller: protectedProcedure.input(z.object({
       sellerId: z.number(),
       competitionId: z.number().optional(),
       vehicleModel: z.string().min(1),
@@ -783,7 +786,12 @@ export const appRouter = router({
       customerCpf: z.string().optional(),
       customerBirthday: z.string().optional(),
       retroDate: z.string().optional(), // Data retroativa YYYY-MM-DD
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode registrar vendas como você mesmo');
+      }
+      input.sellerId = privacySellerId ?? input.sellerId;
       const seller = await db.getSellerById(input.sellerId);
       if (!seller) throw new Error("Vendedor não encontrado");
       
@@ -1266,8 +1274,12 @@ export const appRouter = router({
       const count = await db.countUnreadAdminNotifications();
       return { count };
     }),
-    unreadCountSeller: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
-      const count = await db.countUnreadSellerNotifications(input.sellerId);
+    unreadCountSeller: protectedProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar suas próprias notificações');
+      }
+      const count = await db.countUnreadSellerNotifications(privacySellerId ?? input.sellerId);
       return { count };
     }),
     markRead: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
@@ -1482,12 +1494,14 @@ export const appRouter = router({
     })).query(async ({ input }) => {
       const { inventoryVehicles } = await import("../drizzle/schema");
       const { getDb } = await import("./db");
-      const { eq, like } = await import("drizzle-orm");
+      const { eq, like, and } = await import("drizzle-orm");
+      const { getCurrentTenantId } = await import("./tenantDb");
       const dbConn = await getDb();
       if (!dbConn) return { found: false, brand: null, model: null, year: null, fipePrice: null, version: null };
       const plate = input.plate.toUpperCase().replace(/[^A-Z0-9]/g, '');
       // Try exact match first
-      const rows = await dbConn.select().from(inventoryVehicles).where(like(inventoryVehicles.plate, `%${plate}%`));
+      const rows = await dbConn.select().from(inventoryVehicles)
+        .where(and(like(inventoryVehicles.plate, `%${plate}%`), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
       const found = rows.find((v: any) => {
         const vPlate = (v.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
         return vPlate === plate;
@@ -2719,11 +2733,10 @@ export const appRouter = router({
     // Verificar se está logado como gerente
     me: publicProcedure.query(async ({ ctx }) => {
       if (!ctx.user) return null;
-      // Se o ID é negativo, é um gerente
-      if (ctx.user.id < 0) {
+      if (ctx.user.actorType === "manager") {
         const limits = await getTenantLimits(ctx.tenantId);
         return {
-          id: -ctx.user.id, name: ctx.user.name, role: "manager" as const,
+          id: ctx.user.id, name: ctx.user.name, role: "manager" as const,
           trialEndsAt: limits?.trialEndsAt ?? null, trialExpired: limits?.trialExpired ?? false,
           subscriptionSuspended: limits?.status === "suspended",
         };
@@ -3053,22 +3066,39 @@ Adapte o formato conforme o assunto, mas sempre inclua:
   // ===== DOCUMENTOS DE VENDA (Vendedor ↔ Despachante) =====
   saleDocuments: router({
     // Vendedor: listar seus documentos de venda
-    myDocs: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
-      return db.listSaleDocumentsBySeller(input.sellerId);
+    myDocs: protectedProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode acessar seus pr\u00f3prios documentos');
+      }
+      return db.listSaleDocumentsBySeller(privacySellerId ?? input.sellerId);
     }),
     // Vendedor: contar documentos pendentes
-    pendingCount: publicProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input }) => {
-      return db.countPendingDocsBySeller(input.sellerId);
+    pendingCount: protectedProcedure.input(z.object({ sellerId: z.number() })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode acessar seus pr\u00f3prios documentos');
+      }
+      return db.countPendingDocsBySeller(privacySellerId ?? input.sellerId);
     }),
     // Vendedor: upload de CNH
-    uploadCnh: publicProcedure.input(z.object({
+    uploadCnh: protectedProcedure.input(z.object({
       id: z.number(),
       sellerId: z.number(),
       base64: base64Schema,
       filename: z.string(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      const effectiveSellerId = privacySellerId ?? input.sellerId;
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode enviar documentos como voc\u00ea mesmo');
+      }
+      const doc = await db.getSaleDocumentById(input.id);
+      if (!doc || doc.sellerId !== effectiveSellerId) {
+        throw new Error('Documento n\u00e3o encontrado ou n\u00e3o pertence a este vendedor');
+      }
       const buffer = Buffer.from(input.base64, 'base64');
-      const key = `sale-docs/${input.sellerId}/cnh-${Date.now()}-${input.filename}`;
+      const key = `sale-docs/${effectiveSellerId}/cnh-${Date.now()}-${input.filename}`;
       const { url } = await storagePut(key, buffer, 'image/jpeg');
       const result = await db.uploadSaleDocCnh(input.id, url, key);
       // Se ficou completo, notificar despachante
@@ -3084,14 +3114,23 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       return { success: true, docStatus: result.docStatus };
     }),
     // Vendedor: upload de Comprovante de Resid\u00eancia
-    uploadComprovante: publicProcedure.input(z.object({
+    uploadComprovante: protectedProcedure.input(z.object({
       id: z.number(),
       sellerId: z.number(),
       base64: base64Schema,
       filename: z.string(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      const effectiveSellerId = privacySellerId ?? input.sellerId;
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Voc\u00ea s\u00f3 pode enviar documentos como voc\u00ea mesmo');
+      }
+      const doc = await db.getSaleDocumentById(input.id);
+      if (!doc || doc.sellerId !== effectiveSellerId) {
+        throw new Error('Documento n\u00e3o encontrado ou n\u00e3o pertence a este vendedor');
+      }
       const buffer = Buffer.from(input.base64, 'base64');
-      const key = `sale-docs/${input.sellerId}/comprovante-${Date.now()}-${input.filename}`;
+      const key = `sale-docs/${effectiveSellerId}/comprovante-${Date.now()}-${input.filename}`;
       const { url } = await storagePut(key, buffer, 'image/jpeg');
       const result = await db.uploadSaleDocComprovante(input.id, url, key);
       if (result.docStatus === 'completo') {
@@ -3372,11 +3411,16 @@ Adapte o formato conforme o assunto, mas sempre inclua:
   // ===== CENTRAL DE RESULTADOS (VENDEDOR) =====
   sellerResults: router({
     // Dashboard completo do vendedor
-    getDashboard: publicProcedure.input(z.object({
+    getDashboard: protectedProcedure.input(z.object({
       sellerId: z.number(),
       month: z.number().min(1).max(12).optional(),
       year: z.number().optional(),
-    })).query(async ({ input }) => {
+    })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar seus próprios resultados');
+      }
+      input.sellerId = privacySellerId ?? input.sellerId;
       const now = new Date();
       const month = input.month || (now.getMonth() + 1);
       const year = input.year || now.getFullYear();
@@ -3544,12 +3588,16 @@ Adapte o formato conforme o assunto, mas sempre inclua:
     }),
 
     // Listar vales
-    listAdvances: publicProcedure.input(z.object({
+    listAdvances: protectedProcedure.input(z.object({
       sellerId: z.number(),
       month: z.number(),
       year: z.number(),
-    })).query(async ({ input }) => {
-      return db.getSellerAdvances(input.sellerId, input.month, input.year);
+    })).query(async ({ input, ctx }) => {
+      const privacySellerId = await getPrivacySellerId(ctx);
+      if (privacySellerId && input.sellerId !== privacySellerId) {
+        throw new Error('Você só pode acessar seus próprios vales');
+      }
+      return db.getSellerAdvances(privacySellerId ?? input.sellerId, input.month, input.year);
     }),
 
     // Regras de comissão

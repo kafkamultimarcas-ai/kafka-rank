@@ -9,6 +9,7 @@ import { eq, sql } from "drizzle-orm";
 import { admins, managers, sellers, users } from "../drizzle/schema";
 import { getDb } from "./db";
 import { getDefaultTenantId, getTenantBySlug } from "./tenantService";
+import type { AuthActor } from "./_core/context";
 
 const tenantCache = new Map<string, { tenantId: number; expiresAt: number }>();
 const tenantSlugCache = new Map<string, { tenantId: number; slug: string; expiresAt: number }>();
@@ -84,7 +85,7 @@ async function resolveTenantBySlugCached(slug: string): Promise<{ tenantId: numb
  * Resolve tenantId from user context.
  * Falls back to the first active tenant only for legacy routes without slug.
  */
-export async function resolveTenantId(user: any): Promise<number> {
+export async function resolveTenantId(user: AuthActor | null): Promise<number> {
   if (!user) return getDefaultTenantId();
 
   const cacheKey = `${user.openId || ""}_${user.id || ""}`;
@@ -99,31 +100,28 @@ export async function resolveTenantId(user: any): Promise<number> {
   let tenantId = await getDefaultTenantId();
 
   try {
-    if (user.id < -1000000) {
-      const sellerId = -(user.id + 1000000);
+    if (user.actorType === "seller") {
       const [seller] = await db
         .select({ tenantId: sellers.tenantId })
         .from(sellers)
-        .where(eq(sellers.id, sellerId))
+        .where(eq(sellers.id, user.id))
         .limit(1);
       if (seller) tenantId = seller.tenantId;
-    } else if (user.loginMethod === "crm_admin") {
-      const adminId = -(user.id + 2000000);
+    } else if (user.actorType === "crm_admin") {
       const [admin] = await db
         .select({ tenantId: admins.tenantId })
         .from(admins)
-        .where(eq(admins.id, adminId))
+        .where(eq(admins.id, user.id))
         .limit(1);
       if (admin) tenantId = admin.tenantId;
-    } else if (user.id < 0 && user.id > -1000000) {
-      const managerId = -user.id;
+    } else if (user.actorType === "manager") {
       const [manager] = await db
         .select({ tenantId: managers.tenantId })
         .from(managers)
-        .where(eq(managers.id, managerId))
+        .where(eq(managers.id, user.id))
         .limit(1);
       if (manager) tenantId = manager.tenantId;
-    } else if (user.openId) {
+    } else if (user.actorType === "oauth" && user.openId) {
       const [oauthUser] = await db
         .select({ tenantId: users.tenantId })
         .from(users)
@@ -142,7 +140,7 @@ export async function resolveTenantId(user: any): Promise<number> {
 
 export async function resolveTenantContext(
   req: { headers?: Record<string, unknown>; originalUrl?: string; url?: string },
-  user: any
+  user: AuthActor | null
 ): Promise<TenantResolution> {
   const requestedSlug = extractTenantSlugFromRequest(req);
   if (requestedSlug) {

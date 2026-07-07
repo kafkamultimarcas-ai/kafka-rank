@@ -469,10 +469,13 @@ export const crmInventoryRouter = router({
   getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) return null;
-    const result = await dbConn.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.id)).limit(1);
+    const result = await dbConn.select().from(inventoryVehicles)
+      .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+      .limit(1);
     const v = result[0];
     if (!v) return null;
     // Map to CRM-compatible format
@@ -494,9 +497,10 @@ export const crmInventoryRouter = router({
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
     const { eq, and, like, or, desc } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) return [];
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(inventoryVehicles.tenantId, getCurrentTenantId())];
     if (input?.status && input.status !== "all") {
       conditions.push(eq(inventoryVehicles.status, input.status as any));
     }
@@ -509,8 +513,7 @@ export const crmInventoryRouter = router({
         like(inventoryVehicles.color, p),
       ));
     }
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-    const rows = await dbConn.select().from(inventoryVehicles).where(where).orderBy(desc(inventoryVehicles.createdAt));
+    const rows = await dbConn.select().from(inventoryVehicles).where(and(...conditions)).orderBy(desc(inventoryVehicles.createdAt));
     // Map to CRM-compatible format
     return rows.map(v => ({
       id: v.id, brand: v.brand, model: v.model, year: v.year ? String(v.year) : null,
@@ -530,10 +533,12 @@ export const crmInventoryRouter = router({
   })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
     const result = await dbConn.insert(inventoryVehicles).values({
       externalId: `manual-${nanoid(8)}`,
+      tenantId: getCurrentTenantId(),
       brand: input.brand, model: input.model,
       year: input.year ? parseInt(input.year) : null,
       color: input.color || null, plate: input.plate || null,
@@ -550,23 +555,29 @@ export const crmInventoryRouter = router({
   })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
     const updates: any = {};
     if (input.status) updates.status = input.status;
     if (input.notes !== undefined) updates.observation = input.notes;
-    await dbConn.update(inventoryVehicles).set(updates).where(eq(inventoryVehicles.id, input.id));
+    const [result] = await dbConn.update(inventoryVehicles).set(updates)
+      .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+    if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
     return { success: true };
   }),
 
   delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
-    await dbConn.delete(inventoryVehicles).where(eq(inventoryVehicles.id, input.id));
+    const [result] = await dbConn.delete(inventoryVehicles)
+      .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+    if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
     return { success: true };
   }),
 
@@ -635,6 +646,8 @@ export const crmIntegrationsRouter = router({
       pageId: config.pageId || "",
       hasAppSecret: !!config.appSecret,
       hasPageAccessToken: !!config.pageAccessToken,
+      dmEnabled: !!config.dmEnabled,
+      commentTriggerWords: Array.isArray(config.commentTriggerWords) ? config.commentTriggerWords.join(", ") : "",
     };
   }),
 
@@ -644,6 +657,8 @@ export const crmIntegrationsRouter = router({
     pageAccessToken: z.string().optional(),
     verifyToken: z.string().optional(),
     pageId: z.string().optional(),
+    dmEnabled: z.boolean().optional(),
+    commentTriggerWords: z.string().optional(),
   })).mutation(async ({ input }) => {
     let integration = await crmDb.getIntegrationByType("facebook");
     let existingConfig: any = {};
@@ -657,6 +672,10 @@ export const crmIntegrationsRouter = router({
     if (input.pageAccessToken && !input.pageAccessToken.includes("***")) newConfig.pageAccessToken = input.pageAccessToken;
     if (input.verifyToken !== undefined) newConfig.verifyToken = input.verifyToken;
     if (input.pageId !== undefined) newConfig.pageId = input.pageId;
+    if (input.dmEnabled !== undefined) newConfig.dmEnabled = input.dmEnabled;
+    if (input.commentTriggerWords !== undefined) {
+      newConfig.commentTriggerWords = input.commentTriggerWords.split(",").map(w => w.trim()).filter(Boolean);
+    }
 
     if (integration) {
       await crmDb.updateIntegration(integration.id, { config: JSON.stringify(newConfig) });
@@ -1276,10 +1295,13 @@ export const crmChatRouter = router({
     // Query from inventory_vehicles table (same table the frontend list uses)
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("Erro de conexão");
-    const rows = await dbConn.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.vehicleId)).limit(1);
+    const rows = await dbConn.select().from(inventoryVehicles)
+      .where(and(eq(inventoryVehicles.id, input.vehicleId), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+      .limit(1);
     const v = rows[0];
     if (!v) throw new Error("Veículo não encontrado");
     
@@ -1398,11 +1420,13 @@ export const crmAiRouter = router({
       const { getDb } = await import("../db");
       const { inventoryVehicles } = await import("../../drizzle/schema");
       const { like, or, and, eq } = await import("drizzle-orm");
+      const { getCurrentTenantId } = await import("../tenantDb");
       const dbConn = await getDb();
       if (dbConn) {
         const search = `%${lead.vehicleInterest}%`;
         const vehicles = await dbConn.select().from(inventoryVehicles)
           .where(and(
+            eq(inventoryVehicles.tenantId, getCurrentTenantId()),
             eq(inventoryVehicles.status, "available"),
             or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))
           )).limit(5);

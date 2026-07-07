@@ -183,6 +183,7 @@ function Router() {
         <Route path="/ficha-financiamento" component={FichaFinanciamento} />
         <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/estoque" component={Estoque} />
+        <Route path="/t/:slug/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/t/:slug/financeiro" component={FinanceiroPage} />
         <Route path="/assinatura" component={AssinaturaPage} />

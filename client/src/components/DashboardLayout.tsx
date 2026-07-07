@@ -23,10 +23,12 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, Eye, EyeOff, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import TrialStatusBanner from "./TrialStatusBanner";
+import { StoreLoginPicker } from "./StoreLoginPicker";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 
@@ -42,6 +44,7 @@ const menuItems = [
   { icon: Target, label: "Metas", path: "/admin/metas" },
   { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
   { icon: Gift, label: "Carros Bônus", path: "/admin/bonus-veiculos" },
+  { icon: CreditCard, label: "Assinatura", path: "/assinatura" },
   { icon: Settings, label: "Ajustes", path: "/admin/configuracoes" },
   { icon: LayoutGrid, label: "CRM Gerente", path: "/crm/admin" },
   { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
@@ -91,6 +94,11 @@ export default function DashboardLayout({
   const { loading, user } = useAuth();
   const managerQuery = trpc.managers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const sellerQuery = trpc.sellers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const billingQuery = trpc.billing.getMyPlan.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    enabled: !!user && user.role === "admin",
+  });
   const isManagerLoading = managerQuery.isLoading;
   const isSellerLoading = sellerQuery.isLoading;
 
@@ -140,6 +148,17 @@ export default function DashboardLayout({
         isManager={!!isManager || !!isSellerGerente}
         isSellerGerente={!!isSellerGerente}
         tenantSlug={tenantSlug}
+        trialEndsAt={
+          managerQuery.data?.trialEndsAt ??
+          sellerQuery.data?.trialEndsAt ??
+          billingQuery.data?.trialEndsAt ??
+          null
+        }
+        subscriptionSuspended={
+          managerQuery.data?.subscriptionSuspended ??
+          sellerQuery.data?.subscriptionSuspended ??
+          (billingQuery.data?.status === "suspended")
+        }
       >
         {children}
       </DashboardLayoutContent>
@@ -148,29 +167,6 @@ export default function DashboardLayout({
 }
 
 function ManagerLoginScreen() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const loginMutation = trpc.managers.login.useMutation();
-  const utils = trpc.useUtils();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim() || !password.trim()) return;
-    setIsLoading(true);
-    try {
-      await loginMutation.mutateAsync({ username: username.trim(), password });
-      await utils.managers.me.invalidate();
-      await utils.auth.me.invalidate();
-      toast.success("Login realizado com sucesso!");
-    } catch (err: any) {
-      toast.error(err.message || "Usuário ou senha inválidos");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
@@ -182,51 +178,11 @@ function ManagerLoginScreen() {
             Painel Administrativo
           </h1>
           <p className="text-sm text-muted-foreground text-center max-w-sm">
-            Faça login para acessar o gerenciamento da competição de vendas.
+            Selecione sua loja para acessar o gerenciamento da competição de vendas.
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="w-full space-y-4">
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Usuário</label>
-            <input
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Digite seu usuário"
-              className="w-full h-11 px-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              autoComplete="username"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Senha</label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Digite sua senha"
-                className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          <Button
-            type="submit"
-            disabled={isLoading || !username.trim() || !password.trim()}
-            size="lg"
-            className="w-full racing-gradient text-white font-semibold shadow-lg hover:shadow-xl transition-all"
-          >
-            {isLoading ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
+        <StoreLoginPicker title="" description="" className="w-full" />
 
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -255,9 +211,22 @@ type DashboardLayoutContentProps = {
   isManager: boolean;
   isSellerGerente?: boolean;
   tenantSlug: string | null;
+  trialEndsAt: number | null;
+  subscriptionSuspended: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager, isSellerGerente, tenantSlug }: DashboardLayoutContentProps) {
+function DashboardLayoutContent({
+  children,
+  setSidebarWidth,
+  displayName,
+  displayEmail,
+  showOwnerItems,
+  isManager,
+  isSellerGerente,
+  tenantSlug,
+  trialEndsAt,
+  subscriptionSuspended,
+}: DashboardLayoutContentProps) {
   const { logout: oauthLogout } = useAuth();
   const managerLogout = trpc.managers.logout.useMutation();
   const sellerLogout = trpc.sellers.logout.useMutation();
@@ -405,6 +374,11 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
       </div>
 
       <SidebarInset>
+        <TrialStatusBanner
+          tenantSlug={tenantSlug}
+          trialEndsAt={trialEndsAt}
+          subscriptionSuspended={subscriptionSuspended}
+        />
         {isMobile && (
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">

@@ -96,16 +96,16 @@ export const managerOrAdminProcedure = publicProcedure.use(
     }
 
     const isAdmin = ctx.user.role === 'admin';
-    const isManager = ctx.user.id < 0 && ctx.user.id > -1000000; // Managers from managers table
-    const isCrmAdmin = ctx.user.loginMethod === 'crm_admin';
-    const isSellerGerente = (ctx.user as any).sellerRole === 'gerente';
+    const isManager = ctx.user.actorType === 'manager';
+    const isCrmAdmin = ctx.user.actorType === 'crm_admin';
+    const isSellerGerente = ctx.user.sellerRole === 'gerente';
 
     if (!isAdmin && !isManager && !isCrmAdmin && !isSellerGerente) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores e gerentes" });
     }
 
-    const editorName = ctx.user.name || 
-      (isManager ? `Gerente #${-ctx.user.id}` : 
+    const editorName = ctx.user.name ||
+      (isManager ? `Gerente #${ctx.user.id}` :
        isSellerGerente ? `Gerente ${ctx.user.name}` : 'Admin');
 
     return next({

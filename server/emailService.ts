@@ -13,7 +13,8 @@ export type EmailType =
   | "subscription_suspended"
   | "trial_ending"
   | "user_welcome"
-  | "plan_changed";
+  | "plan_changed"
+  | "billing_critical_alert";
 
 // Resend API - uses env var RESEND_API_KEY
 function getResend(): Resend | null {
@@ -259,6 +260,34 @@ export async function sendTrialEndingEmail(email: string, brandName: string, day
   `);
 
   return dispatchEmail({ to: email, subject: `⏳ Seu trial acaba em ${daysLeft} dia${daysLeft === 1 ? "" : "s"}`, html, emailType: "trial_ending", tenantId, fallbackLog: billingUrl });
+}
+
+// Alerta interno pros Super Admins quando o caminho de cobrança (webhook ASAAS,
+// billingRouter) falha de um jeito que precisa de atenção humana — ver
+// server/billingAlertService.ts. Não é um e-mail pro cliente da loja.
+export async function sendBillingCriticalAlertEmail(
+  toEmails: string[],
+  alert: { code: string; message: string; tenantId: number | null; context?: Record<string, unknown> }
+): Promise<void> {
+  const html = emailShell("Kafka Rank", `
+    <p style="color: #fff; font-size: 18px; font-weight: 700; margin: 0 0 12px;">Falha crítica no fluxo de cobrança 🚨</p>
+    <p style="color: #a0a0b0; font-size: 15px; margin: 0 0 8px;"><strong style="color: #fff;">Código:</strong> ${alert.code}</p>
+    <p style="color: #a0a0b0; font-size: 15px; margin: 0 0 8px;"><strong style="color: #fff;">Loja (tenantId):</strong> ${alert.tenantId ?? "não identificada"}</p>
+    <p style="color: #a0a0b0; font-size: 15px; margin: 0 0 16px;">${alert.message}</p>
+    ${alert.context ? `<pre style="color: #666; font-size: 11px; text-align: left; white-space: pre-wrap; background: #0d0d15; padding: 12px; border-radius: 8px;">${JSON.stringify(alert.context, null, 2)}</pre>` : ""}
+  `);
+
+  await Promise.all(
+    toEmails.map((to) =>
+      dispatchEmail({
+        to,
+        subject: `🚨 Alerta de cobrança: ${alert.code}`,
+        html,
+        emailType: "billing_critical_alert",
+        tenantId: alert.tenantId,
+      })
+    )
+  );
 }
 
 // Verify code

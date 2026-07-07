@@ -400,6 +400,9 @@ export const superAdminRouter = router({
 
     return rows;
   }),
+  // Alertas de cobrança (webhook/API ASAAS) foram unificados na tela de Logs
+  // do Super Admin — ver server/routers/platformLogsRouter.ts (listagem já
+  // centralizada com e-mail/assinatura, mesma tela em client/src/pages/SuperAdmin.tsx).
 });
 
 

@@ -18,16 +18,32 @@ function assertConfigured() {
   }
 }
 
+const ASAAS_TIMEOUT_MS = 30_000;
+
 async function asaasFetch(path: string, init: RequestInit = {}) {
   assertConfigured();
-  const res = await fetch(`${ENV.asaasApiUrl}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      access_token: ENV.asaasApiKey,
-      ...(init.headers || {}),
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ASAAS_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${ENV.asaasApiUrl}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        access_token: ENV.asaasApiKey,
+        ...(init.headers || {}),
+      },
+    });
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new AsaasError(`Timeout ao chamar a API do ASAAS (${ASAAS_TIMEOUT_MS / 1000}s) em ${path}`);
+    }
+    throw new AsaasError(`Falha de rede ao chamar a API do ASAAS em ${path}: ${err.message}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   const text = await res.text();
   let body: any = null;

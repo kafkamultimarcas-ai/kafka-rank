@@ -57,7 +57,11 @@ Não ficou só na tela de assinatura — uma auditoria dedicada (agente de explo
 - JWT do Super Admin usa um secret **separado** do resto do app (`SUPER_SECRET`, `server/superAdminAuth.ts`) — testado explicitamente (`tenant-security.test.ts`) pra garantir que comprometer um token de loja não dá acesso ao portal master.
 - `verifySuperToken`/`signSuperToken` foram extraídos de dentro do `superAdminRouter.ts` pra esse arquivo dedicado, reaproveitados também pelo `platformLogsRouter`/`subscriptionLogsRouter` sem duplicar a lógica de autenticação do portal.
 
-## 5. O que ainda não existe (ver documento 05 pra priorização)
+## 5. Atualização — identidade do ator sem encoding numérico
+
+O objeto de sessão (`ctx.user`) usava um ID negativo com offset mágico pra indicar se quem está logado é OAuth/gerente/vendedor/admin de CRM — isso escondia dois bugs reais de resolução de tenant/permissão, um deles com potencial de segurança (admin de CRM com token antigo sendo tratado como vendedor). Substituído por um campo explícito `actorType`. Ver [documento 08](08-refactor-identidade-actortype.md) pra detalhe completo.
+
+## 6. O que ainda não existe (ver documento 05 pra priorização)
 
 - Revogação de sessão: JWT de 30 dias não pode ser invalidado antes de expirar — redefinir a senha não derruba um token já emitido.
 - `moduleRequiredProcedure` só aplicado em Marketing como referência — outros módulos (CRM, Financeiro, Pós-venda, Estoque, IAM) não têm esse enforcement na própria procedure.

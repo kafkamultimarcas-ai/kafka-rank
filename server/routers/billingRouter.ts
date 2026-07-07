@@ -9,6 +9,7 @@ import * as asaas from "../asaasService";
 import { PLAN_CONFIG } from "../../shared/plans";
 import { isValidCpfCnpj, isValidBrazilianPhone } from "../../shared/validators";
 import { sendPlanChangedEmail } from "../emailService";
+import { createBillingAlert } from "../billingAlertService";
 
 const paidPlanSchema = z.enum(["basic", "pro", "enterprise"]);
 
@@ -79,53 +80,73 @@ export const billingRouter = router({
     }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     if (!tenant) throw new Error("Loja não encontrada");
 
-    let customerId = tenant.asaasCustomerId;
-    if (!customerId) {
-      const customer = await asaas.createCustomer({
-        name: input.billingName,
-        cpfCnpj: input.cpfCnpj,
-        email: input.email || tenant.email || undefined,
-        mobilePhone: input.mobilePhone,
-        externalReference: String(tenantId),
-      });
-      customerId = customer.id;
-      await db.update(tenants).set({ asaasCustomerId: customerId }).where(eq(tenants.id, tenantId));
-    }
-
     const isPlanChange = !!tenant.subscriptionId;
     if (isPlanChange && tenant.plan === input.plan) {
       throw new Error(`A loja já está no plano ${PLAN_CONFIG[input.plan].name}.`);
     }
 
-    const subscription = isPlanChange
-      ? await asaas.updateSubscription(tenant.subscriptionId!, { plan: input.plan })
-      : await asaas.createSubscription({ customerId, plan: input.plan });
+    try {
+      let customerId = tenant.asaasCustomerId;
+      if (!customerId) {
+        const customer = await asaas.createCustomer({
+          name: input.billingName,
+          cpfCnpj: input.cpfCnpj,
+          email: input.email || tenant.email || undefined,
+          mobilePhone: input.mobilePhone,
+          externalReference: String(tenantId),
+        });
+        customerId = customer.id;
+        await db.update(tenants).set({ asaasCustomerId: customerId }).where(eq(tenants.id, tenantId));
+      }
 
-    // Grava o plano escolhido e o id da assinatura já — o status só vira "active"
-    // de verdade quando o webhook confirmar o primeiro pagamento (fonte da verdade
-    // é o ASAAS, isso aqui é só pra já sabermos qual plano cobrar/aplicar limite).
-    await db.update(tenants).set({
-      plan: input.plan,
-      subscriptionId: subscription.id,
-      monthlyPrice: PLAN_CONFIG[input.plan].monthlyPriceCents,
-    }).where(eq(tenants.id, tenantId));
-    clearTenantLimitsCache(tenantId);
+      const subscription = isPlanChange
+        ? await asaas.updateSubscription(tenant.subscriptionId!, { plan: input.plan })
+        : await asaas.createSubscription({ customerId, plan: input.plan });
 
-    const checkoutUrl = await asaas.getCheckoutUrl(subscription.id);
-    // Numa assinatura nova, precisa de link pra pagar a primeira cobrança agora.
-    // Numa troca de plano, pode não haver cobrança PENDING nesse instante (ex:
-    // ciclo atual já pago) — o novo valor só vale a partir da próxima cobrança,
-    // o que não é erro.
-    if (!checkoutUrl && !isPlanChange) {
-      throw new Error("Assinatura criada, mas não foi possível gerar o link de pagamento. Tente novamente em instantes.");
+      // Grava o plano escolhido e o id da assinatura já — o status só vira "active"
+      // de verdade quando o webhook confirmar o primeiro pagamento (fonte da verdade
+      // é o ASAAS, isso aqui é só pra já sabermos qual plano cobrar/aplicar limite).
+      await db.update(tenants).set({
+        plan: input.plan,
+        subscriptionId: subscription.id,
+        monthlyPrice: PLAN_CONFIG[input.plan].monthlyPriceCents,
+      }).where(eq(tenants.id, tenantId));
+      clearTenantLimitsCache(tenantId);
+
+      const checkoutUrl = await asaas.getCheckoutUrl(subscription.id);
+      // Numa assinatura nova, precisa de link pra pagar a primeira cobrança agora.
+      // Numa troca de plano, pode não haver cobrança PENDING nesse instante (ex:
+      // ciclo atual já pago) — o novo valor só vale a partir da próxima cobrança,
+      // o que não é erro.
+      if (!checkoutUrl && !isPlanChange) {
+        await createBillingAlert({
+          tenantId,
+          severity: "warning",
+          code: "checkout_url_missing",
+          message: `Assinatura ${subscription.id} criada mas sem cobrança PENDING pra gerar link de checkout.`,
+          context: { subscriptionId: subscription.id, plan: input.plan },
+        });
+        throw new Error("Assinatura criada, mas não foi possível gerar o link de pagamento. Tente novamente em instantes.");
+      }
+
+      const billingEmail = input.email || tenant.email;
+      if (isPlanChange && billingEmail) {
+        await sendPlanChangedEmail(billingEmail, tenant.name, PLAN_CONFIG[input.plan].name, tenantId);
+      }
+
+      return { checkoutUrl, planChanged: isPlanChange };
+    } catch (err: any) {
+      if (err instanceof asaas.AsaasError) {
+        await createBillingAlert({
+          tenantId,
+          severity: "warning",
+          code: "asaas_api_error",
+          message: `Falha ao chamar API do ASAAS em billingRouter.subscribe: ${err.message}`,
+          context: { status: err.status, body: err.body, plan: input.plan },
+        });
+      }
+      throw err;
     }
-
-    const billingEmail = input.email || tenant.email;
-    if (isPlanChange && billingEmail) {
-      await sendPlanChangedEmail(billingEmail, tenant.name, PLAN_CONFIG[input.plan].name, tenantId);
-    }
-
-    return { checkoutUrl, planChanged: isPlanChange };
   }),
 
   cancelSubscription: adminProcedure.mutation(async () => {
@@ -136,7 +157,20 @@ export const billingRouter = router({
     const [tenant] = await db.select({ subscriptionId: tenants.subscriptionId }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
     if (!tenant?.subscriptionId) throw new Error("Nenhuma assinatura ativa pra cancelar");
 
-    await asaas.cancelSubscription(tenant.subscriptionId);
+    try {
+      await asaas.cancelSubscription(tenant.subscriptionId);
+    } catch (err: any) {
+      if (err instanceof asaas.AsaasError) {
+        await createBillingAlert({
+          tenantId,
+          severity: "warning",
+          code: "asaas_api_error",
+          message: `Falha ao cancelar assinatura no ASAAS: ${err.message}`,
+          context: { status: err.status, body: err.body, subscriptionId: tenant.subscriptionId },
+        });
+      }
+      throw err;
+    }
     // Limpa o id local — sem isso, uma nova tentativa de assinar tentaria dar
     // PUT numa assinatura que não existe mais na ASAAS.
     await db.update(tenants).set({ subscriptionId: null }).where(eq(tenants.id, tenantId));

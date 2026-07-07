@@ -40,6 +40,7 @@ import {
   Bot,
 } from "lucide-react";
 import { useBranding } from "@/contexts/TenantContext";
+import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "text-yellow-400 bg-yellow-500/20", icon: Clock },
@@ -134,6 +135,8 @@ export default function MeusAgendamentos() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<any>({});
 
+  const tenantSlug = getCurrentTenantSlug();
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: appointments, isLoading } = trpc.sdr.myAppointments.useQuery({ sellerId }, { enabled: sellerId > 0, refetchInterval: 10000 });
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
@@ -417,6 +420,20 @@ export default function MeusAgendamentos() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Vendedor não encontrado.</p>
+      </div>
+    );
+  }
+
+  // Vendedor logado só pode ver os próprios agendamentos (gerente vê de qualquer um, igual no backend)
+  if (sellerSession && sellerSession.id !== sellerId && sellerSession.sellerRole !== "gerente") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-400 mb-4">Você não tem permissão para acessar os agendamentos deste colaborador.</p>
+          <Button onClick={() => setLocation(buildTenantPath(tenantSlug, `/agendamentos/${sellerSession.id}`))} className="bg-red-600 hover:bg-red-500">
+            Ir para meus agendamentos
+          </Button>
+        </div>
       </div>
     );
   }

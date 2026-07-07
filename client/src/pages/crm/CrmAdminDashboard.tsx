@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAdminAuth } from "./CrmAdminLogin";
@@ -19,6 +20,8 @@ import {
   Copy, EyeOff, Facebook, BookOpen
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
+import AssinaturaContent from "@/components/billing/AssinaturaContent";
+import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { useBranding } from "@/contexts/TenantContext";
 import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
 
@@ -41,14 +44,34 @@ const DEPT_COLORS: Record<string, string> = {
   financeiro: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
 };
 
-type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas" | "ai_metrics";
+type AdminView = "dashboard" | "leads" | "chat" | "performance" | "pipeline" | "inventory" | "campaigns" | "marketing" | "settings" | "financial" | "sdr" | "attendant" | "fichas" | "ai_metrics" | "assinatura";
+
+function isAdminView(value: string | null): value is AdminView {
+  return value === "dashboard" ||
+    value === "leads" ||
+    value === "chat" ||
+    value === "performance" ||
+    value === "pipeline" ||
+    value === "inventory" ||
+    value === "campaigns" ||
+    value === "marketing" ||
+    value === "settings" ||
+    value === "financial" ||
+    value === "sdr" ||
+    value === "attendant" ||
+    value === "fichas" ||
+    value === "ai_metrics" ||
+    value === "assinatura";
+}
 
 export default function CrmAdminDashboard() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { admin, isLoading, isAuthenticated, logout } = useAdminAuth();
   const { name: brandName, logoUrl } = useBranding();
   const tenantSlug = getCurrentTenantSlug();
-  const [activeView, setActiveView] = useState<AdminView>("chat");
+  const currentSearch = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const initialView = currentSearch?.get("view") ?? null;
+  const [activeView, setActiveView] = useState<AdminView>(isAdminView(initialView) ? initialView : "chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -62,6 +85,20 @@ export default function CrmAdminDashboard() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isAuthenticated, navigate, tenantSlug]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.split("?")[1] || "");
+    const nextView = params.get("view");
+    if (isAdminView(nextView) && nextView !== activeView) {
+      setActiveView(nextView);
+      if (nextView !== "leads") setSelectedDept(null);
+      return;
+    }
+
+    if (!nextView && activeView === "assinatura") {
+      setActiveView("chat");
+    }
+  }, [activeView, location]);
 
   if (isLoading) {
     return (
@@ -93,8 +130,26 @@ export default function CrmAdminDashboard() {
     { key: "marketing" as const, icon: BarChart3, label: "Marketing", section: "IA & Marketing" },
     // --- Equipe ---
     { key: "sdr" as const, icon: Headphones, label: "Painel SDR", section: "Equipe" },
+    { key: "assinatura" as const, icon: CircleDollarSign, label: "Assinatura", section: "Equipe" },
     { key: "settings" as const, icon: Settings, label: "Ajustes", section: "Equipe" },
   ];
+
+  const openView = (view: AdminView) => {
+    setActiveView(view);
+    if (view !== "leads") {
+      setSelectedDept(null);
+    }
+
+    const basePath = buildTenantPath(tenantSlug, "/crm/admin");
+    if (view === "assinatura") {
+      navigate(`${basePath}?view=assinatura`, { replace: true });
+      return;
+    }
+
+    if (location !== basePath) {
+      navigate(basePath, { replace: true });
+    }
+  };
 
   // When clicking a department card, navigate to leads filtered by that dept
   const handleDeptClick = (dept: string) => {
@@ -123,7 +178,7 @@ export default function CrmAdminDashboard() {
             const showSection = idx === 0 || item.section !== menuItems[idx - 1].section;
             return (<div key={item.key}>
               {showSection && <div className={`px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 ${idx > 0 ? 'mt-2 border-t border-border/30 pt-3' : ''}`}>{item.section}</div>}
-              <button onClick={() => { setActiveView(item.key); setSelectedDept(null); }}
+              <button onClick={() => openView(item.key as AdminView)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                 <item.icon className="w-4 h-4" />
                 {item.label}
@@ -155,7 +210,7 @@ export default function CrmAdminDashboard() {
                 const showSection = idx === 0 || item.section !== menuItems[idx - 1].section;
                 return (<div key={item.key}>
                   {showSection && <div className={`px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 ${idx > 0 ? 'mt-2 border-t border-border/30 pt-3' : ''}`}>{item.section}</div>}
-                  <button onClick={() => { setActiveView(item.key); setSelectedDept(null); setSidebarOpen(false); }}
+                  <button onClick={() => { openView(item.key as AdminView); setSidebarOpen(false); }}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${activeView === item.key ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>
                     <item.icon className="w-4 h-4" />
                     {item.label}
@@ -174,6 +229,11 @@ export default function CrmAdminDashboard() {
 
       {/* Main content */}
       <main className="flex-1 min-w-0">
+        <TrialStatusBanner
+          tenantSlug={tenantSlug}
+          trialEndsAt={admin?.trialEndsAt ?? null}
+          subscriptionSuspended={admin?.subscriptionSuspended ?? false}
+        />
         <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
@@ -214,6 +274,7 @@ export default function CrmAdminDashboard() {
           {activeView === "settings" && <SettingsView />}
           {activeView === "pipeline" && <AdminPipelineView />}
           {activeView === "sdr" && <SDRManagementView />}
+          {activeView === "assinatura" && <AssinaturaContent showLogoutButton={false} />}
           {activeView === "attendant" && <AIAttendantView />}
           {activeView === "ai_metrics" && <AIMetricsDashboard />}
           {activeView === "fichas" && <CreditApplicationsView />}
@@ -1816,16 +1877,6 @@ function SettingsView() {
     onError: (e: any) => toast.error('Erro: ' + e.message),
   });
 
-  const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
-  const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
-    onSuccess: () => toast.success("Captura de mensagens enviadas ativada!"),
-    onError: (e: any) => toast.error(e.message),
-  });
-  const configureWebhook = trpc.whatsapp.configureWebhook.useMutation({
-    onSuccess: () => toast.success("Webhook configurado com sucesso!"),
-    onError: (e: any) => toast.error(e.message),
-  });
-
   const toggleAdmin = trpc.adminAuth.update.useMutation({
     onSuccess: (_, vars) => {
       refetch();
@@ -1866,7 +1917,13 @@ function SettingsView() {
   };
 
   return (
-    <div className="space-y-4">
+    <Tabs defaultValue="ajustes" className="w-full">
+      <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+        <TabsTrigger value="ajustes">Ajustes</TabsTrigger>
+        <TabsTrigger value="integracoes">Integrações</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="ajustes" className="space-y-4 mt-0">
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Administradores do CRM</h3>
         <div className="space-y-2">
@@ -2059,8 +2116,16 @@ function SettingsView() {
       {/* SECURITY: Reset All Seller Passwords */}
       <ResetAllPasswordsSection />
 
-      {/* Tenant Settings (Dados da Loja + Z-API) */}
-      <TenantSettingsPanel />
+      {/* Dados da Loja */}
+      <StoreDataPanel />
+      </TabsContent>
+
+      <TabsContent value="integracoes" className="space-y-4 mt-0">
+      {/* WhatsApp (Z-API) */}
+      <WhatsAppZapiPanel />
+
+      {/* Estoque de Veículos */}
+      <InventoryIntegrationPanel />
 
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="flex items-center justify-between mb-2">
@@ -2071,24 +2136,14 @@ function SettingsView() {
           </button>
         </div>
         <div className="space-y-2">
-          <IntegrationItem name="WhatsApp Business API" status={zapiStatus?.connected ? "ativo" : "desconectado"} description="Envio/recepção de mensagens e disparos em massa" />
-          {zapiStatus?.connected && (
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => configureWebhook.mutate()} disabled={configureWebhook.isPending}>
-                {configureWebhook.isPending ? "Configurando..." : "Reconfigurar Webhook"}
-              </Button>
-              <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => enableSentByMe.mutate()} disabled={enableSentByMe.isPending}>
-                {enableSentByMe.isPending ? "Ativando..." : "Ativar Captura Outbound"}
-              </Button>
-            </div>
-          )}
           <TokenIntegrationRow type="sig" name="SIG Web" description="Integre com seu sistema de gestão para sincronizar vendas e estoque" endpointLabel="Sincronização de vendas/estoque" endpointPath="/api/webhooks/sig/sale" />
           <TokenIntegrationRow type="email_parser" name="OLX / Webmotors" description="Receba leads automaticamente das plataformas de anúncio (via encaminhamento de e-mail)" endpointLabel="Parser de e-mail" endpointPath="/api/webhooks/email-parser" />
         </div>
       </div>
 
       <MetaIntegrationPanel />
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -2336,30 +2391,11 @@ function ResetAllPasswordsSection() {
 
 // AiModeConfig removed - now integrated into AIAttendantView
 
-function IntegrationItem({ name, status, description }: { name: string; status: string; description: string }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-accent/30 border border-border">
-      <div>
-        <p className="text-sm text-foreground font-medium">{name}</p>
-        <p className="text-[10px] text-muted-foreground">{description}</p>
-      </div>
-      <span className={`text-[10px] px-2 py-0.5 rounded shrink-0 ${status === "ativo" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
-        {status}
-      </span>
-    </div>
-  );
-}
-
-// ===== TENANT SETTINGS PANEL (Dados da Loja + Z-API) =====
-function TenantSettingsPanel() {
-  const utils = trpc.useUtils();
-  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+// ===== WHATSAPP (Z-API) PANEL =====
+function WhatsAppZapiPanel() {
+  const { data: settings } = trpc.crmPerformance.getTenantSettings.useQuery();
   const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
-    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-  const uploadLogo = trpc.crmPerformance.uploadTenantLogo.useMutation({
-    onSuccess: () => { toast.success("Logo atualizada!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
+    onSuccess: () => { toast.success("Configurações da loja salvas!"); },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
   const testZapi = trpc.crmPerformance.testZapiConnection.useMutation({
@@ -2369,24 +2405,18 @@ function TenantSettingsPanel() {
     },
     onError: (e: any) => toast.error("Erro: " + e.message),
   });
-
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { toast.error("Imagem muito grande. Máximo 3MB."); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(",")[1];
-      uploadLogo.mutate({ base64, mimeType: file.type });
-    };
-    reader.readAsDataURL(file);
-  };
+  const { data: zapiStatus } = trpc.whatsapp.status.useQuery();
+  const enableSentByMe = trpc.whatsapp.enableSentByMe.useMutation({
+    onSuccess: () => toast.success("Captura de mensagens enviadas ativada!"),
+    onError: (e: any) => toast.error(e.message),
+  });
+  const configureWebhook = trpc.whatsapp.configureWebhook.useMutation({
+    onSuccess: () => toast.success("Webhook configurado com sucesso!"),
+    onError: (e: any) => toast.error(e.message),
+  });
 
   const [showZapi, setShowZapi] = useState(false);
-  const [showStore, setShowStore] = useState(false);
   const [zapiForm, setZapiForm] = useState({ zapiInstanceId: '', zapiToken: '', zapiClientToken: '' });
-  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '', inventoryUrl: '' });
   const [initialized, setInitialized] = useState(false);
 
   if (settings && !initialized) {
@@ -2395,23 +2425,11 @@ function TenantSettingsPanel() {
       zapiToken: '',
       zapiClientToken: '',
     });
-    setStoreForm({
-      name: settings.name || '',
-      phone: settings.phone || '',
-      email: settings.email || '',
-      city: settings.city || '',
-      state: settings.state || '',
-      address: settings.address || '',
-      primaryColor: settings.primaryColor || '#DC2626',
-      secondaryColor: settings.secondaryColor || '#1F2937',
-      inventoryUrl: settings.inventoryUrl || '',
-    });
     setInitialized(true);
   }
 
+  // Z-API WhatsApp Configuration
   return (
-    <div className="space-y-4">
-      {/* Z-API WhatsApp Configuration */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <button onClick={() => setShowZapi(!showZapi)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
           <div className="flex items-center gap-3">
@@ -2473,11 +2491,159 @@ function TenantSettingsPanel() {
                 {testZapi.isPending ? 'Testando...' : 'Testar Conexão'}
               </Button>
             </div>
+            {zapiStatus?.connected && (
+              <div className="flex gap-2 pt-1 border-t border-border/50">
+                <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => configureWebhook.mutate()} disabled={configureWebhook.isPending}>
+                  {configureWebhook.isPending ? "Configurando..." : "Reconfigurar Webhook"}
+                </Button>
+                <Button size="sm" variant="outline" className="text-xs flex-1" onClick={() => enableSentByMe.mutate()} disabled={enableSentByMe.isPending}>
+                  {enableSentByMe.isPending ? "Ativando..." : "Ativar Captura Outbound"}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
+  );
+}
 
-      {/* Store Data Configuration */}
+// ===== ESTOQUE (URL de sincronização) PANEL =====
+function InventoryIntegrationPanel() {
+  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+  const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
+    onSuccess: () => { toast.success("URL do estoque salva!"); refetch(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const { data: syncLogs, refetch: refetchLogs } = trpc.inventory.syncLogs.useQuery();
+  const syncNow = trpc.inventory.sync.useMutation({
+    onSuccess: (data) => {
+      if (data.error) toast.error(data.error);
+      else toast.success(`Sincronizado! ${data.added} novo(s), ${data.updated} atualizado(s), ${data.removed} removido(s)`);
+      refetchLogs();
+    },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const [showInventory, setShowInventory] = useState(false);
+  const [inventoryUrl, setInventoryUrl] = useState('');
+  const [initialized, setInitialized] = useState(false);
+
+  if (settings && !initialized) {
+    setInventoryUrl(settings.inventoryUrl || '');
+    setInitialized(true);
+  }
+
+  const lastLog = syncLogs?.[0];
+
+  return (
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <button onClick={() => setShowInventory(!showInventory)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${settings?.inventoryUrl ? 'bg-green-500/20' : 'bg-amber-500/20'}`}>
+              <Car className={`w-5 h-5 ${settings?.inventoryUrl ? 'text-green-400' : 'text-amber-400'}`} />
+            </div>
+            <div className="text-left">
+              <h3 className="text-sm font-bold text-foreground">Estoque de Veículos</h3>
+              <p className="text-[10px] text-muted-foreground">
+                {settings?.inventoryUrl ? 'URL configurada' : 'Configure a URL do site de estoque da sua loja'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] px-2 py-0.5 rounded ${settings?.inventoryUrl ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+              {settings?.inventoryUrl ? 'Configurado' : 'Pendente'}
+            </span>
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${showInventory ? 'rotate-90' : ''}`} />
+          </div>
+        </button>
+        {showInventory && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-[11px] text-blue-300 leading-relaxed">
+                Informe a URL do site onde fica o estoque de veículos da sua loja. O sistema sincroniza automaticamente a cada 15 minutos.
+              </p>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">URL do site de estoque</label>
+              <Input placeholder="https://seusite.com.br" value={inventoryUrl}
+                onChange={e => setInventoryUrl(e.target.value)} className="h-9 text-sm font-mono" />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="flex-1" onClick={() => {
+                if (!inventoryUrl) { toast.error("Informe a URL do estoque"); return; }
+                updateSettings.mutate({ inventoryUrl });
+              }} disabled={updateSettings.isPending}>
+                <Save className="w-3.5 h-3.5 mr-1" />
+                {updateSettings.isPending ? 'Salvando...' : 'Salvar URL'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => syncNow.mutate()} disabled={syncNow.isPending || !settings?.inventoryUrl}>
+                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${syncNow.isPending ? 'animate-spin' : ''}`} />
+                {syncNow.isPending ? 'Sincronizando...' : 'Sincronizar Agora'}
+              </Button>
+            </div>
+            {lastLog && (
+              <div className="pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
+                <span className={lastLog.status === 'success' ? 'text-green-400' : 'text-red-400'}>
+                  {lastLog.status === 'success' ? 'Última sincronização' : 'Falha na sincronização'}
+                </span>
+                {' '}em {new Date(lastLog.createdAt).toLocaleString("pt-BR")}
+                {lastLog.status === 'success'
+                  ? ` — ${lastLog.vehiclesFound} encontrado(s), ${lastLog.vehiclesAdded} novo(s), ${lastLog.vehiclesUpdated} atualizado(s), ${lastLog.vehiclesRemoved} removido(s)`
+                  : lastLog.errorMessage ? ` — ${lastLog.errorMessage}` : ''}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+  );
+}
+
+// ===== STORE DATA PANEL (Dados da Loja) =====
+function StoreDataPanel() {
+  const utils = trpc.useUtils();
+  const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
+  const updateSettings = trpc.crmPerformance.updateTenantSettings.useMutation({
+    onSuccess: () => { toast.success("Configurações da loja salvas!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+  const uploadLogo = trpc.crmPerformance.uploadTenantLogo.useMutation({
+    onSuccess: () => { toast.success("Logo atualizada!"); refetch(); utils.tenantPublic.getBySlug.invalidate(); },
+    onError: (e: any) => toast.error("Erro: " + e.message),
+  });
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast.error("Imagem muito grande. Máximo 3MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      uploadLogo.mutate({ base64, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const [showStore, setShowStore] = useState(false);
+  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '' });
+  const [initialized, setInitialized] = useState(false);
+
+  if (settings && !initialized) {
+    setStoreForm({
+      name: settings.name || '',
+      phone: settings.phone || '',
+      email: settings.email || '',
+      city: settings.city || '',
+      state: settings.state || '',
+      address: settings.address || '',
+      primaryColor: settings.primaryColor || '#DC2626',
+      secondaryColor: settings.secondaryColor || '#1F2937',
+    });
+    setInitialized(true);
+  }
+
+  // Store Data Configuration
+  return (
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <button onClick={() => setShowStore(!showStore)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
           <div className="flex items-center gap-3">
@@ -2534,10 +2700,6 @@ function TenantSettingsPanel() {
                 <label className="text-[10px] text-muted-foreground mb-1 block">Estado (UF)</label>
                 <Input value={storeForm.state} onChange={e => setStoreForm({ ...storeForm, state: e.target.value })} className="h-9 text-sm" maxLength={2} placeholder="SP" />
               </div>
-              <div>
-                <label className="text-[10px] text-muted-foreground mb-1 block">URL do Estoque</label>
-                <Input value={storeForm.inventoryUrl} onChange={e => setStoreForm({ ...storeForm, inventoryUrl: e.target.value })} className="h-9 text-sm" placeholder="https://seusite.com.br/estoque" />
-              </div>
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground mb-1 block">Endereço Completo</label>
@@ -2572,7 +2734,6 @@ function TenantSettingsPanel() {
           </div>
         )}
       </div>
-    </div>
   );
 }
 

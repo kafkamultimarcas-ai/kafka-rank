@@ -1,12 +1,13 @@
-import { useState, useEffect, ReactNode, useMemo } from "react";
+import { useState, ReactNode, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Lock, LogIn, User, Eye, EyeOff, UserPlus, ArrowLeft, Flag, Shield, ChevronDown } from "lucide-react";
+import { Lock, User, UserPlus, ArrowLeft, Flag, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useBranding } from "@/contexts/TenantContext";
-import { buildTenantPath, getTenantLoginPath, getTenantSlugFromPath } from "@/lib/tenant";
+import { StoreLoginPicker } from "@/components/StoreLoginPicker";
+import { buildTenantPath, getTenantSlugFromPath } from "@/lib/tenant";
 
 // Routes that bypass the access gate (public pages, admin, TV, etc.)
 const BYPASS_ROUTES = [
@@ -16,6 +17,7 @@ const BYPASS_ROUTES = [
   "/super-admin",
   "/comercial",
   "/assinatura",
+  "/login-vendedor",
 ];
 
 function isTenantBypassRoute(pathname: string): boolean {
@@ -34,17 +36,15 @@ const DEPARTMENT_OPTIONS = [
 ];
 
 export default function AccessGate({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<"login" | "first-access">("login");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
   // First access state
   const [selectedSellerId, setSelectedSellerId] = useState<number | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState(() =>
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") || "" : ""
+  );
 
   const { user: adminUser, loading: adminLoading } = useAuth();
   const { data: sellerSession, isLoading: sellerLoading } = trpc.sellers.me.useQuery();
@@ -52,20 +52,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const { logoUrl, name: brandName } = useBranding();
   const currentPath = typeof window !== "undefined" ? window.location.pathname : "/";
   const currentTenantSlug = getTenantSlugFromPath(currentPath);
-
-  const loginMutation = trpc.sellers.login.useMutation({
-    onSuccess: (data: any) => {
-      toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
-      if (data.sellerRole === 'gerente') {
-        window.location.href = buildTenantPath(currentTenantSlug, "/gerente");
-      } else {
-        window.location.reload();
-      }
-    },
-    onError: (err) => {
-      toast.error(err.message || "Usuário ou senha inválidos");
-    },
-  });
+  const hasInviteParam = typeof window !== "undefined" && !!new URLSearchParams(window.location.search).get("invite");
 
   const firstAccessMutation = trpc.sellers.firstAccess.useMutation({
     onSuccess: (data: any) => {
@@ -114,19 +101,14 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   }
 
   // Not logged in - show login screen
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim() || !password.trim()) {
-      toast.error("Preencha usuário e senha");
-      return;
-    }
-    loginMutation.mutate({ username: username.trim(), password: password.trim() });
-  };
-
   const handleFirstAccess = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSellerId) {
       toast.error("Selecione seu nome");
+      return;
+    }
+    if (!inviteCode.trim()) {
+      toast.error("Cole o código de convite que seu gerente/admin te enviou");
       return;
     }
     if (!selectedDepartment) {
@@ -147,7 +129,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     }
     firstAccessMutation.mutate({
       sellerId: selectedSellerId,
-      accessCode: "auto",
+      inviteToken: inviteCode.trim(),
       username: newUsername.trim(),
       password: newPassword.trim(),
       department: selectedDepartment,
@@ -166,86 +148,12 @@ export default function AccessGate({ children }: { children: ReactNode }) {
             </h1>
           </div>
 
-          {mode === "login" ? (
+          {!hasInviteParam ? (
             <>
-              <p className="text-sm text-gray-400 text-center mb-6">
-                Faca login para acessar o sistema
+              <p className="text-sm text-gray-400 text-center mb-4">
+                Esse link de acesso não é mais usado para login. Selecione sua loja abaixo.
               </p>
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
-                    <User className="w-4 h-4 text-red-400" />
-                    Usuario
-                  </label>
-                  <Input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Seu nome de usuario"
-                    className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
-                    autoComplete="username"
-                    autoFocus
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
-                    <Lock className="w-4 h-4 text-red-400" />
-                    Senha
-                  </label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Sua senha"
-                      className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 pr-10"
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={loginMutation.isPending}
-                  className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold py-3 text-base uppercase tracking-wider"
-                >
-                  {loginMutation.isPending ? (
-                    <span className="flex items-center gap-2">Entrando...</span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <LogIn className="w-5 h-5" /> ENTRAR
-                    </span>
-                  )}
-                </Button>
-              </form>
-
-              <div className="mt-6 pt-4 border-t border-gray-800 space-y-3">
-                {sellersWithoutLogin.length > 0 && (
-                  <button
-                    onClick={() => setMode("first-access")}
-                    className="w-full text-sm text-blue-400 hover:text-blue-300 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-blue-500/10 transition-colors"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Primeiro acesso? Crie seu login aqui
-                  </button>
-                )}
-
-                <button
-                  onClick={() => { window.location.href = getTenantLoginPath(currentTenantSlug); }}
-                  className="w-full text-xs text-gray-600 hover:text-gray-400 flex items-center justify-center gap-1 py-1"
-                >
-                  <Shield className="w-3 h-3" />
-                  Área da Loja
-                </button>
-              </div>
+              <StoreLoginPicker title="" description="" />
             </>
           ) : (
             <>
@@ -279,6 +187,20 @@ export default function AccessGate({ children }: { children: ReactNode }) {
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
+                    <Lock className="w-4 h-4 text-blue-400" />
+                    Código de convite
+                  </label>
+                  <Input
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="Cole o código enviado pelo seu gerente/admin"
+                    className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 font-mono text-sm"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Peça pro seu gerente/admin te enviar esse código ao te cadastrar</p>
                 </div>
 
                 <div>
@@ -363,7 +285,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
 
               <div className="mt-4 text-center">
                 <button
-                  onClick={() => setMode("login")}
+                  onClick={() => { window.location.href = "/login-vendedor"; }}
                   className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1 mx-auto"
                 >
                   <ArrowLeft className="w-3 h-3" /> Ja tenho login

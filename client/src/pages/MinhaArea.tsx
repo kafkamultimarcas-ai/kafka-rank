@@ -27,7 +27,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
@@ -143,6 +143,20 @@ export default function MinhaArea() {
 
   const dept = sellerSession?.department || "vendas";
   const deptInfo = DEPT_CONFIG[dept] || DEPT_CONFIG.vendas;
+
+  // Link de vendas rastreável ("meu link") - leva pro estoque público já marcado com este vendedor
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showSalesLinkQr, setShowSalesLinkQr] = useState(false);
+  const mySalesLink = useMemo(() => {
+    const base = `${window.location.origin}${buildTenantPath(tenantSlug, "/estoque")}`;
+    return `${base}?vendedor=${sellerId}&utm_source=vendedor&utm_medium=link_direto`;
+  }, [tenantSlug, sellerId]);
+  const copyMySalesLink = () => {
+    navigator.clipboard.writeText(mySalesLink);
+    setLinkCopied(true);
+    toast.success("Link copiado!");
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   // Upload de foto de perfil
   const profilePhotoRef = useRef<HTMLInputElement>(null);
@@ -444,8 +458,8 @@ export default function MinhaArea() {
   const pendingDocsList = useMemo(() => (myDocs || []).filter((d: any) => d.docStatus !== 'completo'), [myDocs]);
   const completeDocs = useMemo(() => (myDocs || []).filter((d: any) => d.docStatus === 'completo'), [myDocs]);
 
-  // Verificar se o vendedor logado é o mesmo do URL
-  const isAuthorized = sellerSession && sellerSession.id === sellerId;
+  // Verificar se o vendedor logado é o mesmo do URL (gerente pode ver a área de qualquer vendedor, igual já é permitido no backend)
+  const isAuthorized = !!sellerSession && (sellerSession.id === sellerId || sellerSession.sellerRole === "gerente");
 
   if (!sellerSession) {
     return (
@@ -529,6 +543,39 @@ export default function MinhaArea() {
 
       {/* Content */}
       <div className="max-w-lg mx-auto p-4 space-y-4">
+        {/* Meu link de vendas - rastreia leads que vieram por este vendedor */}
+        {dept === "vendas" && (
+          <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-primary" /> Meu link de vendas
+                </p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Compartilhe pra saber quais leads vieram por você</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => setShowSalesLinkQr(s => !s)}>
+                  <QrCode className="w-3.5 h-3.5" />
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 px-2" onClick={copyMySalesLink}>
+                  {linkCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+            </div>
+            {showSalesLinkQr && (
+              <div className="flex justify-center mt-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(mySalesLink)}`}
+                  alt="QR code do meu link de vendas"
+                  className="rounded-lg bg-white p-2"
+                  width={160}
+                  height={160}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats Cards - Pós-Venda e Financeiro têm painel próprio */}
         {dept === 'financeiro' ? (
           <FinanceiroStatsCards />

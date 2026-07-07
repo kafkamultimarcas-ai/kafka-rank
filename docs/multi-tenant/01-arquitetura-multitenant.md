@@ -53,7 +53,12 @@ Passo a passo do fluxo implementado:
 - Devolve o mesmo formato de token que o login normal de admin devolveria — o frontend trata como login bem-sucedido e cai direto no painel da loja recém-criada.
 - Desde a Fase V, dispara `sendSignupWelcomeEmail` (ver documento 03) confirmando a criação por e-mail.
 
-### 2.5. Roteamento e proteção de rotas novas (bug recorrente, cuidado ao adicionar rota)
+### 2.5. Atualização — unificação de login e identidade do ator (leva de trabalho posterior)
+
+- A afirmação da seção 2.1 ("único formulário de login que uma loja usa") não era 100% verdade até uma leva de trabalho posterior: existiam mais 3 formulários de login independentes (em `AccessGate.tsx`, `CrmAdminLogin.tsx` sem slug, `ManagerLoginScreen`). Removidos e substituídos por um combobox pesquisável compartilhado — ver [documento 06](06-unificacao-login-selecao-loja.md).
+- O objeto de sessão (`ctx.user` em `server/_core/context.ts`) que representa admin/gerente/vendedor codificava o tipo do ator via sinal e offset numérico do `id` (ex: vendedor = `-(1000000 + seller.id)`). Isso escondia dois bugs reais (um deles neste próprio arquivo, em `resolveTenantId`). Substituído por um campo explícito `actorType` — ver [documento 08](08-refactor-identidade-actortype.md).
+
+### 2.6. Roteamento e proteção de rotas novas (bug recorrente, cuidado ao adicionar rota)
 - `client/src/components/AccessGate.tsx` mantém uma lista `BYPASS_ROUTES` + uma regex `isTenantBypassRoute` que decide quais caminhos **não** passam pelo gate de login legado.
 - **Toda vez que uma rota pública/tenant nova foi adicionada nesta branch** (`/comercial`, `/assinatura`, `/esqueci-senha`, `/redefinir-senha`) ela precisou ser adicionada manualmente a essa lista — esquecer isso faz a rota nova cair no formulário de login antigo em vez de renderizar a página certa. Esse mesmo bug se repetiu 3 vezes ao longo da branch; ao criar uma rota pública nova, checar `AccessGate.tsx` primeiro.
 

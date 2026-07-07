@@ -9,10 +9,20 @@ import { parse as parseCookieHeader } from "cookie";
 import { resolveTenantContext, assertTenantMatch } from "../tenantMiddleware";
 import { withTenantAsync } from "../tenantDb";
 
+// Os 4 tipos de ator autenticado da plataforma (OAuth do dono, gerente,
+// vendedor, admin de CRM) vêm de 4 tabelas com PKs independentes — `id` aqui
+// é sempre o id real da tabela de origem, nunca um valor codificado. Qual
+// tabela decidir é responsabilidade explícita de `actorType`, não do sinal
+// ou da faixa numérica de `id`.
+export type AuthActor = User & {
+  actorType: "oauth" | "manager" | "seller" | "crm_admin";
+  sellerRole?: "vendedor" | "gerente"; // só presente quando actorType === "seller"
+};
+
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: (User & { sellerRole?: string }) | null;
+  user: AuthActor | null;
   tenantId: number;
   tenantSlug: string | null;
 };
@@ -20,12 +30,13 @@ export type TrpcContext = {
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: (User & { sellerRole?: string }) | null = null;
+  let user: AuthActor | null = null;
   const requestTenantResolution = await resolveTenantContext(opts.req, null);
 
   // 1) Try OAuth session first (owner/admin)
   try {
-    user = await sdk.authenticateRequest(opts.req);
+    const oauthUser = await sdk.authenticateRequest(opts.req);
+    user = oauthUser ? ({ ...oauthUser, actorType: "oauth" } as AuthActor) : null;
   } catch (error) {
     user = null;
   }
@@ -43,9 +54,10 @@ export async function createContext(
         }
         const manager = await withTenantAsync(requestTenantResolution.tenantId, () => getManagerById(payload.managerId));
         if (manager && manager.active) {
-          // Create a virtual user object with admin role so adminProcedure works
+          // Virtual user object com role "admin" pra adminProcedure funcionar.
           user = {
-            id: -manager.id, // negative ID to distinguish from real users
+            id: manager.id,
+            actorType: "manager",
             openId: `manager_${manager.id}`,
             name: manager.name,
             email: null,
@@ -54,7 +66,7 @@ export async function createContext(
             createdAt: manager.createdAt,
             updatedAt: manager.updatedAt,
             lastSignedIn: new Date(),
-          } as User;
+          } as AuthActor;
         }
       }
     } catch (error) {
@@ -77,7 +89,8 @@ export async function createContext(
           const admin = await withTenantAsync(requestTenantResolution.tenantId, () => getAdminById(payload.adminId));
           if (admin && admin.active) {
             user = {
-              id: -(2000000 + admin.id),
+              id: admin.id,
+              actorType: "crm_admin",
               openId: `crm_admin_${admin.id}`,
               name: admin.name,
               email: null,
@@ -86,7 +99,7 @@ export async function createContext(
               createdAt: admin.createdAt,
               updatedAt: admin.updatedAt,
               lastSignedIn: new Date(),
-            } as User;
+            } as AuthActor;
           }
         }
       }
@@ -108,9 +121,9 @@ export async function createContext(
         }
         const seller = await withTenantAsync(requestTenantResolution.tenantId, () => getSellerById(payload.sellerId));
         if (seller && seller.active) {
-          // Create a virtual user object - gerente gets special flag
           user = {
-            id: -(1000000 + seller.id), // large negative offset to distinguish from managers
+            id: seller.id,
+            actorType: "seller",
             openId: `seller_${seller.id}`,
             name: seller.name,
             email: seller.email,
@@ -119,8 +132,8 @@ export async function createContext(
             createdAt: seller.createdAt,
             updatedAt: seller.updatedAt,
             lastSignedIn: new Date(),
-            sellerRole: seller.sellerRole || 'vendedor', // Pass sellerRole to context
-          } as User & { sellerRole?: string };
+            sellerRole: (seller.sellerRole as "vendedor" | "gerente") || "vendedor",
+          } as AuthActor;
         }
       }
     } catch (error) {

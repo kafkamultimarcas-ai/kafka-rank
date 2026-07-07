@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express, { type Request } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import { createServer } from "http";
 import net from "net";
 import { sql } from "drizzle-orm";
@@ -13,6 +13,17 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { extractTenantSlugFromRequest } from "../tenantMiddleware";
 import { serveStatic, setupVite } from "./vite";
+import { logger } from "./logger";
+
+// Sem isso, um erro assíncrono não capturado (promise rejeitada sem .catch,
+// exceção fora de qualquer try/catch) derrubava o processo sem deixar rastro
+// nenhum além do que o Node imprime por padrão no stderr.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "[Process] Unhandled promise rejection");
+});
+process.on("uncaughtException", (err) => {
+  logger.error({ err: err.message, stack: err.stack }, "[Process] Uncaught exception");
+});
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -213,6 +224,14 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError({ error, path }) {
+        // Erros de validação/autorização esperados (input inválido, sessão
+        // ausente) não precisam virar log de erro — só o que sobra depois
+        // disso é sinal de algo quebrado de verdade.
+        const expected = ["UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "BAD_REQUEST"];
+        if (expected.includes(error.code)) return;
+        logger.error({ path, code: error.code, err: error.message }, "[tRPC] Erro não tratado");
+      },
     })
   );
   // development mode uses Vite, production mode uses static files
@@ -221,6 +240,15 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
+
+  // Error handler do Express — precisa vir depois de todas as rotas/middlewares.
+  // Sem isso, uma exceção síncrona não tratada numa rota caía no handler
+  // default do Express (resposta HTML genérica) sem nenhum log nosso.
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    logger.error({ err: err?.message, stack: err?.stack }, "[Express] Erro não tratado");
+    if (res.headersSent) return;
+    res.status(500).json({ error: "Erro interno." });
+  });
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
@@ -235,6 +263,7 @@ async function startServer() {
     import("../inventory-scraper").then(m => m.startInventorySync(15)).catch(e => console.error("[Inventory Sync] Failed to start:", e));
     import("../alert-checker").then(m => m.startAlertChecker(2)).catch(e => console.error("[Alert Checker] Failed to start:", e));
     import("../trialReminderJob").then(m => m.startTrialReminderScheduler()).catch(e => console.error("[Trial Reminder] Failed to start:", e));
+    import("../inactive-dispatch").then(m => m.startInactiveDispatchScheduler(60)).catch(e => console.error("[Inactive Dispatch] Failed to start:", e));
   });
 }
 

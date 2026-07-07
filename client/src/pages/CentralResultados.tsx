@@ -31,10 +31,25 @@ export default function CentralResultados() {
   const sellerId = parseInt(params.sellerId || "0", 10);
   const [activeCard, setActiveCard] = useState<string | null>(null);
 
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: dashboard, isLoading } = trpc.sellerResults.getDashboard.useQuery(
     { sellerId },
     { enabled: sellerId > 0 },
   );
+
+  // Vendedor logado só pode ver os próprios resultados (gerente vê de qualquer um, igual no backend)
+  if (sellerSession && sellerSession.id !== sellerId && sellerSession.sellerRole !== "gerente") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 p-4">
+        <div className="text-center">
+          <p className="mb-4 text-red-400">Você não tem permissão para acessar os resultados deste colaborador.</p>
+          <Button onClick={() => navigate(buildTenantPath(tenantSlug, `/meus-resultados/${sellerSession.id}`))} variant="outline">
+            Ir para meus resultados
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const monthNames = useMemo(() => ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"], []);
 

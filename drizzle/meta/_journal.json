@@ -519,6 +519,27 @@
       "when": 1783120067602,
       "tag": "0073_opposite_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "5",
+      "when": 1783221897116,
+      "tag": "0074_bumpy_magneto",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "5",
+      "when": 1783286428428,
+      "tag": "0075_wild_post",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "5",
+      "when": 1783364242915,
+      "tag": "0076_chemical_kabuki",
+      "breakpoints": true
     }
   ]
 }
