@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   Building2, Users, ShoppingCart, TrendingUp, Plus, Search,
   Settings, LogOut, Eye, Edit, Trash2, Shield, Crown,
   Store, MapPin, Phone, Mail, Palette, Zap, BarChart3,
-  ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle,
-  Key, RefreshCw
+  ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle, EyeOff,
+  Key, RefreshCw, X
 } from "lucide-react";
+import { slugify, formatPhone, normalizeUsername, isValidEmail, getAvailabilityMessage } from "@/lib/tenantForm";
+import { getDefaultPlanLimits, TRIAL_PLAN_LIMITS } from "@shared/plans";
 
 // ===== AUTH STATE =====
 function useSuperAuth() {
@@ -27,78 +30,13 @@ function useSuperAuth() {
     }
   }, [me, token]);
 
-  const login = (t: string, a: any) => {
-    localStorage.setItem("super_token", t);
-    setToken(t);
-    setAdmin(a);
-  };
-
   const logout = () => {
     localStorage.removeItem("super_token");
     setToken(null);
     setAdmin(null);
   };
 
-  return { token, admin, login, logout, isLoggedIn: !!token && !!admin };
-}
-
-// ===== LOGIN SCREEN =====
-function SuperLoginScreen({ onLogin }: { onLogin: (token: string, admin: any) => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const loginMut = trpc.superAdmin.login.useMutation({
-    onSuccess: (data) => {
-      toast.success("Login realizado!");
-      onLogin(data.token, data.admin);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 mb-4">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Portal Super Admin</h1>
-          <p className="text-gray-400 mt-1">Gerencie todas as lojas do Kafka Rank</p>
-        </div>
-
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 space-y-4">
-          <div>
-            <label className="text-sm text-gray-400 mb-1 block">Usuário</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="superadmin"
-              onKeyDown={(e) => e.key === "Enter" && loginMut.mutate({ username, password })}
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 mb-1 block">Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="********"
-              onKeyDown={(e) => e.key === "Enter" && loginMut.mutate({ username, password })}
-            />
-          </div>
-          <button
-            onClick={() => loginMut.mutate({ username, password })}
-            disabled={loginMut.isPending || !username || !password}
-            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50"
-          >
-            {loginMut.isPending ? "Entrando..." : "Entrar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return { token, admin, logout, isLoggedIn: !!token && !!admin };
 }
 
 // ===== STATUS BADGE =====
@@ -134,12 +72,26 @@ function PlanBadge({ plan }: { plan: string }) {
 
 // ===== CREATE TENANT MODAL =====
 function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string;
+    slug: string;
+    phone: string;
+    email: string;
+    city: string;
+    state: string;
+    plan: "trial" | "basic" | "pro" | "enterprise";
+    maxSellers: number;
+    maxAdmins: number;
+    adminEmail: string;
+    adminPassword: string;
+    adminName: string;
+  }>({
     name: "", slug: "", phone: "", email: "", city: "", state: "",
     plan: "trial" as "trial" | "basic" | "pro" | "enterprise",
-    maxSellers: 10, maxAdmins: 2,
-    adminUsername: "", adminPassword: "", adminName: "",
+    maxSellers: TRIAL_PLAN_LIMITS.maxSellers, maxAdmins: TRIAL_PLAN_LIMITS.maxAdmins,
+    adminEmail: "", adminPassword: "", adminName: "",
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const createMut = trpc.superAdmin.createTenant.useMutation({
     onSuccess: (data) => {
@@ -150,7 +102,61 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
     onError: (err) => toast.error(err.message),
   });
 
-  const slugify = (text: string) => text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const trimmedName = form.name.trim();
+  const trimmedSlug = slugify(form.slug);
+  const trimmedPhone = form.phone.trim();
+  const trimmedEmail = form.email.trim();
+  const trimmedAdminName = form.adminName.trim();
+  const trimmedAdminEmail = form.adminEmail.trim().toLowerCase();
+  const trimmedAdminPassword = form.adminPassword.trim();
+  const phoneDigits = trimmedPhone.replace(/\D/g, "");
+  const [debouncedSlug, setDebouncedSlug] = useState(trimmedSlug);
+  const [debouncedAdminEmail, setDebouncedAdminEmail] = useState(trimmedAdminEmail);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSlug(trimmedSlug), 350);
+    return () => window.clearTimeout(timer);
+  }, [trimmedSlug]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedAdminEmail(trimmedAdminEmail), 350);
+    return () => window.clearTimeout(timer);
+  }, [trimmedAdminEmail]);
+
+  const nameIsValid = trimmedName.length >= 2;
+  const slugIsValid = trimmedSlug.length >= 2;
+  const phoneIsValid = !trimmedPhone || phoneDigits.length === 10 || phoneDigits.length === 11;
+  const emailIsValid = !trimmedEmail || isValidEmail(trimmedEmail);
+  const adminNameIsValid = trimmedAdminName.length >= 2;
+  const adminEmailIsValid = isValidEmail(trimmedAdminEmail);
+  const passwordIsValid = trimmedAdminPassword.length >= 4;
+  const availabilityQuery = trpc.superAdmin.checkAvailability.useQuery(
+    {
+      token,
+      slug: debouncedSlug || undefined,
+      adminEmail: debouncedAdminEmail || undefined,
+    },
+    {
+      enabled: slugIsValid || adminEmailIsValid,
+      retry: false,
+    }
+  );
+
+  const slugAvailability = availabilityQuery.data?.slug;
+  const emailAvailabilityData = availabilityQuery.data?.adminEmail;
+  const slugAvailable = !slugIsValid || debouncedSlug !== trimmedSlug ? true : slugAvailability?.available !== false;
+  const adminEmailAvailable = !adminEmailIsValid || debouncedAdminEmail !== trimmedAdminEmail ? true : emailAvailabilityData?.available !== false;
+  const canSubmit =
+    !createMut.isPending &&
+    nameIsValid &&
+    slugIsValid &&
+    phoneIsValid &&
+    emailIsValid &&
+    adminNameIsValid &&
+    adminEmailIsValid &&
+    passwordIsValid &&
+    slugAvailable &&
+    adminEmailAvailable;
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -159,7 +165,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Store className="w-5 h-5 text-red-500" /> Nova Loja
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">×</button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -172,9 +178,11 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value, slug: slugify(e.target.value) })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-11 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="Ex: Auto Center Premium"
+                  autoFocus
                 />
+                {!nameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um nome com pelo menos 2 caracteres.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Slug (URL) *</label>
@@ -183,16 +191,29 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   onChange={(e) => setForm({ ...form, slug: slugify(e.target.value) })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="auto-center-premium"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
+                <p className="mt-1 text-[11px] text-gray-400">Link da loja: `http://localhost:3000/t/{trimmedSlug || "sua-loja"}/login`</p>
+                <p className="mt-1 text-[11px] text-gray-500">Esse será o acesso principal da equipe comercial da loja.</p>
+                {slugIsValid && debouncedSlug === trimmedSlug && slugAvailability && (
+                  <p className={`mt-1 text-[11px] ${slugAvailability.available ? "text-emerald-400" : "text-amber-400"}`}>
+                    {getAvailabilityMessage(slugAvailability.value, slugAvailability.available, "slug")}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Telefone</label>
                 <input
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="(47) 99999-0000"
+                  inputMode="tel"
+                  autoComplete="tel"
                 />
+                {!phoneIsValid && <p className="mt-1 text-[11px] text-amber-400">Use 10 ou 11 d&iacute;gitos.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Email</label>
@@ -201,7 +222,12 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="contato@loja.com"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
                 />
+                {!emailIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um email v&aacute;lido.</p>}
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Cidade</label>
@@ -232,7 +258,10 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
               {(["trial", "basic", "pro", "enterprise"] as const).map((p) => (
                 <button
                   key={p}
-                  onClick={() => setForm({ ...form, plan: p, maxSellers: p === "enterprise" ? 50 : p === "pro" ? 30 : p === "basic" ? 15 : 10 })}
+                  onClick={() => {
+                    const limits = getDefaultPlanLimits(p);
+                    setForm({ ...form, plan: p, maxSellers: limits.maxSellers, maxAdmins: limits.maxAdmins });
+                  }}
                   className={`py-2 rounded-lg text-sm font-semibold border transition-all ${form.plan === p ? "bg-red-600/20 border-red-500 text-red-400" : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600"}`}
                 >
                   {p.toUpperCase()}
@@ -272,26 +301,49 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   onChange={(e) => setForm({ ...form, adminName: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="João Silva"
+                  autoComplete="name"
                 />
+                {!adminNameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe o nome do admin responsável.</p>}
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Login *</label>
+                <label className="text-xs text-gray-500 mb-1 block">E-mail (login) *</label>
                 <input
-                  value={form.adminUsername}
-                  onChange={(e) => setForm({ ...form, adminUsername: e.target.value })}
+                  type="email"
+                  value={form.adminEmail}
+                  onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
-                  placeholder="admin"
+                  placeholder="admin@loja.com"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="email"
                 />
+                <p className="mt-1 text-[11px] text-gray-500">E-mail é a identidade única de login.</p>
+                {adminEmailIsValid && debouncedAdminEmail === trimmedAdminEmail && emailAvailabilityData && (
+                  <p className={`mt-1 text-[11px] ${emailAvailabilityData.available ? "text-emerald-400" : "text-amber-400"}`}>
+                    {emailAvailabilityData.available ? "E-mail disponível" : (emailAvailabilityData.reason === "invalid" ? "E-mail inválido" : "E-mail já está em uso")}
+                  </p>
+                )}
               </div>
-              <div>
+              <div className="relative">
                 <label className="text-xs text-gray-500 mb-1 block">Senha *</label>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={form.adminPassword}
                   onChange={(e) => setForm({ ...form, adminPassword: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-11 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
                   placeholder="Mínimo 4 caracteres"
+                  autoComplete="new-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-[29px] text-gray-400 transition-colors hover:text-white"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <p className="mt-1 text-[11px] text-gray-500">Recomendação: pelo menos 8 caracteres com letras e números.</p>
               </div>
             </div>
           </div>
@@ -302,8 +354,20 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
             Cancelar
           </button>
           <button
-            onClick={() => createMut.mutate({ ...form, token })}
-            disabled={createMut.isPending || !form.name || !form.slug || !form.adminUsername || !form.adminPassword || !form.adminName}
+            onClick={() => createMut.mutate({
+              ...form,
+              token,
+              name: trimmedName,
+              slug: trimmedSlug,
+              phone: trimmedPhone,
+              email: trimmedEmail,
+              city: form.city.trim(),
+              state: form.state.trim().toUpperCase(),
+              adminName: trimmedAdminName,
+              adminEmail: trimmedAdminEmail,
+              adminPassword: trimmedAdminPassword,
+            })}
+            disabled={!canSubmit}
             className="px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-lg transition-all disabled:opacity-50"
           >
             {createMut.isPending ? "Criando..." : "Criar Loja"}
@@ -342,6 +406,14 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
     });
   }, [tenant]);
 
+  const editPhone = (editForm.phone || "").trim();
+  const editPhoneDigits = editPhone.replace(/\D/g, "");
+  const editPhoneIsValid = !editPhone || editPhoneDigits.length === 10 || editPhoneDigits.length === 11;
+  const editEmail = (editForm.email || "").trim();
+  const editEmailIsValid = !editEmail || isValidEmail(editEmail);
+  const editNameIsValid = (editForm.name || "").trim().length >= 2;
+  const canSaveTenant = editNameIsValid && editPhoneIsValid && editEmailIsValid && !updateMut.isPending;
+
   if (!tenant) return null;
 
   return (
@@ -355,7 +427,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
           <div className="flex items-center gap-2">
             <StatusBadge status={tenant.status || "trial"} />
             <PlanBadge plan={tenant.plan || "trial"} />
-            <button onClick={onClose} className="text-gray-400 hover:text-white ml-2">✕</button>
+            <button onClick={onClose} className="text-gray-400 hover:text-white ml-2">×</button>
           </div>
         </div>
 
@@ -388,6 +460,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                   <label className="text-xs text-gray-500 mb-1 block">Nome</label>
                   <input value={editForm.name || ""} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                  {!editNameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um nome com pelo menos 2 caracteres.</p>}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Status</label>
@@ -411,18 +484,26 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Max Vendedores</label>
-                  <input type="number" value={editForm.maxSellers || 10} onChange={(e) => setEditForm({ ...editForm, maxSellers: Number(e.target.value) })}
+                  <input type="number" value={editForm.maxSellers || TRIAL_PLAN_LIMITS.maxSellers} onChange={(e) => setEditForm({ ...editForm, maxSellers: Number(e.target.value) })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Telefone</label>
-                  <input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  <input value={editForm.phone || ""} onChange={(e) => setEditForm({ ...editForm, phone: formatPhone(e.target.value) })}
+                    inputMode="tel"
+                    autoComplete="tel"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                  {!editPhoneIsValid && <p className="mt-1 text-[11px] text-amber-400">Use 10 ou 11 d&iacute;gitos.</p>}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Email</label>
                   <input value={editForm.email || ""} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
+                  {!editEmailIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe um email v&aacute;lido.</p>}
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Cidade</label>
@@ -442,8 +523,17 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setEditMode(false)} className="px-4 py-2 text-gray-400 hover:text-white">Cancelar</button>
                 <button
-                  onClick={() => updateMut.mutate({ token, tenantId, ...editForm })}
-                  disabled={updateMut.isPending}
+                  onClick={() => updateMut.mutate({
+                    token,
+                    tenantId,
+                    ...editForm,
+                    name: (editForm.name || "").trim(),
+                    phone: editPhone,
+                    email: editEmail,
+                    city: (editForm.city || "").trim(),
+                    state: (editForm.state || "").trim().toUpperCase(),
+                  })}
+                  disabled={!canSaveTenant}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium disabled:opacity-50"
                 >
                   {updateMut.isPending ? "Salvando..." : "Salvar"}
@@ -509,7 +599,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                         >
                           OK
                         </button>
-                        <button onClick={() => { setResetPwAdmin(null); setNewPw(""); }} className="text-xs text-gray-400">✕</button>
+                        <button onClick={() => { setResetPwAdmin(null); setNewPw(""); }} className="text-xs text-gray-400">×</button>
                       </div>
                     ) : (
                       <button onClick={() => setResetPwAdmin(a.id)} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1">
@@ -530,12 +620,259 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
   );
 }
 
+// ===== PLATFORM LOG DETAIL MODAL (e-mail ou assinatura) =====
+function PlatformLogDetailModal({ token, logType, logId, onClose, onResolved }: { token: string; logType: "email" | "subscription" | "billing_alert"; logId: number; onClose: () => void; onResolved?: () => void }) {
+  const { data: log, isLoading, refetch } = trpc.platformLogs.getById.useQuery({ token, logType, id: logId });
+  const resolveMut = trpc.platformLogs.resolveBillingAlert.useMutation({
+    onSuccess: () => { toast.success("Alerta marcado como resolvido."); refetch(); onResolved?.(); },
+    onError: (err) => toast.error(err.message || "Erro ao resolver alerta"),
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">Detalhe do log</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        {isLoading ? (
+          <div className="p-8 text-center text-gray-500 text-sm">Carregando...</div>
+        ) : !log ? (
+          <div className="p-8 text-center text-gray-500 text-sm">Log não encontrado.</div>
+        ) : log.logType === "email" ? (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><span className="text-gray-500 block">Loja</span><span className="text-white">{log.tenantName ? `${log.tenantName} (${log.tenantSlug})` : "—"}</span></div>
+              <div><span className="text-gray-500 block">Tipo</span><span className="text-white">{log.emailType}</span></div>
+              <div><span className="text-gray-500 block">Status</span><span className="text-white">{log.status}</span></div>
+              <div><span className="text-gray-500 block">Destinatário</span><span className="text-white">{log.toEmail}</span></div>
+              <div className="col-span-2"><span className="text-gray-500 block">Assunto</span><span className="text-white">{log.subject}</span></div>
+              <div><span className="text-gray-500 block">ID no provedor</span><span className="text-white">{log.providerId || "—"}</span></div>
+              <div><span className="text-gray-500 block">Enviado em</span><span className="text-white">{new Date(log.createdAt).toLocaleString("pt-BR")}</span></div>
+            </div>
+            {log.errorMessage && (
+              <div>
+                <span className="text-gray-500 text-xs block mb-1">Erro</span>
+                <p className="bg-black/40 border border-red-900 rounded-lg p-3 text-xs text-red-400">{log.errorMessage}</p>
+              </div>
+            )}
+          </div>
+        ) : log.logType === "billing_alert" ? (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><span className="text-gray-500 block">Loja</span><span className="text-white">{log.tenantName ? `${log.tenantName} (${log.tenantSlug})` : (log.tenantId ? `#${log.tenantId}` : "—")}</span></div>
+              <div><span className="text-gray-500 block">Severidade</span><span className={log.severity === "critical" ? "text-red-400" : "text-amber-400"}>{log.severity === "critical" ? "Crítico" : "Aviso"}</span></div>
+              <div><span className="text-gray-500 block">Código</span><span className="text-white font-mono">{log.code}</span></div>
+              <div><span className="text-gray-500 block">Status</span><span className="text-white">{log.resolved ? `Resolvido${log.resolvedBy ? ` por ${log.resolvedBy}` : ""}` : "Pendente"}</span></div>
+              <div className="col-span-2"><span className="text-gray-500 block">Mensagem</span><span className="text-white">{log.message}</span></div>
+              <div><span className="text-gray-500 block">Criado em</span><span className="text-white">{new Date(log.createdAt).toLocaleString("pt-BR")}</span></div>
+              {log.resolvedAt && <div><span className="text-gray-500 block">Resolvido em</span><span className="text-white">{new Date(log.resolvedAt).toLocaleString("pt-BR")}</span></div>}
+            </div>
+            {log.context && (
+              <div>
+                <span className="text-gray-500 text-xs block mb-1">Contexto</span>
+                <pre className="bg-black/40 border border-gray-800 rounded-lg p-3 text-[10px] text-gray-300 overflow-x-auto max-h-64 overflow-y-auto">
+                  {JSON.stringify(JSON.parse(log.context), null, 2)}
+                </pre>
+              </div>
+            )}
+            {!log.resolved && (
+              <button
+                onClick={() => resolveMut.mutate({ token, id: log.id })}
+                disabled={resolveMut.isPending}
+                className="w-full bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
+              >
+                Marcar resolvido
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><span className="text-gray-500 block">Loja</span><span className="text-white">{log.tenantName} ({log.tenantSlug})</span></div>
+              <div><span className="text-gray-500 block">Evento</span><span className="text-white">{log.eventType}</span></div>
+              <div><span className="text-gray-500 block">Status</span><span className="text-white">{log.status || "—"}</span></div>
+              <div><span className="text-gray-500 block">Valor</span><span className="text-white">{log.value ? `R$ ${log.value}` : "—"}</span></div>
+              <div><span className="text-gray-500 block">Forma de pagamento</span><span className="text-white">{log.billingType || "—"}</span></div>
+              <div><span className="text-gray-500 block">Cobrança ASAAS</span><span className="text-white">{log.asaasPaymentId || "—"}</span></div>
+              <div><span className="text-gray-500 block">Vencimento</span><span className="text-white">{log.dueDate ? new Date(log.dueDate).toLocaleDateString("pt-BR") : "—"}</span></div>
+              <div><span className="text-gray-500 block">Recebido em</span><span className="text-white">{new Date(log.createdAt).toLocaleString("pt-BR")}</span></div>
+            </div>
+            <div>
+              <span className="text-gray-500 text-xs block mb-1">Payload cru</span>
+              <pre className="bg-black/40 border border-gray-800 rounded-lg p-3 text-[10px] text-gray-300 overflow-x-auto max-h-64 overflow-y-auto">
+                {log.rawPayload ? JSON.stringify(JSON.parse(log.rawPayload), null, 2) : "—"}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== PLATFORM LOGS SECTION (Super Admin) — e-mail + assinatura + alertas de cobrança no mesmo lugar =====
+const LOG_TYPE_OPTIONS: { value: "" | "email" | "subscription" | "billing_alert"; label: string }[] = [
+  { value: "", label: "Todos os tipos" },
+  { value: "email", label: "E-mail" },
+  { value: "subscription", label: "Assinatura" },
+  { value: "billing_alert", label: "Alerta de Cobrança" },
+];
+const LOGS_PAGE_SIZE = 20;
+
+function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[] }) {
+  const [tenantFilter, setTenantFilter] = useState<string>("");
+  const [logTypeFilter, setLogTypeFilter] = useState<"" | "email" | "subscription" | "billing_alert">("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [page, setPage] = useState(0);
+  const [detail, setDetail] = useState<{ logType: "email" | "subscription" | "billing_alert"; id: number } | null>(null);
+
+  const { data, isLoading, refetch } = trpc.platformLogs.list.useQuery({
+    token,
+    tenantId: tenantFilter ? Number(tenantFilter) : undefined,
+    logType: logTypeFilter || undefined,
+    status: statusFilter || undefined,
+    startDate: startDate ? new Date(startDate).getTime() : undefined,
+    endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
+    limit: LOGS_PAGE_SIZE,
+    offset: page * LOGS_PAGE_SIZE,
+  });
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / LOGS_PAGE_SIZE)) : 1;
+
+  const resolveMut = trpc.platformLogs.resolveBillingAlert.useMutation({
+    onSuccess: () => { toast.success("Alerta marcado como resolvido."); refetch(); },
+    onError: (err) => toast.error(err.message || "Erro ao resolver alerta"),
+  });
+
+  const selectClass = "bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:ring-2 focus:ring-red-500";
+  const resetPage = () => setPage(0);
+
+  return (
+    <div className="bg-gray-900/80 border border-gray-800 rounded-xl">
+      <div className="p-4 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Key className="w-5 h-5 text-red-500" /> Logs da Plataforma
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={tenantFilter} onChange={(e) => { setTenantFilter(e.target.value); resetPage(); }} className={selectClass}>
+            <option value="">Todas as lojas</option>
+            {tenants.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <select value={logTypeFilter} onChange={(e) => { setLogTypeFilter(e.target.value as any); resetPage(); }} className={selectClass}>
+            {LOG_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); resetPage(); }} className={selectClass}>
+            <option value="">Todos os status</option>
+            <option value="sent">E-mail: enviado</option>
+            <option value="failed">E-mail: falhou</option>
+            <option value="CONFIRMED">Assinatura: CONFIRMED</option>
+            <option value="RECEIVED">Assinatura: RECEIVED</option>
+            <option value="OVERDUE">Assinatura: OVERDUE</option>
+            <option value="PENDING">Assinatura: PENDING</option>
+            <option value="critical">Alerta: Crítico</option>
+            <option value="warning">Alerta: Aviso</option>
+          </select>
+          <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); resetPage(); }} className={selectClass} title="Data início" />
+          <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); resetPage(); }} className={selectClass} title="Data fim" />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="p-8 text-center text-gray-500 text-sm">Carregando...</div>
+      ) : !data || data.items.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          <Key className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Nenhum log encontrado com esses filtros.</p>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500 text-xs">
+                  <th className="text-left px-4 py-2 font-medium">Tipo</th>
+                  <th className="text-left px-4 py-2 font-medium">Loja</th>
+                  <th className="text-left px-4 py-2 font-medium">Evento</th>
+                  <th className="text-left px-4 py-2 font-medium">Detalhe</th>
+                  <th className="text-left px-4 py-2 font-medium">Status</th>
+                  <th className="text-left px-4 py-2 font-medium">Data</th>
+                  <th className="text-left px-4 py-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {data.items.map((item: any) => {
+                  const typeMeta = item.logType === "email"
+                    ? { icon: <Mail className="w-3 h-3" />, label: "E-mail", className: "bg-blue-500/15 text-blue-400" }
+                    : item.logType === "billing_alert"
+                      ? { icon: <AlertTriangle className="w-3 h-3" />, label: "Alerta", className: item.status === "critical" ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400" }
+                      : { icon: <Key className="w-3 h-3" />, label: "Assinatura", className: "bg-purple-500/15 text-purple-400" };
+                  return (
+                    <tr key={`${item.logType}-${item.id}`} onClick={() => setDetail({ logType: item.logType, id: item.id })} className="hover:bg-gray-800/50 cursor-pointer transition-colors">
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${typeMeta.className}`}>
+                          {typeMeta.icon}
+                          {typeMeta.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-white text-xs font-medium">{item.tenantName || (item.logType === "billing_alert" && item.tenantId ? `#${item.tenantId}` : "—")}</div>
+                        <div className="text-gray-500 text-[10px]">{item.tenantSlug}</div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-300 text-xs font-mono">{item.title}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{item.detail || "—"}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {item.logType === "billing_alert" ? (
+                          <span className={item.status === "critical" ? "text-red-400" : "text-amber-400"}>
+                            {item.status === "critical" ? "Crítico" : "Aviso"}{item.resolved ? " · resolvido" : ""}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">{item.status || "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.createdAt).toLocaleString("pt-BR")}</td>
+                      <td className="px-4 py-3 text-right">
+                        {item.logType === "billing_alert" && !item.resolved && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); resolveMut.mutate({ token, id: item.id }); }}
+                            disabled={resolveMut.isPending}
+                            className="text-xs text-green-400 hover:text-green-300 font-semibold whitespace-nowrap"
+                          >
+                            Marcar resolvido
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800">
+            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="text-xs text-gray-400 disabled:opacity-30 hover:text-white">← Anterior</button>
+            <span className="text-xs text-gray-500">Página {page + 1} de {totalPages} ({data.total} logs)</span>
+            <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="text-xs text-gray-400 disabled:opacity-30 hover:text-white">Próxima →</button>
+          </div>
+        </>
+      )}
+
+      {detail && <PlatformLogDetailModal token={token} logType={detail.logType} logId={detail.id} onClose={() => setDetail(null)} onResolved={() => refetch()} />}
+    </div>
+  );
+}
+
 // ===== MAIN DASHBOARD =====
 function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any; onLogout: () => void }) {
   const { data: dashboard, refetch } = trpc.superAdmin.dashboard.useQuery({ token });
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [activeSection, setActiveSection] = useState<"tenants" | "subscriptions">("tenants");
+  // Conta eventos raros de assinatura + alertas críticos de cobrança não
+  // resolvidos — os dois viram o mesmo badge na aba "Logs" (tela unificada).
+  const { data: rareEvents } = trpc.platformLogs.getRareEventsCount.useQuery({ token }, { refetchInterval: 60000 });
 
   const filteredTenants = (dashboard?.tenants || []).filter((t: any) =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -558,6 +895,25 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <nav className="flex items-center gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1 mr-2">
+              <button
+                onClick={() => setActiveSection("tenants")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeSection === "tenants" ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                Lojas
+              </button>
+              <button
+                onClick={() => setActiveSection("subscriptions")}
+                className={`relative px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeSection === "subscriptions" ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                Logs
+                {!!rareEvents?.count && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
+                    {rareEvents.count}
+                  </span>
+                )}
+              </button>
+            </nav>
             <span className="text-sm text-gray-400">{admin?.name}</span>
             <button onClick={onLogout} className="text-gray-400 hover:text-red-400 transition-colors">
               <LogOut className="w-5 h-5" />
@@ -566,6 +922,11 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
         </div>
       </header>
 
+      {activeSection === "subscriptions" ? (
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <PlatformLogsSection token={token} tenants={dashboard?.tenants || []} />
+        </div>
+      ) : (
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -694,6 +1055,7 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
           </div>
         </div>
       </div>
+      )}
 
       {/* Modals */}
       {showCreate && <CreateTenantModal token={token} onClose={() => setShowCreate(false)} onCreated={() => refetch()} />}
@@ -704,11 +1066,28 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
 
 // ===== MAIN EXPORT =====
 export default function SuperAdmin() {
-  const { token, admin, login, logout, isLoggedIn } = useSuperAuth();
+  const [, navigate] = useLocation();
+  const { token, admin, logout, isLoggedIn } = useSuperAuth();
+
+  useEffect(() => {
+    if (!token) navigate("/login", { replace: true });
+  }, [navigate, token]);
 
   if (!isLoggedIn) {
-    return <SuperLoginScreen onLogin={login} />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 mb-4">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">Redirecionando para o login</h1>
+          <p className="text-gray-400 mt-1">Use o mesmo login por e-mail para acessar o portal Super Admin.</p>
+        </div>
+      </div>
+    );
   }
 
   return <SuperDashboard token={token!} admin={admin} onLogout={logout} />;
 }
+
+

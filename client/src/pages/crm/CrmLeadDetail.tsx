@@ -10,6 +10,7 @@ import {
   Mic, MicOff, User, FileText, CheckCircle, AlertTriangle,
   CreditCard, Zap, DollarSign, Briefcase, Building2, Video, MapPinned
 } from "lucide-react";
+import { useBranding } from "@/contexts/TenantContext";
 
 const SCORE_CONFIG = {
   hot: { label: "Quente", icon: Flame, color: "text-red-400", bg: "bg-red-500/20" },
@@ -29,6 +30,7 @@ function formatDateTime(ts: number | string | Date | null | undefined) {
 }
 
 export default function CrmLeadDetail() {
+  const { name: brandName } = useBranding();
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
   const leadId = parseInt(params.id || "0");
@@ -67,7 +69,7 @@ export default function CrmLeadDetail() {
   const handleWhatsApp = () => {
     if (!lead?.phone) { toast.error("Lead sem telefone"); return; }
     const phone = lead.phone.replace(/\D/g, "");
-    const msg = encodeURIComponent(`Ola ${lead.name}! Tudo bem? Aqui e da Kafka Multimarcas.`);
+    const msg = encodeURIComponent(`Ola ${lead.name}! Tudo bem? Aqui e da ${brandName}.`);
     window.open(`https://wa.me/55${phone}?text=${msg}`, "_blank");
     addActivity.mutate({ leadId, sellerId, type: "whatsapp", description: "WhatsApp enviado" });
   };

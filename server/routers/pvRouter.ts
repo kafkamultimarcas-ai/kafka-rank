@@ -1,9 +1,10 @@
-import { publicProcedure, adminProcedure, router } from "../_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import * as db from "../db";
 import { storagePut } from "../storage";
 import { nanoid } from "nanoid";
 import { sendPushNewPvChamado } from "../pushService";
+import { getPrivacySellerId } from "../authHelpers";
 
 // ===== PÓS-VENDA ROUTER =====
 
@@ -38,11 +39,20 @@ export const pvChamadosRouter = router({
   }),
 
   // Listar chamados (com filtros)
-  list: publicProcedure.input(z.object({
+  list: protectedProcedure.input(z.object({
     status: z.string().optional(),
     vendedorId: z.number().optional(),
     responsavelPvId: z.number().optional(),
-  }).optional()).query(async ({ input }) => {
+  }).optional()).query(async ({ input, ctx }) => {
+    const privacySellerId = await getPrivacySellerId(ctx);
+    if (privacySellerId) {
+      const seller = await db.getSellerById(privacySellerId);
+      if (seller?.department !== 'pos_venda') {
+        // Vendedor de vendas só pode ver os chamados que ele mesmo abriu
+        return db.listPvChamados({ ...(input || {}), vendedorId: privacySellerId, responsavelPvId: undefined });
+      }
+      // Pós-venda mantém a visão compartilhada do setor (comportamento já existente)
+    }
     return db.listPvChamados(input || {});
   }),
 
@@ -92,7 +102,7 @@ export const pvChamadosRouter = router({
   }),
 
   // Atualizar chamado pelo colaborador de pós-venda (sem precisar ser admin)
-  updateBySeller: publicProcedure.input(z.object({
+  updateBySeller: protectedProcedure.input(z.object({
     id: z.number(),
     sellerId: z.number(), // ID do colaborador de pós-venda logado
     status: z.string().optional(),
@@ -105,9 +115,14 @@ export const pvChamadosRouter = router({
     dataEntregaReal: z.number().optional(),
     observacoes: z.string().optional(),
     servicoRealizado: z.string().optional(),
-  })).mutation(async ({ input }) => {
+  })).mutation(async ({ input, ctx }) => {
+    const privacySellerId = await getPrivacySellerId(ctx);
+    if (privacySellerId && input.sellerId !== privacySellerId) {
+      throw new Error('Você só pode atualizar chamados como você mesmo');
+    }
+    const effectiveSellerId = privacySellerId ?? input.sellerId;
     // Verificar se o seller é do setor pós-venda
-    const seller = await db.getSellerById(input.sellerId);
+    const seller = await db.getSellerById(effectiveSellerId);
     if (!seller || seller.department !== 'pos_venda') {
       throw new Error('Apenas colaboradores do setor Pós-Venda podem atualizar chamados.');
     }

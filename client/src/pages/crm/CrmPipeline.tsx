@@ -7,6 +7,8 @@ import {
   ArrowLeft, Phone, MessageCircle, User, LayoutGrid, SlidersHorizontal,
   Calendar, Flame, Thermometer, Snowflake, Car, ChevronLeft, ChevronRight
 } from "lucide-react";
+import { useBranding } from "@/contexts/TenantContext";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 const SCORE_ICONS: Record<string, any> = { hot: Flame, warm: Thermometer, cold: Snowflake };
 const SCORE_COLORS: Record<string, string> = { hot: "text-red-400", warm: "text-amber-400", cold: "text-blue-400" };
@@ -16,7 +18,9 @@ const DEPT_LABELS: Record<string, string> = {
 };
 
 export default function CrmPipeline() {
+  const { name: brandName } = useBranding();
   const [, navigate] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const sellerId = sellerSession?.id || 0;
   const dept = sellerSession?.department || "vendas";
@@ -59,7 +63,7 @@ export default function CrmPipeline() {
   const handleWhatsApp = (lead: any) => {
     if (!lead.phone) { toast.error("Lead sem telefone"); return; }
     const phone = lead.phone.replace(/\D/g, "");
-    const msg = encodeURIComponent(`Ola ${lead.name}! Tudo bem? Aqui e da Kafka Multimarcas.`);
+    const msg = encodeURIComponent(`Ola ${lead.name}! Tudo bem? Aqui e da ${brandName}.`);
     window.open(`https://wa.me/55${phone}?text=${msg}`, "_blank");
     addActivity.mutate({ leadId: lead.id, sellerId, type: "whatsapp", description: "WhatsApp enviado" });
   };
@@ -92,7 +96,7 @@ export default function CrmPipeline() {
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate("/crm")} className="p-1.5 hover:bg-accent rounded-lg">
+            <button onClick={() => navigate(buildTenantPath(tenantSlug, "/crm"))} className="p-1.5 hover:bg-accent rounded-lg">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <h1 className="text-sm font-bold text-foreground">Pipeline</h1>
@@ -158,7 +162,7 @@ export default function CrmPipeline() {
             const scoreColor = SCORE_COLORS[lead.score] || "text-amber-400";
             return (
               <div key={lead.id} className="rounded-xl border border-border bg-card p-3">
-                <div className="flex items-start justify-between mb-2" onClick={() => navigate(`/crm/lead/${lead.id}`)}>
+                <div className="flex items-start justify-between mb-2" onClick={() => navigate(buildTenantPath(tenantSlug, `/crm/lead/${lead.id}`))}>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-foreground truncate">{lead.name}</h3>
@@ -212,11 +216,11 @@ export default function CrmPipeline() {
       {/* Bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t border-border z-50">
         <div className="flex justify-around py-2">
-          <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, `/minha-area/${sellerId}`))} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
             <User className="w-5 h-5" />
             <span className="text-[10px]">Minha Area</span>
           </button>
-          <button onClick={() => navigate("/crm")} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, "/crm"))} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
             <LayoutGrid className="w-5 h-5" />
             <span className="text-[10px]">CRM</span>
           </button>
@@ -224,7 +228,7 @@ export default function CrmPipeline() {
             <SlidersHorizontal className="w-5 h-5" />
             <span className="text-[10px] font-bold">Pipeline</span>
           </button>
-          <button onClick={() => navigate(`/agendamentos/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, `/agendamentos/${sellerId}`))} className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground">
             <Calendar className="w-5 h-5" />
             <span className="text-[10px]">Agenda</span>
           </button>

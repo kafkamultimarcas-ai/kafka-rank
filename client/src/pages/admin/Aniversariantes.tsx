@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Cake, Send, Phone, Mail, Car, Users, PartyPopper, Gift, MessageCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { useBranding } from "@/contexts/TenantContext";
 
 export default function Aniversariantes() {
+  const { name: brandName } = useBranding();
   const { data: birthdays, isLoading, refetch } = trpc.birthday.todayBirthdays.useQuery();
   const sendOne = trpc.birthday.sendBirthdayMessage.useMutation();
   const sendBulk = trpc.birthday.sendBulkBirthday.useMutation();
@@ -100,7 +102,7 @@ export default function Aniversariantes() {
               <textarea
                 value={customMessage}
                 onChange={e => setCustomMessage(e.target.value)}
-                placeholder={`🎂 Parabéns, {nome}! 🎉\n\nA equipe Kafka Multimarcas deseja a você um feliz aniversário! 🌟\n\nQue este novo ciclo seja repleto de conquistas, saúde e muita prosperidade! 🚀\n\nConte sempre conosco! ❤️\n\nKafka Multimarcas - Onde seus sonhos ganham rodas!`}
+                placeholder={`🎂 Parabéns, {nome}! 🎉\n\nA equipe ${brandName} deseja a você um feliz aniversário! 🌟\n\nQue este novo ciclo seja repleto de conquistas, saúde e muita prosperidade! 🚀\n\nConte sempre conosco! ❤️\n\n${brandName}`}
                 className="w-full h-40 p-3 rounded-lg bg-gray-800 border border-gray-700 text-white text-sm resize-none placeholder:text-gray-500"
               />
               <p className="text-[10px] text-gray-500">Use {"{nome}"} para inserir o primeiro nome do cliente automaticamente</p>

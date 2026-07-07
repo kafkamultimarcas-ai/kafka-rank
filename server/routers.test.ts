@@ -93,6 +93,12 @@ vi.mock("./db", () => ({
   markAllNotificationsRead: vi.fn().mockResolvedValue(undefined),
   markAllNotificationsReadSeller: vi.fn().mockResolvedValue(undefined),
   getInactiveSellers: vi.fn().mockResolvedValue([]),
+  getDb: vi.fn().mockResolvedValue(null),
+  checkDuplicateDispatch: vi.fn().mockResolvedValue({ isDuplicate: false }),
+  checkDuplicateFei: vi.fn().mockResolvedValue({ isDuplicate: false }),
+  getSaleDocumentBySaleId: vi.fn().mockResolvedValue(null),
+  listBracketMatches: vi.fn().mockResolvedValue([]),
+  autoLaunchBonus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./storage", () => ({

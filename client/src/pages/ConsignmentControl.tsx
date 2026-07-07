@@ -17,6 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { maskPhone } from "@/lib/masks";
+import { isValidBrazilianPhone } from "@shared/validators";
 
 type Tab = "patio" | "completed" | "history";
 
@@ -111,6 +113,10 @@ export default function ConsignmentControl() {
 
   const handleSaveEdit = () => {
     if (!editRecord) return;
+    if (editRecord.ownerPhone && !isValidBrazilianPhone(editRecord.ownerPhone)) {
+      toast.error("Telefone do proprietário inválido");
+      return;
+    }
     updateConsignment.mutate({
       id: editRecord.id,
       vehiclePlate: editRecord.vehiclePlate || undefined,
@@ -607,7 +613,7 @@ export default function ConsignmentControl() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-foreground text-xs">Telefone</Label>
-                  <Input value={editRecord.ownerPhone || ''} onChange={e => setEditRecord({...editRecord, ownerPhone: e.target.value})} className="bg-muted border-border text-foreground" />
+                  <Input value={editRecord.ownerPhone || ''} onChange={e => setEditRecord({...editRecord, ownerPhone: maskPhone(e.target.value)})} className="bg-muted border-border text-foreground" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

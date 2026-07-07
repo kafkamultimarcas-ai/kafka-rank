@@ -15,22 +15,14 @@ import {
 } from "../db";
 import { ENV } from "../_core/env";
 import jwt from "jsonwebtoken";
-
-// Privacy helper: returns sellerId if logged in as seller (non-gerente), null otherwise
-async function getFichaPrivacySellerId(ctx: any): Promise<number | null> {
-  if (!ctx.user || (ctx.user as any).loginMethod !== 'seller_password') return null;
-  const sellerId = -(ctx.user.id + 1000000);
-  const seller = await getSellerById(sellerId);
-  if (seller && seller.sellerRole === 'gerente') return null;
-  return sellerId;
-}
+import { getPrivacySellerId as getFichaPrivacySellerId } from "../authHelpers";
 import { storagePut } from "../storage";
 import { BANCOS_FINANCIAMENTO } from "../../drizzle/schema";
 
 // ===== FICHAS DE FINANCIAMENTO ROUTER =====
 export const fichaRouter = router({
   // Vendedor cria ficha
-  create: publicProcedure.input(z.object({
+  create: protectedProcedure.input(z.object({
     sellerId: z.number(),
     // Veículo
     veiculo: z.string().optional(),
@@ -60,9 +52,14 @@ export const fichaRouter = router({
     observacoesVendedor: z.string().optional(),
     // Bancos já tentados pelo vendedor
     bancosTentados: z.array(z.string()).optional(),
-  })).mutation(async ({ input }) => {
+  })).mutation(async ({ input, ctx }) => {
+    const privacySellerId = await getFichaPrivacySellerId(ctx);
+    if (privacySellerId && input.sellerId !== privacySellerId) {
+      throw new Error('Você só pode criar fichas como você mesmo');
+    }
+    const effectiveSellerId = privacySellerId ?? input.sellerId;
     const fichaId = await createFichaFinanciamento({
-      sellerId: input.sellerId,
+      sellerId: effectiveSellerId,
       veiculo: input.veiculo,
       placa: input.placa?.toUpperCase(),
       anoModelo: input.anoModelo,

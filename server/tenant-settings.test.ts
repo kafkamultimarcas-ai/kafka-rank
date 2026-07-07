@@ -96,9 +96,14 @@ describe("Tenant Settings - Frontend Panel", () => {
     expect(dashboardContent).toContain("Email");
     expect(dashboardContent).toContain("Cidade");
     expect(dashboardContent).toContain("Estado (UF)");
-    expect(dashboardContent).toContain("URL do Estoque");
     expect(dashboardContent).toContain("Cor Principal");
     expect(dashboardContent).toContain("Cor Secundária");
+  });
+
+  it("should have inventory URL config in the Integrações tab (not in store data)", () => {
+    expect(dashboardContent).toContain("function InventoryIntegrationPanel()");
+    expect(dashboardContent).toContain("<InventoryIntegrationPanel />");
+    expect(dashboardContent).toContain("URL do site de estoque");
   });
 
   it("should have test connection button", () => {

@@ -21,11 +21,14 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
+import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, Eye, EyeOff, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import TrialStatusBanner from "./TrialStatusBanner";
+import { StoreLoginPicker } from "./StoreLoginPicker";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 
@@ -41,6 +44,7 @@ const menuItems = [
   { icon: Target, label: "Metas", path: "/admin/metas" },
   { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
   { icon: Gift, label: "Carros Bônus", path: "/admin/bonus-veiculos" },
+  { icon: CreditCard, label: "Assinatura", path: "/assinatura" },
   { icon: Settings, label: "Ajustes", path: "/admin/configuracoes" },
   { icon: LayoutGrid, label: "CRM Gerente", path: "/crm/admin" },
   { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
@@ -69,11 +73,20 @@ const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 
+function TenantLoginRedirect({ tenantSlug }: { tenantSlug: string }) {
+  useEffect(() => {
+    window.location.replace(getTenantLoginPath(tenantSlug));
+  }, [tenantSlug]);
+
+  return <DashboardLayoutSkeleton />;
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const tenantSlug = getCurrentTenantSlug();
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -81,6 +94,11 @@ export default function DashboardLayout({
   const { loading, user } = useAuth();
   const managerQuery = trpc.managers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const sellerQuery = trpc.sellers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const billingQuery = trpc.billing.getMyPlan.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    enabled: !!user && user.role === "admin",
+  });
   const isManagerLoading = managerQuery.isLoading;
   const isSellerLoading = sellerQuery.isLoading;
 
@@ -100,7 +118,11 @@ export default function DashboardLayout({
   const isSellerGerente = sellerQuery.data && sellerQuery.data.sellerRole === 'gerente';
 
   if (!isOwner && !isManager && !isSellerGerente) {
-    return <ManagerLoginScreen />;
+    if (tenantSlug) {
+      return <TenantLoginRedirect tenantSlug={tenantSlug} />;
+    }
+    window.location.replace("/login");
+    return <DashboardLayoutSkeleton />;
   }
 
   const displayName = isOwner 
@@ -126,6 +148,18 @@ export default function DashboardLayout({
         showOwnerItems={showOwnerItems}
         isManager={!!isManager || !!isSellerGerente}
         isSellerGerente={!!isSellerGerente}
+        tenantSlug={tenantSlug}
+        trialEndsAt={
+          managerQuery.data?.trialEndsAt ??
+          sellerQuery.data?.trialEndsAt ??
+          billingQuery.data?.trialEndsAt ??
+          null
+        }
+        subscriptionSuspended={
+          managerQuery.data?.subscriptionSuspended ??
+          sellerQuery.data?.subscriptionSuspended ??
+          (billingQuery.data?.status === "suspended")
+        }
       >
         {children}
       </DashboardLayoutContent>
@@ -134,28 +168,9 @@ export default function DashboardLayout({
 }
 
 function ManagerLoginScreen() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const loginMutation = trpc.managers.login.useMutation();
-  const utils = trpc.useUtils();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username.trim() || !password.trim()) return;
-    setIsLoading(true);
-    try {
-      await loginMutation.mutateAsync({ username: username.trim(), password });
-      await utils.managers.me.invalidate();
-      await utils.auth.me.invalidate();
-      toast.success("Login realizado com sucesso!");
-    } catch (err: any) {
-      toast.error(err.message || "Usuário ou senha inválidos");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  useEffect(() => {
+    window.location.replace("/login");
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -168,51 +183,13 @@ function ManagerLoginScreen() {
             Painel Administrativo
           </h1>
           <p className="text-sm text-muted-foreground text-center max-w-sm">
-            Faça login para acessar o gerenciamento da competição de vendas.
+            Selecione sua loja para acessar o gerenciamento da competição de vendas.
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="w-full space-y-4">
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Usuário</label>
-            <input
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Digite seu usuário"
-              className="w-full h-11 px-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              autoComplete="username"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground mb-1.5 block">Senha</label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Digite sua senha"
-                className="w-full h-11 px-3 pr-10 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          <Button
-            type="submit"
-            disabled={isLoading || !username.trim() || !password.trim()}
-            size="lg"
-            className="w-full racing-gradient text-white font-semibold shadow-lg hover:shadow-xl transition-all"
-          >
-            {isLoading ? "Entrando..." : "Entrar"}
-          </Button>
-        </form>
+        <div className="w-full rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+          O acesso agora acontece pelo login único com e-mail e senha.
+        </div>
 
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -240,9 +217,23 @@ type DashboardLayoutContentProps = {
   showOwnerItems: boolean;
   isManager: boolean;
   isSellerGerente?: boolean;
+  tenantSlug: string | null;
+  trialEndsAt: number | null;
+  subscriptionSuspended: boolean;
 };
 
-function DashboardLayoutContent({ children, setSidebarWidth, displayName, displayEmail, showOwnerItems, isManager, isSellerGerente }: DashboardLayoutContentProps) {
+function DashboardLayoutContent({
+  children,
+  setSidebarWidth,
+  displayName,
+  displayEmail,
+  showOwnerItems,
+  isManager,
+  isSellerGerente,
+  tenantSlug,
+  trialEndsAt,
+  subscriptionSuspended,
+}: DashboardLayoutContentProps) {
   const { logout: oauthLogout } = useAuth();
   const managerLogout = trpc.managers.logout.useMutation();
   const sellerLogout = trpc.sellers.logout.useMutation();
@@ -253,7 +244,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const allItems = showOwnerItems ? [...menuItems, ...ownerOnlyItems] : menuItems;
-  const activeMenuItem = allItems.find(item => item.path === location);
+  const activeMenuItem = allItems.find(item => buildTenantPath(tenantSlug, item.path) === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -287,12 +278,15 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
       await sellerLogout.mutateAsync();
       await utils.sellers.me.invalidate();
       toast.success("Logout realizado!");
-      window.location.href = "/";
+      window.location.href = getTenantLoginPath(tenantSlug);
     } else if (isManager) {
       await managerLogout.mutateAsync();
       await utils.managers.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("Logout realizado!");
+      if (tenantSlug) {
+        window.location.href = getTenantLoginPath(tenantSlug);
+      }
     } else {
       await oauthLogout();
     }
@@ -326,7 +320,7 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
             <SidebarMenu className="px-2 py-1">
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setLocation("/")}
+                  onClick={() => setLocation(tenantSlug ? buildTenantPath(tenantSlug, "/admin") : "/")}
                   tooltip="Tela Inicial"
                   className="h-10 transition-all font-normal"
                 >
@@ -336,12 +330,13 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
               </SidebarMenuItem>
               <div className="my-2 border-t border-border" />
               {allItems.map(item => {
-                const isActive = location === item.path;
+                const itemPath = buildTenantPath(tenantSlug, item.path);
+                const isActive = location === itemPath;
                 return (
-                  <SidebarMenuItem key={item.path}>
+                  <SidebarMenuItem key={itemPath}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => setLocation(item.path)}
+                      onClick={() => setLocation(itemPath)}
                       tooltip={item.label}
                       className={`h-10 transition-all font-normal`}
                     >
@@ -386,6 +381,11 @@ function DashboardLayoutContent({ children, setSidebarWidth, displayName, displa
       </div>
 
       <SidebarInset>
+        <TrialStatusBanner
+          tenantSlug={tenantSlug}
+          trialEndsAt={trialEndsAt}
+          subscriptionSuspended={subscriptionSuspended}
+        />
         {isMobile && (
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">

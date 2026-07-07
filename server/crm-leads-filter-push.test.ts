@@ -62,7 +62,8 @@ describe("CRM Lead Status Filter & Push Notifications", () => {
     it("usePushNotifications hook is importable", async () => {
       // Verify the hook file exists and exports correctly
       const fs = await import("fs");
-      const hookPath = "/home/ubuntu/kafka_sales_competition/client/src/hooks/usePushNotifications.ts";
+      const path = await import("path");
+      const hookPath = path.join(__dirname, "../client/src/hooks/usePushNotifications.ts");
       expect(fs.existsSync(hookPath)).toBe(true);
       const content = fs.readFileSync(hookPath, "utf-8");
       expect(content).toContain("export function usePushNotifications");
@@ -73,7 +74,8 @@ describe("CRM Lead Status Filter & Push Notifications", () => {
 
     it("CrmCommandCenter imports usePushNotifications", async () => {
       const fs = await import("fs");
-      const crmPath = "/home/ubuntu/kafka_sales_competition/client/src/pages/crm/CrmCommandCenter.tsx";
+      const path = await import("path");
+      const crmPath = path.join(__dirname, "../client/src/pages/crm/CrmCommandCenter.tsx");
       const content = fs.readFileSync(crmPath, "utf-8");
       expect(content).toContain("import { usePushNotifications }");
       expect(content).toContain("pushSupported");
@@ -83,7 +85,8 @@ describe("CRM Lead Status Filter & Push Notifications", () => {
 
     it("CrmCommandCenter has accepted/pending lead filter buttons", async () => {
       const fs = await import("fs");
-      const crmPath = "/home/ubuntu/kafka_sales_competition/client/src/pages/crm/CrmCommandCenter.tsx";
+      const path = await import("path");
+      const crmPath = path.join(__dirname, "../client/src/pages/crm/CrmCommandCenter.tsx");
       const content = fs.readFileSync(crmPath, "utf-8");
       expect(content).toContain("leadStatusFilter");
       expect(content).toContain("Aceitos");
@@ -93,7 +96,8 @@ describe("CRM Lead Status Filter & Push Notifications", () => {
 
     it("CrmCommandCenter has BellRing icon for subscribed state", async () => {
       const fs = await import("fs");
-      const crmPath = "/home/ubuntu/kafka_sales_competition/client/src/pages/crm/CrmCommandCenter.tsx";
+      const path = await import("path");
+      const crmPath = path.join(__dirname, "../client/src/pages/crm/CrmCommandCenter.tsx");
       const content = fs.readFileSync(crmPath, "utf-8");
       expect(content).toContain("BellRing");
       expect(content).toContain("isSubscribed &&");
@@ -104,7 +108,8 @@ describe("CRM Lead Status Filter & Push Notifications", () => {
   describe("Service Worker Push Handling", () => {
     it("sw.js handles new_lead and lead_transferred notification types", async () => {
       const fs = await import("fs");
-      const swPath = "/home/ubuntu/kafka_sales_competition/client/public/sw.js";
+      const path = await import("path");
+      const swPath = path.join(__dirname, "../client/public/sw.js");
       const content = fs.readFileSync(swPath, "utf-8");
       expect(content).toContain('"new_lead"');
       expect(content).toContain('"lead_transferred"');
