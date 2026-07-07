@@ -75,22 +75,17 @@ export const appRouter = router({
       name: z.string().min(1),
       nickname: z.string().optional(),
       phone: z.string().optional(),
-      email: z.string().optional(),
+      email: z.string().email("E-mail do vendedor inválido"),
       department: z.string().optional(),
     })).mutation(async ({ input, ctx }) => {
-      // Token de uso único pro vendedor criar o próprio login (ver sellers.firstAccess) —
-      // sem isso, qualquer um que descobrisse o sellerId (via sellers.list, pública)
-      // conseguiria criar login pra outra pessoa antes dela mesma fazer isso.
       const inviteToken = nanoid(24);
       const id = await db.createSeller({ ...input, inviteToken });
 
       let loginUrl: string | null = null;
-      if (input.email) {
-        const tenant = await getTenantById(ctx.tenantId);
-        if (tenant) {
-          loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login?invite=${inviteToken}`;
-          await sendUserWelcomeEmail(input.email, tenant.name, "vendedor", loginUrl, ctx.tenantId);
-        }
+      const tenant = await getTenantById(ctx.tenantId);
+      if (tenant) {
+        loginUrl = `${getRequestOrigin(ctx.req)}/login?invite=${inviteToken}`;
+        await sendUserWelcomeEmail(input.email, tenant.name, "vendedor", loginUrl, ctx.tenantId);
       }
 
       return { id, inviteToken, loginUrl };
@@ -100,7 +95,7 @@ export const appRouter = router({
       name: z.string().optional(),
       nickname: z.string().optional(),
       phone: z.string().optional(),
-      email: z.string().optional(),
+      email: z.string().email().optional(),
       department: z.string().optional(),
       active: z.boolean().optional(),
       sellerRole: z.string().optional(),
@@ -211,7 +206,11 @@ export const appRouter = router({
           if (seller && seller.active) {
             // SECURITY: Verify that the seller's username still matches the JWT
             // This prevents stale tokens from accessing wrong profiles
-            if (seller.username && payload.username && seller.username !== payload.username) {
+            if (
+              seller.username &&
+              payload.username &&
+              seller.username.toLowerCase() !== payload.username.toLowerCase()
+            ) {
               console.warn(`[SECURITY] JWT username mismatch for seller #${payload.sellerId}: JWT=${payload.username}, DB=${seller.username}. Clearing session.`);
               const cookieOptions = getSessionCookieOptions(ctx.req);
               ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
@@ -2750,22 +2749,19 @@ export const appRouter = router({
     }),
 
     create: adminProcedure.input(z.object({
-      username: z.string().min(3),
+      username: z.string().min(3).optional(),
       password: z.string().min(4),
       name: z.string().min(1),
-      email: z.string().email().optional(),
+      email: z.string().email("E-mail do gerente inválido"),
     })).mutation(async ({ input, ctx }) => {
-      const existing = await db.getManagerByUsername(input.username);
-      if (existing) throw new Error("Usuário já existe");
       const passwordHash = await bcrypt.hash(input.password, 10);
-      const id = await db.createManager({ username: input.username, passwordHash, name: input.name, email: input.email });
+      const username = input.username || input.email.split("@")[0];
+      const id = await db.createManager({ username, passwordHash, name: input.name, email: input.email });
 
-      if (input.email) {
-        const tenant = await getTenantById(ctx.tenantId);
-        if (tenant) {
-          const loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login`;
-          await sendUserWelcomeEmail(input.email, tenant.name, "gerente", loginUrl, ctx.tenantId);
-        }
+      const tenant = await getTenantById(ctx.tenantId);
+      if (tenant) {
+        const loginUrl = `${getRequestOrigin(ctx.req)}/login`;
+        await sendUserWelcomeEmail(input.email, tenant.name, "gerente", loginUrl, ctx.tenantId);
       }
 
       return { id };

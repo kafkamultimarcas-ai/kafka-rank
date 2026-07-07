@@ -16,6 +16,8 @@ import { getDb } from "./db";
 
 import { getCurrentTenantId } from "./tenantDb";
 import { getTenantLimits } from "./tenantService";
+import { assertGlobalUsernameAvailable } from "./usernamePolicy";
+import { assertGlobalEmailAvailable } from "./emailPolicy";
 
 // ===== ADMINS =====
 
@@ -40,10 +42,21 @@ export async function getAdminById(id: number) {
   return rows[0] || null;
 }
 
-export async function createAdmin(data: { username: string; passwordHash: string; name: string; role?: "owner" | "admin"; permissions?: string }) {
+export async function createAdmin(data: {
+  username: string;
+  passwordHash: string;
+  name: string;
+  role?: "owner" | "admin";
+  permissions?: string;
+  email: string;
+  phone?: string;
+  mustChangePassword?: boolean;
+}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const tenantId = getCurrentTenantId();
+  const username = await assertGlobalUsernameAvailable(data.username);
+  const email = await assertGlobalEmailAvailable(data.email);
   const limits = await getTenantLimits(tenantId);
   if (limits) {
     const [{ count }] = await db.select({ count: sql<number>`COUNT(*)` }).from(admins).where(and(eq(admins.tenantId, tenantId), eq(admins.active, true)));
@@ -52,9 +65,12 @@ export async function createAdmin(data: { username: string; passwordHash: string
     }
   }
   const result = await db.insert(admins).values({
-    username: data.username,
+    username,
     passwordHash: data.passwordHash,
     name: data.name,
+    email,
+    phone: data.phone,
+    mustChangePassword: data.mustChangePassword ?? false,
     role: data.role || "admin",
     permissions: data.permissions || JSON.stringify({vendas:true,pre_vendas:false,consignacao:false,fei:false,marketing:false,financeiro:false,estoque:false,configuracoes:false,gerenciar_admins:false}),
     tenantId,
@@ -68,10 +84,32 @@ export async function listAdmins() {
   return db.select({ id: admins.id, username: admins.username, name: admins.name, email: admins.email, role: admins.role, active: admins.active, permissions: admins.permissions, createdAt: admins.createdAt }).from(admins).where(eq(admins.tenantId, getCurrentTenantId())).orderBy(desc(admins.createdAt));
 }
 
-export async function updateAdmin(id: number, data: Partial<{ name: string; passwordHash: string; active: boolean; role: "owner" | "admin"; permissions: string }>) {
+export async function updateAdmin(id: number, data: Partial<{
+  name: string;
+  username: string;
+  passwordHash: string;
+  active: boolean;
+  role: "owner" | "admin";
+  permissions: string;
+  email: string;
+  phone: string;
+  mustChangePassword: boolean;
+  lastAccess: number;
+}>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(admins).set(data).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.id, id)));
+  const updateData: Record<string, unknown> = { ...data };
+  if (typeof data.username === "string") {
+    updateData.username = await assertGlobalUsernameAvailable(data.username, {
+      allow: [{ ownerType: "admin", ownerId: id }],
+    });
+  }
+  if (typeof data.email === "string") {
+    updateData.email = await assertGlobalEmailAvailable(data.email, {
+      allow: [{ ownerType: "admin", ownerId: id }],
+    });
+  }
+  await db.update(admins).set(updateData).where(and(eq(admins.tenantId, getCurrentTenantId()), eq(admins.id, id)));
 }
 
 export async function deleteAdmin(id: number) {

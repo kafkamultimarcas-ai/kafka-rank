@@ -25,8 +25,8 @@ describe("tenant route helpers", () => {
     expect(buildTenantPath("loja-demo", "/super-admin")).toBe("/super-admin");
   });
 
-  it("resolve a porta oficial de login humano da loja", () => {
-    expect(getTenantLoginPath("loja-demo")).toBe("/t/loja-demo/login");
-    expect(getTenantLoginPath(null)).toBe("/login-vendedor");
+  it("resolve para a página unificada de login independente do slug", () => {
+    expect(getTenantLoginPath("loja-demo")).toBe("/login");
+    expect(getTenantLoginPath(null)).toBe("/login");
   });
 });

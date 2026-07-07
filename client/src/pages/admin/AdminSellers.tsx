@@ -155,7 +155,7 @@ export default function AdminSellers() {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
     if (form.phone && !isValidBrazilianPhone(form.phone)) { toast.error("Telefone inválido"); return; }
-    if (form.email && !isValidEmail(form.email)) { toast.error("E-mail inválido"); return; }
+    if (!form.email.trim() || !isValidEmail(form.email)) { toast.error("E-mail é obrigatório e será o login do vendedor"); return; }
     if (editingSeller) {
       updateSeller.mutate({ id: editingSeller.id, ...form });
     } else {

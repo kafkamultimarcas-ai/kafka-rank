@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   Building2, Users, ShoppingCart, TrendingUp, Plus, Search,
@@ -9,6 +10,7 @@ import {
   Key, RefreshCw, X
 } from "lucide-react";
 import { slugify, formatPhone, normalizeUsername, isValidEmail, getAvailabilityMessage } from "@/lib/tenantForm";
+import { getDefaultPlanLimits, TRIAL_PLAN_LIMITS } from "@shared/plans";
 
 // ===== AUTH STATE =====
 function useSuperAuth() {
@@ -28,78 +30,13 @@ function useSuperAuth() {
     }
   }, [me, token]);
 
-  const login = (t: string, a: any) => {
-    localStorage.setItem("super_token", t);
-    setToken(t);
-    setAdmin(a);
-  };
-
   const logout = () => {
     localStorage.removeItem("super_token");
     setToken(null);
     setAdmin(null);
   };
 
-  return { token, admin, login, logout, isLoggedIn: !!token && !!admin };
-}
-
-// ===== LOGIN SCREEN =====
-function SuperLoginScreen({ onLogin }: { onLogin: (token: string, admin: any) => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const loginMut = trpc.superAdmin.login.useMutation({
-    onSuccess: (data) => {
-      toast.success("Login realizado!");
-      onLogin(data.token, data.admin);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 mb-4">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Portal Super Admin</h1>
-          <p className="text-gray-400 mt-1">Gerencie todas as lojas do Kafka Rank</p>
-        </div>
-
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-6 space-y-4">
-          <div>
-            <label className="text-sm text-gray-400 mb-1 block">Usuário</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="superadmin"
-              onKeyDown={(e) => e.key === "Enter" && loginMut.mutate({ username, password })}
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 mb-1 block">Senha</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-              placeholder="********"
-              onKeyDown={(e) => e.key === "Enter" && loginMut.mutate({ username, password })}
-            />
-          </div>
-          <button
-            onClick={() => loginMut.mutate({ username, password })}
-            disabled={loginMut.isPending || !username || !password}
-            className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50"
-          >
-            {loginMut.isPending ? "Entrando..." : "Entrar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return { token, admin, logout, isLoggedIn: !!token && !!admin };
 }
 
 // ===== STATUS BADGE =====
@@ -135,11 +72,24 @@ function PlanBadge({ plan }: { plan: string }) {
 
 // ===== CREATE TENANT MODAL =====
 function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string;
+    slug: string;
+    phone: string;
+    email: string;
+    city: string;
+    state: string;
+    plan: "trial" | "basic" | "pro" | "enterprise";
+    maxSellers: number;
+    maxAdmins: number;
+    adminEmail: string;
+    adminPassword: string;
+    adminName: string;
+  }>({
     name: "", slug: "", phone: "", email: "", city: "", state: "",
     plan: "trial" as "trial" | "basic" | "pro" | "enterprise",
-    maxSellers: 10, maxAdmins: 2,
-    adminUsername: "", adminPassword: "", adminName: "",
+    maxSellers: TRIAL_PLAN_LIMITS.maxSellers, maxAdmins: TRIAL_PLAN_LIMITS.maxAdmins,
+    adminEmail: "", adminPassword: "", adminName: "",
   });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -157,11 +107,11 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
   const trimmedPhone = form.phone.trim();
   const trimmedEmail = form.email.trim();
   const trimmedAdminName = form.adminName.trim();
-  const normalizedAdminUsername = normalizeUsername(form.adminUsername);
+  const trimmedAdminEmail = form.adminEmail.trim().toLowerCase();
   const trimmedAdminPassword = form.adminPassword.trim();
   const phoneDigits = trimmedPhone.replace(/\D/g, "");
   const [debouncedSlug, setDebouncedSlug] = useState(trimmedSlug);
-  const [debouncedAdminUsername, setDebouncedAdminUsername] = useState(normalizedAdminUsername);
+  const [debouncedAdminEmail, setDebouncedAdminEmail] = useState(trimmedAdminEmail);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSlug(trimmedSlug), 350);
@@ -169,33 +119,33 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
   }, [trimmedSlug]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedAdminUsername(normalizedAdminUsername), 350);
+    const timer = window.setTimeout(() => setDebouncedAdminEmail(trimmedAdminEmail), 350);
     return () => window.clearTimeout(timer);
-  }, [normalizedAdminUsername]);
+  }, [trimmedAdminEmail]);
 
   const nameIsValid = trimmedName.length >= 2;
   const slugIsValid = trimmedSlug.length >= 2;
   const phoneIsValid = !trimmedPhone || phoneDigits.length === 10 || phoneDigits.length === 11;
   const emailIsValid = !trimmedEmail || isValidEmail(trimmedEmail);
   const adminNameIsValid = trimmedAdminName.length >= 2;
-  const usernameIsValid = normalizedAdminUsername.length >= 3;
+  const adminEmailIsValid = isValidEmail(trimmedAdminEmail);
   const passwordIsValid = trimmedAdminPassword.length >= 4;
   const availabilityQuery = trpc.superAdmin.checkAvailability.useQuery(
     {
       token,
       slug: debouncedSlug || undefined,
-      adminUsername: debouncedAdminUsername || undefined,
+      adminEmail: debouncedAdminEmail || undefined,
     },
     {
-      enabled: slugIsValid || usernameIsValid,
+      enabled: slugIsValid || adminEmailIsValid,
       retry: false,
     }
   );
 
   const slugAvailability = availabilityQuery.data?.slug;
-  const usernameAvailability = availabilityQuery.data?.adminUsername;
+  const emailAvailabilityData = availabilityQuery.data?.adminEmail;
   const slugAvailable = !slugIsValid || debouncedSlug !== trimmedSlug ? true : slugAvailability?.available !== false;
-  const adminUsernameAvailable = !usernameIsValid || debouncedAdminUsername !== normalizedAdminUsername ? true : usernameAvailability?.available !== false;
+  const adminEmailAvailable = !adminEmailIsValid || debouncedAdminEmail !== trimmedAdminEmail ? true : emailAvailabilityData?.available !== false;
   const canSubmit =
     !createMut.isPending &&
     nameIsValid &&
@@ -203,10 +153,10 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
     phoneIsValid &&
     emailIsValid &&
     adminNameIsValid &&
-    usernameIsValid &&
+    adminEmailIsValid &&
     passwordIsValid &&
     slugAvailable &&
-    adminUsernameAvailable;
+    adminEmailAvailable;
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -308,7 +258,10 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
               {(["trial", "basic", "pro", "enterprise"] as const).map((p) => (
                 <button
                   key={p}
-                  onClick={() => setForm({ ...form, plan: p, maxSellers: p === "enterprise" ? 50 : p === "pro" ? 30 : p === "basic" ? 15 : 10 })}
+                  onClick={() => {
+                    const limits = getDefaultPlanLimits(p);
+                    setForm({ ...form, plan: p, maxSellers: limits.maxSellers, maxAdmins: limits.maxAdmins });
+                  }}
                   className={`py-2 rounded-lg text-sm font-semibold border transition-all ${form.plan === p ? "bg-red-600/20 border-red-500 text-red-400" : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600"}`}
                 >
                   {p.toUpperCase()}
@@ -353,21 +306,22 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                 {!adminNameIsValid && <p className="mt-1 text-[11px] text-amber-400">Informe o nome do admin responsável.</p>}
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">Login *</label>
+                <label className="text-xs text-gray-500 mb-1 block">E-mail (login) *</label>
                 <input
-                  value={form.adminUsername}
-                  onChange={(e) => setForm({ ...form, adminUsername: normalizeUsername(e.target.value) })}
+                  type="email"
+                  value={form.adminEmail}
+                  onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
-                  placeholder="admin"
+                  placeholder="admin@loja.com"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  autoComplete="username"
+                  autoComplete="email"
                 />
-                <p className="mt-1 text-[11px] text-gray-500">Use letras min&uacute;sculas, n&uacute;meros, ponto, h&iacute;fen ou underscore.</p>
-                {usernameIsValid && debouncedAdminUsername === normalizedAdminUsername && usernameAvailability && (
-                  <p className={`mt-1 text-[11px] ${usernameAvailability.available ? "text-emerald-400" : "text-amber-400"}`}>
-                    {getAvailabilityMessage(usernameAvailability.value, usernameAvailability.available, "username")}
+                <p className="mt-1 text-[11px] text-gray-500">E-mail é a identidade única de login.</p>
+                {adminEmailIsValid && debouncedAdminEmail === trimmedAdminEmail && emailAvailabilityData && (
+                  <p className={`mt-1 text-[11px] ${emailAvailabilityData.available ? "text-emerald-400" : "text-amber-400"}`}>
+                    {emailAvailabilityData.available ? "E-mail disponível" : (emailAvailabilityData.reason === "invalid" ? "E-mail inválido" : "E-mail já está em uso")}
                   </p>
                 )}
               </div>
@@ -410,7 +364,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
               city: form.city.trim(),
               state: form.state.trim().toUpperCase(),
               adminName: trimmedAdminName,
-              adminUsername: normalizedAdminUsername,
+              adminEmail: trimmedAdminEmail,
               adminPassword: trimmedAdminPassword,
             })}
             disabled={!canSubmit}
@@ -530,7 +484,7 @@ function TenantDetailModal({ token, tenantId, onClose }: { token: string; tenant
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Max Vendedores</label>
-                  <input type="number" value={editForm.maxSellers || 10} onChange={(e) => setEditForm({ ...editForm, maxSellers: Number(e.target.value) })}
+                  <input type="number" value={editForm.maxSellers || TRIAL_PLAN_LIMITS.maxSellers} onChange={(e) => setEditForm({ ...editForm, maxSellers: Number(e.target.value) })}
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none" />
                 </div>
                 <div>
@@ -1112,10 +1066,25 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
 
 // ===== MAIN EXPORT =====
 export default function SuperAdmin() {
-  const { token, admin, login, logout, isLoggedIn } = useSuperAuth();
+  const [, navigate] = useLocation();
+  const { token, admin, logout, isLoggedIn } = useSuperAuth();
+
+  useEffect(() => {
+    if (!token) navigate("/login", { replace: true });
+  }, [navigate, token]);
 
   if (!isLoggedIn) {
-    return <SuperLoginScreen onLogin={login} />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-800 mb-4">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">Redirecionando para o login</h1>
+          <p className="text-gray-400 mt-1">Use o mesmo login por e-mail para acessar o portal Super Admin.</p>
+        </div>
+      </div>
+    );
   }
 
   return <SuperDashboard token={token!} admin={admin} onLogout={logout} />;

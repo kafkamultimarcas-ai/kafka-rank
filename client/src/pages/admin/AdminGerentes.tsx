@@ -9,7 +9,7 @@ export default function AdminGerentes() {
   const { data: managers, isLoading } = trpc.managers.list.useQuery();
   const utils = trpc.useUtils();
   const [showCreate, setShowCreate] = useState(false);
-  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newName, setNewName] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -22,7 +22,7 @@ export default function AdminGerentes() {
     onSuccess: () => {
       utils.managers.list.invalidate();
       setShowCreate(false);
-      setNewUsername("");
+      setNewEmail("");
       setNewPassword("");
       setNewName("");
       toast.success("Gerente criado com sucesso!");
@@ -51,8 +51,8 @@ export default function AdminGerentes() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim() || !newPassword.trim() || !newName.trim()) return;
-    createMutation.mutate({ username: newUsername.trim(), password: newPassword, name: newName.trim() });
+    if (!newEmail.trim() || !newPassword.trim() || !newName.trim()) return;
+    createMutation.mutate({ email: newEmail.trim().toLowerCase(), password: newPassword, name: newName.trim() });
   };
 
   const handleUpdate = (id: number) => {
@@ -105,12 +105,13 @@ export default function AdminGerentes() {
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Usuário</label>
+                <label className="text-xs text-muted-foreground mb-1 block">E-mail (login)</label>
                 <input
-                  type="text"
-                  value={newUsername}
-                  onChange={e => setNewUsername(e.target.value)}
-                  placeholder="Ex: joao"
+                  type="email"
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  placeholder="joao@loja.com"
+                  autoComplete="email"
                   className="w-full h-10 px-3 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -132,7 +133,7 @@ export default function AdminGerentes() {
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancelar</Button>
-              <Button type="submit" size="sm" disabled={createMutation.isPending || !newUsername.trim() || !newPassword.trim() || !newName.trim()}>
+              <Button type="submit" size="sm" disabled={createMutation.isPending || !newEmail.trim() || !newPassword.trim() || !newName.trim()}>
                 {createMutation.isPending ? "Criando..." : "Criar Gerente"}
               </Button>
             </div>

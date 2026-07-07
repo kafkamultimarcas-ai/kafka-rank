@@ -25,6 +25,6 @@ export function buildTenantPath(tenantSlug: string | null | undefined, pathname:
   return `/t/${tenantSlug}${pathname}`;
 }
 
-export function getTenantLoginPath(tenantSlug: string | null | undefined): string {
-  return tenantSlug ? `/t/${tenantSlug}/login` : "/login-vendedor";
+export function getTenantLoginPath(_tenantSlug: string | null | undefined): string {
+  return "/login";
 }

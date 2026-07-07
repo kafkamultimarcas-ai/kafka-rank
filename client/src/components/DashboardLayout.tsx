@@ -121,7 +121,8 @@ export default function DashboardLayout({
     if (tenantSlug) {
       return <TenantLoginRedirect tenantSlug={tenantSlug} />;
     }
-    return <ManagerLoginScreen />;
+    window.location.replace("/login");
+    return <DashboardLayoutSkeleton />;
   }
 
   const displayName = isOwner 
@@ -167,6 +168,10 @@ export default function DashboardLayout({
 }
 
 function ManagerLoginScreen() {
+  useEffect(() => {
+    window.location.replace("/login");
+  }, []);
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
@@ -182,7 +187,9 @@ function ManagerLoginScreen() {
           </p>
         </div>
 
-        <StoreLoginPicker title="" description="" className="w-full" />
+        <div className="w-full rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+          O acesso agora acontece pelo login único com e-mail e senha.
+        </div>
 
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">

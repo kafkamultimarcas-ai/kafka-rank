@@ -300,10 +300,20 @@ export async function syncAllTenants(): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
-  const activeTenants = await db
-    .select({ id: tenants.id, inventoryUrl: tenants.inventoryUrl })
-    .from(tenants)
-    .where(ne(tenants.inventoryUrl, ""));
+  let activeTenants: Array<{ id: number; inventoryUrl: string | null }>;
+  try {
+    activeTenants = await db
+      .select({ id: tenants.id, inventoryUrl: tenants.inventoryUrl })
+      .from(tenants)
+      .where(ne(tenants.inventoryUrl, ""));
+  } catch (err: any) {
+    const code = err?.cause?.code || err?.code;
+    if (code === "ECONNREFUSED" || code === "ETIMEDOUT" || code === "ENOTFOUND") {
+      console.warn(`[Inventory Sync] DB unavailable (${code}) - skipping this run`);
+      return;
+    }
+    throw err;
+  }
 
   for (const tenant of activeTenants) {
     if (!tenant.inventoryUrl) continue;

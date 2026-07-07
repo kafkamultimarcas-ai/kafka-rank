@@ -155,10 +155,10 @@ function TermosContent() {
         </p>
         <Sub title="4.1. Período de Teste Gratuito (Trial)">
           <p>
-            Novas Lojas têm direito a um período de teste gratuito de 30 (trinta) dias, com limites reduzidos de
-            uso, sem necessidade de cartão de crédito. Ao final do período de teste, o acesso à Plataforma será
-            suspenso automaticamente caso nenhum plano pago seja contratado, sem prejuízo da preservação dos dados
-            já inseridos pelo prazo indicado na Política de Privacidade.
+            Novas Lojas têm direito a um período de teste gratuito de 10 (dez) dias, limitado a até 3 (três)
+            vendedores e 1 (um) administrador, sem necessidade de cartão de crédito. Ao final do período de teste,
+            o acesso à Plataforma será suspenso automaticamente caso nenhum plano pago seja contratado, sem
+            prejuízo da preservação dos dados já inseridos pelo prazo indicado na Política de Privacidade.
           </p>
         </Sub>
         <Sub title="4.2. Inadimplência e Suspensão">
