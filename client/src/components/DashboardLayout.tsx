@@ -21,14 +21,13 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
 import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import TrialStatusBanner from "./TrialStatusBanner";
-import { StoreLoginPicker } from "./StoreLoginPicker";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 
@@ -75,7 +74,7 @@ const MAX_WIDTH = 400;
 
 function TenantLoginRedirect({ tenantSlug }: { tenantSlug: string }) {
   useEffect(() => {
-    window.location.replace(getTenantLoginPath(tenantSlug));
+    window.location.replace("/login");
   }, [tenantSlug]);
 
   return <DashboardLayoutSkeleton />;
@@ -278,14 +277,14 @@ function DashboardLayoutContent({
       await sellerLogout.mutateAsync();
       await utils.sellers.me.invalidate();
       toast.success("Logout realizado!");
-      window.location.href = getTenantLoginPath(tenantSlug);
+      window.location.href = "/login";
     } else if (isManager) {
       await managerLogout.mutateAsync();
       await utils.managers.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("Logout realizado!");
       if (tenantSlug) {
-        window.location.href = getTenantLoginPath(tenantSlug);
+        window.location.href = "/login";
       }
     } else {
       await oauthLogout();

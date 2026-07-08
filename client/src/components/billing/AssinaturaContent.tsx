@@ -20,7 +20,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { useBranding } from "@/contexts/TenantContext";
-import { getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { getCurrentTenantSlug } from "@/lib/tenant";
 import { PLAN_CONFIG, LAUNCH_PROMO_LIMIT, formatCentsToBRL, type PaidPlanId } from "@shared/plans";
 import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 import { maskCpfCnpj, maskPhone } from "@/lib/masks";
@@ -431,7 +431,7 @@ export default function AssinaturaContent({
 
       {showLogoutButton && (
         <div className="text-center">
-          <Button variant="ghost" onClick={() => navigate(getTenantLoginPath(tenantSlug))} className="text-muted-foreground">
+          <Button variant="ghost" onClick={() => navigate("/login")} className="text-muted-foreground">
             <LogOut className="w-4 h-4 mr-1.5" />
             Sair de {brandName}
           </Button>

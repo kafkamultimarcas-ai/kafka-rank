@@ -10,9 +10,12 @@ import { buildTenantPath, getTenantSlugFromPath } from "@/lib/tenant";
 
 const BYPASS_ROUTES = [
   "/crm/admin", "/crm", "/crm/integracoes",
+  "/crm/admin/login",
   "/tv",
   "/admin",
+  "/admin/login",
   "/super-admin",
+  "/super-admin/login",
   "/comercial",
   "/assinatura",
   "/login",
@@ -21,7 +24,11 @@ const BYPASS_ROUTES = [
 ];
 
 function isTenantBypassRoute(pathname: string): boolean {
-  return /^\/t\/[a-z0-9-]+\/(?:admin|crm|gerente|pos-venda|financeiro|minha-area|assinatura)(?:\/|$)/i.test(pathname);
+  return (
+    /^\/t\/[a-z0-9-]+\/login(?:\/|$)/i.test(pathname) ||
+    /^\/t\/[a-z0-9-]+\/crm\/admin\/login(?:\/|$)/i.test(pathname) ||
+    /^\/t\/[a-z0-9-]+\/(?:admin|crm|gerente|pos-venda|financeiro|minha-area|assinatura)(?:\/|$)/i.test(pathname)
+  );
 }
 
 const DEPARTMENT_OPTIONS = [
@@ -72,7 +79,10 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     return allSellers.filter(s => !s.username);
   }, [allSellers]);
 
-  const isBypassRoute = BYPASS_ROUTES.some(route => currentPath.startsWith(route)) || isTenantBypassRoute(currentPath);
+  const isBypassRoute =
+    currentPath === "/" ||
+    BYPASS_ROUTES.some(route => currentPath.startsWith(route)) ||
+    isTenantBypassRoute(currentPath);
   const isLoggedIn = !!adminUser || !!sellerSession;
   const shouldRedirectToLogin = !isBypassRoute && !sellerLoading && !adminLoading && !isLoggedIn && !hasInviteParam;
 

@@ -7,7 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import AccessGate from "./components/AccessGate";
 import LiveAlerts from "./components/LiveAlerts";
 import TrialExpiredGate from "./components/TrialExpiredGate";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Flag } from "lucide-react";
 
 import NotFound from "@/pages/NotFound";
@@ -86,11 +86,28 @@ function PageLoader() {
   );
 }
 
+function RootRedirect() {
+  useEffect(() => {
+    window.location.replace("/comercial");
+  }, []);
+
+  return <PageLoader />;
+}
+
+function LegacyLoginRedirect() {
+  useEffect(() => {
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    window.location.replace(`/login${search}`);
+  }, []);
+
+  return <PageLoader />;
+}
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
-        <Route path="/" component={ComercialHome} />
+        <Route path="/" component={RootRedirect} />
         <Route path="/corrida/:id" component={RaceTrack} />
         <Route path="/competicao/:id" component={CompetitionView} />
         <Route path="/vendedor/:id" component={SellerProfile} />
@@ -98,6 +115,11 @@ function Router() {
         <Route path="/registrar-venda" component={RegisterSale} />
         <Route path="/tv" component={TVMode} />
         <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
+        <Route path="/admin/login" component={LegacyLoginRedirect} />
+        <Route path="/crm/admin/login" component={LegacyLoginRedirect} />
+        <Route path="/super-admin/login" component={LegacyLoginRedirect} />
+        <Route path="/t/:slug/login" component={LegacyLoginRedirect} />
+        <Route path="/t/:slug/crm/admin/login" component={LegacyLoginRedirect} />
         <Route path="/login" component={UnifiedLogin} />
         <Route path="/esqueci-senha" component={EsqueciSenha} />
         <Route path="/redefinir-senha" component={RedefinirSenha} />

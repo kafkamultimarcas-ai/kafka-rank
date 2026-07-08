@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge, ChannelIndicator } from "@/components/ChannelIcon";
 import { useBranding } from "@/contexts/TenantContext";
-import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -916,7 +916,7 @@ export default function CrmCommandCenter() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Faça login para acessar o CRM</p>
-          <Button onClick={() => navigate(getTenantLoginPath(tenantSlug))} className="racing-gradient text-white">Fazer Login</Button>
+          <Button onClick={() => navigate("/login")} className="racing-gradient text-white">Fazer Login</Button>
         </div>
       </div>
     );

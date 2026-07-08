@@ -9,7 +9,7 @@ Este documento consolida e **reconcilia** tudo que já foi levantado sobre o que
 ## O que já está pronto (não precisa refazer)
 
 - **Isolamento multi-tenant**: `tenantId` em toda tabela de dado, testado automaticamente (`tenant-security.test.ts` varre o schema inteiro).
-- **Login unificado**: só 2 pontos de entrada (`/super-admin`, `/t/:slug/login`), com seletor de loja pesquisável — [documento 06](06-unificacao-login-selecao-loja.md).
+- **Login unificado**: ponto principal em `/login`, com resolução automática por e-mail e compatibilidade com rotas legadas redirecionadas; `/super-admin` continua separado depois da autenticação.
 - **Identidade do ator sem gambiarra de ID**: `actorType` explícito em vez de codificação numérica — [documento 08](08-refactor-identidade-actortype.md), corrigiu 2 bugs reais de resolução de tenant/permissão.
 - **Cobrança via ASAAS**: assinar, trocar de plano, cancelar, proteção contra cobrança duplicada, webhook idempotente e transacional (bug de idempotência corrigido — [documento 07](07-observabilidade-alertas-cobranca.md)).
 - **Observabilidade interna sem serviço externo**: logger estruturado (pino), alertas de cobrança com e-mail pros Super Admins, tudo numa única tela de Logs — [documento 07](07-observabilidade-alertas-cobranca.md).

@@ -8,6 +8,10 @@ export function getCurrentTenantSlug(): string | null {
   return getTenantSlugFromPath(window.location.pathname);
 }
 
+export function getTenantLoginPath(): string {
+  return "/login";
+}
+
 export function buildTenantPath(tenantSlug: string | null | undefined, pathname: string): string {
   if (!pathname.startsWith("/")) {
     pathname = `/${pathname}`;
@@ -23,8 +27,4 @@ export function buildTenantPath(tenantSlug: string | null | undefined, pathname:
   }
 
   return `/t/${tenantSlug}${pathname}`;
-}
-
-export function getTenantLoginPath(_tenantSlug: string | null | undefined): string {
-  return "/login";
 }

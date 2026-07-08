@@ -14,7 +14,7 @@ Kafka Rank é uma plataforma SaaS multi-tenant desenvolvida para lojas de veícu
 | **Backend** | Node.js 22 + Express 4 + tRPC 11 |
 | **Banco de Dados** | MySQL 8 (TiDB Cloud) com Drizzle ORM — 76 migrations |
 | **Autenticação** | OAuth2 (Manus Auth, dono da plataforma) + JWT por sessão (gerente/vendedor/admin de CRM) |
-| **Multi-Tenant** | Isolamento por loja via `/t/:slug/...`, login único por loja (`/t/:slug/login`) |
+| **Multi-Tenant** | Isolamento por loja via `/t/:slug/...`, login único global em `/login` |
 | **Pagamentos** | ASAAS (assinatura, troca de plano, cancelamento, webhook idempotente) |
 | **Observabilidade** | Logger estruturado (pino) + alertas internos de cobrança, sem serviço externo |
 | **Testes** | Vitest (~79 arquivos, ~832 testes) |
@@ -101,7 +101,7 @@ Lista completa, com esforço estimado por item e ordem recomendada: [**`docs/mul
 
 ### Multi-Tenant (SaaS)
 - Isolamento completo de dados por loja (`tenantId` em toda tabela, filtrado automaticamente via `AsyncLocalStorage` — não é responsabilidade de cada query lembrar de filtrar)
-- **Login único por loja**: `https://kafkarank.com/t/<slug-da-loja>/login` — um único formulário, tenta admin → gerente → vendedor nessa ordem; `https://kafkarank.com/super-admin` pro dono da plataforma. São os **únicos** dois pontos de entrada — qualquer outra tela de login foi removida/redirecionada (ver [documento 06](docs/multi-tenant/06-unificacao-login-selecao-loja.md))
+- **Login único global**: `https://kafkarank.com/login` — um único formulário por e-mail, resolve automaticamente admin → gerente → vendedor → super admin e redireciona para a área correta. `https://kafkarank.com/super-admin` continua sendo o portal do dono da plataforma depois de autenticado. Rotas antigas como `/t/:slug/login`, `/crm/admin/login` e `/admin/login` permanecem só como redirecionamento compatível.
 - Cadastro self-service de loja nova (`/comercial/cadastro`) — provisiona tenant + admin dono + seed de CRM numa chamada só
 - "Esqueci minha senha" self-service por loja, com token de uso único
 - Planos (Trial/Basic/Pro/Enterprise) com cobrança recorrente via **ASAAS** — assinar, trocar de plano, cancelar, tudo com proteção contra cobrança duplicada
@@ -466,7 +466,7 @@ const register = trpc.sales.register.useMutation();
 Existem **4 tipos de ator autenticado**, cada um numa tabela própria (`users`, `managers`, `sellers`, `admins`), unificados no contexto tRPC (`ctx.user`) através de um campo explícito `actorType: "oauth" | "manager" | "seller" | "crm_admin"` — nunca por inferência de faixa numérica de ID (ver [documento 08](docs/multi-tenant/08-refactor-identidade-actortype.md) pro histórico de por que isso importa: a versão anterior escondia bugs reais de resolução de tenant).
 
 - **Dono da plataforma**: OAuth2 via Manus Auth, JWT em cookie HttpOnly.
-- **Admin/gerente/vendedor de uma loja**: senha própria, um único formulário de login por loja (`/t/:slug/login`, `tenantAuth.login` tenta admin → gerente → vendedor), sessão em cookie HttpOnly (gerente/vendedor) ou token retornado ao cliente (admin de CRM).
+- **Admin/gerente/vendedor de uma loja**: senha própria, um único formulário em `/login` (`tenantAuth.loginByEmail` resolve o papel automaticamente), sessão em cookie HttpOnly (gerente/vendedor) ou token retornado ao cliente (admin de CRM).
 - Todo JWT de sessão de loja carrega `tenantId` embutido, validado (`assertTenantMatch`) contra o tenant resolvido pela URL a cada request — impede um token de uma loja ser usado em outra.
 - `protectedProcedure`/`adminProcedure`/`managerOrAdminProcedure` (`server/_core/trpc.ts`) fazem o gate de permissão a partir de `ctx.user.role`/`actorType`/`sellerRole`.
 

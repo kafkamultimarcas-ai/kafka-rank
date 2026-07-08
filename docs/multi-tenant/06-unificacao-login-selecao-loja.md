@@ -1,5 +1,7 @@
 # Unificação de Login + Seleção de Loja
 
+> Status: documento histórico. Esta fase foi supersedida pelo login único global em `/login`, com resolução por e-mail e redirecionamento automático. As rotas `/t/:slug/login`, `/crm/admin/login` e afins hoje existem apenas como compatibilidade/redirecionamento.
+
 ## Análise
 
 Levantamento (via exploração direta do código, não amostragem) encontrou **5 telas de login funcionalmente independentes** no app, cada uma com seu próprio formulário de usuário/senha:

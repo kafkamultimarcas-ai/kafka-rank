@@ -354,8 +354,7 @@ async function main() {
     console.log(`Tenant ID: ${tenantId}`);
 
     logSection("URLs de teste");
-    console.log(`Login vendedor: http://localhost:3000/t/${DEMO.tenant.slug}/login`);
-    console.log(`Login CRM admin: http://localhost:3000/t/${DEMO.tenant.slug}/crm/admin/login`);
+    console.log("Login único: http://localhost:3000/login");
     console.log(`CRM admin: http://localhost:3000/t/${DEMO.tenant.slug}/crm/admin`);
     console.log(`Gerente: http://localhost:3000/t/${DEMO.tenant.slug}/gerente`);
 

@@ -151,41 +151,6 @@ export const appRouter = router({
       return { success: true };
     }),
 
-    // === LOGIN DE VENDEDOR POR SENHA ===
-    login: publicProcedure.input(z.object({
-      username: z.string().min(1),
-      password: z.string().min(1),
-    })).mutation(async ({ input, ctx }) => {
-      // SECURITY: Only match by exact username (no name/nickname fallback)
-      const seller = await db.getSellerByUsername(input.username);
-      if (!seller || !seller.active || !seller.passwordHash) {
-        throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
-      }
-      const valid = await bcrypt.compare(input.password, seller.passwordHash);
-      if (!valid) {
-        throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
-      }
-      // SECURITY: Verify seller.username matches input exactly (prevent any collation tricks)
-      if (!seller.username || seller.username.toLowerCase() !== input.username.toLowerCase()) {
-        console.warn(`[SECURITY] Login attempt with username '${input.username}' matched seller #${seller.id} with username '${seller.username}' - BLOCKED`);
-        throw new Error("Usu\u00e1rio ou senha inv\u00e1lidos");
-      }
-      // Atualizar lastAccess
-      await db.updateSellerLastAccess(seller.id);
-      // SECURITY: Clear any existing seller_session cookie before setting new one
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
-      // Gerar JWT e setar cookie com sellerId + username para dupla verificação
-      const token = jwt.sign(
-        { sellerId: seller.id, username: seller.username, tenantId: (seller as any).tenantId, tenantSlug: ctx.tenantSlug },
-        ENV.cookieSecret,
-        { expiresIn: "30d" }
-      );
-      ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      console.log(`[AUTH] Seller #${seller.id} (${seller.username}) logged in successfully`);
-      return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
-    }),
-
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
@@ -2698,30 +2663,6 @@ export const appRouter = router({
 
   // ===== MANAGERS (Gerentes com login por senha) =====
   managers: router({
-    // Login por senha - público
-    login: publicProcedure.input(z.object({
-      username: z.string().min(1),
-      password: z.string().min(1),
-    })).mutation(async ({ input, ctx }) => {
-      const manager = await db.getManagerByUsername(input.username);
-      if (!manager || !manager.active) {
-        throw new Error("Usuário ou senha inválidos");
-      }
-      const valid = await bcrypt.compare(input.password, manager.passwordHash);
-      if (!valid) {
-        throw new Error("Usuário ou senha inválidos");
-      }
-      // Gerar JWT e setar cookie
-      const token = jwt.sign(
-        { managerId: manager.id, username: manager.username, tenantId: (manager as any).tenantId, tenantSlug: ctx.tenantSlug },
-        ENV.cookieSecret,
-        { expiresIn: "30d" }
-      );
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.cookie("manager_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, name: manager.name };
-    }),
-
     // Logout gerente
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

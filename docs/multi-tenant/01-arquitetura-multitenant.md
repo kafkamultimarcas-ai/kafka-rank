@@ -22,10 +22,10 @@ Como uma única instância do Kafka Rank atende várias lojas (tenants) isoladas
 
 ## 2. Autenticação unificada (login único por loja)
 
-### 2.1. Um único formulário, três tipos de conta
-- `client/src/pages/SellerLogin.tsx`, rota `/t/:slug/login` — é o único formulário de login que uma loja usa. Não pergunta "você é admin, gerente ou vendedor" — só usuário e senha.
-- `server/routers/tenantAuthRouter.ts` (`tenantAuth.login`) tenta, nessa ordem, dentro do tenant resolvido: **admin → gerente → vendedor** (`crmDb.getAdminByUsername` → `db.getManagerByUsername` → `db.getSellerByUsername`), comparando a senha com `bcrypt.compare` em cada tentativa até achar uma que bata.
-- Cada tipo de conta emite seu próprio JWT (`admin_auth`, sessão de gerente, sessão de vendedor) e seu próprio redirect (`/crm/admin`, `/gerente`, `/minha-area/:id`, `/pos-venda`, `/financeiro` conforme o `department`/`sellerRole`).
+### 2.1. Um único formulário, múltiplos tipos de conta
+- `client/src/pages/UnifiedLogin.tsx`, rota `/login` — é o formulário humano principal do sistema. Não pergunta papel nem loja: recebe e-mail e senha.
+- `server/routers/tenantAuthRouter.ts` (`tenantAuth.loginByEmail`) resolve a identidade pelo e-mail e tenta autenticar na ordem **admin → gerente → vendedor**, com fallback separado para **super admin**.
+- Cada tipo de conta emite seu próprio JWT (`admin_auth`, sessão de gerente, sessão de vendedor, token de super admin) e seu próprio redirect (`/admin`, `/gerente`, `/minha-area/:id`, `/pos-venda`, `/financeiro`, `/super-admin` conforme o papel).
 
 ### 2.2. Sessões: cookie vs. localStorage
 - **Admin**: token JWT devolvido na resposta, guardado em `localStorage` (`crm_admin_token`) pelo frontend, mandado como Bearer/parâmetro em cada chamada.
@@ -55,7 +55,7 @@ Passo a passo do fluxo implementado:
 
 ### 2.5. Atualização — unificação de login e identidade do ator (leva de trabalho posterior)
 
-- A afirmação da seção 2.1 ("único formulário de login que uma loja usa") não era 100% verdade até uma leva de trabalho posterior: existiam mais 3 formulários de login independentes (em `AccessGate.tsx`, `CrmAdminLogin.tsx` sem slug, `ManagerLoginScreen`). Removidos e substituídos por um combobox pesquisável compartilhado — ver [documento 06](06-unificacao-login-selecao-loja.md).
+- A afirmação da seção 2.1 evoluiu de novo numa leva posterior: o login por slug foi supersedido por `/login`, com resolução da loja pelo e-mail. As rotas antigas com slug foram mantidas apenas como redirecionamento compatível.
 - O objeto de sessão (`ctx.user` em `server/_core/context.ts`) que representa admin/gerente/vendedor codificava o tipo do ator via sinal e offset numérico do `id` (ex: vendedor = `-(1000000 + seller.id)`). Isso escondia dois bugs reais (um deles neste próprio arquivo, em `resolveTenantId`). Substituído por um campo explícito `actorType` — ver [documento 08](08-refactor-identidade-actortype.md).
 
 ### 2.6. Roteamento e proteção de rotas novas (bug recorrente, cuidado ao adicionar rota)

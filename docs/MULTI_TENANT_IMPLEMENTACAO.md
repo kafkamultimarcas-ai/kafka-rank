@@ -63,16 +63,16 @@ Base já sólida no repositório antes de qualquer mudança descrita abaixo:
 
 Antes: três endpoints de login separados (`sellers.login`, `adminAuth.login`, `managers.login`), cada um com sua própria tela.
 
-Agora existe **um único ponto de entrada por loja**: `/t/:slug/login`, atendido pelo componente [client/src/pages/SellerLogin.tsx](../client/src/pages/SellerLogin.tsx), que chama a rota tRPC nova `tenantAuth.login` ([server/routers/tenantAuthRouter.ts](../server/routers/tenantAuthRouter.ts)).
+Hoje existe **um único ponto de entrada humano principal**: `/login`, atendido pelo componente [client/src/pages/UnifiedLogin.tsx](../client/src/pages/UnifiedLogin.tsx), que chama a rota tRPC `tenantAuth.loginByEmail` ([server/routers/tenantAuthRouter.ts](../server/routers/tenantAuthRouter.ts)).
 
 Como funciona:
-1. Exige que o tenant já tenha sido resolvido pela URL (`ctx.tenantSlug` e `ctx.tenantId` válidos) — se não, erro claro em vez de cair silenciosamente no tenant padrão.
-2. Tenta autenticar, dentro do tenant, na ordem **admin → manager → seller**.
+1. Resolve a identidade pelo e-mail e descobre automaticamente a loja e o papel do usuário.
+2. Tenta autenticar na ordem **admin → manager → seller**, com fallback separado para `super_admin`.
 3. Cada tipo mantém o mecanismo de sessão que já existia (Bearer token para admin, cookie `manager_session`, cookie `seller_session`) — decisão deliberada para não mexer nos middlewares de leitura desses tokens.
-4. Retorna `{ userType, role, department?, sellerRole?, mustChangePassword?, token?, redirectPath }`. O `redirectPath` já vem calculado no backend (`/crm/admin`, `/gerente`, `/financeiro`, `/pos-venda`, `/minha-area/:id`).
+4. Retorna `{ userType, role, department?, sellerRole?, mustChangePassword?, token?, redirectPath, tenantSlug }`. O `redirectPath` já vem calculado no backend (`/admin`, `/gerente`, `/financeiro`, `/pos-venda`, `/minha-area/:id`, `/super-admin`).
 5. Fluxo de primeiro acesso do admin (troca de senha obrigatória) preservado.
 
-As URLs diretas antigas (`/crm/admin/login` com auto-login do owner, etc.) continuam existindo em paralelo — não foram removidas.
+As URLs diretas antigas (`/t/:slug/login`, `/crm/admin/login`, `/admin/login`, etc.) continuam existindo só como compatibilidade e redirecionam para `/login`.
 
 ---
 
@@ -295,33 +295,33 @@ curl http://localhost:3000/health
 
 ### 4. Credenciais dos dois tenants de teste
 
-**`loja-demo`** (id 2) — `http://localhost:3000/t/loja-demo/login`
+**`loja-demo`** (id 2) — usar `http://localhost:3000/login`
 
 | Papel | Username | Senha |
 |---|---|---|
-| Admin CRM | `admin-lojademo` | `senha123` |
-| Manager (tabela managers) | `gerente-lojademo` | `senha123` |
-| Vendedor | `vendedor-lojademo` | `senha123` |
-| Vendedor (role gerente) | `gerente-seller-lojademo` | `senha123` |
-| Financeiro | `financeiro-lojademo` | `senha123` |
-| Pós-venda | `posvenda-lojademo` | `senha123` |
-| Super Admin (global, não é do tenant) | `superadmin` | `senha123` |
+| Admin CRM | `admin@loja-demo.local` | `senha123` |
+| Manager (tabela managers) | `gerente@loja-demo.local` | `senha123` |
+| Vendedor | `vendedor@loja-demo.local` | `senha123` |
+| Vendedor (role gerente) | `gerente-painel@loja-demo.local` | `senha123` |
+| Financeiro | `financeiro@loja-demo.local` | `senha123` |
+| Pós-venda | `posvenda@loja-demo.local` | `senha123` |
+| Super Admin (global, não é do tenant) | `super@local.test` | `senha123` |
 
-**`auto-veloz`** (id independente, gerado no seed) — `http://localhost:3000/t/auto-veloz/login`
+**`auto-veloz`** (id independente, gerado no seed) — usar `http://localhost:3000/login`
 
 | Papel | Username | Senha |
 |---|---|---|
-| Admin CRM | `admin-autoveloz` | `senha123` |
-| Manager (tabela managers) | `gerente-autoveloz` | `senha123` |
-| Vendedor | `vendedor-autoveloz` | `senha123` |
-| Vendedor (role gerente) | `gerente-seller-autoveloz` | `senha123` |
+| Admin CRM | `admin@auto-veloz.local` | `senha123` |
+| Manager (tabela managers) | `gerente@auto-veloz.local` | `senha123` |
+| Vendedor | `vendedor@auto-veloz.local` | `senha123` |
+| Vendedor (role gerente) | `gerente-painel@auto-veloz.local` | `senha123` |
 
-Login único: qualquer uma das credenciais de uma loja autentica na URL `/t/<slug>/login` dessa loja e redireciona para a área certa automaticamente conforme o papel.
+Login único: qualquer uma das credenciais autentica em `/login` e redireciona para a área certa automaticamente conforme o papel e a loja.
 
 ### 5. Roteiro de teste manual — golden path
 
-1. Logar como `admin-lojademo` em `/t/loja-demo/login` → confirmar que cai no CRM admin da loja-demo, com nome/cor/logo da loja-demo no header.
-2. Em outra aba (ou anônima), logar como `admin-autoveloz` em `/t/auto-veloz/login` → confirmar branding diferente (cor azul da auto-veloz) e que os dados (leads, pipeline, vendedores) são completamente distintos dos da loja-demo.
+1. Logar como `admin@loja-demo.local` em `/login` → confirmar que cai no menu `/t/loja-demo/admin`, com nome/cor/logo da loja-demo no header.
+2. Em outra aba (ou anônima), logar como `admin@auto-veloz.local` em `/login` → confirmar branding diferente (cor azul da auto-veloz) e que os dados (leads, pipeline, vendedores) são completamente distintos dos da loja-demo.
 3. Criar um lead/tarefa de marketing/venda em cada loja e confirmar que **não aparece** na outra loja ao atualizar a listagem.
 4. Copiar o token/cookie de sessão de um admin de uma loja e tentar usá-lo manualmente contra a URL `/t/<outra-loja>/...` (via DevTools ou trocando o cookie) → deve ser rejeitado (`TENANT_MISMATCH` no log do servidor).
 5. Testar login de vendedor, gerente e financeiro de cada loja, confirmando que o menu/permissões batem com o papel retornado no login.
@@ -500,7 +500,7 @@ Em ordem de impacto:
 
 ## Fase N — Bug crítico: login de vendedor/gerente "funcionava" mas a sessão nunca ficava logada
 
-Reportado pelo usuário testando o login único em `/t/loja-demo/login`: `admin-lojademo` funcionava normalmente, mas `vendedor-lojademo` caía em "Você precisa fazer login para acessar esta área" logo após logar com sucesso, e `gerente-seller-lojademo` caía em "Acesso Restrito — Esta área é exclusiva para gerentes".
+Reportado pelo usuário na fase em que o login humano ainda passava por `/t/loja-demo/login`: `admin-lojademo` funcionava normalmente, mas `vendedor-lojademo` caía em "Você precisa fazer login para acessar esta área" logo após logar com sucesso, e `gerente-seller-lojademo` caía em "Acesso Restrito — Esta área é exclusiva para gerentes".
 
 ### Causa raiz
 [server/_core/cookies.ts](../server/_core/cookies.ts) — `getSessionCookieOptions` sempre retornava `sameSite: "none"`, mas só marcava `secure: true` quando a request já era HTTPS. Em desenvolvimento local (`http://localhost:3000`), isso gera um cookie `Set-Cookie: ...; SameSite=None` **sem** `Secure` — combinação inválida pela especificação, que todo navegador moderno (Chrome, Firefox, Safari) descarta silenciosamente. O login em si funcionava (a resposta HTTP vinha 200 com os dados certos), mas o cookie `seller_session`/`manager_session` nunca era de fato armazenado pelo navegador, então a primeira requisição seguinte já chegava sem sessão.
@@ -557,7 +557,7 @@ Até esta fase, a única forma de nascer uma loja nova era o Super Admin logar e
 
 ### Frontend
 - **`client/src/lib/tenantForm.ts`** (novo) — `slugify`, `formatPhone`, `normalizeUsername`, `isValidEmail`, `getAvailabilityMessage` extraídos de dentro de `SuperAdmin.tsx` (onde viviam como funções locais) pra um módulo compartilhado. `SuperAdmin.tsx` e o novo formulário público importam do mesmo lugar — mesma normalização de slug/username nos dois formulários.
-- **`client/src/pages/public/ComercialHome.tsx`** (novo, rota `/comercial`) — landing single-page: hero, seção de recursos, **Planos e Preços** (Trial grátis com CTA de cadastro; Basic/Pro/Enterprise com CTA "Falar com vendas" via WhatsApp, sem checkout de verdade — não existe billing implementado), **Quem Somos** (texto institucional — rascunho editável, sem alegações factuais reais sobre a empresa, precisa de revisão humana antes de ir pro ar), botão "Entrar" que abre um campo pra digitar o slug da loja e redireciona pra `/t/:slug/login` (não existe uma tela de login única global, cada loja tem a sua), e footer.
+- **`client/src/pages/public/ComercialHome.tsx`** (novo, rota `/comercial`) — landing single-page: hero, seção de recursos, **Planos e Preços** (Trial grátis com CTA de cadastro; Basic/Pro/Enterprise com CTA "Falar com vendas" via WhatsApp, sem checkout de verdade — não existe billing implementado), **Quem Somos** (texto institucional — rascunho editável, sem alegações factuais reais sobre a empresa, precisa de revisão humana antes de ir pro ar), botão "Entrar" que leva para `/login`, e footer.
 - **`client/src/pages/public/ComercialCadastro.tsx`** (novo, rota `/comercial/cadastro`) — formulário de duas seções (dados da loja + dados do admin), mesmos campos e mesma checagem de disponibilidade em tempo real do `CreateTenantModal` do Super Admin, sem seletor de plano (sempre trial). Campo honeypot escondido via CSS (não via JS, pra pegar bots simples que não executam JS) e checkbox obrigatório de aceite de termos. No sucesso, salva o token em `localStorage` (mesma chave `crm_admin_token` que `SellerLogin.tsx` usa) e redireciona direto pro painel administrativo da loja recém-criada — sem passo de login manual.
 - Rotas registradas em `client/src/App.tsx` (lazy-loaded, mesmo padrão das demais páginas).
 

@@ -6,12 +6,11 @@ import { trpc } from "@/lib/trpc";
 import { ArrowLeft, CheckCircle2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
-import { getTenantLoginPath } from "@/lib/tenant";
 
 export default function RedefinirSenha() {
   const [, navigate] = useLocation();
   const search = useSearch();
-  const { tenant, tenantSlug } = useTenant();
+  const { tenant } = useTenant();
   const token = new URLSearchParams(search).get("token") || "";
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,7 +45,7 @@ export default function RedefinirSenha() {
             Esse link de redefinição de senha está incompleto. Solicite um novo.
           </p>
           <button
-            onClick={() => navigate(getTenantLoginPath(tenantSlug))}
+            onClick={() => navigate("/login")}
             className="mt-4 text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1 mx-auto"
           >
             <ArrowLeft className="w-3 h-3" /> Voltar ao login
@@ -73,7 +72,7 @@ export default function RedefinirSenha() {
               <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
               <p className="text-sm text-gray-300 mb-4">Sua senha foi redefinida. Já pode entrar com a nova senha.</p>
               <Button
-                onClick={() => navigate(getTenantLoginPath(tenantSlug))}
+                onClick={() => navigate("/login")}
                 className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold py-3 text-base uppercase tracking-wider"
               >
                 Ir para o login
@@ -126,7 +125,7 @@ export default function RedefinirSenha() {
           {!done && (
             <div className="mt-4 text-center">
               <button
-                onClick={() => navigate(getTenantLoginPath(tenantSlug))}
+                onClick={() => navigate("/login")}
                 className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-1 mx-auto"
               >
                 <ArrowLeft className="w-3 h-3" /> Voltar ao login

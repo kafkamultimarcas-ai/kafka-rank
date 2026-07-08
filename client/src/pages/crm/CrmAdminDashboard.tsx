@@ -23,7 +23,7 @@ import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
 import AssinaturaContent from "@/components/billing/AssinaturaContent";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { useBranding } from "@/contexts/TenantContext";
-import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
+import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -78,7 +78,7 @@ export default function CrmAdminDashboard() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      const loginPath = getTenantLoginPath(tenantSlug);
+      const loginPath = "/login";
       if (window.location.pathname !== loginPath) {
         navigate(loginPath, { replace: true });
       }
@@ -142,13 +142,10 @@ export default function CrmAdminDashboard() {
     }
 
     const basePath = buildTenantPath(tenantSlug, "/crm/admin");
-    if (view === "assinatura") {
-      navigate(`${basePath}?view=assinatura`, { replace: true });
-      return;
-    }
-
-    if (location !== basePath) {
-      navigate(basePath, { replace: true });
+    const target = view === "assinatura" ? `${basePath}?view=assinatura` : basePath;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (currentUrl !== target) {
+      navigate(target, { replace: true });
     }
   };
 

@@ -2,7 +2,7 @@
 
 ## Resumo executivo
 
-O projeto já tem uma base multitenant funcional e testável localmente. O fluxo principal por loja já existe, com login unificado em `/t/:slug/login`, contexto de tenant no backend, isolamento de sessão, webhooks tenant-aware, storage com prefixo por tenant, limites de plano e portal separado de Super Admin.
+O projeto já tem uma base multitenant funcional e testável localmente. O fluxo principal já existe, com login unificado em `/login`, contexto de tenant no backend, isolamento de sessão, webhooks tenant-aware, storage com prefixo por tenant, limites de plano e portal separado de Super Admin.
 
 Hoje o status é adequado para:
 
@@ -30,7 +30,7 @@ Essa diferença existe porque o núcleo multitenant está bom, mas ainda há pen
 
 ### Autenticação
 
-1. Login humano oficial por loja em `/t/:slug/login`
+1. Login humano oficial em `/login`
 2. Retorno padronizado com papel, permissões e redirect
 3. Separação do portal `/super-admin`
 4. Validação de coerência entre sessão e tenant da URL
@@ -119,7 +119,7 @@ A leitura mais honesta hoje é:
 
 O fluxo que deve ser tratado como oficial na validação é:
 
-- loja acessa `http://localhost:3000/t/:slug/login`
+- loja acessa `http://localhost:3000/login`
 - plataforma acessa `http://localhost:3000/super-admin`
 
 ## Passo a passo curto para QA local
@@ -136,8 +136,8 @@ pnpm dev
 Depois:
 
 1. teste `http://localhost:3000/super-admin`
-2. teste `http://localhost:3000/t/loja-demo/login`
-3. teste `http://localhost:3000/t/auto-veloz/login`
+2. teste `http://localhost:3000/login`
+3. valide os usuários de `loja-demo` e `auto-veloz` nesse mesmo `/login`
 4. valide redirecionamentos por papel
 5. valide isolamento cruzado entre as duas lojas
 
@@ -149,17 +149,19 @@ Todos os usuários criados pelos seeds locais usam a mesma senha:
 
 ## Depois disso, use senha123 para todos os usuários seedados, inclusive:
 
-- superadmin
-
-- admin-lojademo
-- gerente-lojademo
-- vendedor-lojademo
-- financeiro-lojademo
-- posvenda-lojademo
-
-- admin-autoveloz
-- gerente-autoveloz
-- vendedor-autoveloz
+- super@local.test
+- admin@kafka-multimarcas.local
+- admin@loja-demo.local
+- gerente@loja-demo.local
+- vendedor@loja-demo.local
+- gerente-painel@loja-demo.local
+- financeiro@loja-demo.local
+- posvenda@loja-demo.local
+- admin@auto-veloz.local
+- gerente@auto-veloz.local
+- vendedor@auto-veloz.local
+- gerente-painel@auto-veloz.local
+- pedrofelipe@loja-sp.local
 
 Após alterar isso, rode novamente:
 

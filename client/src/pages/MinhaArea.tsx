@@ -138,7 +138,7 @@ export default function MinhaArea() {
   const sellerId = parseInt(params.sellerId || "0");
   const { name: tenantName } = useBranding();
 
-  const { data: sellerSession } = trpc.sellers.me.useQuery();
+  const { data: sellerSession, isLoading: sellerSessionLoading } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: unreadCount } = trpc.notifications.unreadCountSeller.useQuery({ sellerId }, { enabled: sellerId > 0 });
   const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications(sellerId);
@@ -464,12 +464,20 @@ export default function MinhaArea() {
   // Verificar se o vendedor logado é o mesmo do URL (gerente pode ver a área de qualquer vendedor, igual já é permitido no backend)
   const isAuthorized = !!sellerSession && (sellerSession.id === sellerId || sellerSession.sellerRole === "gerente");
 
+  if (sellerSessionLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="text-gray-400 animate-pulse">Carregando...</div>
+      </div>
+    );
+  }
+
   if (!sellerSession) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-gray-400 mb-4">Você precisa fazer login para acessar esta área.</p>
-          <Button onClick={() => window.location.href = buildTenantPath(tenantSlug, "/")} className="bg-red-600 hover:bg-red-500">
+          <Button onClick={() => { window.location.href = "/login"; }} className="bg-red-600 hover:bg-red-500">
             Fazer Login
           </Button>
         </div>

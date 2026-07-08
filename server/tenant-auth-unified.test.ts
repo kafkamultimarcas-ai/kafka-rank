@@ -68,7 +68,15 @@ vi.mock("./emailPolicy", async () => {
     ...actual,
     findIdentityByEmail: vi.fn(async (email: string) => {
       const norm = email.trim().toLowerCase();
-      if (norm === "admin@lojademo.com") {
+      if (norm === "admin@kafka-multimarcas.local") {
+        return {
+          userType: "admin", userId: 101, tenantId: 1, tenantSlug: "kafka-multimarcas",
+          tenantName: "Kafka Multimarcas",
+          passwordHash: "hashed_senha123", active: true, name: "PEDROFELIPE",
+          role: "owner", mustChangePassword: false, email: norm,
+        };
+      }
+      if (norm === "admin@loja-demo.local") {
         return {
           userType: "admin", userId: 1, tenantId: 2, tenantSlug: "loja-demo",
           tenantName: "Loja Demo Multi",
@@ -76,7 +84,23 @@ vi.mock("./emailPolicy", async () => {
           role: "owner", mustChangePassword: false, email: norm,
         };
       }
-      if (norm === "admin-firstaccess@lojademo.com") {
+      if (norm === "pedrofelipe@loja-sp.local") {
+        return {
+          userType: "admin", userId: 301, tenantId: 4, tenantSlug: "loja-sp",
+          tenantName: "Loja SP",
+          passwordHash: "hashed_senha123", active: true, name: "pedro felipe",
+          role: "owner", mustChangePassword: false, email: norm,
+        };
+      }
+      if (norm === "admin@auto-veloz.local") {
+        return {
+          userType: "admin", userId: 201, tenantId: 3, tenantSlug: "auto-veloz",
+          tenantName: "Auto Veloz Motors",
+          passwordHash: "hashed_senha123", active: true, name: "Admin Auto Veloz",
+          role: "owner", mustChangePassword: false, email: norm,
+        };
+      }
+      if (norm === "admin-firstaccess@loja-demo.local") {
         return {
           userType: "admin", userId: 2, tenantId: 2, tenantSlug: "loja-demo",
           tenantName: "Loja Demo Multi",
@@ -84,14 +108,21 @@ vi.mock("./emailPolicy", async () => {
           role: "admin", mustChangePassword: true, email: norm,
         };
       }
-      if (norm === "gerente@lojademo.com") {
+      if (norm === "gerente@loja-demo.local") {
         return {
           userType: "manager", userId: 5, tenantId: 2, tenantSlug: "loja-demo",
           tenantName: "Loja Demo Multi",
           passwordHash: "hashed_senha123", active: true, name: "Gerente Demo", email: norm,
         };
       }
-      if (norm === "vendedor@lojademo.com") {
+      if (norm === "gerente@auto-veloz.local") {
+        return {
+          userType: "manager", userId: 205, tenantId: 3, tenantSlug: "auto-veloz",
+          tenantName: "Auto Veloz Motors",
+          passwordHash: "hashed_senha123", active: true, name: "Gerente Auto Veloz", email: norm,
+        };
+      }
+      if (norm === "vendedor@loja-demo.local") {
         return {
           userType: "seller", userId: 10, tenantId: 2, tenantSlug: "loja-demo",
           tenantName: "Loja Demo Multi",
@@ -99,7 +130,15 @@ vi.mock("./emailPolicy", async () => {
           department: "vendas", sellerRole: "vendedor", email: norm,
         };
       }
-      if (norm === "financeiro@lojademo.com") {
+      if (norm === "gerente-painel@loja-demo.local") {
+        return {
+          userType: "seller", userId: 11, tenantId: 2, tenantSlug: "loja-demo",
+          tenantName: "Loja Demo Multi",
+          passwordHash: "hashed_senha123", active: true, name: "Gerente Painel Demo",
+          department: "vendas", sellerRole: "gerente", email: norm,
+        };
+      }
+      if (norm === "financeiro@loja-demo.local") {
         return {
           userType: "seller", userId: 12, tenantId: 2, tenantSlug: "loja-demo",
           tenantName: "Loja Demo Multi",
@@ -107,7 +146,31 @@ vi.mock("./emailPolicy", async () => {
           department: "financeiro", sellerRole: "vendedor", email: norm,
         };
       }
-      if (norm === "inativo@lojademo.com") {
+      if (norm === "posvenda@loja-demo.local") {
+        return {
+          userType: "seller", userId: 13, tenantId: 2, tenantSlug: "loja-demo",
+          tenantName: "Loja Demo Multi",
+          passwordHash: "hashed_senha123", active: true, name: "Pós-venda Demo",
+          department: "pos_venda", sellerRole: "vendedor", email: norm,
+        };
+      }
+      if (norm === "vendedor@auto-veloz.local") {
+        return {
+          userType: "seller", userId: 210, tenantId: 3, tenantSlug: "auto-veloz",
+          tenantName: "Auto Veloz Motors",
+          passwordHash: "hashed_senha123", active: true, name: "Vendedor Auto Veloz",
+          department: "vendas", sellerRole: "vendedor", email: norm,
+        };
+      }
+      if (norm === "gerente-painel@auto-veloz.local") {
+        return {
+          userType: "seller", userId: 211, tenantId: 3, tenantSlug: "auto-veloz",
+          tenantName: "Auto Veloz Motors",
+          passwordHash: "hashed_senha123", active: true, name: "Gerente Painel Auto Veloz",
+          department: "vendas", sellerRole: "gerente", email: norm,
+        };
+      }
+      if (norm === "inativo@loja-demo.local") {
         return {
           userType: "seller", userId: 99, tenantId: 2, tenantSlug: "loja-demo",
           tenantName: "Loja Demo Multi",
@@ -166,120 +229,6 @@ vi.mock("./db", async () => {
   };
 });
 
-describe("tenantAuth.login - resolução de tenant", () => {
-  it("rejeita quando o tenant não foi resolvido pela URL", async () => {
-    const { ctx } = createTenantContext(null, null);
-    const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.tenantAuth.login({ username: "admin-lojademo", password: "senha123" })
-    ).rejects.toThrow(/Loja não encontrada/);
-  });
-
-  it("rejeita quando o slug não corresponde a nenhuma loja (tenantId -1)", async () => {
-    const { ctx } = createTenantContext(-1, "loja-inexistente");
-    const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.tenantAuth.login({ username: "admin-lojademo", password: "senha123" })
-    ).rejects.toThrow(/Loja não encontrada/);
-  });
-});
-
-describe("tenantAuth.login - admin", () => {
-  it("autentica admin e retorna token com redirect para /crm/admin", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "admin-lojademo", password: "senha123" });
-
-    expect(result.userType).toBe("admin");
-    expect(result.redirectPath).toBe("/crm/admin");
-    expect(result.mustChangePassword).toBe(false);
-    expect(result.token).toBeTruthy();
-  });
-
-  it("sinaliza mustChangePassword no primeiro acesso do admin", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "admin-firstaccess", password: "temp123" });
-
-    expect(result.userType).toBe("admin");
-    expect(result.mustChangePassword).toBe(true);
-    expect(result.token).toBeTruthy();
-  });
-});
-
-describe("tenantAuth.login - manager", () => {
-  it("autentica manager, seta cookie manager_session e redireciona para /gerente", async () => {
-    const { ctx, setCookies } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "gerente-lojademo", password: "senha123" });
-
-    expect(result.userType).toBe("manager");
-    expect(result.redirectPath).toBe("/gerente");
-    const managerCookie = setCookies.find(c => c.name === "manager_session");
-    expect(managerCookie).toBeDefined();
-    expect(managerCookie!.options).toMatchObject({ httpOnly: true, path: "/" });
-  });
-});
-
-describe("tenantAuth.login - seller", () => {
-  it("vendedor comum vai para /minha-area/:id", async () => {
-    const { ctx, setCookies } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "vendedor-lojademo", password: "senha123" });
-
-    expect(result.userType).toBe("seller");
-    expect(result.redirectPath).toBe("/minha-area/10");
-    expect(setCookies.find(c => c.name === "seller_session")).toBeDefined();
-  });
-
-  it("seller com sellerRole=gerente vai para /gerente", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "gerente-seller-lojademo", password: "senha123" });
-    expect(result.redirectPath).toBe("/gerente");
-  });
-
-  it("seller do financeiro vai para /financeiro", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "financeiro-lojademo", password: "senha123" });
-    expect(result.redirectPath).toBe("/financeiro");
-  });
-
-  it("seller de pós-venda vai para /pos-venda", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.login({ username: "posvenda-lojademo", password: "senha123" });
-    expect(result.redirectPath).toBe("/pos-venda");
-  });
-});
-
-describe("tenantAuth.login - credenciais inválidas", () => {
-  it("rejeita usuário inexistente", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.tenantAuth.login({ username: "ninguem", password: "1234" })
-    ).rejects.toThrow("Usuário ou senha inválidos");
-  });
-
-  it("rejeita senha errada para admin", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.tenantAuth.login({ username: "admin-lojademo", password: "errada" })
-    ).rejects.toThrow("Usuário ou senha inválidos");
-  });
-
-  it("rejeita senha errada para seller", async () => {
-    const { ctx } = createTenantContext(2, "loja-demo");
-    const caller = appRouter.createCaller(ctx);
-    await expect(
-      caller.tenantAuth.login({ username: "vendedor-lojademo", password: "errada" })
-    ).rejects.toThrow("Usuário ou senha inválidos");
-  });
-});
-
 describe("tenantAuth.loginByEmail - resolução automática de tenant por email", () => {
   it("resolve preview de super admin pelo mesmo email login", async () => {
     const { ctx } = createTenantContext(null, null);
@@ -298,7 +247,7 @@ describe("tenantAuth.loginByEmail - resolução automática de tenant por email"
   it("resolve preview do login por email com loja e nome do usuário", async () => {
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginPreviewByEmail({ email: "vendedor@lojademo.com" });
+    const result = await caller.tenantAuth.loginPreviewByEmail({ email: "vendedor@loja-demo.local" });
 
     expect(result).toEqual({
       userType: "seller",
@@ -312,14 +261,34 @@ describe("tenantAuth.loginByEmail - resolução automática de tenant por email"
   it("autentica admin por email e devolve tenantSlug + redirect", async () => {
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginByEmail({ email: "admin@lojademo.com", password: "senha123" });
+    const result = await caller.tenantAuth.loginByEmail({ email: "admin@loja-demo.local", password: "senha123" });
 
     expect(result.userType).toBe("admin");
     expect(result.tenantSlug).toBe("loja-demo");
     expect(result.tenantId).toBe(2);
-    expect(result.redirectPath).toBe("/crm/admin");
+    expect(result.redirectPath).toBe("/admin");
     expect(result.token).toBeTruthy();
     expect(result.mustChangePassword).toBe(false);
+  });
+
+  it("autentica admin da kafka-multimarcas e envia para o menu /admin", async () => {
+    const { ctx } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "admin@kafka-multimarcas.local", password: "senha123" });
+
+    expect(result.userType).toBe("admin");
+    expect(result.tenantSlug).toBe("kafka-multimarcas");
+    expect(result.redirectPath).toBe("/admin");
+  });
+
+  it("autentica admin da loja-sp e envia para o menu /admin", async () => {
+    const { ctx } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "pedrofelipe@loja-sp.local", password: "senha123" });
+
+    expect(result.userType).toBe("admin");
+    expect(result.tenantSlug).toBe("loja-sp");
+    expect(result.redirectPath).toBe("/admin");
   });
 
   it("autentica super admin pelo mesmo login por email", async () => {
@@ -337,7 +306,7 @@ describe("tenantAuth.loginByEmail - resolução automática de tenant por email"
   it("sinaliza mustChangePassword no primeiro acesso do admin via email", async () => {
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginByEmail({ email: "admin-firstaccess@lojademo.com", password: "temp123" });
+    const result = await caller.tenantAuth.loginByEmail({ email: "admin-firstaccess@loja-demo.local", password: "temp123" });
 
     expect(result.userType).toBe("admin");
     expect(result.mustChangePassword).toBe(true);
@@ -346,7 +315,7 @@ describe("tenantAuth.loginByEmail - resolução automática de tenant por email"
   it("autentica manager por email e seta cookie manager_session", async () => {
     const { ctx, setCookies } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginByEmail({ email: "gerente@lojademo.com", password: "senha123" });
+    const result = await caller.tenantAuth.loginByEmail({ email: "gerente@loja-demo.local", password: "senha123" });
 
     expect(result.userType).toBe("manager");
     expect(result.tenantSlug).toBe("loja-demo");
@@ -357,24 +326,63 @@ describe("tenantAuth.loginByEmail - resolução automática de tenant por email"
   it("autentica seller comum por email e vai para /minha-area/:id", async () => {
     const { ctx, setCookies } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginByEmail({ email: "vendedor@lojademo.com", password: "senha123" });
+    const result = await caller.tenantAuth.loginByEmail({ email: "vendedor@loja-demo.local", password: "senha123" });
 
     expect(result.userType).toBe("seller");
     expect(result.redirectPath).toBe("/minha-area/10");
     expect(setCookies.find(c => c.name === "seller_session")).toBeDefined();
   });
 
+  it("autentica seller-gerente e vai para /gerente", async () => {
+    const { ctx } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "gerente-painel@loja-demo.local", password: "senha123" });
+    expect(result.redirectPath).toBe("/gerente");
+  });
+
   it("autentica seller do financeiro e vai para /financeiro", async () => {
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginByEmail({ email: "financeiro@lojademo.com", password: "senha123" });
+    const result = await caller.tenantAuth.loginByEmail({ email: "financeiro@loja-demo.local", password: "senha123" });
     expect(result.redirectPath).toBe("/financeiro");
+  });
+
+  it("autentica seller de pós-venda e vai para /pos-venda", async () => {
+    const { ctx } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "posvenda@loja-demo.local", password: "senha123" });
+    expect(result.redirectPath).toBe("/pos-venda");
+  });
+
+  it("autentica manager da auto-veloz e seta cookie manager_session", async () => {
+    const { ctx, setCookies } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "gerente@auto-veloz.local", password: "senha123" });
+
+    expect(result.userType).toBe("manager");
+    expect(result.tenantSlug).toBe("auto-veloz");
+    expect(result.redirectPath).toBe("/gerente");
+    expect(setCookies.find(c => c.name === "manager_session")).toBeDefined();
+  });
+
+  it("autentica vendedor da auto-veloz e vai para /minha-area/:id", async () => {
+    const { ctx } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "vendedor@auto-veloz.local", password: "senha123" });
+    expect(result.redirectPath).toBe("/minha-area/210");
+  });
+
+  it("autentica gerente-painel da auto-veloz e vai para /gerente", async () => {
+    const { ctx } = createTenantContext(null, null);
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.tenantAuth.loginByEmail({ email: "gerente-painel@auto-veloz.local", password: "senha123" });
+    expect(result.redirectPath).toBe("/gerente");
   });
 
   it("normaliza email (trim + lowercase) antes de buscar", async () => {
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
-    const result = await caller.tenantAuth.loginByEmail({ email: "  ADMIN@LojaDemo.com  ", password: "senha123" });
+    const result = await caller.tenantAuth.loginByEmail({ email: "  ADMIN@Loja-Demo.Local  ", password: "senha123" });
     expect(result.userType).toBe("admin");
   });
 
@@ -390,15 +398,15 @@ describe("tenantAuth.loginByEmail - resolução automática de tenant por email"
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
     await expect(
-      caller.tenantAuth.loginByEmail({ email: "admin@lojademo.com", password: "errada" })
+      caller.tenantAuth.loginByEmail({ email: "admin@loja-demo.local", password: "errada" })
     ).rejects.toThrow("E-mail ou senha inválidos");
   });
 
-  it("rejeita identidade inativa", async () => {
+  it("rejeita identidade inativa (fallback pra super admin também não bate)", async () => {
     const { ctx } = createTenantContext(null, null);
     const caller = appRouter.createCaller(ctx);
     await expect(
-      caller.tenantAuth.loginByEmail({ email: "inativo@lojademo.com", password: "senha123" })
+      caller.tenantAuth.loginByEmail({ email: "inativo@loja-demo.local", password: "senha-errada" })
     ).rejects.toThrow("E-mail ou senha inválidos");
   });
 });

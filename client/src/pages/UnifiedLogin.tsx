@@ -14,6 +14,7 @@ type LoginStep = "credentials" | "change_password";
 
 export default function UnifiedLogin() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("credentials");
@@ -40,11 +41,11 @@ export default function UnifiedLogin() {
   );
 
   const loginMutation = trpc.tenantAuth.loginByEmail.useMutation({
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (data.userType === "super_admin") {
         localStorage.setItem(SUPER_ADMIN_TOKEN_KEY, data.token || "");
         toast.success(`Bem-vindo, ${data.name}!`);
-        navigate(data.redirectPath);
+        window.location.href = data.redirectPath;
         return;
       }
 
@@ -56,11 +57,12 @@ export default function UnifiedLogin() {
         return;
       }
 
-      toast.success(`Bem-vindo, ${data.name}!`);
       if (data.userType === "admin") {
         localStorage.setItem(ADMIN_TOKEN_KEY, data.token || "");
       }
-      navigate(`/t/${data.tenantSlug}${data.redirectPath}`);
+
+      toast.success(`Bem-vindo, ${data.name}!`);
+      window.location.href = `/t/${data.tenantSlug}${data.redirectPath}`;
     },
     onError: (err) => {
       toast.error(err.message || "E-mail ou senha inválidos");
@@ -71,7 +73,7 @@ export default function UnifiedLogin() {
     onSuccess: () => {
       localStorage.setItem(ADMIN_TOKEN_KEY, pendingAdminToken);
       toast.success("Senha alterada com sucesso!");
-      navigate(`/t/${pendingSlug}/crm/admin`);
+      window.location.href = `/t/${pendingSlug}/admin`;
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao alterar senha");

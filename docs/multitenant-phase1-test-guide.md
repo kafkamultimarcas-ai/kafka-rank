@@ -46,7 +46,7 @@ pnpm seed:second-tenant
 
 Esses seeds são idempotentes. Eles criam ou atualizam:
 
-- `superadmin`
+- o super admin global (`super@local.test`, username interno `superadmin`)
 - tenant `loja-demo`
 - tenant `auto-veloz`
 - usuários de admin, gerente e vendedores para validação cruzada
@@ -60,9 +60,10 @@ pnpm dev
 ## 7. URLs principais
 
 ```text
+http://localhost:3000/login
 http://localhost:3000/super-admin
-http://localhost:3000/t/loja-demo/login
-http://localhost:3000/t/auto-veloz/login
+http://localhost:3000/t/loja-demo/admin
+http://localhost:3000/t/auto-veloz/admin
 http://localhost:3000/t/loja-demo/crm/admin
 http://localhost:3000/t/auto-veloz/crm/admin
 ```
@@ -71,42 +72,43 @@ http://localhost:3000/t/auto-veloz/crm/admin
 
 ### Plataforma
 
-- Super Admin: `superadmin` / `senha123`
+- Super Admin: `super@local.test` / `senha123`
 
 ### Loja Demo
 
-- CRM admin: `admin-lojademo` / `senha123`
-- Vendedor vendas: `vendedor-lojademo` / `senha123`
-- Vendedor gerente: `gerente-seller-lojademo` / `senha123`
-- Vendedor financeiro: `financeiro-lojademo` / `senha123`
-- Vendedor pós-venda: `posvenda-lojademo` / `senha123`
-- Gerente tabela `managers`: `gerente-lojademo` / `senha123`
+- Admin: `admin@loja-demo.local` / `senha123`
+- Manager: `gerente@loja-demo.local` / `senha123`
+- Vendedor vendas: `vendedor@loja-demo.local` / `senha123`
+- Seller com papel gerente: `gerente-painel@loja-demo.local` / `senha123`
+- Financeiro: `financeiro@loja-demo.local` / `senha123`
+- Pós-venda: `posvenda@loja-demo.local` / `senha123`
 
 ### Auto Veloz
 
-- CRM admin: `admin-autoveloz` / `senha123`
-- Vendedor vendas: `vendedor-autoveloz` / `senha123`
-- Vendedor gerente: `gerente-seller-autoveloz` / `senha123`
-- Gerente tabela `managers`: `gerente-autoveloz` / `senha123`
+- Admin: `admin@auto-veloz.local` / `senha123`
+- Manager: `gerente@auto-veloz.local` / `senha123`
+- Vendedor vendas: `vendedor@auto-veloz.local` / `senha123`
+- Seller com papel gerente: `gerente-painel@auto-veloz.local` / `senha123`
 
 ## 9. Roteiro de teste manual
 
-### Login humano oficial por loja
+### Login humano oficial
 
-1. Abra `http://localhost:3000/t/loja-demo/login`
-2. Entre com `admin-lojademo` / `senha123`
+1. Abra `http://localhost:3000/login`
+2. Entre com `admin@loja-demo.local` / `senha123`
 3. Confirme redirecionamento para a área da loja
-4. Repita em `http://localhost:3000/t/auto-veloz/login`
+4. Faça logout e repita com `admin@auto-veloz.local` / `senha123`
 5. Confirme que branding, sessão e navegação pertencem à loja correta
 
 ### Redirecionamento por papel
 
-Teste em `http://localhost:3000/t/loja-demo/login`:
+Teste em `http://localhost:3000/login`:
 
-- `vendedor-lojademo` / `senha123` deve ir para `/t/loja-demo/minha-area/:sellerId`
-- `gerente-seller-lojademo` / `senha123` deve ir para `/t/loja-demo/gerente`
-- `financeiro-lojademo` / `senha123` deve ir para `/t/loja-demo/financeiro`
-- `posvenda-lojademo` / `senha123` deve ir para `/t/loja-demo/pos-venda`
+- `vendedor@loja-demo.local` / `senha123` deve ir para `/t/loja-demo/minha-area/:sellerId`
+- `gerente-painel@loja-demo.local` / `senha123` deve ir para `/t/loja-demo/gerente`
+- `financeiro@loja-demo.local` / `senha123` deve ir para `/t/loja-demo/financeiro`
+- `posvenda@loja-demo.local` / `senha123` deve ir para `/t/loja-demo/pos-venda`
+- `gerente@loja-demo.local` / `senha123` deve ir para `/t/loja-demo/gerente`
 
 ### Isolamento entre lojas
 
@@ -117,8 +119,8 @@ Teste em `http://localhost:3000/t/loja-demo/login`:
 
 ### Super Admin
 
-1. Abra `http://localhost:3000/super-admin`
-2. Entre com `superadmin` / `senha123`
+1. Abra `http://localhost:3000/login`
+2. Entre com `super@local.test` / `senha123`
 3. Confira listagem de tenants
 4. Edite uma loja
 5. Valide slug, telefone, login inicial e dados do plano
@@ -126,7 +128,7 @@ Teste em `http://localhost:3000/t/loja-demo/login`:
 ### Slug inválido
 
 1. Abra `http://localhost:3000/t/slug-inexistente/login`
-2. Confirme mensagem de loja não encontrada
+2. Confirme redirecionamento para `/login`
 
 ## 10. Testes automatizados recomendados
 
@@ -150,6 +152,6 @@ pnpm build
 
 ## 11. Observações
 
-- O caminho oficial de login humano da loja é `/t/:slug/login`
+- O caminho oficial de login humano agora é `/login`
 - O portal `/super-admin` continua separado
-- Algumas rotas legadas ainda existem por compatibilidade, mas o fluxo recomendado para QA já deve usar as rotas com slug
+- Algumas rotas legadas com slug ainda existem por compatibilidade, mas o fluxo recomendado para QA deve usar `/login`

@@ -55,5 +55,5 @@ Fora de escopo (documentado, não resolvido aqui): existem **dois conceitos de "
 1. `npx tsc --noEmit -p .`.
 2. `npx vitest run server/manager-access.test.ts server/seller-auth.test.ts server/seller-login.test.ts server/tenant-security.test.ts server/tenant-limits.test.ts`.
 3. (Opcional, mais lento) `npx vitest run` completo — comparar a lista de falhas com a de antes do refactor pra confirmar que não há regressão nova.
-4. No preview, com os usuários de seed (`scripts/seed-demo-tenant.mjs`): logar como `admin-lojademo`, `gerente-lojademo` e `vendedor-lojademo` (senha `senha123` em todos) via `/t/loja-demo/login`, confirmar que cada um cai na área certa.
+4. No preview, com os usuários de seed (`scripts/seed-demo-tenant.mjs`): logar como `admin@loja-demo.local`, `gerente@loja-demo.local` e `vendedor@loja-demo.local` (senha `senha123` em todos) via `/login`, confirmar que cada um cai na área certa.
 5. Logado como vendedor comum, tentar acessar `/t/loja-demo/minha-area/<id-de-outro-vendedor>` — deve mostrar "Você não tem permissão para acessar os dados deste colaborador."

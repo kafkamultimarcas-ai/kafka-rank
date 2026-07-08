@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTenantPath,
-  getTenantLoginPath,
   getTenantSlugFromPath,
 } from "./tenant";
 
@@ -25,8 +24,4 @@ describe("tenant route helpers", () => {
     expect(buildTenantPath("loja-demo", "/super-admin")).toBe("/super-admin");
   });
 
-  it("resolve para a página unificada de login independente do slug", () => {
-    expect(getTenantLoginPath("loja-demo")).toBe("/login");
-    expect(getTenantLoginPath(null)).toBe("/login");
-  });
 });

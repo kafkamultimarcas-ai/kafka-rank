@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import { useMemo, useState, useEffect } from "react";
 import { useBranding } from "@/contexts/TenantContext";
-import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 const MODULE_CONFIG: Record<string, { label: string; icon: any; path: string; color: string; description: string }> = {
   ranking: { label: "Ranking de Vendas", icon: Trophy, path: "/", color: "bg-red-500/20 text-red-400 border-red-500/30", description: "Ranking geral de vendas" },
@@ -128,10 +128,10 @@ export default function GerentePanel() {
   });
 
   const sellerLogoutMutation = trpc.sellers.logout.useMutation({
-    onSuccess: () => { setLocation(getTenantLoginPath(tenantSlug)); },
+    onSuccess: () => { setLocation("/login"); },
   });
   const managerLogoutMutation = trpc.managers.logout.useMutation({
-    onSuccess: () => { setLocation(getTenantLoginPath(tenantSlug)); },
+    onSuccess: () => { setLocation("/login"); },
   });
 
   // Auto-generate insights on first load

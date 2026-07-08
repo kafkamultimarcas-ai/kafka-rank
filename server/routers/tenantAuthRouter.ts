@@ -142,7 +142,7 @@ export const tenantAuthRouter = router({
         role: identity.role || "admin",
         mustChangePassword: identity.mustChangePassword || false,
         token,
-        redirectPath: "/crm/admin",
+        redirectPath: "/admin",
         tenantSlug: identity.tenantSlug,
         tenantId: identity.tenantId,
         ...trialInfo,
@@ -193,105 +193,4 @@ export const tenantAuthRouter = router({
     };
   }),
 
-  // Login legado por username, ainda escopado por tenant.
-  login: publicProcedure.input(z.object({
-    username: z.string().min(1),
-    password: z.string().min(1),
-  })).mutation(async ({ input, ctx }): Promise<UnifiedLoginResult> => {
-    if (!ctx.tenantSlug || ctx.tenantId <= 0) {
-      throw new Error("Loja não encontrada. Acesse pelo link da sua loja.");
-    }
-
-    const limits = await getTenantLimits(ctx.tenantId);
-    const trialInfo = {
-      trialEndsAt: limits?.trialEndsAt ?? null,
-      trialExpired: limits?.trialExpired ?? false,
-      subscriptionSuspended: limits?.status === "suspended",
-    };
-
-    const username = input.username.trim();
-
-    const admin = await crmDb.getAdminByUsername(username);
-    if (admin && admin.active) {
-      const valid = await bcrypt.compare(input.password, admin.passwordHash);
-      if (valid) {
-        const token = jwt.sign(
-          { adminId: admin.id, role: admin.role, type: "admin_auth", tenantId: (admin as any).tenantId, tenantSlug: ctx.tenantSlug },
-          ENV.cookieSecret,
-          { expiresIn: "30d" }
-        );
-        await crmDb.updateAdmin(admin.id, { lastAccess: Date.now() } as any);
-        return {
-          userType: "admin",
-          id: admin.id,
-          name: admin.name,
-          role: admin.role,
-          mustChangePassword: (admin as any).mustChangePassword || false,
-          token,
-          redirectPath: "/crm/admin",
-          tenantSlug: ctx.tenantSlug,
-          tenantId: ctx.tenantId,
-          ...trialInfo,
-        };
-      }
-    }
-
-    const manager = await db.getManagerByUsername(username);
-    if (manager && manager.active) {
-      const valid = await bcrypt.compare(input.password, manager.passwordHash);
-      if (valid) {
-        const token = jwt.sign(
-          { managerId: manager.id, username: manager.username, tenantId: (manager as any).tenantId, tenantSlug: ctx.tenantSlug },
-          ENV.cookieSecret,
-          { expiresIn: "30d" }
-        );
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
-        ctx.res.cookie("manager_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-        return {
-          userType: "manager",
-          id: manager.id,
-          name: manager.name,
-          role: "manager",
-          redirectPath: "/gerente",
-          tenantSlug: ctx.tenantSlug,
-          tenantId: ctx.tenantId,
-          ...trialInfo,
-        };
-      }
-    }
-
-    const seller = await db.getSellerByUsername(username);
-    if (seller && seller.active && seller.passwordHash) {
-      const valid = await bcrypt.compare(input.password, seller.passwordHash);
-      if (valid && seller.username && seller.username.toLowerCase() === username.toLowerCase()) {
-        await db.updateSellerLastAccess(seller.id);
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
-        const token = jwt.sign(
-          { sellerId: seller.id, username: seller.username, tenantId: (seller as any).tenantId, tenantSlug: ctx.tenantSlug },
-          ENV.cookieSecret,
-          { expiresIn: "30d" }
-        );
-        ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-
-        const department = seller.department || "vendas";
-        const sellerRole = seller.sellerRole || "vendedor";
-        return {
-          userType: "seller",
-          id: seller.id,
-          name: seller.name,
-          role: sellerRole,
-          department,
-          sellerRole,
-          redirectPath: buildSellerRedirect(department, sellerRole, seller.id),
-          tenantSlug: ctx.tenantSlug,
-          tenantId: ctx.tenantId,
-          ...trialInfo,
-        };
-      }
-    }
-
-    throw new Error("Usuário ou senha inválidos");
-  }),
 });

@@ -40,38 +40,6 @@ async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadP
 // ===== ADMIN AUTH (Login direto com usuário + senha) =====
 
 export const adminAuthRouter = router({
-  // Auto-login for owner - enters CRM admin without password (finds first owner admin for the tenant resolved pela rota)
-  // Login direto com usuário + senha
-  login: publicProcedure.input(z.object({
-    username: z.string().min(1),
-    password: z.string().min(1),
-  })).mutation(async ({ input, ctx }) => {
-    const admin = await crmDb.getAdminByUsername(input.username);
-    if (!admin || !admin.active) {
-      throw new Error("Usuário ou senha inválidos");
-    }
-    const valid = await bcrypt.compare(input.password, admin.passwordHash);
-    if (!valid) {
-      throw new Error("Usuário ou senha inválidos");
-    }
-
-    const mustChange = (admin as any).mustChangePassword || false;
-
-    const token = jwt.sign(
-      { adminId: admin.id, role: admin.role, type: "admin_auth", tenantId: (admin as any).tenantId, tenantSlug: ctx.tenantSlug },
-      ENV.cookieSecret,
-      { expiresIn: "30d" }
-    );
-
-    // Update last access
-    await crmDb.updateAdmin(admin.id, { lastAccess: Date.now() } as any);
-
-    return {
-      token,
-      admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role, mustChangePassword: mustChange },
-    };
-  }),
-
   // Trocar senha (primeiro acesso ou voluntário)
   changePassword: publicProcedure.input(z.object({
     token: z.string(),
