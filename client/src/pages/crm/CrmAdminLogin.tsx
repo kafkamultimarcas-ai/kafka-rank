@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,34 +34,12 @@ export default function CrmAdminLogin() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [token, setToken] = useState("");
-  const [autoLoginFailed, setAutoLoginFailed] = useState(false);
-  const autoLoginTriedRef = useRef(false);
-
-  // Auto-login mutation (for Manus owner)
-  const autoLoginMutation = trpc.adminAuth.autoLogin.useMutation({
-    onSuccess: (data) => {
-      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
-      toast.success(`Bem-vindo, ${data.admin.name}!`);
-      navigate("/crm/admin", { replace: true });
-    },
-    onError: () => {
-      setAutoLoginFailed(true);
-    },
-  });
-
-  // Auto-login on page load
+  // Redirect if already logged in
   useEffect(() => {
-    if (autoLoginTriedRef.current) return;
-    autoLoginTriedRef.current = true;
     const existingToken = localStorage.getItem(ADMIN_TOKEN_KEY);
     if (existingToken) {
-      // Only navigate if not already on admin page to prevent loops
-      if (!window.location.pathname.startsWith("/crm/admin") || window.location.pathname === "/crm/admin/login") {
-        navigate("/crm/admin", { replace: true });
-      }
-      return;
+      navigate("/crm/admin", { replace: true });
     }
-    autoLoginMutation.mutate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -117,17 +95,7 @@ export default function CrmAdminLogin() {
     changePasswordMutation.mutate({ token, newPassword });
   };
 
-  // Show loading while trying auto-login
-  if (!autoLoginFailed && autoLoginMutation.isPending) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
-          <p className="text-gray-400 text-sm">Entrando automaticamente...</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
