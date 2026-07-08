@@ -238,12 +238,15 @@ export default function CrmAdminDashboard() {
               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1.5 hover:bg-accent rounded-lg">
                 <Menu className="w-5 h-5 text-muted-foreground" />
               </button>
-              <h2 className="text-base font-bold text-foreground">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground truncate">{brandName}</p>
+                <h2 className="text-xs text-muted-foreground truncate">
                 {menuItems.find(m => m.key === activeView)?.label || "Painel"}
                 {selectedDept && activeView === "leads" && (
                   <span className="text-primary ml-2 text-sm">• {DEPT_LABELS[selectedDept]}</span>
                 )}
-              </h2>
+                </h2>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {selectedDept && activeView === "leads" && (

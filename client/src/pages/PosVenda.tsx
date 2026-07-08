@@ -19,7 +19,7 @@ function formatDate(d: any) {
 }
 
 export default function PosVenda() {
-  const { logoUrl } = useBranding();
+  const { logoUrl, name: brandName } = useBranding();
   const [, navigate] = useLocation();
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const [showForm, setShowForm] = useState(false);
@@ -87,6 +87,8 @@ export default function PosVenda() {
             <button onClick={() => navigate("/")} className="text-gray-500 hover:text-gray-300">
               <ArrowLeft className="h-5 w-5" />
             </button>
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain border border-gray-800 bg-gray-900" />
+            <span className="font-bold text-white text-sm truncate max-w-[140px]">{brandName}</span>
             <Wrench className="h-5 w-5 text-orange-400" />
             <span className="font-bold text-white">Pós-Venda</span>
             <span className="text-[10px] text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">{allChamados.length} chamados</span>
@@ -98,7 +100,7 @@ export default function PosVenda() {
             >
               <Plus className="h-3.5 w-3.5" /> Novo
             </button>
-            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain border border-gray-800 bg-gray-900" />
           </div>
         </div>
       </header>

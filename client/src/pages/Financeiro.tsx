@@ -41,7 +41,7 @@ function formatCurrency(value: string | number) {
 type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios";
 
 export default function Financeiro() {
-  const { logoUrl } = useBranding();
+  const { logoUrl, name: brandName } = useBranding();
   const [, navigate] = useLocation();
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
   const { data: sellerSession } = trpc.sellers.me.useQuery();
@@ -66,11 +66,11 @@ export default function Financeiro() {
             <button onClick={() => navigate("/")} className="text-gray-500 hover:text-gray-300">
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <DollarSign className="h-5 w-5 text-emerald-400" />
-            <div>
-              <span className="font-bold text-white text-sm">Financeiro</span>
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain border border-gray-800 bg-gray-900" />
+            <div className="min-w-0">
+              <p className="font-bold text-white text-sm truncate">{brandName}</p>
               {sellerSession && (
-                <p className="text-[10px] text-gray-500">{sellerSession.nickname || sellerSession.name}</p>
+                <p className="text-[10px] text-gray-500 truncate">Financeiro · {sellerSession.nickname || sellerSession.name}</p>
               )}
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function Financeiro() {
             >
               <LogOut className="h-3.5 w-3.5" /> Sair
             </button>
-            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
+            <DollarSign className="h-5 w-5 text-emerald-400" />
           </div>
         </div>
       </header>

@@ -193,8 +193,8 @@ export default function UnifiedLogin() {
               Use seu e-mail para acessar sua loja.
             </p>
             {previewQuery.data && (
-              <div className="mt-4 w-full rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-left">
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-300">
+              <div className="mt-4 w-full rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/12 via-blue-500/10 to-cyan-500/12 p-4 text-left shadow-[0_0_0_1px_rgba(56,189,248,0.05)]">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
                   <Building2 className="h-3.5 w-3.5" />
                   Loja identificada
                 </div>
@@ -202,12 +202,12 @@ export default function UnifiedLogin() {
                   {previewQuery.data.tenantName}
                 </p>
                 <div className="mt-3 flex items-center gap-2 text-sm text-gray-200">
-                  <UserRound className="h-4 w-4 text-red-300" />
+                  <UserRound className="h-4 w-4 text-sky-200" />
                   <span>{previewQuery.data.name}</span>
                   {previewQuery.data.tenantName && (
                     <>
                       <span className="text-gray-500">•</span>
-                      <span className="text-red-200">{previewQuery.data.roleLabel}</span>
+                      <span className="text-blue-100">{previewQuery.data.roleLabel}</span>
                     </>
                   )}
                 </div>

@@ -64,7 +64,7 @@ function priorityIcon(p: string) {
 }
 
 export default function GerentePanel() {
-  const { logoUrl } = useBranding();
+  const { logoUrl, name: brandName } = useBranding();
   const [, setLocation] = useLocation();
   const tenantSlug = getCurrentTenantSlug();
   const { data: sellerSession, isLoading: sellerSessionLoading } = trpc.sellers.me.useQuery();
@@ -180,13 +180,13 @@ export default function GerentePanel() {
             <Button variant="ghost" size="icon" onClick={() => setLocation(buildTenantPath(tenantSlug, "/"))} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
-            <div>
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain border border-border bg-background" />
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-heading font-bold text-sm text-foreground">PAINEL DO GERENTE</span>
+                <span className="font-heading font-bold text-sm text-foreground truncate">{brandName}</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-bold">MENTOR IA</span>
               </div>
-              <p className="text-[10px] text-muted-foreground">{managerDisplayName}</p>
+              <p className="text-[10px] text-muted-foreground truncate">Painel do Gerente · {managerDisplayName}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

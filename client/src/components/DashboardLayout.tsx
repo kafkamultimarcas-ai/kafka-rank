@@ -20,6 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
+import { useBranding } from "@/contexts/TenantContext";
 import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
@@ -233,6 +234,7 @@ function DashboardLayoutContent({
   trialEndsAt,
   subscriptionSuspended,
 }: DashboardLayoutContentProps) {
+  const { name: brandName, logoUrl } = useBranding();
   const { logout: oauthLogout } = useAuth();
   const managerLogout = trpc.managers.logout.useMutation();
   const sellerLogout = trpc.sellers.logout.useMutation();
@@ -304,14 +306,18 @@ function DashboardLayoutContent({
               >
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
-              {!isCollapsed && (
-                <div className="flex items-center gap-2 min-w-0">
-                  <Flag className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex items-center gap-2 min-w-0">
+                <img
+                  src={logoUrl}
+                  alt={brandName}
+                  className="h-8 w-8 rounded-lg object-contain border border-border bg-background shrink-0"
+                />
+                {!isCollapsed && (
                   <span className="font-heading font-bold text-sm tracking-tight truncate text-foreground">
-                    KAFKA RANK
+                    {brandName}
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </SidebarHeader>
 
@@ -390,9 +396,19 @@ function DashboardLayoutContent({
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
               <div className="flex items-center gap-3">
-                <span className="tracking-tight text-foreground font-heading text-sm">
-                  {activeMenuItem?.label ?? "Menu"}
-                </span>
+                <img
+                  src={logoUrl}
+                  alt={brandName}
+                  className="h-8 w-8 rounded-lg object-contain border border-border bg-background shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="tracking-tight text-foreground font-heading text-sm truncate">
+                    {brandName}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {activeMenuItem?.label ?? "Menu"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
