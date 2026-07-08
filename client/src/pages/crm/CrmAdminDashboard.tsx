@@ -20,6 +20,7 @@ import {
   Copy, EyeOff, Facebook, BookOpen
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
+import { CrmSettingsAjustesPanel, CrmSettingsIntegracoesPanel, StoreDataPanel as SharedStoreDataPanel } from "@/components/admin/CrmSettingsPanels";
 import AssinaturaContent from "@/components/billing/AssinaturaContent";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { useBranding } from "@/contexts/TenantContext";
@@ -1848,6 +1849,30 @@ function getAdminRoleLabel(admin: any): { label: string; color: string } {
 }
 
 function SettingsView() {
+  return (
+    <Tabs defaultValue="dados-loja" className="w-full">
+      <TabsList className="grid w-full max-w-2xl grid-cols-3 mb-4">
+        <TabsTrigger value="dados-loja">Dados da Loja</TabsTrigger>
+        <TabsTrigger value="ajustes">Ajustes</TabsTrigger>
+        <TabsTrigger value="integracoes">Integrações</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="dados-loja" className="mt-0">
+        <SharedStoreDataPanel />
+      </TabsContent>
+
+      <TabsContent value="ajustes" className="mt-0">
+        <CrmSettingsAjustesPanel />
+      </TabsContent>
+
+      <TabsContent value="integracoes" className="mt-0">
+        <CrmSettingsIntegracoesPanel />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function LegacySettingsView() {
   const [, navigate] = useLocation();
   const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
   const [showAdd, setShowAdd] = useState(false);
