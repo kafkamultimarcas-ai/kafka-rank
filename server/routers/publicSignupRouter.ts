@@ -66,6 +66,6 @@ export const publicSignupRouter = router({
       const loginUrl = `${getRequestOrigin(ctx.req)}/login`;
       await sendSignupWelcomeEmail(adminEmail, input.name, loginUrl, tenantId);
 
-      return { tenantId, slug, token, redirectPath: "/crm/admin", adminEmail };
+      return { tenantId, slug, token, redirectPath: "/admin", adminEmail };
     }),
 });

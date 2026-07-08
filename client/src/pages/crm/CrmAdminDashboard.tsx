@@ -187,7 +187,13 @@ export default function CrmAdminDashboard() {
             </div>);
           })}
         </nav>
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border space-y-1">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, "/admin"))} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all">
+            <LayoutDashboard className="w-4 h-4" /> Painel Admin
+          </button>
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, "/gerente"))} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all">
+            <Shield className="w-4 h-4" /> Painel Gerente
+          </button>
           <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-all">
             <LogOut className="w-4 h-4" /> Sair
           </button>
@@ -219,7 +225,13 @@ export default function CrmAdminDashboard() {
                 </div>);
               })}
             </nav>
-            <div className="p-3 border-t border-border">
+            <div className="p-3 border-t border-border space-y-1">
+              <button onClick={() => { navigate(buildTenantPath(tenantSlug, "/admin")); setSidebarOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all">
+                <LayoutDashboard className="w-4 h-4" /> Painel Admin
+              </button>
+              <button onClick={() => { navigate(buildTenantPath(tenantSlug, "/gerente")); setSidebarOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-all">
+                <Shield className="w-4 h-4" /> Painel Gerente
+              </button>
               <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10">
                 <LogOut className="w-4 h-4" /> Sair
               </button>

@@ -71,7 +71,7 @@ export default function UnifiedLogin() {
     onSuccess: () => {
       localStorage.setItem(ADMIN_TOKEN_KEY, pendingAdminToken);
       toast.success("Senha alterada com sucesso!");
-      navigate(`/t/${pendingSlug}/crm/admin`);
+      navigate(`/t/${pendingSlug}/admin`);
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao alterar senha");
