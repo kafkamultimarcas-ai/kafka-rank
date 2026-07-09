@@ -92,15 +92,25 @@ function Router() {
       <Switch>
         <Route path="/" component={ComercialHome} />
         <Route path="/corrida/:id" component={RaceTrack} />
+        <Route path="/t/:slug/corrida/:id" component={RaceTrack} />
         <Route path="/competicao/:id" component={CompetitionView} />
+        <Route path="/t/:slug/competicao/:id" component={CompetitionView} />
         <Route path="/vendedor/:id" component={SellerProfile} />
+        <Route path="/t/:slug/vendedor/:id" component={SellerProfile} />
         <Route path="/treinamentos" component={TrainingsList} />
+        <Route path="/t/:slug/treinamentos" component={TrainingsList} />
         <Route path="/registrar-venda" component={RegisterSale} />
+        <Route path="/t/:slug/registrar-venda" component={RegisterSale} />
         <Route path="/tv" component={TVMode} />
+        <Route path="/t/:slug/tv" component={TVMode} />
         <Route path="/agendamentos/:sellerId" component={MeusAgendamentos} />
+        <Route path="/t/:slug/agendamentos/:sellerId" component={MeusAgendamentos} />
         <Route path="/login" component={UnifiedLogin} />
+        <Route path="/t/:slug/login" component={UnifiedLogin} />
         <Route path="/esqueci-senha" component={EsqueciSenha} />
+        <Route path="/t/:slug/esqueci-senha" component={EsqueciSenha} />
         <Route path="/redefinir-senha" component={RedefinirSenha} />
+        <Route path="/t/:slug/redefinir-senha" component={RedefinirSenha} />
         <Route path="/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/t/:slug/minha-area/:sellerId" component={MinhaArea} />
         <Route path="/admin" component={AdminDashboard} />
@@ -157,8 +167,11 @@ function Router() {
         <Route path="/t/:slug/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />
+        <Route path="/t/:slug/crm" component={CrmCommandCenter} />
         <Route path="/crm/lead/:id" component={CrmLeadDetail} />
+        <Route path="/t/:slug/crm/lead/:id" component={CrmLeadDetail} />
         <Route path="/crm/pipeline" component={CrmPipeline} />
+        <Route path="/t/:slug/crm/pipeline" component={CrmPipeline} />
         <Route path="/crm/admin" component={CrmAdminDashboard} />
         <Route path="/t/:slug/crm/admin" component={CrmAdminDashboard} />
         <Route path="/crm/integracoes" component={IntegrationDocs} />
@@ -170,11 +183,17 @@ function Router() {
         <Route path="/pos-venda" component={PosVenda} />
         <Route path="/t/:slug/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
+        <Route path="/t/:slug/controle-patio" component={ConsignmentControl} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
+        <Route path="/t/:slug/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
+        <Route path="/t/:slug/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />
         <Route path="/simulador-financiamento" component={SimuladorFinanciamento} />
+        <Route path="/t/:slug/simulador-financiamento" component={SimuladorFinanciamento} />
         <Route path="/ficha-financiamento" component={FichaFinanciamento} />
+        <Route path="/t/:slug/ficha-financiamento" component={FichaFinanciamento} />
         <Route path="/mesa-credito" component={MesaCredito} />
+        <Route path="/t/:slug/mesa-credito" component={MesaCredito} />
         <Route path="/estoque" component={Estoque} />
         <Route path="/t/:slug/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
@@ -182,9 +201,13 @@ function Router() {
         <Route path="/assinatura" component={AssinaturaPage} />
         <Route path="/t/:slug/assinatura" component={AssinaturaPage} />
         <Route path="/feirao" component={RankingFeirao} />
+        <Route path="/t/:slug/feirao" component={RankingFeirao} />
         <Route path="/meus-resultados/:sellerId" component={CentralResultados} />
+        <Route path="/t/:slug/meus-resultados/:sellerId" component={CentralResultados} />
         <Route path="/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
+        <Route path="/t/:slug/carros-bonus/:sellerId?" component={CarrosBonusSeller} />
         <Route path="/busca-veiculo" component={VehicleSearch} />
+        <Route path="/t/:slug/busca-veiculo" component={VehicleSearch} />
         <Route path="/gerente" component={GerentePanel} />
         <Route path="/t/:slug/gerente" component={GerentePanel} />
         <Route path="/super-admin" component={SuperAdmin} />

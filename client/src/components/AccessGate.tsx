@@ -21,7 +21,7 @@ const BYPASS_ROUTES = [
 ];
 
 function isTenantBypassRoute(pathname: string): boolean {
-  return /^\/t\/[a-z0-9-]+\/(?:admin|crm|gerente|pos-venda|financeiro|minha-area|assinatura)(?:\/|$)/i.test(pathname);
+  return /^\/t\/[a-z0-9-]+\/(?:admin|crm|gerente|pos-venda|financeiro|minha-area|assinatura|login|esqueci-senha|redefinir-senha|registrar-venda|agendamentos|meus-resultados|carros-bonus|busca-veiculo|feirao|ficha-financiamento|mesa-credito|ia-vendedor|simulador-financiamento|controle-patio|estoque|treinamentos|corrida|competicao|vendedor|tv)(?:\/|$)/i.test(pathname);
 }
 
 const DEPARTMENT_OPTIONS = [

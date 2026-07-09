@@ -2306,3 +2306,4 @@
 - [x] Cards clicáveis no Admin Vendas (total, aprovadas, pendentes → expandir lista)
 - [x] Cards clicáveis na MinhaArea (resumo do setor → expandir detalhes)
 - [x] Varredura geral de usabilidade: facilitar navegação e acesso rápido
+- [x] Corrigir 404 vendedores: adicionar rotas /t/:slug/ para todas as páginas de vendedor (busca-veiculo, feirao, registrar-venda, agendamentos, meus-resultados, carros-bonus, ficha-financiamento, mesa-credito, ia-vendedor, simulador-financiamento, controle-patio, corrida, competicao, vendedor, treinamentos, tv, login, esqueci-senha, redefinir-senha, crm, crm/lead, crm/pipeline)
