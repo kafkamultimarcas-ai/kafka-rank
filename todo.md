@@ -2311,3 +2311,10 @@
 - [x] Adicionar botão Ver Corrida nas competições ativas (AdminDashboard e AdminCompetitions)
 - [ ] Corrigir deslogar ao navegar entre abas (sessão perdida)
 - [ ] Implementar opção Lembrar-me no login (salvar credenciais)
+
+## Lembrar-me no Login
+- [x] Checkbox "Lembrar-me" no UnifiedLogin.tsx
+- [x] Salvar email no localStorage quando "Lembrar-me" marcado
+- [x] Preencher email automaticamente se salvo no localStorage
+- [x] Auto-redirect se sessão válida já existir (cookie seller_session/admin_token)
+- [x] Corrigir deslogar ao navegar entre abas (navigate sem buildTenantPath) - FEITO

@@ -9,19 +9,66 @@ import { useLocation } from "wouter";
 const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 const ADMIN_TOKEN_KEY = "crm_admin_token";
 const SUPER_ADMIN_TOKEN_KEY = "super_token";
+const REMEMBER_EMAIL_KEY = "kafka_remember_email";
+const REMEMBER_ME_KEY = "kafka_remember_me";
 
 type LoginStep = "credentials" | "change_password";
 
 export default function UnifiedLogin() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
+    return saved || "";
+  });
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem(REMEMBER_ME_KEY) === "true";
+  });
   const [step, setStep] = useState<LoginStep>("credentials");
   const [pendingAdminToken, setPendingAdminToken] = useState("");
   const [pendingSlug, setPendingSlug] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [debouncedEmail, setDebouncedEmail] = useState("");
+
+  // Auto-redirect: if seller session already exists, redirect to their area
+  const { data: sellerSession, isLoading: sellerLoading } = trpc.sellers.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (sellerLoading) return;
+    if (sellerSession) {
+      // Already logged in as seller - redirect to their area
+      const slug = (window.location.pathname.match(/^\/t\/([^/]+)/) || [])[1];
+      if (slug) {
+        const dept = sellerSession.department || "vendas";
+        const role = sellerSession.sellerRole || "vendedor";
+        if (dept === "pos_venda") {
+          window.location.href = `/t/${slug}/pos-venda`;
+        } else if (dept === "financeiro") {
+          window.location.href = `/t/${slug}/financeiro`;
+        } else if (role === "gerente") {
+          window.location.href = `/t/${slug}/gerente`;
+        } else {
+          window.location.href = `/t/${slug}/minha-area/${sellerSession.id}`;
+        }
+      }
+    }
+  }, [sellerSession, sellerLoading]);
+
+  // Auto-redirect: if admin token exists and is valid
+  useEffect(() => {
+    const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (adminToken) {
+      const slug = (window.location.pathname.match(/^\/t\/([^/]+)/) || [])[1];
+      if (slug) {
+        // Admin token exists - redirect to admin panel
+        window.location.href = `/t/${slug}/admin`;
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -41,6 +88,15 @@ export default function UnifiedLogin() {
 
   const loginMutation = trpc.tenantAuth.loginByEmail.useMutation({
     onSuccess: (data) => {
+      // Save or clear "remember me" preference
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_EMAIL_KEY, email.trim().toLowerCase());
+        localStorage.setItem(REMEMBER_ME_KEY, "true");
+      } else {
+        localStorage.removeItem(REMEMBER_EMAIL_KEY);
+        localStorage.removeItem(REMEMBER_ME_KEY);
+      }
+
       if (data.userType === "super_admin") {
         localStorage.setItem(SUPER_ADMIN_TOKEN_KEY, data.token || "");
         toast.success(`Bem-vindo, ${data.name}!`);
@@ -231,7 +287,7 @@ export default function UnifiedLogin() {
                 placeholder="voce@email.com"
                 className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
                 autoComplete="email"
-                autoFocus
+                autoFocus={!email}
               />
             </div>
 
@@ -247,7 +303,22 @@ export default function UnifiedLogin() {
                 placeholder="Sua senha"
                 className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
                 autoComplete="current-password"
+                autoFocus={!!email}
               />
+            </div>
+
+            {/* Lembrar-me checkbox */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="remember-me"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 focus:ring-offset-0 cursor-pointer"
+              />
+              <label htmlFor="remember-me" className="text-sm text-gray-400 cursor-pointer select-none">
+                Lembrar meu e-mail
+              </label>
             </div>
 
             <Button
