@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { Trophy, Users, User, TrendingUp, ChevronRight, Zap, Settings, PlusCircle, LogIn, Shield, Bell, BellRing, BookOpen, Tv, Target, Award, CalendarPlus, Wrench, AlertTriangle, Bot, Sparkles, MessageCircle, Camera, Lightbulb, DollarSign, Calculator, FileText, Flame, Car, LayoutGrid, Crown, Star, Calendar, Search } from "lucide-react";
 import { useLocation } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { useMemo, useState } from "react";
 import { getLoginUrl } from "@/const";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -217,7 +218,7 @@ export default function Home() {
                 <BookOpen className="h-4 w-4" /> Treinamentos
               </Button>
               {activeComps.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => setLocation(`/corrida/${activeComps[0].id}`)} className="gap-2">
+                <Button variant="outline" size="sm" onClick={() => setLocation(buildTenantPath(getCurrentTenantSlug(), `/corrida/${activeComps[0].id}`))} className="gap-2">
                   <Trophy className="h-4 w-4" /> Ranking
                 </Button>
               )}
@@ -625,7 +626,7 @@ export default function Home() {
               {activeComps.map(comp => (
                 <button
                   key={comp.id}
-                  onClick={() => setLocation(`/corrida/${comp.id}`)}
+                  onClick={() => setLocation(buildTenantPath(getCurrentTenantSlug(), `/corrida/${comp.id}`))}
                   className="racing-card p-5 text-left hover:border-primary/50 transition-all group"
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -1064,7 +1065,7 @@ export default function Home() {
               {finishedComps.map(comp => (
                 <button
                   key={comp.id}
-                  onClick={() => setLocation(`/competicao/${comp.id}`)}
+                  onClick={() => setLocation(buildTenantPath(getCurrentTenantSlug(), `/competicao/${comp.id}`))}
                   className="racing-card p-5 text-left hover:border-primary/50 transition-all opacity-80 hover:opacity-100"
                 >
                   <div className="flex items-center gap-2 mb-2">

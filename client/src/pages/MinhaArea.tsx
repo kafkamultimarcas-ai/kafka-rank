@@ -141,6 +141,9 @@ export default function MinhaArea() {
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: unreadCount } = trpc.notifications.unreadCountSeller.useQuery({ sellerId }, { enabled: sellerId > 0 });
+  const { data: activeCompetitions } = trpc.competitions.list.useQuery({ status: "active" });
+  const activeComp = activeCompetitions?.[0];
+  const { data: compRanking } = trpc.competitions.ranking.useQuery({ id: activeComp?.id || 0 }, { enabled: !!activeComp?.id, refetchInterval: 30000 });
   const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications(sellerId);
 
   const dept = sellerSession?.department || "vendas";
@@ -1566,8 +1569,92 @@ export default function MinhaArea() {
             </button>
           )}
 
-          {/* Ver Ranking - não mostrar para financeiro */}
-          {dept !== 'financeiro' && (
+          {/* Competição Ativa - Ranking ao Vivo */}
+          {dept !== 'financeiro' && activeComp && compRanking && compRanking.length > 0 && (
+            <div className="bg-gradient-to-br from-yellow-600/10 via-orange-500/5 to-red-500/10 border border-yellow-500/30 rounded-xl overflow-hidden">
+              {/* Header da competição */}
+              <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-400" />
+                  <div>
+                    <p className="text-white font-bold text-sm">{activeComp.name}</p>
+                    <p className="text-gray-500 text-[10px]">
+                      {new Date(activeComp.startDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} a {new Date(activeComp.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+                <span className="flex items-center gap-1 text-[10px] font-bold text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  AO VIVO
+                </span>
+              </div>
+
+              {/* Minha posição */}
+              {(() => {
+                const myEntry = compRanking.find(r => r.participant.sellerId === sellerId);
+                if (!myEntry) return null;
+                return (
+                  <div className="mx-4 mb-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-heading font-bold text-lg ${
+                      myEntry.position === 1 ? 'bg-yellow-500 text-black' :
+                      myEntry.position === 2 ? 'bg-gray-400 text-black' :
+                      myEntry.position === 3 ? 'bg-amber-700 text-white' :
+                      'bg-gray-700 text-white'
+                    }`}>
+                      {myEntry.position}º
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-bold text-sm">Você está em {myEntry.position}º lugar</p>
+                      <p className="text-yellow-400 text-xs font-heading font-bold">{myEntry.participant.points} pontos</p>
+                    </div>
+                    {myEntry.position > 1 && (() => {
+                      const above = compRanking[myEntry.position - 2];
+                      const diff = above.participant.points - myEntry.participant.points;
+                      return <p className="text-[10px] text-gray-400">-{diff} pts do {myEntry.position - 1}º</p>;
+                    })()}
+                  </div>
+                );
+              })()}
+
+              {/* Mini ranking top 5 */}
+              <div className="px-4 pb-3 space-y-1">
+                {compRanking.slice(0, 5).map((entry, idx) => (
+                  <div key={entry.participant.id} className={`flex items-center gap-2 py-1.5 px-2 rounded-lg ${
+                    entry.participant.sellerId === sellerId ? 'bg-yellow-500/10 border border-yellow-500/20' : ''
+                  }`}>
+                    <span className={`w-5 text-center text-xs font-bold ${
+                      idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-amber-600' : 'text-gray-600'
+                    }`}>{entry.position}</span>
+                    {entry.seller?.photoUrl ? (
+                      <img src={entry.seller.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-[9px] font-bold text-white">
+                        {entry.seller?.name?.charAt(0)}
+                      </div>
+                    )}
+                    <span className={`text-xs flex-1 truncate ${entry.participant.sellerId === sellerId ? 'text-white font-bold' : 'text-gray-300'}`}>
+                      {entry.participant.sellerId === sellerId ? 'Você' : (entry.seller?.nickname || entry.seller?.name)}
+                    </span>
+                    <span className="text-xs font-bold text-orange-400 tabular-nums">{entry.participant.points}</span>
+                  </div>
+                ))}
+                {compRanking.length > 5 && (
+                  <p className="text-center text-[10px] text-gray-500 pt-1">+{compRanking.length - 5} participantes</p>
+                )}
+              </div>
+
+              {/* Botão ver corrida completa */}
+              <button
+                onClick={() => navigate(buildTenantPath(tenantSlug, `/corrida/${activeComp.id}`))}
+                className="w-full border-t border-yellow-500/20 py-3 text-center text-sm font-bold text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+              >
+                Ver Corrida Completa →
+              </button>
+            </div>
+          )}
+
+          {/* Fallback se não tem competição ativa */}
+          {dept !== 'financeiro' && (!activeComp || !compRanking || compRanking.length === 0) && (
           <button
             onClick={() => navigate(buildTenantPath(tenantSlug, "/"))}
             className="w-full bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-yellow-500/60 transition-all"
@@ -1577,7 +1664,7 @@ export default function MinhaArea() {
             </div>
             <div className="text-left flex-1">
               <p className="text-white font-bold">Ver Ranking</p>
-              <p className="text-gray-400 text-sm">Confira sua posição na competição</p>
+              <p className="text-gray-400 text-sm">Nenhuma competição ativa no momento</p>
             </div>
           </button>
           )}

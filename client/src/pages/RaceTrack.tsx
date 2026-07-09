@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { useBranding } from "@/contexts/TenantContext";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 const CAR_COLORS = [
   "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6",
@@ -346,7 +347,14 @@ export default function RaceTrack() {
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center gap-4 h-14">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+          <Button variant="ghost" size="icon" onClick={() => {
+            const slug = getCurrentTenantSlug();
+            if (sellerSession) {
+              setLocation(buildTenantPath(slug, `/minha-area/${sellerSession.id}`));
+            } else {
+              setLocation(buildTenantPath(slug, "/"));
+            }
+          }}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -455,42 +463,45 @@ export default function RaceTrack() {
             {!isTeamComp && ranking && ranking.length > 0 && (
               <div>
                 {ranking.length >= 3 && (
-                  <div className="flex items-end justify-center gap-3 sm:gap-6 mb-8 py-4">
-                    {/* 2nd place */}
-                    <div className="flex flex-col items-center">
-                      <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[1]?.seller?.name || "?"} photoUrl={ranking[1]?.seller?.competitionPhotoUrl || ranking[1]?.seller?.photoUrl} size="lg" borderColor="#9ca3af" isMe={mySellerId === ranking[1]?.seller?.id} onPhotoChange={handlePhotoClick} />
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-xs font-bold text-white shadow">2</div>
+                  <div className="relative mb-8 py-6 rounded-2xl bg-gradient-to-b from-primary/5 to-transparent border border-border/30">
+                    <div className="flex items-end justify-center gap-4 sm:gap-8">
+                      {/* 2nd place */}
+                      <div className="flex flex-col items-center">
+                        <div className="relative mb-2">
+                          <PlayerAvatar name={ranking[1]?.seller?.name || "?"} photoUrl={ranking[1]?.seller?.competitionPhotoUrl || ranking[1]?.seller?.photoUrl} size="lg" borderColor="#9ca3af" isMe={mySellerId === ranking[1]?.seller?.id} onPhotoChange={handlePhotoClick} />
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-gradient-to-br from-gray-300 to-gray-500 flex items-center justify-center text-xs font-bold text-white shadow-lg">2</div>
+                        </div>
+                        <p className="text-xs font-bold text-foreground text-center truncate max-w-[80px] mt-1">{ranking[1]?.seller?.nickname || ranking[1]?.seller?.name}</p>
+                        <p className="text-xs font-heading text-primary font-bold">{ranking[1]?.participant.points} pts</p>
+                        <div className="w-20 h-16 bg-gradient-to-t from-gray-500/20 to-gray-400/5 rounded-t-lg mt-2 flex items-center justify-center border border-gray-400/20">
+                          <span className="font-heading text-2xl font-black text-gray-400">2</span>
+                        </div>
                       </div>
-                      <p className="text-xs font-semibold text-foreground text-center truncate max-w-[80px]">{ranking[1]?.seller?.nickname || ranking[1]?.seller?.name}</p>
-                      <p className="text-xs font-heading text-primary">{ranking[1]?.participant.points} pts</p>
-                      <div className="w-20 h-16 racing-card mt-2 flex items-center justify-center">
-                        <span className="font-heading text-2xl font-bold text-gray-400">2</span>
+                      {/* 1st place */}
+                      <div className="flex flex-col items-center -mt-6">
+                        <Trophy className="h-8 w-8 text-yellow-500 mb-1 drop-shadow-lg animate-pulse" />
+                        <div className="relative mb-2">
+                          <div className="absolute -inset-2 rounded-full bg-yellow-500/20 blur-md" />
+                          <PlayerAvatar name={ranking[0]?.seller?.name || "?"} photoUrl={ranking[0]?.seller?.competitionPhotoUrl || ranking[0]?.seller?.photoUrl} size="xl" borderColor="#eab308" isMe={mySellerId === ranking[0]?.seller?.id} onPhotoChange={handlePhotoClick} />
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center text-sm font-bold text-white shadow-lg shadow-yellow-500/30">1</div>
+                        </div>
+                        <p className="text-sm font-black text-foreground text-center truncate max-w-[100px] mt-1">{ranking[0]?.seller?.nickname || ranking[0]?.seller?.name}</p>
+                        <p className="text-sm font-heading text-primary font-bold">{ranking[0]?.participant.points} pts</p>
+                        <div className="w-24 h-20 bg-gradient-to-t from-yellow-500/20 to-yellow-400/5 rounded-t-lg mt-2 flex items-center justify-center border border-yellow-500/30 shadow-lg shadow-yellow-500/10">
+                          <span className="font-heading text-3xl font-black text-yellow-500">1</span>
+                        </div>
                       </div>
-                    </div>
-                    {/* 1st place */}
-                    <div className="flex flex-col items-center -mt-4">
-                      <Trophy className="h-7 w-7 text-yellow-500 mb-1" />
-                      <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[0]?.seller?.name || "?"} photoUrl={ranking[0]?.seller?.competitionPhotoUrl || ranking[0]?.seller?.photoUrl} size="xl" borderColor="#eab308" isMe={mySellerId === ranking[0]?.seller?.id} onPhotoChange={handlePhotoClick} />
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-yellow-500 flex items-center justify-center text-sm font-bold text-white shadow">1</div>
-                      </div>
-                      <p className="text-sm font-bold text-foreground text-center truncate max-w-[100px]">{ranking[0]?.seller?.nickname || ranking[0]?.seller?.name}</p>
-                      <p className="text-sm font-heading text-primary font-bold">{ranking[0]?.participant.points} pts</p>
-                      <div className="w-24 h-20 racing-card mt-2 flex items-center justify-center glow-orange">
-                        <span className="font-heading text-3xl font-bold text-primary">1</span>
-                      </div>
-                    </div>
-                    {/* 3rd place */}
-                    <div className="flex flex-col items-center">
-                      <div className="relative mb-2">
-                        <PlayerAvatar name={ranking[2]?.seller?.name || "?"} photoUrl={ranking[2]?.seller?.competitionPhotoUrl || ranking[2]?.seller?.photoUrl} size="md" borderColor="#b45309" isMe={mySellerId === ranking[2]?.seller?.id} onPhotoChange={handlePhotoClick} />
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-amber-700 flex items-center justify-center text-xs font-bold text-white shadow">3</div>
-                      </div>
-                      <p className="text-xs font-semibold text-foreground text-center truncate max-w-[80px]">{ranking[2]?.seller?.nickname || ranking[2]?.seller?.name}</p>
-                      <p className="text-xs font-heading text-primary">{ranking[2]?.participant.points} pts</p>
-                      <div className="w-18 h-14 racing-card mt-2 flex items-center justify-center">
-                        <span className="font-heading text-xl font-bold text-amber-700">3</span>
+                      {/* 3rd place */}
+                      <div className="flex flex-col items-center">
+                        <div className="relative mb-2">
+                          <PlayerAvatar name={ranking[2]?.seller?.name || "?"} photoUrl={ranking[2]?.seller?.competitionPhotoUrl || ranking[2]?.seller?.photoUrl} size="md" borderColor="#b45309" isMe={mySellerId === ranking[2]?.seller?.id} onPhotoChange={handlePhotoClick} />
+                          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-xs font-bold text-white shadow-lg">3</div>
+                        </div>
+                        <p className="text-xs font-bold text-foreground text-center truncate max-w-[80px] mt-1">{ranking[2]?.seller?.nickname || ranking[2]?.seller?.name}</p>
+                        <p className="text-xs font-heading text-primary font-bold">{ranking[2]?.participant.points} pts</p>
+                        <div className="w-18 h-14 bg-gradient-to-t from-amber-700/20 to-amber-600/5 rounded-t-lg mt-2 flex items-center justify-center border border-amber-700/20">
+                          <span className="font-heading text-xl font-black text-amber-700">3</span>
+                        </div>
                       </div>
                     </div>
                   </div>

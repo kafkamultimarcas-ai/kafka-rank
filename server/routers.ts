@@ -398,6 +398,28 @@ export const appRouter = router({
     })).mutation(async ({ input }) => {
       const { id, ...data } = input;
       await db.updateCompetition(id, data);
+      // Auto-add all eligible sellers when competition is activated
+      if (data.status === "active") {
+        const comp = await db.getCompetitionById(id);
+        if (comp && comp.type === "individual") {
+          const existingParticipants = await db.listParticipants(id);
+          const existingSellerIds = new Set(existingParticipants.map(p => p.sellerId));
+          const allSellers = await db.listSellers(true);
+          // Filter sellers by competition category (vendas = vendas+pre_vendas, others = exact match)
+          const category = comp.category || "vendas";
+          const eligibleSellers = allSellers.filter(s => {
+            if (category === "vendas") return s.department === "vendas" || s.department === "pre_vendas";
+            return s.department === category;
+          });
+          // Add sellers not already participating
+          for (const seller of eligibleSellers) {
+            if (!existingSellerIds.has(seller.id)) {
+              await db.addParticipant({ competitionId: id, sellerId: seller.id });
+            }
+          }
+          console.log(`[Competition] Auto-added ${eligibleSellers.filter(s => !existingSellerIds.has(s.id)).length} sellers to competition #${id}`);
+        }
+      }
       if (data.status === "finished") {
         const comp = await db.getCompetitionById(id);
         if (comp) {

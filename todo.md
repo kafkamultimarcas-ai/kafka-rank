@@ -2318,3 +2318,10 @@
 - [x] Preencher email automaticamente se salvo no localStorage
 - [x] Auto-redirect se sessão válida já existir (cookie seller_session/admin_token)
 - [x] Corrigir deslogar ao navegar entre abas (navigate sem buildTenantPath) - FEITO
+
+## Bugs Gamificação / Pista de Corrida (Jul 2026)
+- [x] Bug: TV mostrando "Nenhuma competição ativa" - CORRIGIDO: participantes auto-adicionados ao ativar competição
+- [x] Garantir que vendedores aparecem na pista de corrida com fotos - CORRIGIDO: participantes inseridos no banco
+- [x] Verificar se vendedores conseguem trocar foto no perfil (Minha Área) - JÁ FUNCIONA
+- [x] Rank de competição visível para vendedores na área deles - ADICIONADO widget com posição + mini-leaderboard
+- [x] Melhorar visual da gamificação/pista de corrida - TV e RaceTrack com gradientes, glow, podium melhorado

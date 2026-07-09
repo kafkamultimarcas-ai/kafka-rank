@@ -355,7 +355,17 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdi
             <DialogTitle className="font-heading text-foreground">Gerenciar Participantes</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Adicione vendedores à competição:</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Adicione vendedores à competição:</p>
+              {sellers.filter((s: any) => !participantSellerIds.has(s.id)).length > 0 && !isTeamType && (
+                <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={() => {
+                  const remaining = sellers.filter((s: any) => !participantSellerIds.has(s.id));
+                  remaining.forEach((seller: any) => addParticipant.mutate({ competitionId: comp.id, sellerId: seller.id }));
+                }}>
+                  <Plus className="h-3 w-3" /> Adicionar Todos ({sellers.filter((s: any) => !participantSellerIds.has(s.id)).length})
+                </Button>
+              )}
+            </div>
             <div className="space-y-2">
               {sellers.filter((s: any) => !participantSellerIds.has(s.id)).map((seller: any) => (
                 <div key={seller.id} className="flex items-center gap-3 p-2 rounded-lg bg-accent/30">
