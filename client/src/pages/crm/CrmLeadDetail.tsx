@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation, useParams } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
 import {
   ArrowLeft, Phone, MessageCircle, Calendar, Clock, Edit2, Save, X,
@@ -110,7 +111,7 @@ export default function CrmLeadDetail() {
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
         <div className="flex items-center justify-between px-3 py-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate("/crm")} className="p-1.5 hover:bg-accent rounded-lg">
+            <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/crm"))} className="p-1.5 hover:bg-accent rounded-lg">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div>

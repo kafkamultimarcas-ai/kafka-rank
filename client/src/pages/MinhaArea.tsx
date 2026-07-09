@@ -287,7 +287,7 @@ export default function MinhaArea() {
   const logoutMutation = trpc.sellers.logout.useMutation({
     onSuccess: () => {
       toast.success("Logout realizado!");
-      window.location.href = "/";
+      window.location.href = buildTenantPath(tenantSlug, "/login");
     },
   });
 
@@ -1508,7 +1508,7 @@ export default function MinhaArea() {
 
           {/* CRM - Meus Clientes */}
           <button
-            onClick={() => navigate("/crm")}
+            onClick={() => navigate(buildTenantPath(tenantSlug, "/crm"))}
             className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
           >
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1523,7 +1523,7 @@ export default function MinhaArea() {
           {/* Simulador de Financiamento */}
           {(dept === "vendas" || dept === "fei") && (
             <button
-              onClick={() => navigate(`/simulador-financiamento/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/simulador-financiamento/${sellerId}`))}
               className="w-full bg-gradient-to-r from-teal-600/20 to-emerald-500/10 border border-teal-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-teal-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-teal-500/20 flex items-center justify-center">
@@ -1569,7 +1569,7 @@ export default function MinhaArea() {
           {/* Ver Ranking - não mostrar para financeiro */}
           {dept !== 'financeiro' && (
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate(buildTenantPath(tenantSlug, "/"))}
             className="w-full bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-yellow-500/60 transition-all"
           >
             <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
@@ -1868,7 +1868,7 @@ export default function MinhaArea() {
 
         {/* Back */}
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(buildTenantPath(tenantSlug, "/"))}
           className="flex items-center gap-2 text-gray-500 hover:text-gray-300 text-sm mx-auto"
         >
           <ArrowLeft className="w-3 h-3" /> Voltar ao ranking

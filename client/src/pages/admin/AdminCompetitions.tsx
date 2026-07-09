@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Play, Square, Users, UserPlus, X, Pencil, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Play, Square, Users, UserPlus, X, Pencil, RotateCcw, Eye } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
 import BracketPanel from "@/components/BracketPanel";
 
@@ -37,6 +39,8 @@ function tsToDateInput(ts: number) {
 }
 
 export default function AdminCompetitions() {
+  const [, setLocation] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
   const { data: competitions } = trpc.competitions.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const utils = trpc.useUtils();
@@ -147,6 +151,7 @@ export default function AdminCompetitions() {
                 onReactivate={() => updateComp.mutate({ id: comp.id, status: "active" })}
                 onEdit={() => openEdit(comp)}
                 onDelete={() => { if (confirm("Remover esta competição?")) deleteComp.mutate({ id: comp.id }); }}
+                onViewRace={() => setLocation(buildTenantPath(tenantSlug, `/corrida/${comp.id}`))}
                 onOpenParticipants={() => setParticipantDialog(comp.id)}
                 onOpenTeams={() => setTeamDialog(comp.id)}
                 participantDialogOpen={participantDialog === comp.id}
@@ -251,7 +256,7 @@ function CompetitionForm({ f, setF, onSubmit, submitLabel, isPending }: {
   );
 }
 
-function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdit, onDelete, onOpenParticipants, onOpenTeams,
+function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdit, onDelete, onOpenParticipants, onOpenTeams, onViewRace,
   participantDialogOpen, onCloseParticipants, teamDialogOpen, onCloseTeams,
   addParticipant, removeParticipant, createTeam, deleteTeam, teamForm, setTeamForm }: any) {
   const { data: participants } = trpc.participants.list.useQuery({ competitionId: comp.id });
@@ -326,6 +331,12 @@ function CompetitionCard({ comp, sellers, onStart, onFinish, onReactivate, onEdi
           <Button variant="outline" size="sm" onClick={onOpenTeams} className="gap-1 text-xs">
             <Users className="h-3 w-3" />
             Equipes ({teams?.length || 0})
+          </Button>
+        )}
+        {comp.status === "active" && (
+          <Button variant="outline" size="sm" onClick={onViewRace} className="gap-1 text-xs text-primary border-primary/30">
+            <Eye className="h-3 w-3" />
+            Ver Corrida
           </Button>
         )}
       </div>

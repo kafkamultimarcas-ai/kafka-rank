@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Search, ArrowLeft, Car, Banknote, FileText, Warehouse, Calendar, Trash2, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
 
 function formatDate(ts: number | string | Date | null | undefined) {
@@ -77,7 +78,7 @@ export default function VehicleSearch() {
       {/* Header */}
       <div className="sticky top-0 z-50 bg-gray-950/95 backdrop-blur border-b border-gray-800 px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">
+          <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/"))} className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>

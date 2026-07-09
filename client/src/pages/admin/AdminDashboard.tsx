@@ -1,12 +1,16 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-import { Users, Trophy, ShoppingCart, TrendingUp, Sparkles, Wrench, Banknote, DollarSign, Calendar, AlertTriangle } from "lucide-react";
+import { Users, Trophy, ShoppingCart, TrendingUp, Sparkles, Wrench, Banknote, DollarSign, Calendar, AlertTriangle, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 
 export default function AdminDashboard() {
+  const [, setLocation] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
   const { data: sellers } = trpc.sellers.list.useQuery({});
   const { data: competitions } = trpc.competitions.list.useQuery({});
   const { data: quote } = trpc.quotes.latest.useQuery();
@@ -137,6 +141,9 @@ export default function AdminDashboard() {
                       <p className="text-sm font-medium text-foreground truncate">{comp.name}</p>
                       <p className="text-xs text-muted-foreground">{comp.type === "individual" ? "Individual" : comp.type === "team" ? "Equipes" : "Grupos"}</p>
                     </div>
+                    <Button variant="ghost" size="sm" onClick={() => setLocation(buildTenantPath(tenantSlug, `/corrida/${comp.id}`))} className="gap-1 text-xs shrink-0">
+                      <Eye className="h-3 w-3" /> Ver Corrida
+                    </Button>
                   </div>
                 ))}
               </div>

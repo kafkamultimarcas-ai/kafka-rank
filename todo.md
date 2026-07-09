@@ -2307,3 +2307,7 @@
 - [x] Cards clicáveis na MinhaArea (resumo do setor → expandir detalhes)
 - [x] Varredura geral de usabilidade: facilitar navegação e acesso rápido
 - [x] Corrigir 404 vendedores: adicionar rotas /t/:slug/ para todas as páginas de vendedor (busca-veiculo, feirao, registrar-venda, agendamentos, meus-resultados, carros-bonus, ficha-financiamento, mesa-credito, ia-vendedor, simulador-financiamento, controle-patio, corrida, competicao, vendedor, treinamentos, tv, login, esqueci-senha, redefinir-senha, crm, crm/lead, crm/pipeline)
+- [x] Adicionar link TV/Corrida no menu lateral do DashboardLayout
+- [x] Adicionar botão Ver Corrida nas competições ativas (AdminDashboard e AdminCompetitions)
+- [ ] Corrigir deslogar ao navegar entre abas (sessão perdida)
+- [ ] Implementar opção Lembrar-me no login (salvar credenciais)

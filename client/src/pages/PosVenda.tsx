@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
 import { Wrench, ArrowLeft, Plus, Phone, Car, User, AlertTriangle, MapPin, Clock, ChevronDown, ChevronUp, FileText, MessageCircle, PhoneCall, X, Search } from "lucide-react";
 import { useBranding } from "@/contexts/TenantContext";
@@ -84,7 +85,7 @@ export default function PosVenda() {
       <header className="border-b border-gray-800 bg-gray-950/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/")} className="text-gray-500 hover:text-gray-300">
+            <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/"))} className="text-gray-500 hover:text-gray-300">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <Wrench className="h-5 w-5 text-orange-400" />

@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
 import { 
   DollarSign, ArrowLeft, Wrench, Clock, ChevronDown, ChevronUp, Phone, Car, 
@@ -46,7 +47,7 @@ export default function Financeiro() {
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const logoutMutation = trpc.sellers.logout.useMutation({
-    onSuccess: () => navigate("/"),
+    onSuccess: () => { window.location.href = buildTenantPath(getCurrentTenantSlug(), "/login"); },
   });
 
   const tabs: { key: MainTab; label: string; icon: any; color: string }[] = [
@@ -63,7 +64,7 @@ export default function Financeiro() {
       <header className="border-b border-gray-800 bg-gray-950/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/")} className="text-gray-500 hover:text-gray-300">
+            <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/"))} className="text-gray-500 hover:text-gray-300">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <DollarSign className="h-5 w-5 text-emerald-400" />
