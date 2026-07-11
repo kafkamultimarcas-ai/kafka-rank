@@ -14,12 +14,16 @@
 import { invokeLLM } from "./_core/llm";
 import * as crmDb from "./crmDb";
 import * as zapi from "./zapi-service";
+import * as metaMessaging from "./metaMessagingService";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { inventoryVehicles } from "../drizzle/schema";
 import { like, or, and, eq, gte, lte, between } from "drizzle-orm";
+import { getCurrentTenantId } from "./tenantDb";
 
 // ===== TYPES =====
+export type AttendantChannel = 'whatsapp' | 'meta';
+
 interface AttendantConfig {
   attendantEnabled: boolean;
   attendantMode: string; // 'always' | 'off_hours' | 'holidays'
@@ -83,7 +87,7 @@ export async function getAttendantConfig(): Promise<AttendantConfig | null> {
   const dbConn = await getDb();
   if (!dbConn) return null;
   try {
-    const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+    const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
     const rawRows = result as any;
     const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
     if (rows && rows.length > 0) {
@@ -195,7 +199,7 @@ async function searchVehiclesByTypeAndPrice(
   if (!dbConn) return [];
 
   try {
-    const conditions: any[] = [eq(inventoryVehicles.status, "available")];
+    const conditions: any[] = [eq(inventoryVehicles.tenantId, getCurrentTenantId()), eq(inventoryVehicles.status, "available")];
 
     // Map common terms to bodyType values
     const typeMap: Record<string, string[]> = {
@@ -256,11 +260,26 @@ async function searchVehiclesByTypeAndPrice(
   }
 }
 
+// ===== CHANNEL-AWARE SEND DISPATCH =====
+// handleAttendantMessage precisa responder pelo MESMO canal de origem da mensagem.
+// zapi.* fala com o WhatsApp (Z-API); metaMessaging.* fala com Messenger/Instagram
+// (mesmo endpoint da Send API da Meta pra ambos, via PSID/IGSID).
+async function sendChannelText(channel: AttendantChannel, to: string, text: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  if (channel === 'meta') return metaMessaging.sendText(to, text);
+  return zapi.sendText(to, text);
+}
+
+async function sendChannelImage(channel: AttendantChannel, to: string, imageUrl: string, caption?: string): Promise<{ success: boolean; error?: string }> {
+  if (channel === 'meta') return metaMessaging.sendImage(to, imageUrl, caption);
+  return zapi.sendImage(to, imageUrl, caption);
+}
+
 // ===== SEND VEHICLE PHOTOS =====
 async function sendVehiclePhotos(
   phone: string,
   leadId: number,
-  vehicles: any[]
+  vehicles: any[],
+  channel: AttendantChannel = 'whatsapp'
 ): Promise<number> {
   let sentCount = 0;
   for (const v of vehicles.slice(0, 3)) { // Max 3 vehicles
@@ -278,7 +297,7 @@ async function sendVehiclePhotos(
       const kmStr = v.km ? `${v.km.toLocaleString('pt-BR')} km` : '0 km';
       const caption = `${v.brand} ${v.model} ${v.year || ''} - ${kmStr} - ${priceStr}`;
       try {
-        const imgResult = await zapi.sendImage(phone, photoToSend, caption);
+        const imgResult = await sendChannelImage(channel, phone, photoToSend, caption);
         if (imgResult.success) {
           await crmDb.createMessage({
             leadId, phone, direction: "outbound", messageType: "image",
@@ -312,9 +331,9 @@ export async function createCreditApplication(leadId: number, data: CollectedDat
       return exRows[0].id;
     }
 
-    const result = await dbConn.execute(sql`INSERT INTO credit_applications 
-      (leadId, customerName, customerCpf, customerRg, customerBirthDate, customerPhone, customerEmail, customerAddress, customerIncome, customerEmployer, customerEmploymentTime, vehicleInterest, downPayment, tradeInVehicle, tradeInPlate, tradeInKm, financingTerm, aiCollected, aiCollectedAt, updatedAt)
-      VALUES (${leadId}, ${data.customerName || null}, ${data.customerCpf || null}, ${data.customerRg || null}, ${data.customerBirthDate || null}, ${data.customerPhone || null}, ${data.customerEmail || null}, ${data.customerAddress || null}, ${data.customerIncome || 0}, ${data.customerEmployer || null}, ${data.customerEmploymentTime || null}, ${data.vehicleInterest || null}, ${data.downPayment || 0}, ${data.tradeInVehicle || null}, ${data.tradeInPlate || null}, ${data.tradeInKm || 0}, ${data.financingTerm || 48}, 1, ${Date.now()}, ${Date.now()})`);
+    const result = await dbConn.execute(sql`INSERT INTO credit_applications
+      (leadId, customerName, customerCpf, customerRg, customerBirthDate, customerPhone, customerEmail, customerAddress, customerIncome, customerEmployer, customerEmploymentTime, vehicleInterest, downPayment, tradeInVehicle, tradeInPlate, tradeInKm, financingTerm, aiCollected, aiCollectedAt, updatedAt, tenantId)
+      VALUES (${leadId}, ${data.customerName || null}, ${data.customerCpf || null}, ${data.customerRg || null}, ${data.customerBirthDate || null}, ${data.customerPhone || null}, ${data.customerEmail || null}, ${data.customerAddress || null}, ${data.customerIncome || 0}, ${data.customerEmployer || null}, ${data.customerEmploymentTime || null}, ${data.vehicleInterest || null}, ${data.downPayment || 0}, ${data.tradeInVehicle || null}, ${data.tradeInPlate || null}, ${data.tradeInKm || 0}, ${data.financingTerm || 48}, 1, ${Date.now()}, ${Date.now()}, ${getCurrentTenantId()})`);
     const insertResult = result as any;
     const insertId = insertResult?.[0]?.insertId || insertResult?.insertId;
     if (insertId) {
@@ -346,9 +365,9 @@ export async function createAiAppointment(leadId: number, data: CollectedData): 
         }
       } catch { /* use default */ }
     }
-    const result = await dbConn.execute(sql`INSERT INTO ai_appointments 
-      (leadId, customerName, customerPhone, scheduledDate, scheduledTime, vehicleInterest, purpose, status, aiCreated, notes)
-      VALUES (${leadId}, ${data.customerName || null}, ${data.customerPhone || null}, ${scheduledTimestamp}, ${data.scheduledTime || '10:00'}, ${data.vehicleInterest || null}, 'visita', 'pending', 1, ${'Agendamento feito pela IA Atendente'})`);
+    const result = await dbConn.execute(sql`INSERT INTO ai_appointments
+      (leadId, customerName, customerPhone, scheduledDate, scheduledTime, vehicleInterest, purpose, status, aiCreated, notes, tenantId)
+      VALUES (${leadId}, ${data.customerName || null}, ${data.customerPhone || null}, ${scheduledTimestamp}, ${data.scheduledTime || '10:00'}, ${data.vehicleInterest || null}, 'visita', 'pending', 1, ${'Agendamento feito pela IA Atendente'}, ${getCurrentTenantId()})`);
     const insertResult = result as any;
     const insertId = insertResult?.[0]?.insertId || insertResult?.insertId;
     if (insertId) {
@@ -404,7 +423,8 @@ export async function analyzeLeadTemperature(leadId: number, chatHistory: string
 }
 
 // ===== BUILD SYSTEM PROMPT =====
-function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData: CollectedData, vehicleContext: string, chatHistory: string, aiMsgCount: number = 0, hardLimit: number = 5): string {
+function buildAttendantPrompt(config: AttendantConfig, lead: any, collectedData: CollectedData, vehicleContext: string, chatHistory: string, aiMsgCount: number = 0, hardLimit: number = 5, channel: AttendantChannel = 'whatsapp'): string {
+  const channelLabel = channel === 'meta' ? 'WhatsApp, Messenger ou Instagram' : 'WhatsApp';
   const firstName = (collectedData.customerName || lead.name || '').split(' ')[0] || 'amigo';
 
   // Calculate current Brasília time for correct greeting
@@ -544,7 +564,7 @@ ${tradeInStatus}`;
     ? `\n\nPERGUNTAS JA FEITAS (NUNCA REPITA ESTAS):\n${questionsAsked.map((q, i) => `${i+1}. ${q}`).join('\n')}`
     : '';
 
-  return `Voce e uma SDR (pre-vendas) da KAFKA Multimarcas, especialista em atendimento automotivo via WhatsApp.
+  return `Voce e uma SDR (pre-vendas) da KAFKA Multimarcas, especialista em atendimento automotivo via ${channelLabel}.
 
 === SEU OBJETIVO PRINCIPAL: QUALIFICAR O LEAD ===
 Sua UNICA missao e QUALIFICAR o lead para o vendedor. Isso significa:
@@ -702,7 +722,7 @@ Identifique o perfil do cliente pelo TOM das mensagens e adapte:
 - Se o cliente mandou VIDEO: "Recebi o video, vou analisar e ja te dou um retorno"
 
 === REGRAS ABSOLUTAS (NUNCA VIOLE) ===
-1. MENSAGENS CURTAS: 1-2 frases no maximo. Como gente de verdade no WhatsApp
+1. MENSAGENS CURTAS: 1-2 frases no maximo. Como gente de verdade no ${channelLabel}
 2. ZERO emoji. Nunca use emoji. Nenhum. Sem caracteres especiais Unicode de emoji. PROIBIDO
 3. ZERO formatacao: sem markdown, sem asteriscos, sem negrito, sem listas
 4. UMA pergunta por vez. NUNCA faca duas perguntas na mesma mensagem
@@ -966,7 +986,8 @@ async function logAiConversation(
 export async function handleAttendantMessage(
   leadId: number,
   incomingMessage: string,
-  phone: string
+  phone: string,
+  channel: AttendantChannel = 'whatsapp'
 ): Promise<{ sent: boolean; message?: string; action?: string }> {
   try {
     const config = await getAttendantConfig();
@@ -1314,7 +1335,7 @@ export async function handleAttendantMessage(
     }).join("\n");
 
     // Build prompt (pass message count so AI knows how many messages remain)
-    const systemPrompt = buildAttendantPrompt(config, lead, collectedData, vehicleContext + externalLinkContext, chatHistory, aiMsgCount, hardLimit);
+    const systemPrompt = buildAttendantPrompt(config, lead, collectedData, vehicleContext + externalLinkContext, chatHistory, aiMsgCount, hardLimit, channel);
 
     // Build context awareness for the LLM
     let contextNote = '';
@@ -1569,8 +1590,8 @@ export async function handleAttendantMessage(
       }
     }
 
-    // Send the message via WhatsApp
-    const sendResult = await zapi.sendText(phone, responseText);
+    // Send the message via the origin channel (WhatsApp or Messenger/Instagram)
+    const sendResult = await sendChannelText(channel, phone, responseText);
     if (sendResult.success) {
       // Save the message
       await crmDb.createMessage({
@@ -1623,7 +1644,7 @@ export async function handleAttendantMessage(
           // Small delay before sending photos (feels more natural)
           await new Promise(r => setTimeout(r, 2000));
           const vehiclesToSend = matchedVehicles.slice(0, 3);
-          const sentCount = await sendVehiclePhotos(phone, leadId, vehiclesToSend);
+          const sentCount = await sendVehiclePhotos(phone, leadId, vehiclesToSend, channel);
           if (sentCount > 0) {
             // Track which vehicles were sent to avoid duplicates
             const newSentIds = vehiclesToSend.map((v: any) => v.id);
@@ -1638,7 +1659,7 @@ export async function handleAttendantMessage(
           if (broadVehicles.length > 0) {
             await new Promise(r => setTimeout(r, 2000));
             const vehiclesToSend = broadVehicles.slice(0, 3);
-            const sentCount = await sendVehiclePhotos(phone, leadId, vehiclesToSend);
+            const sentCount = await sendVehiclePhotos(phone, leadId, vehiclesToSend, channel);
             if (sentCount > 0) {
               const newSentIds = vehiclesToSend.map((v: any) => v.id);
               updatedData.sentVehicleIds = [...alreadySentIds, ...newSentIds];
@@ -1652,7 +1673,7 @@ export async function handleAttendantMessage(
           const broadVehicles = await searchVehiclesByTypeAndPrice(vType, undefined, undefined, vSearch, 3);
           if (broadVehicles.length > 0) {
             await new Promise(r => setTimeout(r, 2000));
-            const sentCount = await sendVehiclePhotos(phone, leadId, broadVehicles);
+            const sentCount = await sendVehiclePhotos(phone, leadId, broadVehicles, channel);
             if (sentCount > 0) {
               const newSentIds = broadVehicles.slice(0, 3).map((v: any) => v.id);
               updatedData.sentVehicleIds = [...alreadySentIds, ...newSentIds];

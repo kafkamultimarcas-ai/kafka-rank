@@ -14,6 +14,8 @@ import {
   Volume2, Download, Play, File, Square, Handshake, Power, Shuffle, CheckCheck, CreditCard
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge, ChannelIndicator } from "@/components/ChannelIcon";
+import { useBranding } from "@/contexts/TenantContext";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -751,7 +753,9 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
 }
 
 export default function CrmCommandCenter() {
+  const { name: brandName } = useBranding();
   const [, navigate] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [filterScore, setFilterScore] = useState<string | null>(null);
@@ -881,7 +885,7 @@ export default function CrmCommandCenter() {
   const handleWhatsApp = useCallback((lead: any, customMsg?: string) => {
     if (!lead.phone) { toast.error("Lead sem telefone"); return; }
     const phone = lead.phone.replace(/\D/g, "");
-    const msg = customMsg || `Olá ${lead.name}! Tudo bem? Aqui é da Kafka Multimarcas.`;
+    const msg = customMsg || `Olá ${lead.name}! Tudo bem? Aqui é da ${brandName}.`;
     window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(msg)}`, "_blank");
     addActivity.mutate({ leadId: lead.id, sellerId, type: "whatsapp", description: "WhatsApp enviado" });
   }, [sellerId, addActivity]);
@@ -912,7 +916,7 @@ export default function CrmCommandCenter() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Faça login para acessar o CRM</p>
-          <Button onClick={() => navigate("/login-vendedor")} className="racing-gradient text-white">Fazer Login</Button>
+          <Button onClick={() => navigate("/login")} className="racing-gradient text-white">Fazer Login</Button>
         </div>
       </div>
     );
@@ -924,7 +928,7 @@ export default function CrmCommandCenter() {
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border/50">
         <div className="flex items-center justify-between px-3 py-2.5">
           <div className="flex items-center gap-2.5">
-            <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="p-1.5 hover:bg-accent rounded-lg transition-colors">
+            <button onClick={() => navigate(buildTenantPath(tenantSlug, `/minha-area/${sellerId}`))} className="p-1.5 hover:bg-accent rounded-lg transition-colors">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
             <div>
@@ -1189,7 +1193,7 @@ export default function CrmCommandCenter() {
                   onWhatsApp={() => handleWhatsApp(lead)} onCall={() => handleCall(lead)}
                   onChat={() => setChatLeadId(lead.id)}
                   onMoveStage={(newStage) => moveStage.mutate({ id: lead.id, newStage, sellerId })}
-                  onView={() => navigate(`/crm/lead/${lead.id}`)}
+                  onView={() => navigate(buildTenantPath(tenantSlug, `/crm/lead/${lead.id}`))}
                   onTemplateSelect={(tId) => handleTemplateSelect(lead, tId)}
                   onAssign={(newSellerId) => handleAssign(lead.id, newSellerId)}
                   showTemplates={showTemplates === lead.id}
@@ -1213,7 +1217,7 @@ export default function CrmCommandCenter() {
         <PipelineView sellerId={sellerId} dept={dept} stages={stages || []} leads={filteredLeads || []}
           isSDR={isSDR} sellerMap={sellerMap}
           onMoveStage={(id, stage) => moveStage.mutate({ id, newStage: stage, sellerId })}
-          onView={(id) => navigate(`/crm/lead/${id}`)} />
+          onView={(id) => navigate(buildTenantPath(tenantSlug, `/crm/lead/${id}`))} />
       )}
 
       {activeTab === "fichas" && (
@@ -1235,14 +1239,14 @@ export default function CrmCommandCenter() {
       {/* Bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/98 backdrop-blur-xl border-t border-border/40 z-50 safe-area-bottom">
         <div className="flex justify-around py-1.5 max-w-md mx-auto">
-          <button onClick={() => navigate(`/minha-area/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-lg">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, `/minha-area/${sellerId}`))} className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-lg">
             <User className="w-5 h-5" /><span className="text-[10px]">Minha Área</span>
           </button>
           <button className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-primary relative">
             <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-primary rounded-full" />
             <LayoutGrid className="w-5 h-5" /><span className="text-[10px] font-bold">CRM</span>
           </button>
-          <button onClick={() => navigate(`/agendamentos/${sellerId}`)} className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-lg">
+          <button onClick={() => navigate(buildTenantPath(tenantSlug, `/agendamentos/${sellerId}`))} className="flex flex-col items-center gap-0.5 px-4 py-1.5 text-muted-foreground/70 hover:text-muted-foreground transition-colors rounded-lg">
             <Calendar className="w-5 h-5" /><span className="text-[10px]">Agenda</span>
           </button>
         </div>
@@ -2072,6 +2076,7 @@ function SellerFichasView({ sellerId }: { sellerId: number }) {
   const [notes, setNotes] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'fichas' | 'simulacao'>('fichas');
   const [, navigate] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
 
   const statusColors: Record<string, string> = {
     pending: "text-amber-400 bg-amber-500/10 border-amber-500/30",
@@ -2277,7 +2282,7 @@ function SellerFichasView({ sellerId }: { sellerId: number }) {
                         </div>
                       )}
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-[11px]" onClick={() => navigate(`/crm/lead/${lead.id}`)}>
+                        <Button size="sm" variant="outline" className="text-[11px]" onClick={() => navigate(buildTenantPath(tenantSlug, `/crm/lead/${lead.id}`))}>
                           <Eye className="w-3 h-3 mr-1" /> Ver Lead
                         </Button>
                       </div>

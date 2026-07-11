@@ -2,6 +2,8 @@ import { ENV } from "./_core/env";
 import { getDb } from "./db";
 import { tenants } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { getCurrentTenantId } from "./tenantDb";
+import { decryptSecret } from "./_core/secretCrypto";
 
 // ===== TENANT-AWARE Z-API CREDENTIALS =====
 
@@ -16,7 +18,13 @@ interface ZapiCredentials {
 const credentialsCache = new Map<number, { creds: ZapiCredentials; expiresAt: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
-/** Get Z-API credentials for a specific tenant, fallback to global ENV */
+/**
+ * Get Z-API credentials for a specific tenant, fallback to global ENV.
+ * Quando tenantId não é passado explicitamente, usa o tenant resolvido da request
+ * atual (AsyncLocalStorage) — isso cobre automaticamente qualquer chamador que
+ * rode dentro de um contexto tRPC ou de um webhook já tenantizado, sem precisar
+ * que cada um dos pontos de chamada passe o tenantId manualmente.
+ */
 async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials> {
   // Default global credentials
   const globalCreds: ZapiCredentials = {
@@ -26,10 +34,11 @@ async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials>
     apiUrl: ENV.zapiApiUrl || "https://api.z-api.io",
   };
 
-  if (!tenantId || tenantId <= 1) return globalCreds;
+  const effectiveTenantId = tenantId ?? getCurrentTenantId();
+  if (!effectiveTenantId || effectiveTenantId <= 1) return globalCreds;
 
   // Check cache
-  const cached = credentialsCache.get(tenantId);
+  const cached = credentialsCache.get(effectiveTenantId);
   if (cached && cached.expiresAt > Date.now()) return cached.creds;
 
   // Fetch from DB
@@ -40,16 +49,16 @@ async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials>
       zapiInstanceId: tenants.zapiInstanceId,
       zapiToken: tenants.zapiToken,
       zapiClientToken: tenants.zapiClientToken,
-    }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    }).from(tenants).where(eq(tenants.id, effectiveTenantId)).limit(1);
 
     if (tenant?.zapiInstanceId && tenant?.zapiToken) {
       const creds: ZapiCredentials = {
         instanceId: tenant.zapiInstanceId,
-        token: tenant.zapiToken,
-        clientToken: tenant.zapiClientToken || "",
+        token: decryptSecret(tenant.zapiToken),
+        clientToken: decryptSecret(tenant.zapiClientToken),
         apiUrl: "https://api.z-api.io",
       };
-      credentialsCache.set(tenantId, { creds, expiresAt: Date.now() + CACHE_TTL });
+      credentialsCache.set(effectiveTenantId, { creds, expiresAt: Date.now() + CACHE_TTL });
       return creds;
     }
   } catch (err) {

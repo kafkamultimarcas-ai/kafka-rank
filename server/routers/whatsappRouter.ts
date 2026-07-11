@@ -40,12 +40,15 @@ export const whatsappRouter = router({
       // Import dynamically to avoid circular deps
       const { getDb } = await import("../db");
       const { inventoryVehicles } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
+      const { eq, and } = await import("drizzle-orm");
+      const { getCurrentTenantId } = await import("../tenantDb");
 
       const db = await getDb();
       if (!db) throw new Error("DB not available");
 
-      const [vehicle] = await db.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.vehicleId)).limit(1);
+      const [vehicle] = await db.select().from(inventoryVehicles)
+        .where(and(eq(inventoryVehicles.id, input.vehicleId), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+        .limit(1);
       if (!vehicle) throw new Error("Veículo não encontrado");
 
       const priceFormatted = vehicle.price
@@ -75,8 +78,13 @@ export const whatsappRouter = router({
       webhookUrl: z.string().url().optional(),
     }).optional())
     .mutation(async ({ input }) => {
-      // Default to our production webhook URL
-      const url = input?.webhookUrl || "https://kafkarank.com/api/webhooks/whatsapp";
+      // Default to our production webhook URL, scoped to the current tenant's slug
+      // (a legacy call without slug always resolves to tenant 1 on the server side)
+      const { getCurrentTenantSlug } = await import("../tenantUrls");
+      const tenantSlug = await getCurrentTenantSlug();
+      const url = input?.webhookUrl || (tenantSlug
+        ? `https://kafkarank.com/api/webhooks/whatsapp/${tenantSlug}`
+        : "https://kafkarank.com/api/webhooks/whatsapp");
       const result = await zapi.setWebhook(url);
       // Also enable notifySentByMe to capture outbound messages from the phone
       await zapi.enableNotifySentByMe();

@@ -2,11 +2,13 @@ import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download, ZoomIn, ChevronLeft, ChevronRight, Heart, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
+import { useBranding } from "@/contexts/TenantContext";
+import { getCurrentTenantSlug } from "@/lib/tenant";
 
 function formatPrice(v: number | null | undefined) {
   if (!v) return "Consulte";
@@ -58,17 +60,64 @@ function isIOS() {
 }
 
 export default function Estoque() {
+  const { logoUrl, name: brandName } = useBranding();
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("available");
   const [brandFilter, setBrandFilter] = useState("");
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => {
+    const veiculoParam = new URLSearchParams(window.location.search).get("veiculo");
+    return veiculoParam ? Number(veiculoParam) : null;
+  });
   const [copiedId, setCopiedId] = useState<number | null>(null);
-  
+  const referredSellerId = useMemo(() => {
+    const v = new URLSearchParams(window.location.search).get("vendedor");
+    return v ? Number(v) : null;
+  }, []);
+
   // Lightbox state
   const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // "Tenho Interesse" modal state
+  const [interestVehicle, setInterestVehicle] = useState<any | null>(null);
+  const [interestName, setInterestName] = useState("");
+  const [interestPhone, setInterestPhone] = useState("");
+  const [interestSending, setInterestSending] = useState(false);
+
+  const submitInterest = async () => {
+    if (!interestVehicle || interestName.trim().length < 2) return;
+    setInterestSending(true);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const res = await fetch("/api/webhooks/widget/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: interestName.trim(),
+          phone: interestPhone.trim() || null,
+          vehicleInterest: `${interestVehicle.brand} ${interestVehicle.model} (#${interestVehicle.id})`,
+          tenantSlug: getCurrentTenantSlug(),
+          pageUrl: window.location.href,
+          utmSource: params.get("utm_source") || undefined,
+          utmMedium: params.get("utm_medium") || undefined,
+          utmCampaign: params.get("utm_campaign") || undefined,
+          sellerId: referredSellerId || undefined,
+          formId: "estoque_publico",
+        }),
+      });
+      if (!res.ok) throw new Error("Falha ao enviar");
+      toast.success("Recebemos seu interesse! Entraremos em contato em breve.");
+      setInterestVehicle(null);
+      setInterestName("");
+      setInterestPhone("");
+    } catch {
+      toast.error("Não deu pra enviar agora. Tenta de novo em instantes.");
+    } finally {
+      setInterestSending(false);
+    }
+  };
 
   // Extrair filtro de preço da busca
   const priceFilter = useMemo(() => extractPriceFilter(search), [search]);
@@ -92,7 +141,7 @@ export default function Estoque() {
 
   const sendViaWhatsApp = (v: any) => {
     const photos: string[] = v.photos ? (typeof v.photos === "string" ? JSON.parse(v.photos) : v.photos as string[]) : [];
-    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *Kafka Multimarcas*`;
+    const text = `🚗 *${v.brand} ${v.model}*${v.version ? ` ${v.version}` : ""}\n📅 Ano: ${v.year || "N/A"}\n\n${photos.length > 0 ? photos.slice(0, 5).join("\n") : ""}\n\n🏪 *${brandName}*`;
     const encoded = encodeURIComponent(text);
     window.open(`https://wa.me/?text=${encoded}`, "_blank");
   };
@@ -257,7 +306,7 @@ export default function Estoque() {
             <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="gap-1.5 -ml-2">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={LOGO_URL} alt="Kafka" className="h-7 w-7 rounded-lg" />
+            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
             <div>
               <span className="font-heading font-bold text-sm text-foreground">ESTOQUE</span>
               <span className="text-xs text-muted-foreground ml-2">{vehicles?.length || 0} veículos</span>
@@ -502,6 +551,13 @@ export default function Estoque() {
 
                       {/* Actions */}
                       <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setInterestVehicle(v); }}
+                          className="w-full gap-1.5 text-xs racing-gradient text-white"
+                        >
+                          <Heart className="h-3.5 w-3.5" /> Tenho Interesse
+                        </Button>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
@@ -557,6 +613,37 @@ export default function Estoque() {
           </div>
         )}
       </div>
+
+      {/* "Tenho Interesse" modal */}
+      <Dialog open={!!interestVehicle} onOpenChange={(open) => !open && setInterestVehicle(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tenho interesse</DialogTitle>
+          </DialogHeader>
+          {interestVehicle && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {interestVehicle.brand} {interestVehicle.model} {interestVehicle.year ? `${interestVehicle.year}` : ""} — {formatPrice(interestVehicle.price)}
+              </p>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Seu nome *</Label>
+                <Input value={interestName} onChange={(e) => setInterestName(e.target.value)} placeholder="Como podemos te chamar?" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">WhatsApp</Label>
+                <Input value={interestPhone} onChange={(e) => setInterestPhone(e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Alguém da nossa equipe entra em contato em breve.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setInterestVehicle(null)} disabled={interestSending}>Cancelar</Button>
+            <Button onClick={submitInterest} disabled={interestSending || interestName.trim().length < 2} className="racing-gradient text-white">
+              {interestSending ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Enviando...</> : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

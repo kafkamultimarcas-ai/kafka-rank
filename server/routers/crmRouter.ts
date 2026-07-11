@@ -12,6 +12,8 @@ import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 import * as zapi from "../zapi-service";
 import { sellers } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { getCurrentTenantId } from "../tenantDb";
+import { getTenantLimits } from "../tenantService";
 
 // ===== HELPER: Notify seller via WhatsApp when they receive a new lead =====
 async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadPhone: string | null, source: string | null, vehicleInterest: string | null) {
@@ -28,7 +30,7 @@ async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadP
     
     const message = `\ud83d\udea8 *NOVO LEAD RECEBIDO!*\n\n\ud83d\udc64 ${leadName}${sourceLabel}${phoneLabel}${vehicleLabel}\n\n\u26a1 Responda R\u00c1PIDO para n\u00e3o perder essa venda!`;
     
-    await zapi.sendText(seller.phone, message);
+    await zapi.sendText(seller.phone, message, (seller as any).tenantId);
     console.log(`[WhatsApp] Lead notification sent to seller #${sellerId} (${seller.phone})`);
   } catch (err: any) {
     console.error(`[WhatsApp] Failed to notify seller #${sellerId}:`, err.message);
@@ -38,55 +40,6 @@ async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadP
 // ===== ADMIN AUTH (Login direto com usuário + senha) =====
 
 export const adminAuthRouter = router({
-  // Auto-login for owner - enters CRM admin without password (finds first owner admin for the tenant)
-  autoLogin: publicProcedure.input(z.object({
-    tenantId: z.number().optional(),
-  }).optional()).mutation(async ({ input }) => {
-    // Try to find the first owner admin, fallback to any active admin
-    const allAdmins = await crmDb.listAdmins();
-    const admin = allAdmins.find((a: any) => a.role === 'owner' && a.active) || allAdmins.find((a: any) => a.active);
-    if (!admin) {
-      throw new Error("Nenhuma conta admin encontrada");
-    }
-    const token = jwt.sign(
-      { adminId: admin.id, role: admin.role, type: "admin_auth", tenantId: (admin as any).tenantId || 1 },
-      ENV.cookieSecret,
-      { expiresIn: "30d" }
-    );
-    return { token, admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role, mustChangePassword: false } };
-  }),
-
-  // Login direto com usuário + senha
-  login: publicProcedure.input(z.object({
-    username: z.string().min(1),
-    password: z.string().min(1),
-  })).mutation(async ({ input }) => {
-    const admin = await crmDb.getAdminByUsername(input.username);
-    if (!admin || !admin.active) {
-      throw new Error("Usuário ou senha inválidos");
-    }
-    const valid = await bcrypt.compare(input.password, admin.passwordHash);
-    if (!valid) {
-      throw new Error("Usuário ou senha inválidos");
-    }
-
-    const mustChange = (admin as any).mustChangePassword || false;
-
-    const token = jwt.sign(
-      { adminId: admin.id, role: admin.role, type: "admin_auth", tenantId: (admin as any).tenantId || 1 },
-      ENV.cookieSecret,
-      { expiresIn: "30d" }
-    );
-
-    // Update last access
-    await crmDb.updateAdmin(admin.id, { lastAccess: Date.now() } as any);
-
-    return {
-      token,
-      admin: { id: admin.id, name: admin.name, username: admin.username, role: admin.role, mustChangePassword: mustChange },
-    };
-  }),
-
   // Trocar senha (primeiro acesso ou voluntário)
   changePassword: publicProcedure.input(z.object({
     token: z.string(),
@@ -112,18 +65,22 @@ export const adminAuthRouter = router({
     return { success: true };
   }),
 
-  me: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input }) => {
+  me: publicProcedure.input(z.object({ token: z.string() })).query(async ({ input, ctx }) => {
     try {
       const payload = jwt.verify(input.token, ENV.cookieSecret) as any;
       if (payload.type !== "admin_auth") return null;
       const admin = await crmDb.getAdminById(payload.adminId);
       if (!admin || !admin.active) return null;
+      const limits = await getTenantLimits(ctx.tenantId);
       return {
         id: admin.id,
         name: admin.name,
         username: admin.username,
         role: admin.role,
         mustChangePassword: (admin as any).mustChangePassword || false,
+        trialEndsAt: limits?.trialEndsAt ?? null,
+        trialExpired: limits?.trialExpired ?? false,
+        subscriptionSuspended: limits?.status === "suspended",
       };
     } catch {
       return null;
@@ -135,26 +92,27 @@ export const adminAuthRouter = router({
   }),
 
   create: adminProcedure.input(z.object({
-    username: z.string().min(3),
+    username: z.string().min(3).optional(),
     password: z.string().min(4),
     name: z.string().min(1),
-    email: z.string().email().optional(),
+    email: z.string().email("E-mail do admin inválido"),
     phone: z.string().optional(),
     role: z.enum(["owner", "admin"]).optional(),
     permissions: z.string().optional(),
     mustChangePassword: z.boolean().optional(),
   })).mutation(async ({ input }) => {
     const hash = await bcrypt.hash(input.password, 10);
+    const username = input.username || input.email.split("@")[0];
     const id = await crmDb.createAdmin({
-      username: input.username,
+      username,
       passwordHash: hash,
       name: input.name,
       role: input.role,
       permissions: input.permissions,
       email: input.email,
       phone: input.phone,
-      mustChangePassword: input.mustChangePassword ?? true, // Default: must change on first login
-    } as any);
+      mustChangePassword: input.mustChangePassword ?? true,
+    });
     return { id };
   }),
 
@@ -480,10 +438,13 @@ export const crmInventoryRouter = router({
   getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) return null;
-    const result = await dbConn.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.id)).limit(1);
+    const result = await dbConn.select().from(inventoryVehicles)
+      .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+      .limit(1);
     const v = result[0];
     if (!v) return null;
     // Map to CRM-compatible format
@@ -505,9 +466,10 @@ export const crmInventoryRouter = router({
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
     const { eq, and, like, or, desc } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) return [];
-    const conditions: any[] = [];
+    const conditions: any[] = [eq(inventoryVehicles.tenantId, getCurrentTenantId())];
     if (input?.status && input.status !== "all") {
       conditions.push(eq(inventoryVehicles.status, input.status as any));
     }
@@ -520,8 +482,7 @@ export const crmInventoryRouter = router({
         like(inventoryVehicles.color, p),
       ));
     }
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
-    const rows = await dbConn.select().from(inventoryVehicles).where(where).orderBy(desc(inventoryVehicles.createdAt));
+    const rows = await dbConn.select().from(inventoryVehicles).where(and(...conditions)).orderBy(desc(inventoryVehicles.createdAt));
     // Map to CRM-compatible format
     return rows.map(v => ({
       id: v.id, brand: v.brand, model: v.model, year: v.year ? String(v.year) : null,
@@ -541,10 +502,12 @@ export const crmInventoryRouter = router({
   })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
     const result = await dbConn.insert(inventoryVehicles).values({
       externalId: `manual-${nanoid(8)}`,
+      tenantId: getCurrentTenantId(),
       brand: input.brand, model: input.model,
       year: input.year ? parseInt(input.year) : null,
       color: input.color || null, plate: input.plate || null,
@@ -561,23 +524,29 @@ export const crmInventoryRouter = router({
   })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
     const updates: any = {};
     if (input.status) updates.status = input.status;
     if (input.notes !== undefined) updates.observation = input.notes;
-    await dbConn.update(inventoryVehicles).set(updates).where(eq(inventoryVehicles.id, input.id));
+    const [result] = await dbConn.update(inventoryVehicles).set(updates)
+      .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+    if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
     return { success: true };
   }),
 
   delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("DB not available");
-    await dbConn.delete(inventoryVehicles).where(eq(inventoryVehicles.id, input.id));
+    const [result] = await dbConn.delete(inventoryVehicles)
+      .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId())));
+    if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
     return { success: true };
   }),
 
@@ -646,6 +615,8 @@ export const crmIntegrationsRouter = router({
       pageId: config.pageId || "",
       hasAppSecret: !!config.appSecret,
       hasPageAccessToken: !!config.pageAccessToken,
+      dmEnabled: !!config.dmEnabled,
+      commentTriggerWords: Array.isArray(config.commentTriggerWords) ? config.commentTriggerWords.join(", ") : "",
     };
   }),
 
@@ -655,6 +626,8 @@ export const crmIntegrationsRouter = router({
     pageAccessToken: z.string().optional(),
     verifyToken: z.string().optional(),
     pageId: z.string().optional(),
+    dmEnabled: z.boolean().optional(),
+    commentTriggerWords: z.string().optional(),
   })).mutation(async ({ input }) => {
     let integration = await crmDb.getIntegrationByType("facebook");
     let existingConfig: any = {};
@@ -668,6 +641,10 @@ export const crmIntegrationsRouter = router({
     if (input.pageAccessToken && !input.pageAccessToken.includes("***")) newConfig.pageAccessToken = input.pageAccessToken;
     if (input.verifyToken !== undefined) newConfig.verifyToken = input.verifyToken;
     if (input.pageId !== undefined) newConfig.pageId = input.pageId;
+    if (input.dmEnabled !== undefined) newConfig.dmEnabled = input.dmEnabled;
+    if (input.commentTriggerWords !== undefined) {
+      newConfig.commentTriggerWords = input.commentTriggerWords.split(",").map(w => w.trim()).filter(Boolean);
+    }
 
     if (integration) {
       await crmDb.updateIntegration(integration.id, { config: JSON.stringify(newConfig) });
@@ -1287,10 +1264,13 @@ export const crmChatRouter = router({
     // Query from inventory_vehicles table (same table the frontend list uses)
     const { getDb } = await import("../db");
     const { inventoryVehicles } = await import("../../drizzle/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and } = await import("drizzle-orm");
+    const { getCurrentTenantId } = await import("../tenantDb");
     const dbConn = await getDb();
     if (!dbConn) throw new Error("Erro de conexão");
-    const rows = await dbConn.select().from(inventoryVehicles).where(eq(inventoryVehicles.id, input.vehicleId)).limit(1);
+    const rows = await dbConn.select().from(inventoryVehicles)
+      .where(and(eq(inventoryVehicles.id, input.vehicleId), eq(inventoryVehicles.tenantId, getCurrentTenantId())))
+      .limit(1);
     const v = rows[0];
     if (!v) throw new Error("Veículo não encontrado");
     
@@ -1409,11 +1389,13 @@ export const crmAiRouter = router({
       const { getDb } = await import("../db");
       const { inventoryVehicles } = await import("../../drizzle/schema");
       const { like, or, and, eq } = await import("drizzle-orm");
+      const { getCurrentTenantId } = await import("../tenantDb");
       const dbConn = await getDb();
       if (dbConn) {
         const search = `%${lead.vehicleInterest}%`;
         const vehicles = await dbConn.select().from(inventoryVehicles)
           .where(and(
+            eq(inventoryVehicles.tenantId, getCurrentTenantId()),
             eq(inventoryVehicles.status, "available"),
             or(like(inventoryVehicles.model, search), like(inventoryVehicles.brand, search))
           )).limit(5);
@@ -1439,7 +1421,7 @@ export const crmAiRouter = router({
       const { sql } = await import("drizzle-orm");
       const dbConn = await getDb();
       if (dbConn) {
-        const cfgResult = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+        const cfgResult = await dbConn.execute(sql`SELECT aiMode, feiraoConfig FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
         const cfgRaw = cfgResult as any;
         const cfgRows = Array.isArray(cfgRaw?.[0]) ? cfgRaw[0] : cfgRaw;
         if (cfgRows && cfgRows.length > 0 && cfgRows[0].aiMode === 'feirao' && cfgRows[0].feiraoConfig) {
@@ -1534,7 +1516,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) return defaults;
     try {
       const { sql } = await import("drizzle-orm");
-      const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const result = await dbConn.execute(sql`SELECT * FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
       const rawRows = result as any;
       const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       if (rows && rows.length > 0) {
@@ -1582,21 +1564,22 @@ ${chatHistory || '(Primeira mensagem)'}`;
     const feiraoJson = input.feiraoConfig ? JSON.stringify(input.feiraoConfig) : null;
     const normalJson = input.normalConfig ? JSON.stringify(input.normalConfig) : null;
     const now = Date.now();
+    const tenantId = getCurrentTenantId();
     // Get old config for logging
     let oldMode = 'normal';
     try {
-      const old = await dbConn.execute(sql`SELECT aiMode FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const old = await dbConn.execute(sql`SELECT aiMode FROM crm_ai_global_config WHERE tenantId = ${tenantId} LIMIT 1`);
       const oldRows = Array.isArray((old as any)?.[0]) ? (old as any)[0] : old;
       if (oldRows?.[0]) oldMode = oldRows[0].aiMode || 'normal';
     } catch {}
-    await dbConn.execute(sql`UPDATE crm_ai_global_config SET aiMode = ${input.aiMode}, feiraoConfig = ${feiraoJson}, normalConfig = ${normalJson}, updatedAt = ${now} WHERE id = 1`);
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET aiMode = ${input.aiMode}, feiraoConfig = ${feiraoJson}, normalConfig = ${normalJson}, updatedAt = ${now} WHERE tenantId = ${tenantId}`);
     // Log the change
     const adminName = (ctx as any).user?.name || 'Sistema';
     const adminId = (ctx as any).user?.id || null;
     if (oldMode !== input.aiMode) {
-      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, createdAt) VALUES (${adminId}, ${adminName}, 'modo_ia', 'aiMode', ${oldMode}, ${input.aiMode}, ${now})`);
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (tenantId, adminId, adminName, action, field, oldValue, newValue, createdAt) VALUES (${tenantId}, ${adminId}, ${adminName}, 'modo_ia', 'aiMode', ${oldMode}, ${input.aiMode}, ${now})`);
     } else {
-      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'config_feirao', 'feiraoConfig', ${null}, ${null}, ${input.aiMode === 'feirao' ? feiraoJson : normalJson}, ${now})`);
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (tenantId, adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${tenantId}, ${adminId}, ${adminName}, 'config_feirao', 'feiraoConfig', ${null}, ${null}, ${input.aiMode === 'feirao' ? feiraoJson : normalJson}, ${now})`);
     }
     return { success: true };
   }),
@@ -1620,6 +1603,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) throw new Error("DB not available");
     const { sql } = await import("drizzle-orm");
     const now = Date.now();
+    const tenantId = getCurrentTenantId();
     // Log changes
     const adminName = (ctx as any).user?.name || 'Sistema';
     const adminId = (ctx as any).user?.id || null;
@@ -1632,9 +1616,9 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (input.personality !== undefined) changes.push(`Personalidade: ${input.personality}`);
     if (input.inactiveDispatchEnabled !== undefined) changes.push(`Disparo inativos ${input.inactiveDispatchEnabled ? 'ATIVADO' : 'DESATIVADO'}`);
     if (changes.length > 0) {
-      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'config_avancada', 'advanced', ${null}, ${null}, ${changes.join('; ')}, ${now})`);
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (tenantId, adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${tenantId}, ${adminId}, ${adminName}, 'config_avancada', 'advanced', ${null}, ${null}, ${changes.join('; ')}, ${now})`);
     }
-    await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET
       autoReplyEnabled = ${input.autoReplyEnabled !== undefined ? (input.autoReplyEnabled ? 1 : 0) : sql`autoReplyEnabled`},
       workingHoursEnabled = ${input.workingHoursEnabled !== undefined ? (input.workingHoursEnabled ? 1 : 0) : sql`workingHoursEnabled`},
       workingHoursStart = ${input.workingHoursStart !== undefined ? input.workingHoursStart : sql`workingHoursStart`},
@@ -1647,13 +1631,16 @@ ${chatHistory || '(Primeira mensagem)'}`;
       inactiveDispatchMessage = ${input.inactiveDispatchMessage !== undefined ? input.inactiveDispatchMessage : sql`inactiveDispatchMessage`},
       inactiveDispatchMaxPerDay = ${input.inactiveDispatchMaxPerDay !== undefined ? input.inactiveDispatchMaxPerDay : sql`inactiveDispatchMaxPerDay`},
       updatedAt = ${now}
-    WHERE id = 1`);
+    WHERE tenantId = ${tenantId}`);
 
-    // When global toggle changes, mass-update all leads
+    // When global toggle changes, mass-update apenas os leads deste tenant (NUNCA global sem filtro)
     if (input.autoReplyEnabled !== undefined) {
       const val = input.autoReplyEnabled ? 1 : 0;
-      await dbConn.execute(sql`UPDATE crm_ai_settings SET enabled = ${val}`);
-      console.log(`[AI Config] Global toggle ${input.autoReplyEnabled ? 'ON' : 'OFF'} - updated all leads`);
+      await dbConn.execute(sql`UPDATE crm_ai_settings cas
+        INNER JOIN crm_leads cl ON cl.id = cas.leadId
+        SET cas.enabled = ${val}
+        WHERE cl.tenantId = ${tenantId}`);
+      console.log(`[AI Config] Tenant ${tenantId}: global toggle ${input.autoReplyEnabled ? 'ON' : 'OFF'} - updated leads for this tenant only`);
     }
 
     return { success: true };
@@ -1666,10 +1653,11 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) return { todayCount: 0, totalCount: 0, lastRun: null as number | null };
     try {
       const { sql } = await import("drizzle-orm");
+      const tenantId = getCurrentTenantId();
       const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      const todayResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log WHERE sentAt >= ${todayStart.getTime()}`);
-      const totalResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log`);
-      const configResult = await dbConn.execute(sql`SELECT inactiveDispatchLastRun FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const todayResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log WHERE tenantId = ${tenantId} AND sentAt >= ${todayStart.getTime()}`);
+      const totalResult = await dbConn.execute(sql`SELECT COUNT(*) as cnt FROM crm_ai_inactive_dispatch_log WHERE tenantId = ${tenantId}`);
+      const configResult = await dbConn.execute(sql`SELECT inactiveDispatchLastRun FROM crm_ai_global_config WHERE tenantId = ${tenantId} LIMIT 1`);
       const todayRaw = todayResult as any;
       const totalRaw = totalResult as any;
       const cfgRaw = configResult as any;
@@ -1703,7 +1691,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     try {
       const { sql } = await import("drizzle-orm");
       const limit = input?.limit || 30;
-      const result = await dbConn.execute(sql`SELECT * FROM crm_ai_config_log ORDER BY createdAt DESC LIMIT ${limit}`);
+      const result = await dbConn.execute(sql`SELECT * FROM crm_ai_config_log WHERE tenantId = ${getCurrentTenantId()} ORDER BY createdAt DESC LIMIT ${limit}`);
       const rawRows = result as any;
       const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       return (rows || []).map((r: any) => ({
@@ -1728,7 +1716,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) return defaults;
     try {
       const { sql } = await import("drizzle-orm");
-      const result = await dbConn.execute(sql`SELECT feiraoScheduleStart, feiraoScheduleEnd, feiraoAutoSchedule FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const result = await dbConn.execute(sql`SELECT feiraoScheduleStart, feiraoScheduleEnd, feiraoAutoSchedule FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
       const rawRows = result as any;
       const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       if (rows?.[0]) {
@@ -1752,18 +1740,19 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) throw new Error("DB not available");
     const { sql } = await import("drizzle-orm");
     const now = Date.now();
-    await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
+    const tenantId = getCurrentTenantId();
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET
       feiraoScheduleStart = ${input.feiraoScheduleStart},
       feiraoScheduleEnd = ${input.feiraoScheduleEnd},
       feiraoAutoSchedule = ${input.feiraoAutoSchedule ? 1 : 0},
       updatedAt = ${now}
-    WHERE id = 1`);
+    WHERE tenantId = ${tenantId}`);
     // Log
     const adminName = (ctx as any).user?.name || 'Sistema';
     const adminId = (ctx as any).user?.id || null;
     const startStr = input.feiraoScheduleStart ? new Date(input.feiraoScheduleStart).toLocaleDateString('pt-BR') : 'N/A';
     const endStr = input.feiraoScheduleEnd ? new Date(input.feiraoScheduleEnd).toLocaleDateString('pt-BR') : 'N/A';
-    await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'agendamento_feirao', 'feiraoSchedule', ${null}, ${null}, ${`Auto: ${input.feiraoAutoSchedule ? 'SIM' : 'N\u00c3O'}, In\u00edcio: ${startStr}, Fim: ${endStr}`}, ${now})`);
+    await dbConn.execute(sql`INSERT INTO crm_ai_config_log (tenantId, adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${tenantId}, ${adminId}, ${adminName}, 'agendamento_feirao', 'feiraoSchedule', ${null}, ${null}, ${`Auto: ${input.feiraoAutoSchedule ? 'SIM' : 'N\u00c3O'}, In\u00edcio: ${startStr}, Fim: ${endStr}`}, ${now})`);
     return { success: true };
   }),
 
@@ -1780,7 +1769,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) return defaults;
     try {
       const { sql } = await import("drizzle-orm");
-      const result = await dbConn.execute(sql`SELECT attendantEnabled, attendantMode, attendantPrompt, attendantSchedule, attendantCollectData, attendantAutoSchedule, attendantAutoFicha, attendantAutoDistribute, attendantTankPromo, attendantMaxMessages FROM crm_ai_global_config WHERE id = 1 LIMIT 1`);
+      const result = await dbConn.execute(sql`SELECT attendantEnabled, attendantMode, attendantPrompt, attendantSchedule, attendantCollectData, attendantAutoSchedule, attendantAutoFicha, attendantAutoDistribute, attendantTankPromo, attendantMaxMessages FROM crm_ai_global_config WHERE tenantId = ${getCurrentTenantId()} LIMIT 1`);
       const rawRows = result as any;
       const rows = Array.isArray(rawRows?.[0]) ? rawRows[0] : rawRows;
       if (rows && rows.length > 0) {
@@ -1819,6 +1808,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (!dbConn) throw new Error("DB not available");
     const { sql } = await import("drizzle-orm");
     const now = Date.now();
+    const tenantId = getCurrentTenantId();
     // Log changes
     const adminName = (ctx as any).user?.name || 'Sistema';
     const adminId = (ctx as any).user?.id || null;
@@ -1831,9 +1821,9 @@ ${chatHistory || '(Primeira mensagem)'}`;
     if (input.attendantAutoFicha !== undefined) changes.push(`Auto ficha: ${input.attendantAutoFicha ? 'SIM' : 'N\u00c3O'}`);
     if (input.attendantMaxMessages !== undefined) changes.push(`Max msgs: ${input.attendantMaxMessages}`);
     if (changes.length > 0) {
-      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${adminId}, ${adminName}, 'config_atendente', 'attendant', ${null}, ${null}, ${changes.join('; ')}, ${now})`);
+      await dbConn.execute(sql`INSERT INTO crm_ai_config_log (tenantId, adminId, adminName, action, field, oldValue, newValue, details, createdAt) VALUES (${tenantId}, ${adminId}, ${adminName}, 'config_atendente', 'attendant', ${null}, ${null}, ${changes.join('; ')}, ${now})`);
     }
-    await dbConn.execute(sql`UPDATE crm_ai_global_config SET 
+    await dbConn.execute(sql`UPDATE crm_ai_global_config SET
       attendantEnabled = ${input.attendantEnabled !== undefined ? (input.attendantEnabled ? 1 : 0) : sql`attendantEnabled`},
       attendantMode = ${input.attendantMode !== undefined ? input.attendantMode : sql`attendantMode`},
       attendantPrompt = ${input.attendantPrompt !== undefined ? input.attendantPrompt : sql`attendantPrompt`},
@@ -1845,7 +1835,7 @@ ${chatHistory || '(Primeira mensagem)'}`;
       attendantTankPromo = ${input.attendantTankPromo !== undefined ? (input.attendantTankPromo ? 1 : 0) : sql`attendantTankPromo`},
       attendantMaxMessages = ${input.attendantMaxMessages !== undefined ? input.attendantMaxMessages : sql`attendantMaxMessages`},
       updatedAt = ${now}
-    WHERE id = 1`);
+    WHERE tenantId = ${tenantId}`);
     return { success: true };
   }),
 
@@ -2224,6 +2214,25 @@ export const crmPerformanceRouter = router({
       zapiClientToken: t.zapiClientToken ? '***configurado***' : '',
       hasZapi: !!(t.zapiInstanceId && t.zapiToken && t.zapiClientToken),
     };
+  }),
+
+  uploadTenantLogo: adminProcedure.input(z.object({
+    base64: z.string().max(4 * 1024 * 1024, 'Arquivo muito grande. Máximo 3MB.'),
+    mimeType: z.string(),
+  })).mutation(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB indisponível");
+    const tenantId = getCurrentTenantId();
+    const { tenants } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const ext = input.mimeType.split("/")[1] || "png";
+    const fileKey = `logo/${nanoid(8)}.${ext}`;
+    const buffer = Buffer.from(input.base64, "base64");
+    const { url, key } = await storagePut(fileKey, buffer, input.mimeType);
+    await dbConn.update(tenants).set({ logoUrl: url, logoKey: key }).where(eq(tenants.id, tenantId));
+    return { url };
   }),
 
   updateTenantSettings: adminProcedure.input(z.object({

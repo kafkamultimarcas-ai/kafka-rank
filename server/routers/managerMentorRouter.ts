@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getManagerById } from "../db";
 import { invokeLLM } from "../_core/llm";
 import {
   sellers, sales, managerTasks, managerAlerts, managerMentorMessages,
@@ -8,10 +8,28 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, gte, lte, sql, ne, asc, count } from "drizzle-orm";
 
-// Helper: verify caller is a gerente
+// Helper: verify the gerente identity used by the panel.
+// Positive IDs represent seller-gerente records from `sellers`.
+// Negative IDs represent manager records from `managers`.
 async function verifyGerente(sellerId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+
+  if (sellerId < 0) {
+    const managerId = Math.abs(sellerId);
+    const manager = await getManagerById(managerId);
+    if (!manager || !manager.active) throw new Error("Acesso restrito a gerentes");
+    return {
+      db,
+      manager: {
+        id: -manager.id,
+        name: manager.name,
+        nickname: manager.name,
+        sellerRole: "gerente",
+      },
+    };
+  }
+
   const [seller] = await db.select().from(sellers).where(eq(sellers.id, sellerId)).limit(1);
   if (!seller || seller.sellerRole !== "gerente") throw new Error("Acesso restrito a gerentes");
   return { db, manager: seller };

@@ -1,5 +1,7 @@
 # Auditoria de Segurança - Kafka Rank
 
+> ⚠️ **Desatualizado**: este documento é anterior à branch `feat/multi-tenant`. Vários itens listados como pendentes aqui (rate limiting, headers de segurança) já foram resolvidos — ver [`docs/multi-tenant/09-analise-prontidao-vendas.md`](docs/multi-tenant/09-analise-prontidao-vendas.md) pro estado atual reconciliado.
+
 ## Resultados da Análise
 
 ### POSITIVO (Já implementado)

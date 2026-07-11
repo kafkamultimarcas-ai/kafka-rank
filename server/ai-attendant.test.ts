@@ -100,7 +100,8 @@ describe("AI Attendant System", () => {
   describe("AI Attendant Module", () => {
     it("should have ai-attendant.ts file with handleAIAttendant export", async () => {
       const fs = await import("fs");
-      const content = fs.readFileSync("/home/ubuntu/kafka_sales_competition/server/ai-attendant.ts", "utf8");
+      const path = await import("path");
+      const content = fs.readFileSync(path.join(__dirname, "ai-attendant.ts"), "utf8");
       expect(content).toContain("export async function handleAttendantMessage");
       expect(content).toContain("invokeLLM");
       expect(content).toContain("credit_applications");
@@ -136,11 +137,11 @@ describe("AI Attendant System", () => {
       }
     });
 
-    it("should have crm_ai_appointments table", async () => {
+    it("should have ai_appointments table", async () => {
       const mysql = await import("mysql2/promise");
       const pool = mysql.createPool(process.env.DATABASE_URL || "");
       try {
-        const [rows] = await pool.execute("SELECT COUNT(*) as cnt FROM crm_ai_appointments");
+        const [rows] = await pool.execute("SELECT COUNT(*) as cnt FROM ai_appointments");
         expect(rows).toBeDefined();
       } catch (e: any) {
         expect(e.message).not.toContain("doesn't exist");

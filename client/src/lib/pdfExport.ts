@@ -20,6 +20,7 @@ interface ExportOptions {
   sellerMap: Map<number, string>;
   title?: string;
   sellerName?: string;
+  brandName?: string;
 }
 
 function formatDate(ts: number): string {
@@ -35,7 +36,7 @@ function formatDate(ts: number): string {
 const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
 
 export function exportAgendamentosPDF(options: ExportOptions) {
-  const { records, sellerMap, title, sellerName } = options;
+  const { records, sellerMap, title, sellerName, brandName = "Kafka Rank" } = options;
   const now = Date.now();
 
   if (records.length === 0) return false;
@@ -152,7 +153,7 @@ export function exportAgendamentosPDF(options: ExportOptions) {
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Kafka Rank - Página ${data.pageNumber} de ${pageCount}`,
+          `${brandName} - Página ${data.pageNumber} de ${pageCount}`,
           pageWidth / 2,
           doc.internal.pageSize.getHeight() - 8,
           { align: "center" }
@@ -210,7 +211,7 @@ export function exportAgendamentosPDF(options: ExportOptions) {
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Kafka Rank - Página ${data.pageNumber} de ${pageCount}`,
+          `${brandName} - Página ${data.pageNumber} de ${pageCount}`,
           pageWidth / 2,
           doc.internal.pageSize.getHeight() - 8,
           { align: "center" }
@@ -226,7 +227,7 @@ export function exportAgendamentosPDF(options: ExportOptions) {
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
     doc.text(
-      `Kafka Rank - Página ${i} de ${totalPages}`,
+      `${brandName} - Página ${i} de ${totalPages}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 8,
       { align: "center" }

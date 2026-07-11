@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useMemo, useState, useEffect } from "react";
+import { useBranding } from "@/contexts/TenantContext";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 const MODULE_CONFIG: Record<string, { label: string; icon: any; path: string; color: string; description: string }> = {
   ranking: { label: "Ranking de Vendas", icon: Trophy, path: "/", color: "bg-red-500/20 text-red-400 border-red-500/30", description: "Ranking geral de vendas" },
@@ -31,8 +33,6 @@ const MODULE_CONFIG: Record<string, { label: string; icon: any; path: string; co
   vendedores: { label: "Vendedores", icon: Users, path: "/admin/equipe", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", description: "Gestão da equipe" },
   iam: { label: "IAM (Agente IA)", icon: Bot, path: "/admin/iam", color: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30", description: "Agente inteligente" },
 };
-
-const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310419663028900346/NKs9YYU4Bt79zUwnWH56wx/kafka-rank-logo-gTPVVbk3XkgaZ4gQf48tvP.webp";
 
 // Severity/priority color helpers
 function severityColor(s: string) {
@@ -64,15 +64,25 @@ function priorityIcon(p: string) {
 }
 
 export default function GerentePanel() {
+  const { logoUrl, name: brandName } = useBranding();
   const [, setLocation] = useLocation();
-  const { data: sellerSession, isLoading: sessionLoading } = trpc.sellers.me.useQuery();
+  const tenantSlug = getCurrentTenantSlug();
+  const { data: sellerSession, isLoading: sellerSessionLoading } = trpc.sellers.me.useQuery();
+  const { data: managerSession, isLoading: managerSessionLoading } = trpc.managers.me.useQuery();
   const { data: myPerms, isLoading: permsLoading } = trpc.managerPerms.myPermissions.useQuery();
 
   const [period, setPeriod] = useState<"today" | "week" | "month">("today");
   const [activeTab, setActiveTab] = useState<"overview" | "team" | "modules">("overview");
   const [expandedSeller, setExpandedSeller] = useState<number | null>(null);
 
-  const managerId = sellerSession?.id || 0;
+  const isSellerGerente = !!sellerSession && sellerSession.sellerRole === "gerente";
+  const isManagerTableUser = !!managerSession;
+  const managerId = isManagerTableUser
+    ? -managerSession.id
+    : isSellerGerente
+      ? sellerSession.id
+      : 0;
+  const managerDisplayName = sellerSession?.nickname || sellerSession?.name || managerSession?.name || "Gerente";
 
   // Data queries
   const { data: teamData, isLoading: teamLoading, refetch: refetchTeam } = trpc.managerMentor.getTeamAnalytics.useQuery(
@@ -117,8 +127,11 @@ export default function GerentePanel() {
     onSuccess: () => { refetchMessages(); },
   });
 
-  const logoutMutation = trpc.sellers.logout.useMutation({
-    onSuccess: () => { setLocation("/"); },
+  const sellerLogoutMutation = trpc.sellers.logout.useMutation({
+    onSuccess: () => { setLocation("/login"); },
+  });
+  const managerLogoutMutation = trpc.managers.logout.useMutation({
+    onSuccess: () => { setLocation("/login"); },
   });
 
   // Auto-generate insights on first load
@@ -128,7 +141,7 @@ export default function GerentePanel() {
     }
   }, [managerId]);
 
-  if (sessionLoading || permsLoading) {
+  if (sellerSessionLoading || managerSessionLoading || permsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -136,14 +149,14 @@ export default function GerentePanel() {
     );
   }
 
-  if (!sellerSession || sellerSession.sellerRole !== 'gerente') {
+  if (!isSellerGerente && !isManagerTableUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="racing-card p-8 text-center max-w-md">
           <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="font-heading text-xl text-foreground mb-2">Acesso Restrito</h2>
           <p className="text-muted-foreground mb-4">Esta área é exclusiva para gerentes.</p>
-          <Button onClick={() => setLocation("/")} className="racing-gradient text-white">
+          <Button onClick={() => setLocation(buildTenantPath(tenantSlug, "/"))} className="racing-gradient text-white">
             Voltar ao Início
           </Button>
         </div>
@@ -164,32 +177,34 @@ export default function GerentePanel() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => setLocation(buildTenantPath(tenantSlug, "/"))} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={LOGO_URL} alt="Kafka" className="h-7 w-7 rounded-lg" />
-            <div>
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain border border-border bg-background" />
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-heading font-bold text-sm text-foreground">PAINEL DO GERENTE</span>
+                <span className="font-heading font-bold text-sm text-foreground truncate">{brandName}</span>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-bold">MENTOR IA</span>
               </div>
-              <p className="text-[10px] text-muted-foreground">{sellerSession.nickname || sellerSession.name}</p>
+              <p className="text-[10px] text-muted-foreground truncate">Painel do Gerente · {managerDisplayName}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {isSellerGerente && sellerSession && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation(buildTenantPath(tenantSlug, `/minha-area/${sellerSession.id}`))}
+                className="gap-1.5 text-xs h-8"
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Minha Área</span>
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setLocation(`/minha-area/${sellerSession.id}`)}
-              className="gap-1.5 text-xs h-8"
-            >
-              <Users className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Minha Área</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setLocation("/estoque")}
+              onClick={() => setLocation(buildTenantPath(tenantSlug, "/estoque"))}
               className="gap-1.5 text-xs h-8"
             >
               <Car className="h-3.5 w-3.5" />
@@ -198,7 +213,13 @@ export default function GerentePanel() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => logoutMutation.mutate()}
+              onClick={() => {
+                if (isManagerTableUser) {
+                  managerLogoutMutation.mutate();
+                  return;
+                }
+                sellerLogoutMutation.mutate();
+              }}
               className="gap-1.5 text-xs h-8 border-red-600/50 text-red-400 hover:bg-red-600/10"
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -475,28 +496,28 @@ export default function GerentePanel() {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
-                  onClick={() => setLocation("/admin/vendas")}
+                  onClick={() => setLocation(buildTenantPath(tenantSlug, "/admin/vendas"))}
                   className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors text-left"
                 >
                   <TrendingUp className="h-4 w-4 text-green-400 shrink-0" />
                   <span className="text-xs font-medium text-foreground">Aprovar Vendas</span>
                 </button>
                 <button
-                  onClick={() => setLocation("/crm/admin")}
+                  onClick={() => setLocation(buildTenantPath(tenantSlug, "/crm/admin"))}
                   className="flex items-center gap-2 p-3 rounded-lg bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/20 transition-colors text-left"
                 >
                   <MessageSquare className="h-4 w-4 text-violet-400 shrink-0" />
                   <span className="text-xs font-medium text-foreground">CRM / Leads</span>
                 </button>
                 <button
-                  onClick={() => setLocation("/")}
+                  onClick={() => setLocation(buildTenantPath(tenantSlug, "/"))}
                   className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors text-left"
                 >
                   <Trophy className="h-4 w-4 text-red-400 shrink-0" />
                   <span className="text-xs font-medium text-foreground">Ranking</span>
                 </button>
                 <button
-                  onClick={() => setLocation("/estoque")}
+                  onClick={() => setLocation(buildTenantPath(tenantSlug, "/estoque"))}
                   className="flex items-center gap-2 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition-colors text-left"
                 >
                   <Car className="h-4 w-4 text-cyan-400 shrink-0" />
@@ -713,7 +734,7 @@ export default function GerentePanel() {
                   return (
                     <button
                       key={moduleKey}
-                      onClick={() => setLocation(config.path)}
+                      onClick={() => setLocation(buildTenantPath(tenantSlug, config.path))}
                       className="racing-card p-4 text-left hover:scale-[1.02] transition-all hover:border-primary/30 group"
                     >
                       <div className={`p-2 rounded-lg ${config.color.split(' ').slice(0, 2).join(' ')} w-fit mb-2`}>

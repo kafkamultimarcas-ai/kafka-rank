@@ -9,6 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X, User } from "lucide-react";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
+import { maskCpfCnpj, maskPhone } from "@/lib/masks";
+import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
 
@@ -145,6 +148,7 @@ function VehicleSelector({ value, onChange }: { value: string; onChange: (model:
 }
 
 export default function RegisterSale() {
+  const tenantSlug = getCurrentTenantSlug();
   const [category, setCategory] = useState<Category>("vendas");
   const [sellerId, setSellerId] = useState<string>("");
   const [competitionId, setCompetitionId] = useState<string>("");
@@ -212,7 +216,18 @@ export default function RegisterSale() {
   const recognitionRef = useRef<any>(null);
 
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+  const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
+
+  // Vendedor comum: identidade vem da sessão, não de um dropdown (o backend já
+  // rejeita sellerId diferente do da sessão pra esse tipo de login). Gerente
+  // continua podendo escolher em nome de quem está lançando.
+  const isLockedToSession = !!sellerSession && sellerSession.sellerRole !== "gerente";
+  useEffect(() => {
+    if (isLockedToSession && sellerSession) {
+      setSellerId(String(sellerSession.id));
+    }
+  }, [isLockedToSession, sellerSession]);
 
   const registerSale = trpc.sales.registerBySeller.useMutation();
   const registerFei = trpc.fei.register.useMutation();
@@ -358,6 +373,9 @@ export default function RegisterSale() {
         case "vendas":
           if (!vehicleModel) { toast.error("Informe o modelo do veículo!"); return; }
           if (!saleLeadSource) { toast.error("Selecione a origem do lead!"); return; }
+          if (customerPhone && !isValidBrazilianPhone(customerPhone)) { toast.error("Telefone do cliente inválido!"); return; }
+          if (saleCustomerCpf && !isValidCpfCnpj(saleCustomerCpf)) { toast.error("CPF do cliente inválido!"); return; }
+          if (saleCustomerEmail && !isValidEmail(saleCustomerEmail)) { toast.error("E-mail do cliente inválido!"); return; }
           result = await registerSale.mutateAsync({
             sellerId: sid, competitionId: cid, vehicleModel,
             vehiclePlate: vehiclePlate || undefined,
@@ -379,6 +397,7 @@ export default function RegisterSale() {
         case "fei":
           if (!feiCustomerName) { toast.error("Informe o nome do cliente!"); return; }
           if (!customerCpf) { toast.error("Informe o CPF do cliente!"); return; }
+          if (!isValidCpfCnpj(customerCpf)) { toast.error("CPF do cliente inválido!"); return; }
           if (!vehiclePlate) { toast.error("Informe a placa do veículo!"); return; }
           if (!bankName || !returnType) { toast.error("Informe o banco e o tipo de retorno!"); return; }
           result = await registerFei.mutateAsync({
@@ -395,6 +414,7 @@ export default function RegisterSale() {
         case "consignacao":
           if (!consignPlate || consignPlate.length < 6) { toast.error("Informe a placa do veículo!"); return; }
           if (!consignModel || !ownerName) { toast.error("Informe o modelo e o nome do dono!"); return; }
+          if (ownerPhone && !isValidBrazilianPhone(ownerPhone)) { toast.error("Telefone do proprietário inválido!"); return; }
           if (checkPlateMutation.data?.blocked) { toast.error(checkPlateMutation.data.message); return; }
           result = await registerConsignment.mutateAsync({
             sellerId: sid, competitionId: cid,
@@ -420,6 +440,8 @@ export default function RegisterSale() {
           break;
         case "pre_vendas":
           if (!customerName) { toast.error("Informe o nome do cliente!"); return; }
+          if (customerPhone && !isValidBrazilianPhone(customerPhone)) { toast.error("Telefone do cliente inválido!"); return; }
+          if (customerEmail && !isValidEmail(customerEmail)) { toast.error("E-mail do cliente inválido!"); return; }
           result = await registerSdr.mutateAsync({
             sellerId: sid, competitionId: cid,
             type: sdrType,
@@ -477,7 +499,7 @@ export default function RegisterSale() {
                   <div>
                     <p className="text-orange-400 font-bold text-sm">Documentos Necessários!</p>
                     <p className="text-gray-400 text-xs mt-1">Após a aprovação, envie a <strong className="text-white">CNH</strong> e o <strong className="text-white">Comprovante de Residência</strong> do cliente na sua <strong className="text-white">Minha Área</strong> para o despachante iniciar a transferência.</p>
-                    <Link href={sellerId ? `/minha-area/${sellerId}` : '/login-vendedor'}>
+                    <Link href={sellerId ? buildTenantPath(tenantSlug, `/minha-area/${sellerId}`) : "/login"}>
                       <button className="mt-3 flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors">
                         <Upload className="w-3.5 h-3.5" /> Ir para Minha Área e enviar docs
                       </button>
@@ -493,14 +515,14 @@ export default function RegisterSale() {
                 REGISTRAR OUTRO
               </Button>
               {sellerId && category === "vendas" && (
-                <Link href={`/minha-area/${sellerId}`}>
+                <Link href={buildTenantPath(tenantSlug, `/minha-area/${sellerId}`)}>
                   <Button variant="outline" className="w-full border-orange-600 text-orange-400 hover:bg-orange-600/10 font-bold">
                     <FileText className="w-4 h-4 mr-2" />
                     ENVIAR DOCUMENTOS
                   </Button>
                 </Link>
               )}
-              <Link href="/">
+              <Link href={buildTenantPath(tenantSlug, "/")}>
                 <Button variant="outline" className="w-full border-gray-700 text-gray-300 hover:bg-gray-800">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   VOLTAR AO RANKING
@@ -551,31 +573,38 @@ export default function RegisterSale() {
                 <Flag className="w-4 h-4 text-red-400" />
                 Quem é você?
               </Label>
-              <Select value={sellerId} onValueChange={setSellerId}>
-                <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-                  <SelectValue placeholder="Selecione seu nome" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {sellers?.filter(s => {
-                    const dept = s.department || 'vendas';
-                    if (category === 'vendas') return dept === 'vendas';
-                    if (category === 'fei') return dept === 'fei';
-                    if (category === 'consignacao') return dept === 'consignacao';
-                    if (category === 'despachante') return dept === 'despachante';
-                    if (category === 'pre_vendas') return dept === 'pre_vendas' || dept === 'vendas';
-                    return true;
-                  }).map(seller => (
-                    <SelectItem key={seller.id} value={seller.id.toString()} className="text-white hover:bg-gray-700">
-                      <div className="flex items-center gap-2">
-                        {seller.photoUrl && (
-                          <img src={seller.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
-                        )}
-                        {seller.name} {seller.nickname ? `(${seller.nickname})` : ''}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isLockedToSession ? (
+                <div className="flex items-center gap-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2.5">
+                  <User className="w-4 h-4 text-red-400 shrink-0" />
+                  <span className="text-white text-sm">Registrando como: <strong>{sellerSession?.name}</strong></span>
+                </div>
+              ) : (
+                <Select value={sellerId} onValueChange={setSellerId}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Selecione seu nome" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    {sellers?.filter(s => {
+                      const dept = s.department || 'vendas';
+                      if (category === 'vendas') return dept === 'vendas';
+                      if (category === 'fei') return dept === 'fei';
+                      if (category === 'consignacao') return dept === 'consignacao';
+                      if (category === 'despachante') return dept === 'despachante';
+                      if (category === 'pre_vendas') return dept === 'pre_vendas' || dept === 'vendas';
+                      return true;
+                    }).map(seller => (
+                      <SelectItem key={seller.id} value={seller.id.toString()} className="text-white hover:bg-gray-700">
+                        <div className="flex items-center gap-2">
+                          {seller.photoUrl && (
+                            <img src={seller.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                          )}
+                          {seller.name} {seller.nickname ? `(${seller.nickname})` : ''}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Foto do selecionado */}
@@ -735,12 +764,12 @@ export default function RegisterSale() {
                       <Phone className="w-4 h-4 text-green-400" />
                       Telefone
                     </Label>
-                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(maskPhone(e.target.value))}
                       placeholder="(47) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">CPF</Label>
-                    <Input value={saleCustomerCpf} onChange={e => setSaleCustomerCpf(e.target.value)}
+                    <Input value={saleCustomerCpf} onChange={e => setSaleCustomerCpf(maskCpfCnpj(e.target.value))}
                       placeholder="000.000.000-00" maxLength={14} className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                 </div>
@@ -791,7 +820,7 @@ export default function RegisterSale() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">CPF do cliente *</Label>
-                    <Input value={customerCpf} onChange={e => setCustomerCpf(e.target.value)}
+                    <Input value={customerCpf} onChange={e => setCustomerCpf(maskCpfCnpj(e.target.value))}
                       placeholder="000.000.000-00" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">
@@ -895,7 +924,7 @@ export default function RegisterSale() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Telefone do proprietário</Label>
-                  <Input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)}
+                  <Input value={ownerPhone} onChange={e => setOwnerPhone(maskPhone(e.target.value))}
                     placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                 </div>
 
@@ -1001,7 +1030,7 @@ export default function RegisterSale() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">Telefone</Label>
-                    <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                    <Input value={customerPhone} onChange={e => setCustomerPhone(maskPhone(e.target.value))}
                       placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
                   </div>
                   <div className="space-y-2">

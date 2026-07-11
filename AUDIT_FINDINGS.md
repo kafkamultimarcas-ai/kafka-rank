@@ -1,5 +1,7 @@
 # Auditoria Completa - Kafka Rank CRM
 
+> ⚠️ **Contexto**: documento sem data explícita, provavelmente anterior à branch `feat/multi-tenant`. Os números de dados (vendedores, leads) abaixo são um retrato de um momento específico, não o estado atual. Os itens de performance (índices em `crm_leads`/`crm_activities`) não foram reverificados nesta rodada — ver [`docs/multi-tenant/09-analise-prontidao-vendas.md`](docs/multi-tenant/09-analise-prontidao-vendas.md) pra lista de prioridades atualizada (não cobre performance de índice, então esse item pode continuar válido).
+
 ## Dados Atuais do Sistema
 - **Vendedores:** 18 cadastrados
 - **Leads CRM:** 342

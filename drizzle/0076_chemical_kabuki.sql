@@ -1,0 +1,1 @@
+ALTER TABLE `inventory_vehicles` ADD CONSTRAINT `idx_inventory_vehicles_tenant_external` UNIQUE(`tenantId`,`externalId`);

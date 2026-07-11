@@ -27,9 +27,11 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode } from "lucide-react";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
+import { useBranding } from "@/contexts/TenantContext";
 
 const DEPT_CONFIG: Record<string, { label: string; color: string; icon: any; gradient: string }> = {
   vendas: { label: "Vendas", color: "text-red-400", icon: Car, gradient: "from-red-600/20 to-red-500/10 border-red-500/30" },
@@ -130,17 +132,34 @@ function FinanceiroStatsCards() {
 }
 
 export default function MinhaArea() {
+  const tenantSlug = getCurrentTenantSlug();
   const [, navigate] = useLocation();
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
+  const { name: tenantName } = useBranding();
 
-  const { data: sellerSession } = trpc.sellers.me.useQuery();
+  const { data: sellerSession, isLoading: sellerSessionLoading } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
   const { data: unreadCount } = trpc.notifications.unreadCountSeller.useQuery({ sellerId }, { enabled: sellerId > 0 });
   const { isSupported: pushSupported, isSubscribed, subscribe: subscribePush, permission } = usePushNotifications(sellerId);
 
   const dept = sellerSession?.department || "vendas";
   const deptInfo = DEPT_CONFIG[dept] || DEPT_CONFIG.vendas;
+  const sellerDisplayName = seller?.nickname || seller?.name || sellerSession?.nickname || sellerSession?.name || "Vendedor";
+
+  // Link de vendas rastreável ("meu link") - leva pro estoque público já marcado com este vendedor
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showSalesLinkQr, setShowSalesLinkQr] = useState(false);
+  const mySalesLink = useMemo(() => {
+    const base = `${window.location.origin}${buildTenantPath(tenantSlug, "/estoque")}`;
+    return `${base}?vendedor=${sellerId}&utm_source=vendedor&utm_medium=link_direto`;
+  }, [tenantSlug, sellerId]);
+  const copyMySalesLink = () => {
+    navigator.clipboard.writeText(mySalesLink);
+    setLinkCopied(true);
+    toast.success("Link copiado!");
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   // Upload de foto de perfil
   const profilePhotoRef = useRef<HTMLInputElement>(null);
@@ -442,15 +461,23 @@ export default function MinhaArea() {
   const pendingDocsList = useMemo(() => (myDocs || []).filter((d: any) => d.docStatus !== 'completo'), [myDocs]);
   const completeDocs = useMemo(() => (myDocs || []).filter((d: any) => d.docStatus === 'completo'), [myDocs]);
 
-  // Verificar se o vendedor logado é o mesmo do URL
-  const isAuthorized = sellerSession && sellerSession.id === sellerId;
+  // Verificar se o vendedor logado é o mesmo do URL (gerente pode ver a área de qualquer vendedor, igual já é permitido no backend)
+  const isAuthorized = !!sellerSession && (sellerSession.id === sellerId || sellerSession.sellerRole === "gerente");
+
+  if (sellerSessionLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="text-gray-400 animate-pulse">Carregando...</div>
+      </div>
+    );
+  }
 
   if (!sellerSession) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-gray-400 mb-4">Você precisa fazer login para acessar esta área.</p>
-          <Button onClick={() => window.location.href = "/"} className="bg-red-600 hover:bg-red-500">
+          <Button onClick={() => { window.location.href = "/login"; }} className="bg-red-600 hover:bg-red-500">
             Fazer Login
           </Button>
         </div>
@@ -463,7 +490,7 @@ export default function MinhaArea() {
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-400 mb-4">Você não tem permissão para acessar os dados deste colaborador.</p>
-          <Button onClick={() => navigate(`/minha-area/${sellerSession.id}`)} className="bg-red-600 hover:bg-red-500">
+          <Button onClick={() => navigate(buildTenantPath(tenantSlug, `/minha-area/${sellerSession.id}`))} className="bg-red-600 hover:bg-red-500">
             Ir para minha área
           </Button>
         </div>
@@ -492,7 +519,8 @@ export default function MinhaArea() {
               {uploadingPhoto && <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
             </div>
             <div>
-              <p className="text-white font-bold text-sm">{seller?.nickname || seller?.name}</p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{tenantName}</p>
+              <p className="text-white font-bold text-sm">{sellerDisplayName}</p>
               <p className={`text-xs ${deptInfo.color}`}>{deptInfo.label}</p>
             </div>
           </div>
@@ -527,6 +555,39 @@ export default function MinhaArea() {
 
       {/* Content */}
       <div className="max-w-lg mx-auto p-4 space-y-4">
+        {/* Meu link de vendas - rastreia leads que vieram por este vendedor */}
+        {dept === "vendas" && (
+          <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-primary" /> Meu link de vendas
+                </p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Compartilhe pra saber quais leads vieram por você</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => setShowSalesLinkQr(s => !s)}>
+                  <QrCode className="w-3.5 h-3.5" />
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 px-2" onClick={copyMySalesLink}>
+                  {linkCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+            </div>
+            {showSalesLinkQr && (
+              <div className="flex justify-center mt-3">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(mySalesLink)}`}
+                  alt="QR code do meu link de vendas"
+                  className="rounded-lg bg-white p-2"
+                  width={160}
+                  height={160}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats Cards - Pós-Venda e Financeiro têm painel próprio */}
         {dept === 'financeiro' ? (
           <FinanceiroStatsCards />
@@ -830,7 +891,7 @@ export default function MinhaArea() {
             </div>
             {/* Botão Busca Geral Cross-Setor */}
             <button
-              onClick={() => navigate('/busca-veiculo')}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/busca-veiculo"))}
               className="w-full bg-gradient-to-r from-red-600/10 to-red-500/5 border border-red-500/30 rounded-xl p-3 flex items-center gap-3 hover:border-red-500/60 transition-all"
             >
               <Search className="w-5 h-5 text-red-400" />
@@ -1291,7 +1352,7 @@ export default function MinhaArea() {
           {dept === 'financeiro' && (
             <>
               <button
-                onClick={() => navigate('/financeiro')}
+                onClick={() => navigate(buildTenantPath(tenantSlug, "/financeiro"))}
                 className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
               >
                 <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1303,7 +1364,7 @@ export default function MinhaArea() {
                 </div>
               </button>
               <button
-                onClick={() => navigate('/financeiro?tab=gasolina')}
+                onClick={() => navigate(buildTenantPath(tenantSlug, "/financeiro?tab=gasolina"))}
                 className="w-full bg-gradient-to-r from-amber-600/20 to-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-amber-500/60 transition-all"
               >
                 <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
@@ -1315,7 +1376,7 @@ export default function MinhaArea() {
                 </div>
               </button>
               <button
-                onClick={() => navigate('/financeiro?tab=pos-venda')}
+                onClick={() => navigate(buildTenantPath(tenantSlug, "/financeiro?tab=pos-venda"))}
                 className="w-full bg-gradient-to-r from-orange-600/20 to-orange-500/10 border border-orange-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-orange-500/60 transition-all"
               >
                 <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
@@ -1332,7 +1393,7 @@ export default function MinhaArea() {
           {/* Agendamentos - para Vendas e Pré-Vendas */}
           {(dept === "vendas" || dept === "pre_vendas") && (
             <button
-              onClick={() => navigate(`/agendamentos/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/agendamentos/${sellerId}`))}
               className="w-full bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -1358,7 +1419,7 @@ export default function MinhaArea() {
           {/* Feirão - para Vendas e Pré-Vendas */}
           {(dept === "vendas" || dept === "pre_vendas") && (
             <button
-              onClick={() => navigate("/feirao")}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/feirao"))}
               className="w-full bg-gradient-to-r from-red-600/20 to-orange-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-red-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -1379,7 +1440,7 @@ export default function MinhaArea() {
           {/* Central de Resultados */}
           {dept === "vendas" && (
             <button
-              onClick={() => navigate(`/meus-resultados/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/meus-resultados/${sellerId}`))}
               className="w-full bg-gradient-to-r from-emerald-600/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-emerald-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center">
@@ -1396,7 +1457,7 @@ export default function MinhaArea() {
           {/* Carros Bônus & Campanhas */}
           {dept === "vendas" && (
             <button
-              onClick={() => navigate(`/carros-bonus/${sellerId}`)}
+              onClick={() => navigate(buildTenantPath(tenantSlug, `/carros-bonus/${sellerId}`))}
               className="w-full bg-gradient-to-r from-yellow-600/20 to-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-yellow-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center">
@@ -1413,7 +1474,7 @@ export default function MinhaArea() {
           {/* Registrar - botão específico por setor (não mostrar para financeiro) */}
           {dept !== 'financeiro' && (
           <button
-            onClick={() => navigate("/registrar-venda")}
+            onClick={() => navigate(buildTenantPath(tenantSlug, "/registrar-venda"))}
             className={`w-full bg-gradient-to-r ${deptInfo.gradient} rounded-xl p-4 flex items-center gap-4 hover:opacity-80 transition-all`}
           >
             <div className={`w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center`}>
@@ -1486,7 +1547,7 @@ export default function MinhaArea() {
           {/* Ficha de Financiamento / Mesa de Crédito */}
           {(dept === "vendas") && (
             <button
-              onClick={() => navigate("/ficha-financiamento")}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/ficha-financiamento"))}
               className="w-full bg-gradient-to-r from-blue-600/20 to-indigo-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -1500,7 +1561,7 @@ export default function MinhaArea() {
           )}
           {(dept === "fei") && (
             <button
-              onClick={() => navigate("/mesa-credito")}
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/mesa-credito"))}
               className="w-full bg-gradient-to-r from-blue-600/20 to-indigo-500/10 border border-blue-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/60 transition-all"
             >
               <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">

@@ -92,7 +92,7 @@ describe("SDR Lead Distribution Flow", () => {
       "utf-8"
     );
     const whatsappSection = webhooksSource.slice(
-      webhooksSource.indexOf('app.post("/api/webhooks/whatsapp"'),
+      webhooksSource.indexOf('async function handleWhatsappWebhook'),
       webhooksSource.indexOf('// ===== SIG WEB SYNC =====')
     );
     // WhatsApp leads are now auto-assigned to SDRs and AI responds to first message

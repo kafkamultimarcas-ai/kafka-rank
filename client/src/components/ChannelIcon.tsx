@@ -16,10 +16,12 @@ interface ChannelIconProps {
 // Channel configuration with colors and labels
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; bgColor: string; textColor: string }> = {
   whatsapp: { label: "WhatsApp", color: "#25D366", bgColor: "bg-green-500/15", textColor: "text-green-400" },
+  whatsapp_ctwa: { label: "WhatsApp Ads", color: "#25D366", bgColor: "bg-green-500/15", textColor: "text-green-400" },
   instagram: { label: "Instagram", color: "#E4405F", bgColor: "bg-pink-500/15", textColor: "text-pink-400" },
   instagram_ads: { label: "Insta Ads", color: "#E4405F", bgColor: "bg-pink-500/15", textColor: "text-pink-400" },
   facebook: { label: "Facebook", color: "#1877F2", bgColor: "bg-blue-500/15", textColor: "text-blue-400" },
   facebook_ads: { label: "FB Ads", color: "#1877F2", bgColor: "bg-blue-500/15", textColor: "text-blue-400" },
+  messenger: { label: "Messenger", color: "#00B2FF", bgColor: "bg-sky-500/15", textColor: "text-sky-400" },
   olx: { label: "OLX", color: "#FF6600", bgColor: "bg-orange-500/15", textColor: "text-orange-400" },
   webmotors: { label: "Webmotors", color: "#E31C25", bgColor: "bg-red-500/15", textColor: "text-red-400" },
   icarros: { label: "iCarros", color: "#FF3333", bgColor: "bg-red-500/15", textColor: "text-red-400" },
@@ -66,6 +68,15 @@ function FacebookIcon({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z" fill="#1877F2"/>
+    </svg>
+  );
+}
+
+function MessengerIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 2C6.477 2 2 6.145 2 11.5c0 3.06 1.45 5.788 3.72 7.564V22l3.4-1.867c.907.252 1.87.386 2.88.386 5.523 0 10-4.145 10-9.5S17.523 2 12 2z" fill="#00B2FF"/>
+      <path d="M6.5 13.5l3.5-3.7 2.7 2.2 3.6-3.7-3.9 5.4-2.7-2.2-3.2 4z" fill="white"/>
     </svg>
   );
 }
@@ -146,10 +157,12 @@ export function ChannelIcon({ source, size = 16, className = "", showLabel = fal
   
   const iconMap: Record<string, React.ReactNode> = {
     whatsapp: <WhatsAppIcon size={size} />,
+    whatsapp_ctwa: <WhatsAppIcon size={size} />,
     instagram: <InstagramIcon size={size} />,
     instagram_ads: <InstagramIcon size={size} />,
     facebook: <FacebookIcon size={size} />,
     facebook_ads: <FacebookIcon size={size} />,
+    messenger: <MessengerIcon size={size} />,
     olx: <OlxIcon size={size} />,
     webmotors: <WebmotorsIcon size={size} />,
     icarros: <ICarrosIcon size={size} />,

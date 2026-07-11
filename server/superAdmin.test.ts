@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PLAN_CONFIG, TRIAL_PERIOD_DAYS, TRIAL_PLAN_LIMITS } from "../shared/plans";
 
 // Mock bcryptjs
 vi.mock("bcryptjs", () => ({
@@ -155,25 +156,28 @@ describe("Super Admin Multi-Tenant System", () => {
   describe("Tenant Plan Limits", () => {
     it("should set correct default limits per plan", () => {
       const planLimits: Record<string, { maxSellers: number; maxAdmins: number }> = {
-        trial: { maxSellers: 10, maxAdmins: 2 },
-        basic: { maxSellers: 15, maxAdmins: 2 },
-        pro: { maxSellers: 30, maxAdmins: 3 },
-        enterprise: { maxSellers: 50, maxAdmins: 5 },
+        trial: { maxSellers: TRIAL_PLAN_LIMITS.maxSellers, maxAdmins: TRIAL_PLAN_LIMITS.maxAdmins },
+        basic: { maxSellers: PLAN_CONFIG.basic.maxSellers, maxAdmins: PLAN_CONFIG.basic.maxAdmins },
+        pro: { maxSellers: PLAN_CONFIG.pro.maxSellers, maxAdmins: PLAN_CONFIG.pro.maxAdmins },
+        enterprise: { maxSellers: PLAN_CONFIG.enterprise.maxSellers, maxAdmins: PLAN_CONFIG.enterprise.maxAdmins },
       };
 
-      expect(planLimits.trial.maxSellers).toBe(10);
-      expect(planLimits.basic.maxSellers).toBe(15);
-      expect(planLimits.pro.maxSellers).toBe(30);
-      expect(planLimits.enterprise.maxSellers).toBe(50);
+      expect(planLimits.trial).toEqual(TRIAL_PLAN_LIMITS);
+      expect(planLimits.basic.maxSellers).toBe(5);
+      expect(planLimits.basic.maxAdmins).toBe(1);
+      expect(planLimits.pro.maxSellers).toBe(15);
+      expect(planLimits.pro.maxAdmins).toBe(2);
+      expect(planLimits.enterprise.maxSellers).toBe(999999);
+      expect(planLimits.enterprise.maxAdmins).toBe(999999);
     });
 
     it("should calculate trial expiration correctly", () => {
       const now = Date.now();
-      const trialDays = 30;
+      const trialDays = TRIAL_PERIOD_DAYS;
       const trialEndsAt = now + trialDays * 24 * 60 * 60 * 1000;
 
       const daysUntilExpiry = Math.ceil((trialEndsAt - now) / (24 * 60 * 60 * 1000));
-      expect(daysUntilExpiry).toBe(30);
+      expect(daysUntilExpiry).toBe(TRIAL_PERIOD_DAYS);
     });
   });
 
