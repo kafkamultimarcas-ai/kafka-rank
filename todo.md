@@ -2409,3 +2409,7 @@
 
 ## Skeletons de Carregamento Dashboard Super Admin
 - [x] Skeletons nos cards e gráficos enquanto dados da loja selecionada estão sendo atualizados
+
+## Confirmação de Sucesso e Loading no Botão de Assinatura
+- [x] Tela de confirmação de sucesso com detalhes do plano após aprovação do pagamento
+- [x] Feedback visual de carregamento no botão de assinatura durante processamento

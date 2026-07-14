@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -41,6 +41,8 @@ import {
   ExternalLink,
   AlertTriangle,
   Clock,
+  PartyPopper,
+  ArrowRight,
 } from "lucide-react";
 
 const WHATSAPP_CONTACT = "https://wa.me/5500000000000";
@@ -97,6 +99,9 @@ function SubscribeDialog({
     onSuccess: (data) => {
       if (data.checkoutUrl) {
         toast.success("Redirecionando para o checkout...");
+        // Após o pagamento no Asaas, o usuário volta para a página de assinatura
+        // O Asaas não suporta returnUrl nativo, mas ao voltar manualmente
+        // o sistema detecta o status ativo via query e mostra a tela de sucesso
         window.location.href = data.checkoutUrl;
         return;
       }
@@ -403,6 +408,51 @@ type AssinaturaContentProps = {
   showLogoutButton?: boolean;
 };
 
+function PaymentSuccessScreen({ planName, onDismiss }: { planName: string; onDismiss: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 animate-fade-in">
+      <div className="relative mb-6">
+        <div className="w-20 h-20 rounded-full bg-green-500/15 flex items-center justify-center">
+          <CheckCircle2 className="w-10 h-10 text-green-500" />
+        </div>
+        <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
+          <PartyPopper className="w-4 h-4 text-primary" />
+        </div>
+      </div>
+
+      <h2 className="font-heading text-2xl font-bold text-foreground mb-2 text-center">
+        Pagamento aprovado!
+      </h2>
+      <p className="text-sm text-muted-foreground text-center max-w-sm mb-6">
+        Sua assinatura do plano <span className="font-bold text-foreground">{planName}</span> foi ativada com sucesso. Aproveite todos os recursos!
+      </p>
+
+      <div className="racing-card p-5 w-full max-w-sm mb-6">
+        <h3 className="text-xs font-bold text-foreground mb-3 uppercase tracking-wider">Detalhes da assinatura</h3>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Plano</span>
+            <span className="text-xs font-bold text-foreground">{planName}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Status</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">ATIVO</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Ativado em</span>
+            <span className="text-xs text-foreground">{new Date().toLocaleDateString("pt-BR")}</span>
+          </div>
+        </div>
+      </div>
+
+      <Button onClick={onDismiss} className="racing-gradient text-white">
+        Ir para o painel
+        <ArrowRight className="w-4 h-4 ml-1.5" />
+      </Button>
+    </div>
+  );
+}
+
 export default function AssinaturaContent({
   headerAction,
   showLogoutButton = true,
@@ -411,6 +461,8 @@ export default function AssinaturaContent({
   const { name: brandName } = useBranding();
   const tenantSlug = getCurrentTenantSlug();
   const [subscribingPlan, setSubscribingPlan] = useState<PaidPlanId | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successPlanName, setSuccessPlanName] = useState("");
   const [page, setPage] = useState(0);
 
   const { data: myPlan, error: myPlanError } = trpc.billing.getMyPlan.useQuery();
@@ -428,12 +480,49 @@ export default function AssinaturaContent({
   const isPaidActive = myPlan?.status === "active" && myPlan?.hasActiveSubscription;
   const isSuspended = myPlan?.status === "suspended";
 
+  // Detectar retorno do checkout com sucesso via URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "success" || params.get("status") === "confirmed") {
+      const planId = myPlan?.plan as PaidPlanId;
+      setSuccessPlanName(PLAN_CONFIG[planId]?.name || "Ativo");
+      setShowSuccess(true);
+      // Limpar URL params sem reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [myPlan]);
+
+  // Detectar quando assinatura muda de trial/suspended para active (pagamento confirmado via webhook)
+  useEffect(() => {
+    if (isPaidActive && !showSuccess) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("returning") === "true") {
+        const planId = myPlan?.plan as PaidPlanId;
+        setSuccessPlanName(PLAN_CONFIG[planId]?.name || "Ativo");
+        setShowSuccess(true);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, [isPaidActive, myPlan, showSuccess]);
+
   // Busca link de checkout pendente (para reabrir pagamento)
   const { data: checkoutData } = trpc.billing.getCheckoutUrl.useQuery(undefined, {
     enabled: !!myPlan?.hasActiveSubscription && (isSuspended || myPlan?.status === "trial"),
     refetchOnWindowFocus: false,
   });
   const hasLoadError = !!myPlanError || !!historyError;
+
+  if (showSuccess) {
+    return (
+      <PaymentSuccessScreen
+        planName={successPlanName}
+        onDismiss={() => {
+          setShowSuccess(false);
+          navigate(`/t/${tenantSlug}/crm/admin`);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
