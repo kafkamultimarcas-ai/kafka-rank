@@ -237,6 +237,12 @@ export default function AssinaturaContent({
   const totalPages = history ? Math.max(1, Math.ceil(history.total / PAGE_SIZE)) : 1;
   const isPaidActive = myPlan?.status === "active" && myPlan?.hasActiveSubscription;
   const isSuspended = myPlan?.status === "suspended";
+
+  // Busca link de checkout pendente (para reabrir pagamento)
+  const { data: checkoutData } = trpc.billing.getCheckoutUrl.useQuery(undefined, {
+    enabled: !!myPlan?.hasActiveSubscription && (isSuspended || myPlan?.status === "trial"),
+    refetchOnWindowFocus: false,
+  });
   const hasLoadError = !!myPlanError || !!historyError;
 
   return (
@@ -273,10 +279,22 @@ export default function AssinaturaContent({
             Plano {PLAN_CONFIG[myPlan!.plan as PaidPlanId]?.name || myPlan!.plan} ativo
           </p>
         ) : isSuspended ? (
-          <p className="text-sm text-destructive flex items-center justify-center gap-1.5">
-            <XCircle className="w-4 h-4" />
-            Assinatura em atraso - regularize o pagamento para reativar o acesso
-          </p>
+          <div className="text-center space-y-3">
+            <p className="text-sm text-destructive flex items-center justify-center gap-1.5">
+              <XCircle className="w-4 h-4" />
+              Assinatura em atraso - regularize o pagamento para reativar o acesso
+            </p>
+            {checkoutData?.checkoutUrl && (
+              <Button
+                size="sm"
+                className="racing-gradient text-white"
+                onClick={() => window.location.href = checkoutData.checkoutUrl!}
+              >
+                <CreditCard className="w-4 h-4 mr-1.5" />
+                Pagar agora
+              </Button>
+            )}
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Escolha um plano abaixo para continuar usando o {brandName} sem interrupção.

@@ -2367,3 +2367,9 @@
 - [x] Aba 3: Integrações (WhatsApp Z-API, Estoque, SIG, OLX, Meta)
 - [x] Aba 4: Segurança e Senha (alterar senha, reset geral)
 - [x] Animação fade-in suave ao alternar entre abas de Ajustes
+
+## Análise e Correções Asaas/Assinatura
+- [x] Fix teste trial-expiration (campo email obrigatório faltando no insert)
+- [x] Adicionar rota billing.getCheckoutUrl para reabrir link de pagamento pendente
+- [x] Botão "Pagar agora" na tela de Assinatura quando status suspended
+- [x] Todos os 21 testes de billing/asaas/trial passando

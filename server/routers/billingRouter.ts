@@ -149,6 +149,33 @@ export const billingRouter = router({
     }
   }),
 
+  // Permite ao admin reabrir o link de checkout quando fechou a aba sem pagar.
+  // Busca a cobrança PENDING da assinatura existente e devolve a URL.
+  getCheckoutUrl: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB indisponível");
+    const tenantId = getCurrentTenantId();
+
+    const [tenant] = await db.select({ subscriptionId: tenants.subscriptionId }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+    if (!tenant?.subscriptionId) return { checkoutUrl: null, reason: "no_subscription" as const };
+
+    try {
+      const checkoutUrl = await asaas.getCheckoutUrl(tenant.subscriptionId);
+      return { checkoutUrl, reason: checkoutUrl ? null : "no_pending_payment" as const };
+    } catch (err: any) {
+      if (err instanceof asaas.AsaasError) {
+        await createBillingAlert({
+          tenantId,
+          severity: "warning",
+          code: "asaas_api_error",
+          message: `Falha ao buscar checkout URL: ${err.message}`,
+          context: { status: err.status, body: err.body, subscriptionId: tenant.subscriptionId },
+        });
+      }
+      return { checkoutUrl: null, reason: "api_error" as const };
+    }
+  }),
+
   cancelSubscription: adminProcedure.mutation(async () => {
     const db = await getDb();
     if (!db) throw new Error("DB indisponível");

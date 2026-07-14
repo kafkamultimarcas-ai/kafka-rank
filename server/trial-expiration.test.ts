@@ -79,7 +79,7 @@ describe("tenantAuth.login - trial expirado", () => {
     const db = await getDb();
     const username = `admin-trial-${tenantId}`;
     await db!.insert(admins).values({
-      username, passwordHash: hash, name: "Admin Trial Vencido", role: "owner", active: true, tenantId,
+      username, passwordHash: hash, name: "Admin Trial Vencido", email: `trial-vencido-${tenantId}@test.com`, role: "owner", active: true, tenantId,
     } as any);
 
     const [tenant] = await db!.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId));
@@ -96,7 +96,7 @@ describe("tenantAuth.login - trial expirado", () => {
     const db = await getDb();
     const username = `admin-trial-ok-${tenantId}`;
     await db!.insert(admins).values({
-      username, passwordHash: hash, name: "Admin Trial Ativo", role: "owner", active: true, tenantId,
+      username, passwordHash: hash, name: "Admin Trial Ativo", email: `trial-ativo-${tenantId}@test.com`, role: "owner", active: true, tenantId,
     } as any);
 
     const [tenant] = await db!.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId));
