@@ -1827,3 +1827,21 @@ export const sellerBonuses = mysqlTable("seller_bonuses", {
 
 export type SellerBonus = typeof sellerBonuses.$inferSelect;
 export type InsertSellerBonus = typeof sellerBonuses.$inferInsert;
+
+// ===== INTEGRATION SYNC LOGS (generic for all integrations) =====
+export const integrationSyncLogs = mysqlTable("integration_sync_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  integrationType: varchar("integrationType", { length: 50 }).notNull(), // 'whatsapp', 'sig', 'olx', 'meta', 'inventory'
+  status: mysqlEnum("sync_status", ["success", "error"]).notNull(),
+  summary: text("summary"), // e.g. "124 encontrado(s), 0 novo(s), 116 atualizado(s)"
+  details: text("details"), // JSON with detailed metrics
+  errorMessage: text("errorMessage"),
+  duration: int("duration").default(0), // ms
+  triggeredBy: varchar("triggeredBy", { length: 50 }).default("auto"), // 'auto' | 'manual'
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantTypeIdx: index("idx_integration_sync_logs_tenant_type").on(table.tenantId, table.integrationType),
+}));
+export type IntegrationSyncLog = typeof integrationSyncLogs.$inferSelect;
+export type InsertIntegrationSyncLog = typeof integrationSyncLogs.$inferInsert;

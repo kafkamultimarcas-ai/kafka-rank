@@ -2258,6 +2258,7 @@ function TokenIntegrationRow({ type, name, description, endpointLabel, endpointP
               <Trash2 className="w-3.5 h-3.5 mr-1" /> Remover
             </Button>
           </div>
+          <SyncLogSection integrationType={type === 'sig' ? 'sig' : type === 'email_parser' ? 'olx' : type} mutationKey={type === 'sig' ? 'syncSig' : 'syncOlx'} />
         </div>
       )}
     </div>
@@ -2355,6 +2356,7 @@ function MetaIntegrationPanel() {
               {testConnection.isPending ? "Testando..." : "Testar Conexão"}
             </Button>
           </div>
+          <SyncLogSection integrationType="meta" mutationKey="syncMeta" />
         </div>
       )}
     </div>
@@ -2524,12 +2526,39 @@ function WhatsAppZapiPanel() {
                 </Button>
               </div>
             )}
+            <SyncLogSection integrationType="whatsapp" mutationKey="syncWhatsapp" />
           </div>
         )}
       </div>
   );
 }
-
+// ===== GENERIC SYNC LOG SECTION (reusable) =====
+function SyncLogSection({ integrationType, mutationKey }: { integrationType: string; mutationKey: "syncWhatsapp" | "syncSig" | "syncOlx" | "syncMeta" }) {
+  const { data: logs, refetch } = trpc.crmIntegrations.getSyncLogs.useQuery({ integrationType });
+  const sync = (trpc.crmIntegrations as any)[mutationKey].useMutation({
+    onSuccess: () => { toast.success("Verifica\u00e7\u00e3o conclu\u00edda!"); refetch(); },
+    onError: (e: any) => { toast.error("Erro: " + e.message); refetch(); },
+  });
+  const lastLog = logs?.[0];
+  return (
+    <div className="pt-2 border-t border-border/50 space-y-2">
+      <Button size="sm" variant="outline" className="text-xs" onClick={() => sync.mutate()} disabled={sync.isPending}>
+        <RefreshCw className={`w-3.5 h-3.5 mr-1 ${sync.isPending ? 'animate-spin' : ''}`} />
+        {sync.isPending ? 'Verificando...' : 'Sincronizar Agora'}
+      </Button>
+      {lastLog && (
+        <div className="text-[11px] text-muted-foreground">
+          <span className={lastLog.status === 'success' ? 'text-green-400' : 'text-red-400'}>
+            {lastLog.status === 'success' ? '\u2713 \u00daltima verifica\u00e7\u00e3o' : '\u2717 Falha'}
+          </span>
+          {' '}em {new Date(lastLog.createdAt).toLocaleString("pt-BR")}
+          {lastLog.summary ? ` \u2014 ${lastLog.summary}` : ''}
+          {lastLog.status === 'error' && lastLog.errorMessage ? ` \u2014 ${lastLog.errorMessage}` : ''}
+        </div>
+      )}
+    </div>
+  );
+}
 // ===== ESTOQUE (URL de sincronização) PANEL =====
 function InventoryIntegrationPanel() {
   const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();

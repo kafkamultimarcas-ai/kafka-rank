@@ -707,6 +707,168 @@ export const crmIntegrationsRouter = router({
       return { success: false, error: err.message };
     }
   }),
+  // ===== SYNC LOGS =====
+  getSyncLogs: adminProcedure.input(z.object({
+    integrationType: z.string(),
+  })).query(async ({ input }) => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) return [];
+    const { integrationSyncLogs } = await import("../../drizzle/schema");
+    const { eq, and, desc } = await import("drizzle-orm");
+    return dbConn.select().from(integrationSyncLogs)
+      .where(and(
+        eq(integrationSyncLogs.tenantId, getCurrentTenantId()),
+        eq(integrationSyncLogs.integrationType, input.integrationType)
+      ))
+      .orderBy(desc(integrationSyncLogs.createdAt))
+      .limit(10);
+  }),
+  // Sync WhatsApp (test connection + count conversations)
+  syncWhatsapp: adminProcedure.mutation(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { integrationSyncLogs } = await import("../../drizzle/schema");
+    const tenantId = getCurrentTenantId();
+    const start = Date.now();
+    try {
+      const zapiService = await import("../zapi-service");
+      const statusResult = await zapiService.getStatus(tenantId);
+      const connected = statusResult.connected;
+      const phone = "";
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const [convResult] = await dbConn.execute(sqlTag`SELECT COUNT(*) as cnt FROM crm_conversations WHERE tenantId = ${tenantId} AND updatedAt > DATE_SUB(NOW(), INTERVAL 24 HOUR)`) as any;
+      const conversations24h = convResult?.[0]?.cnt || 0;
+      const duration = Date.now() - start;
+      const summary = connected
+        ? `Conectado (${phone}). ${conversations24h} conversa(s) nas últimas 24h.`
+        : `Desconectado. Escaneie o QR code no painel Z-API.`;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "whatsapp", status: connected ? "success" : "error",
+        summary, duration, triggeredBy: "manual",
+      });
+      return { success: connected, summary, phone, conversations24h };
+    } catch (err: any) {
+      const duration = Date.now() - start;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "whatsapp", status: "error",
+        summary: "Falha na verificação", errorMessage: err.message, duration, triggeredBy: "manual",
+      });
+      throw err;
+    }
+  }),
+  // Sync SIG Web (check webhook status + count recent sales)
+  syncSig: adminProcedure.mutation(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { integrationSyncLogs } = await import("../../drizzle/schema");
+    const tenantId = getCurrentTenantId();
+    const start = Date.now();
+    try {
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const [salesResult] = await dbConn.execute(sqlTag`SELECT COUNT(*) as cnt FROM sales WHERE tenantId = ${tenantId} AND createdAt > DATE_SUB(NOW(), INTERVAL 7 DAY)`) as any;
+      const salesLast7d = salesResult?.[0]?.cnt || 0;
+      const [intResult] = await dbConn.execute(sqlTag`SELECT id FROM crm_integrations WHERE tenantId = ${tenantId} AND type = 'sig' AND active = 1 LIMIT 1`) as any;
+      const rows = Array.isArray(intResult?.[0]) ? intResult[0] : intResult;
+      const isActive = rows?.length > 0;
+      const duration = Date.now() - start;
+      const summary = isActive
+        ? `Webhook ativo. ${salesLast7d} venda(s) recebida(s) nos últimos 7 dias.`
+        : `Integração inativa. Ative e configure o webhook no SIG.`;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "sig", status: isActive ? "success" : "error",
+        summary, duration, triggeredBy: "manual",
+      });
+      return { success: isActive, summary, salesLast7d };
+    } catch (err: any) {
+      const duration = Date.now() - start;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "sig", status: "error",
+        summary: "Falha na verificação", errorMessage: err.message, duration, triggeredBy: "manual",
+      });
+      throw err;
+    }
+  }),
+  // Sync OLX (check webhook status + count recent leads)
+  syncOlx: adminProcedure.mutation(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { integrationSyncLogs } = await import("../../drizzle/schema");
+    const tenantId = getCurrentTenantId();
+    const start = Date.now();
+    try {
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const [leadsResult] = await dbConn.execute(sqlTag`SELECT COUNT(*) as cnt FROM crm_leads WHERE tenantId = ${tenantId} AND source IN ('olx','webmotors','icarros') AND createdAt > DATE_SUB(NOW(), INTERVAL 7 DAY)`) as any;
+      const leadsLast7d = leadsResult?.[0]?.cnt || 0;
+      const [intResult] = await dbConn.execute(sqlTag`SELECT id FROM crm_integrations WHERE tenantId = ${tenantId} AND type = 'email_parser' AND active = 1 LIMIT 1`) as any;
+      const rows = Array.isArray(intResult?.[0]) ? intResult[0] : intResult;
+      const isActive = rows?.length > 0;
+      const duration = Date.now() - start;
+      const summary = isActive
+        ? `Webhook ativo. ${leadsLast7d} lead(s) recebido(s) nos últimos 7 dias.`
+        : `Integração inativa. Ative para receber leads de OLX/Webmotors.`;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "olx", status: isActive ? "success" : "error",
+        summary, duration, triggeredBy: "manual",
+      });
+      return { success: isActive, summary, leadsLast7d };
+    } catch (err: any) {
+      const duration = Date.now() - start;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "olx", status: "error",
+        summary: "Falha na verificação", errorMessage: err.message, duration, triggeredBy: "manual",
+      });
+      throw err;
+    }
+  }),
+  // Sync Meta Ads (test connection + count recent leads)
+  syncMeta: adminProcedure.mutation(async () => {
+    const { getDb } = await import("../db");
+    const dbConn = await getDb();
+    if (!dbConn) throw new Error("DB not available");
+    const { integrationSyncLogs } = await import("../../drizzle/schema");
+    const tenantId = getCurrentTenantId();
+    const start = Date.now();
+    try {
+      const { sql: sqlTag } = await import("drizzle-orm");
+      const [intResult] = await dbConn.execute(sqlTag`SELECT config FROM crm_integrations WHERE tenantId = ${tenantId} AND type = 'facebook' LIMIT 1`) as any;
+      const row = Array.isArray(intResult?.[0]) ? intResult[0][0] : intResult?.[0];
+      let config: any = {};
+      if (row?.config) try { config = JSON.parse(row.config); } catch {}
+      const hasToken = !!config.pageAccessToken;
+      let pageName = "";
+      if (hasToken) {
+        try {
+          const resp = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${config.pageAccessToken}`);
+          const data = await resp.json() as any;
+          if (!data.error) pageName = data.name || "";
+        } catch {}
+      }
+      const [leadsResult] = await dbConn.execute(sqlTag`SELECT COUNT(*) as cnt FROM crm_leads WHERE tenantId = ${tenantId} AND source IN ('facebook','instagram','meta') AND createdAt > DATE_SUB(NOW(), INTERVAL 7 DAY)`) as any;
+      const leadsLast7d = leadsResult?.[0]?.cnt || 0;
+      const duration = Date.now() - start;
+      const connected = hasToken && !!pageName;
+      const summary = connected
+        ? `Conectado à página "${pageName}". ${leadsLast7d} lead(s) nos últimos 7 dias.`
+        : hasToken ? `Token configurado mas conexão falhou. ${leadsLast7d} lead(s) nos últimos 7 dias.`
+        : `Não configurado. Configure App ID, Secret e Page Token.`;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "meta", status: connected ? "success" : "error",
+        summary, duration, triggeredBy: "manual",
+      });
+      return { success: connected, summary, pageName, leadsLast7d };
+    } catch (err: any) {
+      const duration = Date.now() - start;
+      await dbConn.insert(integrationSyncLogs).values({
+        tenantId, integrationType: "meta", status: "error",
+        summary: "Falha na verificação", errorMessage: err.message, duration, triggeredBy: "manual",
+      });
+      throw err;
+    }
+  }),
 });
 
 // ===== CRM CAMPAIGNS =====

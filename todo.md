@@ -2325,3 +2325,13 @@
 - [x] Verificar se vendedores conseguem trocar foto no perfil (Minha Área) - JÁ FUNCIONA
 - [x] Rank de competição visível para vendedores na área deles - ADICIONADO widget com posição + mini-leaderboard
 - [x] Melhorar visual da gamificação/pista de corrida - TV e RaceTrack com gradientes, glow, podium melhorado
+
+## Sync Logs e Botão "Sincronizar Agora" em todas as integrações
+- [x] Criar tabela integration_sync_logs no schema
+- [x] Endpoint para buscar último log de sync por tipo de integração
+- [x] Endpoint para disparar sync manual por tipo de integração
+- [x] Botão "Sincronizar Agora" no WhatsApp (Z-API) com log
+- [x] Botão "Sincronizar Agora" no SIG Web com log
+- [x] Botão "Sincronizar Agora" no OLX/Webmotors com log
+- [x] Botão "Sincronizar Agora" no Meta Ads com log
+- [x] Exibir última sincronização com data/hora e resultado em cada integração
