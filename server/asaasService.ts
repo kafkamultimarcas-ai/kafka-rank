@@ -142,4 +142,32 @@ export async function getCheckoutUrl(subscriptionId: string): Promise<string | n
   return first?.invoiceUrl || null;
 }
 
+/**
+ * Lista pagamentos confirmados/recebidos de uma assinatura, com URL do recibo.
+ * O Asaas devolve `transactionReceiptUrl` para pagamentos confirmados.
+ */
+export type AsaasPayment = {
+  id: string;
+  status: string;
+  value: number;
+  netValue: number;
+  billingType: string;
+  dueDate: string;
+  paymentDate: string | null;
+  invoiceUrl: string | null;
+  transactionReceiptUrl: string | null;
+  description: string | null;
+};
+
+export async function getSubscriptionPayments(
+  subscriptionId: string,
+  options: { status?: string; limit?: number; offset?: number } = {}
+): Promise<{ data: AsaasPayment[]; totalCount: number }> {
+  const params = new URLSearchParams();
+  if (options.status) params.set("status", options.status);
+  params.set("limit", String(options.limit || 20));
+  params.set("offset", String(options.offset || 0));
+  return asaasFetch(`/subscriptions/${subscriptionId}/payments?${params.toString()}`);
+}
+
 export { AsaasError };

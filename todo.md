@@ -2373,3 +2373,7 @@
 - [x] Adicionar rota billing.getCheckoutUrl para reabrir link de pagamento pendente
 - [x] Botão "Pagar agora" na tela de Assinatura quando status suspended
 - [x] Todos os 21 testes de billing/asaas/trial passando
+
+## Histórico de Faturas na Tela de Assinatura
+- [x] Backend: rota billing.getInvoices para listar faturas confirmadas com link de recibo
+- [x] Frontend: seção "Histórico de Faturas" com tabela de faturas pagas e botão de download

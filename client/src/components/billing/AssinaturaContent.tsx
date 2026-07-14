@@ -36,6 +36,9 @@ import {
   History,
   ShieldCheck,
   XCircle,
+  FileText,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 
 const WHATSAPP_CONTACT = "https://wa.me/5500000000000";
@@ -205,6 +208,108 @@ function SubscribeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const BILLING_TYPE_LABELS: Record<string, string> = {
+  BOLETO: "Boleto",
+  PIX: "PIX",
+  CREDIT_CARD: "Cartão de Crédito",
+  DEBIT_CARD: "Cartão de Débito",
+  UNDEFINED: "Não definido",
+};
+
+function InvoicesSection() {
+  const [invoicePage, setInvoicePage] = useState(0);
+  const { data: invoices, isLoading } = trpc.billing.getInvoices.useQuery({
+    limit: 10,
+    offset: invoicePage * 10,
+  });
+
+  const invoiceTotalPages = invoices ? Math.max(1, Math.ceil(invoices.total / 10)) : 1;
+
+  return (
+    <div className="racing-card p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <FileText className="w-4 h-4 text-primary" />
+        <h2 className="text-sm font-bold text-foreground">Faturas e Recibos</h2>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : !invoices || invoices.items.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-8">Nenhuma fatura paga encontrada.</p>
+      ) : (
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data Pgto</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Forma</TableHead>
+                <TableHead>Vencimento</TableHead>
+                <TableHead className="text-right">Recibo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.items.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell className="text-xs">
+                    {inv.paymentDate ? new Date(inv.paymentDate).toLocaleDateString("pt-BR") : "-"}
+                  </TableCell>
+                  <TableCell className="text-xs font-medium">
+                    {formatCentsToBRL(Math.round(inv.value * 100))}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {BILLING_TYPE_LABELS[inv.billingType] || inv.billingType}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("pt-BR") : "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {inv.receiptUrl && (
+                        <Button variant="ghost" size="sm" asChild className="h-7 px-2">
+                          <a href={inv.receiptUrl} target="_blank" rel="noopener noreferrer" title="Baixar recibo">
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                        </Button>
+                      )}
+                      {inv.invoiceUrl && (
+                        <Button variant="ghost" size="sm" asChild className="h-7 px-2">
+                          <a href={inv.invoiceUrl} target="_blank" rel="noopener noreferrer" title="Ver fatura">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </Button>
+                      )}
+                      {!inv.receiptUrl && !inv.invoiceUrl && (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {invoiceTotalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <Button variant="outline" size="sm" disabled={invoicePage === 0} onClick={() => setInvoicePage((p) => p - 1)}>
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">Página {invoicePage + 1} de {invoiceTotalPages}</span>
+              <Button variant="outline" size="sm" disabled={invoicePage >= invoiceTotalPages - 1} onClick={() => setInvoicePage((p) => p + 1)}>
+                Próxima
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -446,6 +551,8 @@ export default function AssinaturaContent({
           </>
         )}
       </div>
+
+      <InvoicesSection />
 
       {showLogoutButton && (
         <div className="text-center">

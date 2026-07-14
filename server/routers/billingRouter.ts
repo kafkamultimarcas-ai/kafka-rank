@@ -176,6 +176,75 @@ export const billingRouter = router({
     }
   }),
 
+  // Lista faturas (pagamentos confirmados/recebidos) da assinatura com link de recibo.
+  getInvoices: adminProcedure.input(z.object({
+    limit: z.number().min(1).max(50).default(10),
+    offset: z.number().min(0).default(0),
+  })).query(async ({ input }) => {
+    const db = await getDb();
+    if (!db) return { items: [], total: 0 };
+    const tenantId = getCurrentTenantId();
+
+    const [tenant] = await db.select({
+      subscriptionId: tenants.subscriptionId,
+      asaasCustomerId: tenants.asaasCustomerId,
+    }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+
+    if (!tenant?.subscriptionId) return { items: [], total: 0 };
+
+    try {
+      // Busca pagamentos com status CONFIRMED ou RECEIVED (faturas pagas)
+      const confirmed = await asaas.getSubscriptionPayments(tenant.subscriptionId, {
+        status: "CONFIRMED",
+        limit: input.limit,
+        offset: input.offset,
+      });
+      const received = await asaas.getSubscriptionPayments(tenant.subscriptionId, {
+        status: "RECEIVED",
+        limit: input.limit,
+        offset: input.offset,
+      });
+
+      // Combina e ordena por data de pagamento (mais recente primeiro)
+      const allPayments = [...(confirmed.data || []), ...(received.data || [])]
+        .sort((a, b) => {
+          const dateA = a.paymentDate ? new Date(a.paymentDate).getTime() : 0;
+          const dateB = b.paymentDate ? new Date(b.paymentDate).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, input.limit);
+
+      const items = allPayments.map((p) => ({
+        id: p.id,
+        value: p.value,
+        netValue: p.netValue,
+        billingType: p.billingType,
+        dueDate: p.dueDate,
+        paymentDate: p.paymentDate,
+        invoiceUrl: p.invoiceUrl,
+        receiptUrl: p.transactionReceiptUrl,
+        description: p.description,
+        status: p.status,
+      }));
+
+      return {
+        items,
+        total: (confirmed.totalCount || 0) + (received.totalCount || 0),
+      };
+    } catch (err: any) {
+      if (err instanceof asaas.AsaasError) {
+        await createBillingAlert({
+          tenantId,
+          severity: "warning",
+          code: "asaas_api_error",
+          message: `Falha ao buscar faturas: ${err.message}`,
+          context: { status: err.status, body: err.body, subscriptionId: tenant.subscriptionId },
+        });
+      }
+      return { items: [], total: 0 };
+    }
+  }),
+
   cancelSubscription: adminProcedure.mutation(async () => {
     const db = await getDb();
     if (!db) throw new Error("DB indisponível");
