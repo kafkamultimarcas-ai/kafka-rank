@@ -147,7 +147,11 @@ export default function CrmAdminDashboard() {
       return;
     }
 
-    if (location !== basePath) {
+    // Check full URL including query string to properly navigate away from ?view=assinatura
+    const currentFullPath = typeof window !== "undefined" 
+      ? window.location.pathname + window.location.search 
+      : location;
+    if (currentFullPath !== basePath) {
       navigate(basePath, { replace: true });
     }
   };
