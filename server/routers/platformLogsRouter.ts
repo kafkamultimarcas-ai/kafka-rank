@@ -2,10 +2,9 @@ import { z } from "zod";
 import { eq, and, gte, lte, count, desc, inArray, type SQL } from "drizzle-orm";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { subscriptionEvents, emailLogs, tenants, billingAlerts } from "../../drizzle/schema";
+import { subscriptionEvents, emailLogs, tenants, billingAlerts, integrationSyncLogs, inventorySyncLogs } from "../../drizzle/schema";
 import { verifySuperToken } from "../superAdminAuth";
-
-const logTypeSchema = z.enum(["email", "subscription", "billing_alert"]);
+const logTypeSchema = z.enum(["email", "subscription", "billing_alert", "integration"]);
 
 // Eventos que nunca mudam status automaticamente (server/webhooks.ts só reage a
 // PAYMENT_CONFIRMED/RECEIVED/OVERDUE) mas merecem olho do Super Admin — dinheiro
@@ -178,9 +177,106 @@ async function listBillingAlertLogs(input: {
   };
 }
 
-/** Visão unificada do Super Admin sobre logs de e-mail, assinatura e alertas de
- * cobrança de todas as lojas — cada tipo continua guardado na tabela que faz sentido pra ele
- * (email_logs / subscription_events / billing_alerts), esta camada só normaliza
+/** Lista logs de integração (integration_sync_logs + inventory_sync_logs) de todas as lojas */
+async function listIntegrationLogs(input: {
+  tenantId?: number; status?: string; startDate?: number; endDate?: number; limit: number; offset: number;
+}): Promise<{ items: NormalizedLogItem[]; total: number }> {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0 };
+
+  // Buscar integration_sync_logs
+  const conditions1: SQL[] = [];
+  if (input.tenantId) conditions1.push(eq(integrationSyncLogs.tenantId, input.tenantId));
+  if (input.status === "success" || input.status === "error") conditions1.push(eq(integrationSyncLogs.status, input.status));
+  if (input.startDate) conditions1.push(gte(integrationSyncLogs.createdAt, new Date(input.startDate)));
+  if (input.endDate) conditions1.push(lte(integrationSyncLogs.createdAt, new Date(input.endDate)));
+  const where1 = conditions1.length > 0 ? and(...conditions1) : undefined;
+
+  // Buscar inventory_sync_logs
+  const conditions2: SQL[] = [];
+  if (input.tenantId) conditions2.push(eq(inventorySyncLogs.tenantId, input.tenantId));
+  if (input.status === "success" || input.status === "error") conditions2.push(eq(inventorySyncLogs.status, input.status));
+  if (input.startDate) conditions2.push(gte(inventorySyncLogs.createdAt, new Date(input.startDate)));
+  if (input.endDate) conditions2.push(lte(inventorySyncLogs.createdAt, new Date(input.endDate)));
+  const where2 = conditions2.length > 0 ? and(...conditions2) : undefined;
+
+  const [intRows, [{ value: intTotal }], invRows, [{ value: invTotal }]] = await Promise.all([
+    db.select({
+      id: integrationSyncLogs.id,
+      tenantId: integrationSyncLogs.tenantId,
+      tenantName: tenants.name,
+      tenantSlug: tenants.slug,
+      integrationType: integrationSyncLogs.integrationType,
+      status: integrationSyncLogs.status,
+      summary: integrationSyncLogs.summary,
+      details: integrationSyncLogs.details,
+      errorMessage: integrationSyncLogs.errorMessage,
+      duration: integrationSyncLogs.duration,
+      triggeredBy: integrationSyncLogs.triggeredBy,
+      createdAt: integrationSyncLogs.createdAt,
+    })
+      .from(integrationSyncLogs)
+      .leftJoin(tenants, eq(tenants.id, integrationSyncLogs.tenantId))
+      .where(where1)
+      .orderBy(desc(integrationSyncLogs.createdAt))
+      .limit(input.limit).offset(input.offset),
+    db.select({ value: count() }).from(integrationSyncLogs).where(where1),
+    db.select({
+      id: inventorySyncLogs.id,
+      tenantId: inventorySyncLogs.tenantId,
+      tenantName: tenants.name,
+      tenantSlug: tenants.slug,
+      status: inventorySyncLogs.status,
+      vehiclesFound: inventorySyncLogs.vehiclesFound,
+      vehiclesAdded: inventorySyncLogs.vehiclesAdded,
+      vehiclesUpdated: inventorySyncLogs.vehiclesUpdated,
+      vehiclesRemoved: inventorySyncLogs.vehiclesRemoved,
+      errorMessage: inventorySyncLogs.errorMessage,
+      duration: inventorySyncLogs.duration,
+      createdAt: inventorySyncLogs.createdAt,
+    })
+      .from(inventorySyncLogs)
+      .leftJoin(tenants, eq(tenants.id, inventorySyncLogs.tenantId))
+      .where(where2)
+      .orderBy(desc(inventorySyncLogs.createdAt))
+      .limit(input.limit).offset(input.offset),
+    db.select({ value: count() }).from(inventorySyncLogs).where(where2),
+  ]);
+
+  const intItems: NormalizedLogItem[] = intRows.map((r) => ({
+    id: r.id,
+    logType: "integration" as const,
+    tenantId: r.tenantId,
+    tenantName: r.tenantName,
+    tenantSlug: r.tenantSlug,
+    title: r.integrationType.toUpperCase(),
+    detail: r.summary || (r.errorMessage ? `Erro: ${r.errorMessage.substring(0, 80)}` : "—"),
+    status: r.status,
+    createdAt: r.createdAt,
+  }));
+
+  const invItems: NormalizedLogItem[] = invRows.map((r) => ({
+    id: r.id + 1000000, // offset to avoid ID collision with integration logs
+    logType: "integration" as const,
+    tenantId: r.tenantId,
+    tenantName: r.tenantName,
+    tenantSlug: r.tenantSlug,
+    title: "ESTOQUE",
+    detail: `${r.vehiclesFound || 0} encontrado(s), ${r.vehiclesAdded || 0} novo(s), ${r.vehiclesUpdated || 0} atualizado(s), ${r.vehiclesRemoved || 0} removido(s)`,
+    status: r.status,
+    createdAt: r.createdAt,
+  }));
+
+  const merged = [...intItems, ...invItems]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, input.limit);
+
+  return { items: merged, total: intTotal + invTotal };
+}
+
+/** Visão unificada do Super Admin sobre logs de e-mail, assinatura, alertas de
+ * cobrança e integrações de todas as lojas — cada tipo continua guardado na tabela que faz sentido pra ele
+ * (email_logs / subscription_events / billing_alerts / integration_sync_logs), esta camada só normaliza
  * pra exibição conjunta. Mesmo token de portal master usado no resto do Super Admin. */
 export const platformLogsRouter = router({
   list: publicProcedure.input(z.object({
@@ -208,22 +304,27 @@ export const platformLogsRouter = router({
       return listBillingAlertLogs({ ...filters, limit: input.limit, offset: input.offset });
     }
 
+    if (input.logType === "integration") {
+      return listIntegrationLogs({ ...filters, limit: input.limit, offset: input.offset });
+    }
+
     // "Todos": busca o suficiente de cada fonte pra cobrir a página pedida,
     // mescla por data e corta no limit — paginação exata entre três tabelas
     // diferentes exigiria um UNION SQL; pro volume de logs de uma plataforma
     // (não é big data), essa aproximação é suficiente e bem mais simples.
     const fetchSize = input.offset + input.limit;
-    const [subs, emails, alerts] = await Promise.all([
+    const [subs, emails, alerts, integrations] = await Promise.all([
       listSubscriptionLogs({ ...filters, limit: fetchSize, offset: 0 }),
       listEmailLogs({ ...filters, limit: fetchSize, offset: 0 }),
       listBillingAlertLogs({ ...filters, limit: fetchSize, offset: 0 }),
+      listIntegrationLogs({ ...filters, limit: fetchSize, offset: 0 }),
     ]);
 
-    const merged = [...subs.items, ...emails.items, ...alerts.items]
+    const merged = [...subs.items, ...emails.items, ...alerts.items, ...integrations.items]
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(input.offset, input.offset + input.limit);
 
-    return { items: merged, total: subs.total + emails.total + alerts.total };
+    return { items: merged, total: subs.total + emails.total + alerts.total + integrations.total };
   }),
 
   // Contagem simples (não é um sistema de "lido/não lido") de eventos raros nos
@@ -281,6 +382,49 @@ export const platformLogsRouter = router({
         .limit(1);
       if (!row) return null;
       return { logType: "billing_alert" as const, ...row.alert, tenantName: row.tenantName, tenantSlug: row.tenantSlug };
+    }
+
+    if (input.logType === "integration") {
+      // Check if it's an inventory log (id >= 1000000) or integration log
+      if (input.id >= 1000000) {
+        const realId = input.id - 1000000;
+        const [row] = await db.select({ log: inventorySyncLogs, tenantName: tenants.name, tenantSlug: tenants.slug })
+          .from(inventorySyncLogs)
+          .leftJoin(tenants, eq(tenants.id, inventorySyncLogs.tenantId))
+          .where(eq(inventorySyncLogs.id, realId))
+          .limit(1);
+        if (!row) return null;
+        return {
+          logType: "integration" as const,
+          subType: "inventory" as const,
+          id: input.id,
+          tenantId: row.log.tenantId,
+          tenantName: row.tenantName,
+          tenantSlug: row.tenantSlug,
+          integrationType: "estoque",
+          status: row.log.status,
+          summary: `${row.log.vehiclesFound || 0} encontrado(s), ${row.log.vehiclesAdded || 0} novo(s), ${row.log.vehiclesUpdated || 0} atualizado(s), ${row.log.vehiclesRemoved || 0} removido(s)`,
+          details: JSON.stringify({ vehiclesFound: row.log.vehiclesFound, vehiclesAdded: row.log.vehiclesAdded, vehiclesUpdated: row.log.vehiclesUpdated, vehiclesRemoved: row.log.vehiclesRemoved }),
+          errorMessage: row.log.errorMessage,
+          duration: row.log.duration,
+          triggeredBy: "auto",
+          createdAt: row.log.createdAt,
+        };
+      } else {
+        const [row] = await db.select({ log: integrationSyncLogs, tenantName: tenants.name, tenantSlug: tenants.slug })
+          .from(integrationSyncLogs)
+          .leftJoin(tenants, eq(tenants.id, integrationSyncLogs.tenantId))
+          .where(eq(integrationSyncLogs.id, input.id))
+          .limit(1);
+        if (!row) return null;
+        return {
+          logType: "integration" as const,
+          subType: "sync" as const,
+          ...row.log,
+          tenantName: row.tenantName,
+          tenantSlug: row.tenantSlug,
+        };
+      }
     }
 
     const [row] = await db.select({ log: emailLogs, tenantName: tenants.name, tenantSlug: tenants.slug })

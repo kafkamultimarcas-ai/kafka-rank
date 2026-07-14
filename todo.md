@@ -2335,3 +2335,11 @@
 - [x] Botão "Sincronizar Agora" no OLX/Webmotors com log
 - [x] Botão "Sincronizar Agora" no Meta Ads com log
 - [x] Exibir última sincronização com data/hora e resultado em cada integração
+
+## Logs de Integração no Super Admin
+- [x] Adicionar tipo "Integração" no filtro de logs do Super Admin
+- [x] Endpoint listIntegrationLogs que busca integration_sync_logs + inventory_sync_logs de todas as lojas
+- [x] Endpoint getById para detalhes de log de integração
+- [x] Modal de detalhes com: loja, tipo, status, disparado por, duração, resumo, erro, detalhes técnicos
+- [x] Ícone e badge verde/vermelho para status na listagem
+- [x] Dados de teste inseridos para visualização
