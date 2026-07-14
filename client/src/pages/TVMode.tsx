@@ -270,7 +270,7 @@ export default function TVMode() {
             <p className="text-xs text-white/40">{time.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" })}</p>
           </div>
           <button
-            onClick={(e) => { e.stopPropagation(); document.exitFullscreen?.(); window.history.back(); }}
+            onClick={(e) => { e.stopPropagation(); try { document.exitFullscreen?.(); } catch {} window.history.back(); }}
             className="p-2 hover:bg-white/10 rounded-lg cursor-pointer"
           >
             <X className="h-5 w-5 text-white/30" />

@@ -166,15 +166,9 @@ async function _checkAlertsInner() {
     for (const lead of warningLeads) {
       if (!warnedLeads.has(lead.id)) {
         // Skip if lead was acknowledged by seller
-        if (await isLeadAcknowledged(lead.id)) {
-          console.log(`[Alert Checker] Lead #${lead.id} já foi confirmado pelo vendedor - não avisar`);
-          continue;
-        }
+        if (await isLeadAcknowledged(lead.id)) continue;
         // Skip if seller has active conversation with lead
-        if (await hasActiveConversation(lead.id)) {
-          console.log(`[Alert Checker] Lead #${lead.id} tem conversa ativa - não avisar`);
-          continue;
-        }
+        if (await hasActiveConversation(lead.id)) continue;
         // Check if this lead is NOT yet at the transfer threshold
         const createdTs = typeof lead.createdAt === 'number' ? lead.createdAt : new Date(lead.createdAt!).getTime();
         const minutesSinceCreation = (Date.now() - createdTs) / 60000;
@@ -194,22 +188,13 @@ async function _checkAlertsInner() {
     
     for (const lead of sellerUnresponded) {
       // CHECK 1: Lead was acknowledged by seller - DON'T transfer
-      if (await isLeadAcknowledged(lead.id)) {
-        console.log(`[Alert Checker] Lead #${lead.id} confirmado pelo vendedor (Recebi/OK) - não transferir`);
-        continue;
-      }
+      if (await isLeadAcknowledged(lead.id)) continue;
 
       // CHECK 2: Seller has active conversation (sent outbound messages) - DON'T transfer
-      if (await hasActiveConversation(lead.id)) {
-        console.log(`[Alert Checker] Lead #${lead.id} tem conversa ativa com vendedor - não transferir`);
-        continue;
-      }
+      if (await hasActiveConversation(lead.id)) continue;
 
       // CHECK 3: Lead is in active negotiation stage - DON'T transfer
-      if (lead.stage === 'Em Negociacao' || lead.stage === 'Em Negociação' || lead.stage === 'Proposta' || lead.stage === 'Fechamento') {
-        console.log(`[Alert Checker] Lead #${lead.id} em negociação ativa (${lead.stage}) - não transferir`);
-        continue;
-      }
+      if (lead.stage === 'Em Negociacao' || lead.stage === 'Em Negociação' || lead.stage === 'Proposta' || lead.stage === 'Fechamento') continue;
 
       // CHECK 4: Check if auto-distribution is enabled
       const database = await getDb();
@@ -241,8 +226,7 @@ async function _checkAlertsInner() {
           a.description?.includes('transferido automaticamente') || a.description?.includes('atribuído automaticamente')
         ).length;
         if (autoTransferCount >= MAX_AUTO_TRANSFERS) {
-          // Lead has been transferred too many times - stop transferring and archive
-          console.log(`[Alert Checker] Lead #${lead.id} já foi transferido ${autoTransferCount}x (max: ${MAX_AUTO_TRANSFERS}) - parando transferências automáticas`);
+          // Lead has been transferred too many times - skip silently
           continue;
         }
       } catch { /* ignore count errors */ }
