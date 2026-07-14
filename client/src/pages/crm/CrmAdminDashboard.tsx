@@ -1893,10 +1893,12 @@ function SettingsView() {
       </div>
 
       {/* Tab Content */}
-      {settingsTab === "usuarios" && <SettingsUsersTab />}
-      {settingsTab === "loja" && <SettingsStoreTab />}
-      {settingsTab === "integracoes" && <SettingsIntegrationsTab />}
-      {settingsTab === "seguranca" && <SettingsSecurityTab />}
+      <div key={settingsTab} className="animate-fade-in">
+        {settingsTab === "usuarios" && <SettingsUsersTab />}
+        {settingsTab === "loja" && <SettingsStoreTab />}
+        {settingsTab === "integracoes" && <SettingsIntegrationsTab />}
+        {settingsTab === "seguranca" && <SettingsSecurityTab />}
+      </div>
     </div>
   );
 }

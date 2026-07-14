@@ -2366,3 +2366,4 @@
 - [x] Aba 2: Dados da Loja (configurações da loja, logo, cores)
 - [x] Aba 3: Integrações (WhatsApp Z-API, Estoque, SIG, OLX, Meta)
 - [x] Aba 4: Segurança e Senha (alterar senha, reset geral)
+- [x] Animação fade-in suave ao alternar entre abas de Ajustes
