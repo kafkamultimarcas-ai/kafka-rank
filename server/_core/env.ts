@@ -12,7 +12,9 @@ export const ENV = {
   zapiApiUrl: process.env.ZAPI_API_URL ?? "https://api.z-api.io",
   zapiClientToken: process.env.ZAPI_CLIENT_TOKEN ?? "",
   asaasApiUrl: process.env.ASAAS_API_URL ?? "https://api-sandbox.asaas.com/v3",
-  asaasApiKey: process.env.ASAAS_API_KEY ?? "",
+  asaasApiKey: process.env.ASAAS_API_KEY
+    ? Buffer.from(process.env.ASAAS_API_KEY, "base64").toString("utf-8")
+    : "",
   asaasWebhookToken: process.env.ASAAS_WEBHOOK_TOKEN ?? "",
   asaasWalletId: process.env.ASAAS_WALLET_ID ?? "",
   // Origem pública da aplicação — usada só por jobs em background (ex: aviso de
