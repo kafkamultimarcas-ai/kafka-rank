@@ -1,7 +1,7 @@
 ﻿import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb, withRetry } from "../db";
-import { tenants, superAdmins, sellers, admins, sales, crmLeads, competitions, crmPipelineStages, finCategories, crmMessages, crmIntegrations } from "../../drizzle/schema";
+import { tenants, superAdmins, sellers, admins, sales, crmLeads, competitions, crmPipelineStages, finCategories, crmMessages, crmIntegrations, inventoryVehicles, finTransactions, integrationSyncLogs, subscriptionEvents } from "../../drizzle/schema";
 import * as zapi from "../zapi-service";
 import { eq, sql, desc, and, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -403,6 +403,134 @@ export const superAdminRouter = router({
   // Alertas de cobrança (webhook/API ASAAS) foram unificados na tela de Logs
   // do Super Admin — ver server/routers/platformLogsRouter.ts (listagem já
   // centralizada com e-mail/assinatura, mesma tela em client/src/pages/SuperAdmin.tsx).
+
+  /** Dashboard completo do Super Admin com métricas agregadas */
+  dashboardStats: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const payload = verifySuperToken(input.token);
+      if (!payload) throw new Error("Não autorizado");
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const allTenants = await withRetry(() => db.select().from(tenants).orderBy(desc(tenants.createdAt)));
+
+      // Contagens gerais
+      const [[{ value: totalSellers }]] = await Promise.all([
+        db.select({ value: count() }).from(sellers).where(eq(sellers.active, true)),
+      ]);
+      const [[{ value: totalVehicles }]] = await Promise.all([
+        db.select({ value: count() }).from(inventoryVehicles),
+      ]);
+      const [[{ value: totalLeads }]] = await Promise.all([
+        db.select({ value: count() }).from(crmLeads),
+      ]);
+      const [[{ value: totalMessages }]] = await Promise.all([
+        db.select({ value: count() }).from(crmMessages),
+      ]);
+      const [[{ value: activeCompetitions }]] = await Promise.all([
+        db.select({ value: count() }).from(competitions).where(eq(competitions.status, "active")),
+      ]);
+
+      // Financeiro interno das lojas
+      const [finStats] = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_transactions,
+          COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as faturamento_total,
+          COALESCE(SUM(CASE WHEN status IN ('pending', 'overdue') THEN amount ELSE 0 END), 0) as faturamento_aberto,
+          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pagamentos_pendentes,
+          COALESCE(SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END), 0) as pagamentos_atrasados,
+          COALESCE(SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END), 0) as pagamentos_pagos
+        FROM fin_transactions
+      `);
+      const finRow = (finStats as any[])[0] || {};
+
+      // Vendas por mês (últimos 6 meses)
+      const [salesByMonth] = await db.execute(sql`
+        SELECT DATE_FORMAT(createdAt, '%Y-%m') as month, COUNT(*) as total, tenantId
+        FROM sales WHERE status = 'approved' AND createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        GROUP BY month, tenantId ORDER BY month ASC
+      `);
+
+      // Faturamento por mês (últimos 6 meses)
+      const [finByMonth] = await db.execute(sql`
+        SELECT DATE_FORMAT(FROM_UNIXTIME(dueDate/1000), '%Y-%m') as month,
+          COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as pago,
+          COALESCE(SUM(CASE WHEN status IN ('pending', 'overdue') THEN amount ELSE 0 END), 0) as aberto,
+          tenantId
+        FROM fin_transactions WHERE dueDate >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000
+        GROUP BY month, tenantId ORDER BY month ASC
+      `);
+
+      // Dados por loja
+      const [vehiclesByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM inventory_vehicles GROUP BY tenantId`);
+      const [leadsByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_leads GROUP BY tenantId`);
+      const [sellersByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM sellers WHERE active = 1 GROUP BY tenantId`);
+      const [integrationsByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_integrations WHERE active = 1 GROUP BY tenantId`);
+
+      // Pagamentos da plataforma (subscription_events)
+      const [platformPayments] = await db.execute(sql`
+        SELECT COUNT(*) as total,
+          COALESCE(SUM(CASE WHEN status = 'CONFIRMED' OR status = 'RECEIVED' THEN 1 ELSE 0 END), 0) as confirmados,
+          COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) as pendentes,
+          COALESCE(SUM(CASE WHEN status = 'OVERDUE' THEN 1 ELSE 0 END), 0) as atrasados,
+          COALESCE(SUM(CASE WHEN (status = 'CONFIRMED' OR status = 'RECEIVED') THEN value ELSE 0 END), 0) as valor_recebido,
+          COALESCE(SUM(CASE WHEN status = 'PENDING' OR status = 'OVERDUE' THEN value ELSE 0 END), 0) as valor_pendente
+        FROM subscription_events
+      `);
+      const platRow = (platformPayments as any[])[0] || {};
+
+      // Distribuições
+      const planDistribution = (allTenants as any[]).reduce((acc: any, t: any) => {
+        acc[t.plan] = (acc[t.plan] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const statusDistribution = (allTenants as any[]).reduce((acc: any, t: any) => {
+        acc[t.tenant_status] = (acc[t.tenant_status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Detalhes por loja
+      const tenantDetails = (allTenants as any[]).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        plan: t.plan,
+        status: t.tenant_status,
+        monthlyPrice: t.monthlyPrice || 0,
+        vehicles: ((vehiclesByTenant as any[]).find((v: any) => v.tenantId === t.id)?.total) || 0,
+        leads: ((leadsByTenant as any[]).find((l: any) => l.tenantId === t.id)?.total) || 0,
+        sellers: ((sellersByTenant as any[]).find((s: any) => s.tenantId === t.id)?.total) || 0,
+        integrations: ((integrationsByTenant as any[]).find((i: any) => i.tenantId === t.id)?.total) || 0,
+      }));
+
+      return {
+        totalTenants: (allTenants as any[]).length,
+        activeTenants: (allTenants as any[]).filter((t: any) => t.tenant_status === "active" || t.tenant_status === "trial").length,
+        totalSellers,
+        totalVehicles,
+        totalLeads,
+        totalMessages,
+        activeCompetitions,
+        faturamentoTotal: Number(finRow.faturamento_total) || 0,
+        faturamentoAberto: Number(finRow.faturamento_aberto) || 0,
+        pagamentosPendentes: Number(finRow.pagamentos_pendentes) || 0,
+        pagamentosAtrasados: Number(finRow.pagamentos_atrasados) || 0,
+        pagamentosPagos: Number(finRow.pagamentos_pagos) || 0,
+        totalTransactions: Number(finRow.total_transactions) || 0,
+        platformPaymentsTotal: Number(platRow.total) || 0,
+        platformPaymentsConfirmados: Number(platRow.confirmados) || 0,
+        platformPaymentsPendentes: Number(platRow.pendentes) || 0,
+        platformPaymentsAtrasados: Number(platRow.atrasados) || 0,
+        platformValorRecebido: Number(platRow.valor_recebido) || 0,
+        platformValorPendente: Number(platRow.valor_pendente) || 0,
+        planDistribution,
+        statusDistribution,
+        salesByMonth: salesByMonth as any[],
+        finByMonth: finByMonth as any[],
+        tenantDetails,
+      };
+    }),
 });
 
 

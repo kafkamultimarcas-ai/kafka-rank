@@ -17,7 +17,7 @@ const RARE_EVENTS_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 // frontend precisar conhecer o schema de cada tabela.
 type NormalizedLogItem = {
   id: number;
-  logType: "email" | "subscription" | "billing_alert";
+  logType: "email" | "subscription" | "billing_alert" | "integration";
   tenantId: number | null;
   tenantName: string | null;
   tenantSlug: string | null;

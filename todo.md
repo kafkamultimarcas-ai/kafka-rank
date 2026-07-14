@@ -2343,3 +2343,13 @@
 - [x] Modal de detalhes com: loja, tipo, status, disparado por, duração, resumo, erro, detalhes técnicos
 - [x] Ícone e badge verde/vermelho para status na listagem
 - [x] Dados de teste inseridos para visualização
+
+## Dashboard Super Admin
+- [ ] Adicionar aba "Dashboard" no menu do Super Admin (ao lado de Lojas e Logs)
+- [ ] Endpoint backend superAdmin.dashboardStats com métricas agregadas
+- [ ] Cards principais: Lojas Total, Pagamentos, Carros em Estoque, Usuários, Faturamento Total, Faturamento em Aberto, Clientes Ativos, Pagamentos em Aberto
+- [ ] Cards clicáveis com modal de detalhes + listagem da origem dos dados
+- [ ] Filtros por loja nos modais quando possível
+- [ ] Gráfico de pizza (distribuição por loja, status de pagamento)
+- [ ] Gráfico de colunas (faturamento mensal, vendas por mês)
+- [ ] Cards adicionais: Leads Total, Integrações Ativas, Competições Ativas, Conversas WhatsApp

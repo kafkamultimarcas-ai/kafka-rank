@@ -7,7 +7,8 @@ import {
   Settings, LogOut, Eye, Edit, Trash2, Shield, Crown,
   Store, MapPin, Phone, Mail, Palette, Zap, BarChart3,
   ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle, EyeOff,
-  Key, RefreshCw, X
+  Key, RefreshCw, X, LayoutDashboard, Car, MessageSquare, DollarSign,
+  Wallet, CreditCard, Trophy, PieChart, TrendingDown, ArrowUpRight
 } from "lucide-react";
 import { slugify, formatPhone, normalizeUsername, isValidEmail, getAvailabilityMessage } from "@/lib/tenantForm";
 import { getDefaultPlanLimits, TRIAL_PLAN_LIMITS } from "@shared/plans";
@@ -897,13 +898,437 @@ function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[]
   );
 }
 
+// ===== SUPER ADMIN DASHBOARD VIEW (cards + gráficos + modais) =====
+function SuperAdminDashboardView({ token }: { token: string }) {
+  const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token });
+  const [detailModal, setDetailModal] = useState<string | null>(null);
+  const [filterTenant, setFilterTenant] = useState<number | null>(null);
+
+  const formatCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+  if (isLoading) return (
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="bg-gray-900/80 border border-gray-800 rounded-xl p-5 animate-pulse h-28" />
+        ))}
+      </div>
+    </div>
+  );
+
+  const cards = [
+    { key: "lojas", label: "Lojas Total", value: stats?.totalTenants || 0, icon: Building2, color: "blue", desc: "Total de lojas cadastradas na plataforma" },
+    { key: "ativas", label: "Clientes Ativos", value: stats?.activeTenants || 0, icon: CheckCircle2, color: "emerald", desc: "Lojas com status ativo ou trial" },
+    { key: "vendedores", label: "Vendedores", value: stats?.totalSellers || 0, icon: Users, color: "amber", desc: "Total de vendedores ativos em todas as lojas" },
+    { key: "veiculos", label: "Veículos em Estoque", value: stats?.totalVehicles || 0, icon: Car, color: "purple", desc: "Total de veículos cadastrados no estoque" },
+    { key: "leads", label: "Leads CRM", value: stats?.totalLeads || 0, icon: MessageSquare, color: "cyan", desc: "Total de leads no CRM de todas as lojas" },
+    { key: "faturamento", label: "Faturamento Total", value: formatCurrency(stats?.faturamentoTotal || 0), icon: DollarSign, color: "green", desc: "Total faturado (contas pagas) de todas as lojas" },
+    { key: "aberto", label: "Faturamento em Aberto", value: formatCurrency(stats?.faturamentoAberto || 0), icon: Wallet, color: "red", desc: "Total de contas pendentes e atrasadas" },
+    { key: "pagamentos", label: "Pagamentos Plataforma", value: stats?.platformPaymentsTotal || 0, icon: CreditCard, color: "indigo", desc: "Total de cobranças de assinatura geradas" },
+    { key: "mensagens", label: "Mensagens WhatsApp", value: (stats?.totalMessages || 0).toLocaleString(), icon: MessageSquare, color: "teal", desc: "Total de mensagens trocadas via WhatsApp" },
+    { key: "competicoes", label: "Competições Ativas", value: stats?.activeCompetitions || 0, icon: Trophy, color: "orange", desc: "Competições de vendas em andamento" },
+    { key: "pgto_pendente", label: "Assinaturas Pendentes", value: stats?.platformPaymentsPendentes || 0, icon: Clock, color: "yellow", desc: "Cobranças de assinatura pendentes de pagamento" },
+    { key: "pgto_atrasado", label: "Assinaturas Atrasadas", value: stats?.platformPaymentsAtrasados || 0, icon: AlertTriangle, color: "red", desc: "Cobranças de assinatura em atraso" },
+  ];
+
+  const colorMap: Record<string, string> = {
+    blue: "bg-blue-500/10 text-blue-400",
+    emerald: "bg-emerald-500/10 text-emerald-400",
+    amber: "bg-amber-500/10 text-amber-400",
+    purple: "bg-purple-500/10 text-purple-400",
+    cyan: "bg-cyan-500/10 text-cyan-400",
+    green: "bg-green-500/10 text-green-400",
+    red: "bg-red-500/10 text-red-400",
+    indigo: "bg-indigo-500/10 text-indigo-400",
+    teal: "bg-teal-500/10 text-teal-400",
+    orange: "bg-orange-500/10 text-orange-400",
+    yellow: "bg-yellow-500/10 text-yellow-400",
+  };
+
+  // Aggregate finByMonth for chart
+  const finMonths = [...new Set((stats?.finByMonth || []).map((r: any) => r.month))].sort();
+  const finPagoByMonth = finMonths.map(m => (stats?.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.pago), 0));
+  const finAbertoByMonth = finMonths.map(m => (stats?.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.aberto), 0));
+
+  // Aggregate salesByMonth for chart
+  const salesMonths = [...new Set((stats?.salesByMonth || []).map((r: any) => r.month))].sort();
+  const salesTotalByMonth = salesMonths.map(m => (stats?.salesByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.total), 0));
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* Cards Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {cards.map(card => {
+          const Icon = card.icon;
+          return (
+            <button
+              key={card.key}
+              onClick={() => setDetailModal(card.key)}
+              className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 text-left hover:border-gray-600 hover:bg-gray-800/60 transition-all group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[card.color] || colorMap.blue}`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xl font-bold text-white truncate">{card.value}</div>
+                  <div className="text-xs text-gray-400">{card.label}</div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-gray-300 transition-colors" />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Faturamento Chart */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-green-400" /> Faturamento Mensal (6 meses)
+          </h3>
+          <div className="space-y-2">
+            {finMonths.length === 0 ? (
+              <p className="text-gray-500 text-sm">Sem dados financeiros</p>
+            ) : finMonths.map((month, i) => {
+              const pago = finPagoByMonth[i];
+              const aberto = finAbertoByMonth[i];
+              const max = Math.max(...finPagoByMonth, ...finAbertoByMonth, 1);
+              return (
+                <div key={month} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400 w-16">{month}</span>
+                  <div className="flex-1 flex gap-1">
+                    <div className="h-5 rounded bg-green-600/80" style={{ width: `${(pago / max) * 100}%` }} title={`Pago: ${formatCurrency(pago)}`} />
+                    <div className="h-5 rounded bg-red-600/60" style={{ width: `${(aberto / max) * 100}%` }} title={`Aberto: ${formatCurrency(aberto)}`} />
+                  </div>
+                  <span className="text-xs text-gray-400 w-24 text-right">{formatCurrency(pago + aberto)}</span>
+                </div>
+              );
+            })}
+            <div className="flex gap-4 mt-2">
+              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-600/80" /> Pago</span>
+              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-600/60" /> Em Aberto</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Vendas Chart */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-blue-400" /> Vendas Aprovadas (6 meses)
+          </h3>
+          <div className="space-y-2">
+            {salesMonths.length === 0 ? (
+              <p className="text-gray-500 text-sm">Sem dados de vendas</p>
+            ) : salesMonths.map((month, i) => {
+              const total = salesTotalByMonth[i];
+              const max = Math.max(...salesTotalByMonth, 1);
+              return (
+                <div key={month} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400 w-16">{month}</span>
+                  <div className="flex-1">
+                    <div className="h-5 rounded bg-blue-600/80" style={{ width: `${(total / max) * 100}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-400 w-12 text-right">{total}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Plan Distribution (Pizza) */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <PieChart className="w-4 h-4 text-purple-400" /> Distribuição de Planos
+          </h3>
+          <div className="flex items-center gap-6">
+            <div className="relative w-28 h-28">
+              {(() => {
+                const plans = stats?.planDistribution || {};
+                const total = Object.values(plans).reduce((a: number, b: any) => a + Number(b), 0) || 1;
+                const colors = { trial: "#f59e0b", basic: "#3b82f6", pro: "#8b5cf6", enterprise: "#ef4444" };
+                let cumulative = 0;
+                const segments = Object.entries(plans).map(([plan, count]: [string, any]) => {
+                  const pct = (Number(count) / total) * 100;
+                  const start = cumulative;
+                  cumulative += pct;
+                  return { plan, pct, start, color: (colors as any)[plan] || "#6b7280" };
+                });
+                const gradientParts = segments.map(s => `${s.color} ${s.start}% ${s.start + s.pct}%`).join(", ");
+                return <div className="w-28 h-28 rounded-full" style={{ background: `conic-gradient(${gradientParts})` }} />;
+              })()}
+            </div>
+            <div className="space-y-2">
+              {Object.entries(stats?.planDistribution || {}).map(([plan, count]: [string, any]) => {
+                const colors: Record<string, string> = { trial: "bg-amber-500", basic: "bg-blue-500", pro: "bg-purple-500", enterprise: "bg-red-500" };
+                return (
+                  <div key={plan} className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full ${colors[plan] || "bg-gray-500"}`} />
+                    <span className="text-xs text-gray-300 capitalize">{plan}</span>
+                    <span className="text-xs text-gray-500">({count})</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Status Distribution */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-amber-400" /> Status das Lojas
+          </h3>
+          <div className="space-y-3">
+            {Object.entries(stats?.statusDistribution || {}).map(([status, count]: [string, any]) => {
+              const total = (stats?.totalTenants || 1);
+              const pct = (Number(count) / total) * 100;
+              const colors: Record<string, string> = { active: "bg-emerald-500", trial: "bg-amber-500", suspended: "bg-red-500", cancelled: "bg-gray-500" };
+              const labels: Record<string, string> = { active: "Ativa", trial: "Trial", suspended: "Suspensa", cancelled: "Cancelada" };
+              return (
+                <div key={status}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-300">{labels[status] || status}</span>
+                    <span className="text-gray-400">{count} ({pct.toFixed(0)}%)</span>
+                  </div>
+                  <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${colors[status] || "bg-gray-600"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Detail Modal */}
+      {detailModal && (
+        <DashboardDetailModal
+          cardKey={detailModal}
+          stats={stats}
+          filterTenant={filterTenant}
+          setFilterTenant={setFilterTenant}
+          onClose={() => { setDetailModal(null); setFilterTenant(null); }}
+          formatCurrency={formatCurrency}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===== DASHBOARD DETAIL MODAL =====
+function DashboardDetailModal({ cardKey, stats, filterTenant, setFilterTenant, onClose, formatCurrency }: {
+  cardKey: string; stats: any; filterTenant: number | null; setFilterTenant: (v: number | null) => void; onClose: () => void; formatCurrency: (v: number) => string;
+}) {
+  const tenantDetails = stats?.tenantDetails || [];
+  const filtered = filterTenant ? tenantDetails.filter((t: any) => t.id === filterTenant) : tenantDetails;
+
+  const getTitle = () => {
+    const titles: Record<string, string> = {
+      lojas: "Lojas Cadastradas", ativas: "Clientes Ativos", vendedores: "Vendedores por Loja",
+      veiculos: "Veículos em Estoque", leads: "Leads por Loja", faturamento: "Faturamento Total",
+      aberto: "Faturamento em Aberto", pagamentos: "Pagamentos da Plataforma", mensagens: "Mensagens WhatsApp",
+      competicoes: "Competições Ativas", pgto_pendente: "Assinaturas Pendentes", pgto_atrasado: "Assinaturas Atrasadas",
+    };
+    return titles[cardKey] || "Detalhes";
+  };
+
+  const getDescription = () => {
+    const descs: Record<string, string> = {
+      lojas: "Lista de todas as lojas cadastradas na plataforma com seus planos e status.",
+      ativas: "Lojas com status ativo ou em período trial que estão operando normalmente.",
+      vendedores: "Distribuição de vendedores ativos por loja.",
+      veiculos: "Total de veículos cadastrados no estoque, distribuídos por loja.",
+      leads: "Total de leads no CRM, distribuídos por loja.",
+      faturamento: "Soma de todas as transações financeiras com status 'pago' de todas as lojas.",
+      aberto: "Soma de todas as transações financeiras pendentes ou atrasadas.",
+      pagamentos: "Cobranças de assinatura da plataforma (via ASAAS).",
+      mensagens: "Total de mensagens trocadas via WhatsApp (Z-API) em todas as lojas.",
+      competicoes: "Competições de vendas atualmente em andamento.",
+      pgto_pendente: "Cobranças de assinatura que ainda não foram pagas.",
+      pgto_atrasado: "Cobranças de assinatura com data de vencimento ultrapassada.",
+    };
+    return descs[cardKey] || "";
+  };
+
+  const renderContent = () => {
+    switch (cardKey) {
+      case "lojas":
+      case "ativas":
+        const tenantList = cardKey === "ativas"
+          ? filtered.filter((t: any) => t.status === "active" || t.status === "trial")
+          : filtered;
+        return (
+          <table className="w-full text-sm">
+            <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+              <th className="text-left py-2">Loja</th><th className="text-left py-2">Plano</th><th className="text-left py-2">Status</th><th className="text-right py-2">Vendedores</th><th className="text-right py-2">Veículos</th><th className="text-right py-2">Leads</th>
+            </tr></thead>
+            <tbody>{tenantList.map((t: any) => (
+              <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <td className="py-2 text-white font-medium">{t.name}</td>
+                <td className="py-2"><span className="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300 uppercase">{t.plan}</span></td>
+                <td className="py-2"><span className={`px-2 py-0.5 rounded text-xs ${t.status === "active" || t.status === "trial" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>{t.status}</span></td>
+                <td className="py-2 text-right text-gray-300">{t.sellers}</td>
+                <td className="py-2 text-right text-gray-300">{t.vehicles}</td>
+                <td className="py-2 text-right text-gray-300">{t.leads}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        );
+      case "vendedores":
+        return (
+          <table className="w-full text-sm">
+            <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+              <th className="text-left py-2">Loja</th><th className="text-right py-2">Vendedores Ativos</th>
+            </tr></thead>
+            <tbody>{filtered.map((t: any) => (
+              <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <td className="py-2 text-white">{t.name}</td>
+                <td className="py-2 text-right text-gray-300 font-semibold">{t.sellers}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        );
+      case "veiculos":
+        return (
+          <table className="w-full text-sm">
+            <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+              <th className="text-left py-2">Loja</th><th className="text-right py-2">Veículos</th>
+            </tr></thead>
+            <tbody>{filtered.map((t: any) => (
+              <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <td className="py-2 text-white">{t.name}</td>
+                <td className="py-2 text-right text-gray-300 font-semibold">{t.vehicles}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        );
+      case "leads":
+        return (
+          <table className="w-full text-sm">
+            <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+              <th className="text-left py-2">Loja</th><th className="text-right py-2">Leads</th>
+            </tr></thead>
+            <tbody>{filtered.map((t: any) => (
+              <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <td className="py-2 text-white">{t.name}</td>
+                <td className="py-2 text-right text-gray-300 font-semibold">{t.leads}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        );
+      case "faturamento":
+      case "aberto":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-green-400">{stats?.pagamentosPagos || 0}</div>
+                <div className="text-xs text-gray-400">Pagos</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-yellow-400">{stats?.pagamentosPendentes || 0}</div>
+                <div className="text-xs text-gray-400">Pendentes</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-red-400">{stats?.pagamentosAtrasados || 0}</div>
+                <div className="text-xs text-gray-400">Atrasados</div>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+                <th className="text-left py-2">Loja</th><th className="text-right py-2">Veículos</th><th className="text-right py-2">Leads</th><th className="text-right py-2">Integrações</th>
+              </tr></thead>
+              <tbody>{filtered.map((t: any) => (
+                <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                  <td className="py-2 text-white">{t.name}</td>
+                  <td className="py-2 text-right text-gray-300">{t.vehicles}</td>
+                  <td className="py-2 text-right text-gray-300">{t.leads}</td>
+                  <td className="py-2 text-right text-gray-300">{t.integrations}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        );
+      case "pagamentos":
+      case "pgto_pendente":
+      case "pgto_atrasado":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-white">{stats?.platformPaymentsTotal || 0}</div>
+                <div className="text-xs text-gray-400">Total</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-green-400">{stats?.platformPaymentsConfirmados || 0}</div>
+                <div className="text-xs text-gray-400">Confirmados</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-yellow-400">{stats?.platformPaymentsPendentes || 0}</div>
+                <div className="text-xs text-gray-400">Pendentes</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+                <div className="text-lg font-bold text-red-400">{stats?.platformPaymentsAtrasados || 0}</div>
+                <div className="text-xs text-gray-400">Atrasados</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                <div className="text-sm text-green-400 font-semibold">{formatCurrency(stats?.platformValorRecebido || 0)}</div>
+                <div className="text-xs text-gray-400">Valor Recebido</div>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                <div className="text-sm text-red-400 font-semibold">{formatCurrency(stats?.platformValorPendente || 0)}</div>
+                <div className="text-xs text-gray-400">Valor Pendente</div>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return <p className="text-gray-400 text-sm">Dados detalhados não disponíveis para este card.</p>;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white">{getTitle()}</h2>
+            <p className="text-xs text-gray-400 mt-1">{getDescription()}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        {/* Filter */}
+        <div className="px-5 py-3 border-b border-gray-800 flex items-center gap-3">
+          <span className="text-xs text-gray-400">Filtrar por loja:</span>
+          <select
+            value={filterTenant || ""}
+            onChange={e => setFilterTenant(e.target.value ? Number(e.target.value) : null)}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white"
+          >
+            <option value="">Todas as lojas</option>
+            {tenantDetails.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {renderContent()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ===== MAIN DASHBOARD =====
 function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any; onLogout: () => void }) {
   const { data: dashboard, refetch } = trpc.superAdmin.dashboard.useQuery({ token });
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [activeSection, setActiveSection] = useState<"tenants" | "subscriptions">("tenants");
+  const [activeSection, setActiveSection] = useState<"dashboard" | "tenants" | "subscriptions">("dashboard");
   // Conta eventos raros de assinatura + alertas críticos de cobrança não
   // resolvidos — os dois viram o mesmo badge na aba "Logs" (tela unificada).
   const { data: rareEvents } = trpc.platformLogs.getRareEventsCount.useQuery({ token }, { refetchInterval: 60000 });
@@ -931,6 +1356,12 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
           <div className="flex items-center gap-3">
             <nav className="flex items-center gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1 mr-2">
               <button
+                onClick={() => setActiveSection("dashboard")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeSection === "dashboard" ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                Dashboard
+              </button>
+              <button
                 onClick={() => setActiveSection("tenants")}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeSection === "tenants" ? "bg-red-600 text-white" : "text-gray-400 hover:text-white"}`}
               >
@@ -956,7 +1387,9 @@ function SuperDashboard({ token, admin, onLogout }: { token: string; admin: any;
         </div>
       </header>
 
-      {activeSection === "subscriptions" ? (
+      {activeSection === "dashboard" ? (
+        <SuperAdminDashboardView token={token} />
+      ) : activeSection === "subscriptions" ? (
         <div className="max-w-7xl mx-auto px-4 py-6">
           <PlatformLogsSection token={token} tenants={dashboard?.tenants || []} />
         </div>
