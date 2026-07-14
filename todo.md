@@ -2353,3 +2353,16 @@
 - [ ] Gráfico de pizza (distribuição por loja, status de pagamento)
 - [ ] Gráfico de colunas (faturamento mensal, vendas por mês)
 - [ ] Cards adicionais: Leads Total, Integrações Ativas, Competições Ativas, Conversas WhatsApp
+
+## Reorganizar Ajustes em 4 Abas
+- [ ] Aba 1: Usuários Administradores (lista de admins, criar, editar, resetar senha)
+- [ ] Aba 2: Dados da Loja (nome, telefone, endereço, cores, logo)
+- [ ] Aba 3: Integrações (WhatsApp, Estoque, SIG, OLX, Meta)
+- [ ] Aba 4: Segurança e Senha (alterar senha do admin logado, configurações de segurança)
+
+## Melhoria Tela de Ajustes - Abas
+- [x] Reorganizar tela de Ajustes em 4 abas separadas
+- [x] Aba 1: Usuários Administradores (gestão de admins e permissões)
+- [x] Aba 2: Dados da Loja (configurações da loja, logo, cores)
+- [x] Aba 3: Integrações (WhatsApp Z-API, Estoque, SIG, OLX, Meta)
+- [x] Aba 4: Segurança e Senha (alterar senha, reset geral)

@@ -17,7 +17,8 @@ import {
   CheckCircle, XCircle, Filter, Plus, Zap, Power, Bot, Send, Volume2,
   Shuffle, ArrowRightLeft, Timer, Headphones, Target,
   ShieldBan, Lock, Unlock, Slash, ImageIcon, Video, RefreshCw,
-  Copy, EyeOff, Facebook, BookOpen
+  Copy, EyeOff, Facebook, BookOpen,
+  Store, Building2, Plug2, KeyRound
 } from "lucide-react";
 import { ChannelIcon, ChannelBadge } from "@/components/ChannelIcon";
 import AssinaturaContent from "@/components/billing/AssinaturaContent";
@@ -1864,7 +1865,44 @@ function getAdminRoleLabel(admin: any): { label: string; color: string } {
 }
 
 function SettingsView() {
-  const [, navigate] = useLocation();
+  const [settingsTab, setSettingsTab] = useState("usuarios");
+
+  return (
+    <div className="w-full">
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-1 p-1 rounded-xl bg-accent/30 border border-border mb-6 overflow-x-auto">
+        {[
+          { key: "usuarios", label: "Usuários Admin", icon: Users },
+          { key: "loja", label: "Dados da Loja", icon: Store },
+          { key: "integracoes", label: "Integrações", icon: Plug2 },
+          { key: "seguranca", label: "Segurança", icon: Shield },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setSettingsTab(tab.key)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              settingsTab === tab.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            }`}
+          >
+            <tab.icon className="w-3.5 h-3.5" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {settingsTab === "usuarios" && <SettingsUsersTab />}
+      {settingsTab === "loja" && <SettingsStoreTab />}
+      {settingsTab === "integracoes" && <SettingsIntegrationsTab />}
+      {settingsTab === "seguranca" && <SettingsSecurityTab />}
+    </div>
+  );
+}
+
+// ===== ABA 1: USUÁRIOS ADMINISTRADORES =====
+function SettingsUsersTab() {
   const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
@@ -1876,10 +1914,6 @@ function SettingsView() {
   });
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
-  const [showChangeMyPassword, setShowChangeMyPassword] = useState(false);
-  const [myOldPassword, setMyOldPassword] = useState("");
-  const [myNewPassword, setMyNewPassword] = useState("");
-  const [myConfirmPassword, setMyConfirmPassword] = useState("");
   const [editingAdminId, setEditingAdminId] = useState<number | null>(null);
   const [editPerms, setEditPerms] = useState<Record<string, boolean>>({});
   const [editName, setEditName] = useState("");
@@ -1919,14 +1953,6 @@ function SettingsView() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const changeMyPassword = trpc.adminAuth.changePassword.useMutation({
-    onSuccess: () => {
-      setShowChangeMyPassword(false); setMyOldPassword(""); setMyNewPassword(""); setMyConfirmPassword("");
-      toast.success("Sua senha foi alterada com sucesso!");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   const PERM_LABELS: Record<string, string> = {
     vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
     fei: "F&I", marketing: "Marketing", financeiro: "Financeiro",
@@ -1934,70 +1960,114 @@ function SettingsView() {
   };
 
   return (
-    <Tabs defaultValue="ajustes" className="w-full">
-      <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-        <TabsTrigger value="ajustes">Ajustes</TabsTrigger>
-        <TabsTrigger value="integracoes">Integrações</TabsTrigger>
-      </TabsList>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-bold text-foreground">Usuários Administradores</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Gerencie os administradores e suas permissões de acesso ao CRM</p>
+        </div>
+        <Button size="sm" onClick={() => setShowAdd(!showAdd)} className="gap-1.5">
+          <UserPlus className="w-3.5 h-3.5" /> Novo Admin
+        </Button>
+      </div>
 
-      <TabsContent value="ajustes" className="space-y-4 mt-0">
-      <div className="rounded-xl border border-border bg-card p-4">
-        <h3 className="text-sm font-bold text-foreground mb-3">Administradores do CRM</h3>
-        <div className="space-y-2">
-          {admins?.map((a: any) => {
-            let perms: Record<string, boolean> = {};
-            try { perms = JSON.parse(a.permissions || "{}"); } catch {}
-            const activePerms = Object.entries(perms).filter(([, v]) => v).map(([k]) => PERM_LABELS[k] || k);
-            const roleInfo = getAdminRoleLabel(a);
-            return (
-              <div key={a.id} className={`p-3 rounded-lg bg-accent/50 border border-border ${!a.active ? 'opacity-60' : ''}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <div>
-                    <p className="text-sm text-foreground font-medium">{a.name}</p>
-                    <p className="text-[10px] text-muted-foreground">@{a.username} • <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${roleInfo.color}`}>{roleInfo.label}</span></p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {a.email && <span className="text-[9px] text-muted-foreground">{a.email}</span>}
-                    {a.role !== 'owner' && (
-                      <button
-                        onClick={() => { toggleAdmin.mutate({ id: a.id, active: !a.active }); }}
-                        className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${a.active ? 'bg-green-500' : 'bg-muted-foreground/30'}`}
-                        title={a.active ? 'Desativar' : 'Ativar'}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${a.active ? 'translate-x-5' : 'translate-x-0'}`} />
-                      </button>
-                    )}
-                    <span className={`text-[10px] px-2 py-0.5 rounded ${a.active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
-                      {a.active ? "Ativo" : "Inativo"}
-                    </span>
-                  </div>
+      {/* Create Admin Form */}
+      {showAdd && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <p className="text-xs font-bold text-primary">Criar Novo Administrador</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input placeholder="Nome completo" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Usuário de login" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Senha temporária" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="h-9 text-sm" />
+            <Input placeholder="Telefone (opcional)" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="h-9 text-sm" />
+          </div>
+          <p className="text-[10px] text-amber-400">⚠️ O admin será obrigado a trocar a senha no primeiro login</p>
+          <div>
+            <p className="text-xs font-medium text-foreground mb-2">Permissões de Acesso:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {Object.entries(PERM_LABELS).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-accent/50 cursor-pointer">
+                  <input type="checkbox" checked={(form.permissions as any)[key] || false}
+                    onChange={e => setForm({ ...form, permissions: { ...form.permissions, [key]: e.target.checked } })}
+                    className="rounded border-border" />
+                  <span className="text-[11px] text-foreground">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => {
+              if (!form.name || !form.username || !form.password || !form.email) { toast.error("Preencha todos os campos obrigatórios"); return; }
+              createAdmin.mutate({
+                name: form.name, username: form.username, password: form.password, email: form.email,
+                role: form.role as any, permissions: JSON.stringify(form.permissions), mustChangePassword: true,
+                ...(form.phone ? { phone: form.phone } : {}),
+              });
+            }} disabled={createAdmin.isPending} className="flex-1">
+              {createAdmin.isPending ? "Criando..." : "Criar Admin"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Admin List */}
+      <div className="space-y-2">
+        {admins?.map((a: any) => {
+          let perms: Record<string, boolean> = {};
+          try { perms = JSON.parse(a.permissions || "{}"); } catch {}
+          const activePerms = Object.entries(perms).filter(([, v]) => v).map(([k]) => PERM_LABELS[k] || k);
+          const roleInfo = getAdminRoleLabel(a);
+          return (
+            <div key={a.id} className={`p-3 rounded-xl border border-border bg-card ${!a.active ? 'opacity-60' : ''}`}>
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <p className="text-sm text-foreground font-medium">{a.name}</p>
+                  <p className="text-[10px] text-muted-foreground">@{a.username} • <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${roleInfo.color}`}>{roleInfo.label}</span></p>
                 </div>
-                {/* Actions Row */}
-                {a.role !== "owner" && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {resetPasswordId === a.id ? (
-                      <div className="flex gap-2 items-center w-full">
-                        <Input placeholder="Nova senha" type="password" value={resetPasswordValue}
-                          onChange={e => setResetPasswordValue(e.target.value)} className="h-7 text-xs flex-1" />
-                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => {
-                          if (resetPasswordValue.length < 4) { toast.error("Mínimo 4 caracteres"); return; }
-                          resetAdminPassword.mutate({ adminId: a.id, newPassword: resetPasswordValue });
-                        }} disabled={resetAdminPassword.isPending}>
-                          {resetAdminPassword.isPending ? "..." : "Salvar"}
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => { setResetPasswordId(null); setResetPasswordValue(""); }}>✕</Button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-3">
-                        <button onClick={() => setResetPasswordId(a.id)} className="text-[10px] text-amber-400 hover:text-amber-300 font-medium">
-                          🔑 Resetar Senha
-                        </button>
-                        <button onClick={() => {
-                          setEditingAdminId(editingAdminId === a.id ? null : a.id);
-                          setEditName(a.name || '');
-                          setEditEmail(a.email || '');
-                          setEditPhone(a.phone || '');
-                          try { setEditPerms(JSON.parse(a.permissions || '{}')); } catch { setEditPerms({}); }
+                <div className="flex items-center gap-2">
+                  {a.email && <span className="text-[9px] text-muted-foreground hidden sm:inline">{a.email}</span>}
+                  {a.role !== 'owner' && (
+                    <button
+                      onClick={() => { toggleAdmin.mutate({ id: a.id, active: !a.active }); }}
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${a.active ? 'bg-green-500' : 'bg-muted-foreground/30'}`}
+                      title={a.active ? 'Desativar' : 'Ativar'}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${a.active ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                  )}
+                  <span className={`text-[10px] px-2 py-0.5 rounded ${a.active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                    {a.active ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
+              </div>
+              {/* Actions Row */}
+              {a.role !== "owner" && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {resetPasswordId === a.id ? (
+                    <div className="flex gap-2 items-center w-full">
+                      <Input placeholder="Nova senha" type="password" value={resetPasswordValue}
+                        onChange={e => setResetPasswordValue(e.target.value)} className="h-7 text-xs flex-1" />
+                      <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => {
+                        if (resetPasswordValue.length < 4) { toast.error("Mínimo 4 caracteres"); return; }
+                        resetAdminPassword.mutate({ adminId: a.id, newPassword: resetPasswordValue });
+                      }} disabled={resetAdminPassword.isPending}>
+                        {resetAdminPassword.isPending ? "..." : "Salvar"}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => { setResetPasswordId(null); setResetPasswordValue(""); }}>✕</Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <button onClick={() => setResetPasswordId(a.id)} className="text-[10px] text-amber-400 hover:text-amber-300 font-medium">
+                        🔑 Resetar Senha
+                      </button>
+                      <button onClick={() => {
+                        setEditingAdminId(editingAdminId === a.id ? null : a.id);
+                        setEditName(a.name || '');
+                        setEditEmail(a.email || '');
+                        setEditPhone(a.phone || '');
+                        try { setEditPerms(JSON.parse(a.permissions || '{}')); } catch { setEditPerms({}); }
                         }} className="text-[10px] text-primary hover:text-primary/80 font-medium">
                           <Edit className="w-3 h-3 inline mr-0.5" /> Editar
                         </button>
@@ -2059,118 +2129,120 @@ function SettingsView() {
             );
           })}
         </div>
-        <Button size="sm" variant="outline" className="mt-3" onClick={() => setShowAdd(!showAdd)}>
-          <UserPlus className="w-3.5 h-3.5 mr-1" /> Novo Admin
-        </Button>
-        {showAdd && (
-          <div className="mt-3 p-3 rounded-lg bg-accent/30 border border-border space-y-3">
-            <Input placeholder="Nome completo" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Usuário de login" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Senha temporária (admin troca no 1º acesso)" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Email (opcional)" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="h-9 text-sm" />
-            <Input placeholder="Telefone (opcional)" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="h-9 text-sm" />
-            <p className="text-[10px] text-amber-400">⚠️ O admin será obrigado a trocar a senha no primeiro login</p>
-
-            {/* Permissions checkboxes */}
-            <div>
-              <p className="text-xs font-medium text-foreground mb-2">Permissões de Acesso:</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {Object.entries(PERM_LABELS).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-accent/50 cursor-pointer">
-                    <input type="checkbox" checked={(form.permissions as any)[key] || false}
-                      onChange={e => setForm({ ...form, permissions: { ...form.permissions, [key]: e.target.checked } })}
-                      className="rounded border-border" />
-                    <span className="text-[11px] text-foreground">{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <Button size="sm" onClick={() => {
-              if (!form.name || !form.username || !form.password || !form.email) { toast.error("Preencha todos os campos"); return; }
-              const name = form.name!;
-              const username = form.username!;
-              const password = form.password!;
-              const email = form.email!;
-              const { phone, role, permissions } = form;
-              const payload = {
-                name,
-                username,
-                password,
-                email,
-                role: role as any,
-                permissions: JSON.stringify(permissions),
-                mustChangePassword: true,
-                ...(phone ? { phone } : {}),
-              };
-              createAdmin.mutate(payload);
-            }} disabled={createAdmin.isPending} className="w-full racing-gradient text-white">
-              {createAdmin.isPending ? "Criando..." : "Criar Admin"}
-            </Button>
-          </div>
-        )}
       </div>
+  );
+}
 
-      {/* Change My Password */}
-      <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground">Minha Senha</h3>
-          <Button size="sm" variant="outline" onClick={() => setShowChangeMyPassword(!showChangeMyPassword)}>
-            🔐 Trocar Senha
-          </Button>
-        </div>
-        {showChangeMyPassword && (
-          <div className="mt-3 space-y-3">
-            <Input placeholder="Nova senha" type="password" value={myNewPassword}
-              onChange={e => setMyNewPassword(e.target.value)} className="h-9 text-sm" />
-            <Input placeholder="Confirmar nova senha" type="password" value={myConfirmPassword}
-              onChange={e => setMyConfirmPassword(e.target.value)} className="h-9 text-sm" />
-            {myConfirmPassword && myNewPassword !== myConfirmPassword && (
-              <p className="text-xs text-red-400">As senhas não coincidem</p>
-            )}
-            <Button size="sm" className="w-full" disabled={changeMyPassword.isPending || myNewPassword.length < 4 || myNewPassword !== myConfirmPassword}
-              onClick={() => {
-                const token = localStorage.getItem("crm_admin_token");
-                if (!token) { toast.error("Faça login novamente"); return; }
-                changeMyPassword.mutate({ token, newPassword: myNewPassword });
-              }}>
-              {changeMyPassword.isPending ? "Salvando..." : "Salvar Nova Senha"}
-            </Button>
-          </div>
-        )}
+// ===== ABA 2: DADOS DA LOJA =====
+function SettingsStoreTab() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-bold text-foreground">Dados da Loja</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">Configure as informações da sua loja, logo e cores de personalização</p>
       </div>
-
-      {/* SECURITY: Reset All Seller Passwords */}
-      <ResetAllPasswordsSection />
-
-      {/* Dados da Loja */}
       <StoreDataPanel />
-      </TabsContent>
+    </div>
+  );
+}
 
-      <TabsContent value="integracoes" className="space-y-4 mt-0">
+// ===== ABA 3: INTEGRAÇÕES =====
+function SettingsIntegrationsTab() {
+  const [, navigate] = useLocation();
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-bold text-foreground">Integrações</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Conecte serviços externos para automatizar o fluxo de leads e dados</p>
+        </div>
+        <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/crm/integracoes"))}
+          className="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium">
+          <BookOpen className="w-3.5 h-3.5" /> Documentação
+        </button>
+      </div>
+
       {/* WhatsApp (Z-API) */}
       <WhatsAppZapiPanel />
 
       {/* Estoque de Veículos */}
       <InventoryIntegrationPanel />
 
+      {/* SIG Web + OLX/Webmotors */}
       <div className="rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold text-foreground">Integrações</h3>
-          <button onClick={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/crm/integracoes"))}
-            className="flex items-center gap-1 text-[10px] text-primary hover:underline">
-            <BookOpen className="w-3 h-3" /> Ver documentação completa
-          </button>
-        </div>
+        <h3 className="text-sm font-bold text-foreground mb-3">Webhooks (Token)</h3>
         <div className="space-y-2">
           <TokenIntegrationRow type="sig" name="SIG Web" description="Integre com seu sistema de gestão para sincronizar vendas e estoque" endpointLabel="Sincronização de vendas/estoque" endpointPath="/api/webhooks/sig/sale" />
           <TokenIntegrationRow type="email_parser" name="OLX / Webmotors" description="Receba leads automaticamente das plataformas de anúncio (via encaminhamento de e-mail)" endpointLabel="Parser de e-mail" endpointPath="/api/webhooks/email-parser" />
         </div>
       </div>
 
+      {/* Meta Ads */}
       <MetaIntegrationPanel />
-      </TabsContent>
-    </Tabs>
+    </div>
+  );
+}
+
+// ===== ABA 4: SEGURANÇA E SENHA =====
+function SettingsSecurityTab() {
+  const [myNewPassword, setMyNewPassword] = useState("");
+  const [myConfirmPassword, setMyConfirmPassword] = useState("");
+
+  const changeMyPassword = trpc.adminAuth.changePassword.useMutation({
+    onSuccess: () => {
+      setMyNewPassword(""); setMyConfirmPassword("");
+      toast.success("Sua senha foi alterada com sucesso!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-bold text-foreground">Segurança e Senha</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">Altere sua senha e gerencie configurações de segurança do sistema</p>
+      </div>
+
+      {/* Change My Password */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/20">
+            <KeyRound className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-foreground">Alterar Minha Senha</h4>
+            <p className="text-[10px] text-muted-foreground">Defina uma nova senha para sua conta de administrador</p>
+          </div>
+        </div>
+        <div className="space-y-3 max-w-md">
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Nova Senha</label>
+            <Input placeholder="Mínimo 4 caracteres" type="password" value={myNewPassword}
+              onChange={e => setMyNewPassword(e.target.value)} className="h-9 text-sm" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground mb-1 block">Confirmar Nova Senha</label>
+            <Input placeholder="Repita a nova senha" type="password" value={myConfirmPassword}
+              onChange={e => setMyConfirmPassword(e.target.value)} className="h-9 text-sm" />
+          </div>
+          {myConfirmPassword && myNewPassword !== myConfirmPassword && (
+            <p className="text-xs text-red-400">As senhas não coincidem</p>
+          )}
+          <Button size="sm" className="w-full" disabled={changeMyPassword.isPending || myNewPassword.length < 4 || myNewPassword !== myConfirmPassword}
+            onClick={() => {
+              const token = localStorage.getItem("crm_admin_token");
+              if (!token) { toast.error("Faça login novamente"); return; }
+              changeMyPassword.mutate({ token, newPassword: myNewPassword });
+            }}>
+            <Lock className="w-3.5 h-3.5 mr-1.5" />
+            {changeMyPassword.isPending ? "Salvando..." : "Salvar Nova Senha"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Reset All Seller Passwords */}
+      <ResetAllPasswordsSection />
+    </div>
   );
 }
 
