@@ -928,35 +928,44 @@ function SuperAdminDashboardView({ token }: { token: string }) {
   const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod });
   const [detailModal, setDetailModal] = useState<string | null>(null);
   const [filterTenant, setFilterTenant] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
   const handleExportCSV = () => {
-    if (!stats) return;
-    // Faturamento data
-    const finMonthsExport = Array.from(new Set((stats.finByMonth || []).map((r: any) => r.month))).sort() as string[];
-    const finPago = finMonthsExport.map(m => (stats.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.pago), 0));
-    const finAberto = finMonthsExport.map(m => (stats.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.aberto), 0));
-    // Vendas data
-    const salesMonthsExport = Array.from(new Set((stats.salesByMonth || []).map((r: any) => r.month))).sort() as string[];
-    const salesTotal = salesMonthsExport.map(m => (stats.salesByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.total), 0));
-    // Mensagens data
-    const msgMonthsExport = (stats.messagesByMonth || []).map((r: any) => r.month).sort() as string[];
-    const msgTotals = msgMonthsExport.map((m: string) => Number((stats.messagesByMonth || []).find((r: any) => r.month === m)?.total || 0));
+    if (!stats || exporting) return;
+    setExporting(true);
+    try {
+      // Faturamento data
+      const finMonthsExport = Array.from(new Set((stats.finByMonth || []).map((r: any) => r.month))).sort() as string[];
+      const finPago = finMonthsExport.map(m => (stats.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.pago), 0));
+      const finAberto = finMonthsExport.map(m => (stats.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.aberto), 0));
+      // Vendas data
+      const salesMonthsExport = Array.from(new Set((stats.salesByMonth || []).map((r: any) => r.month))).sort() as string[];
+      const salesTotal = salesMonthsExport.map(m => (stats.salesByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.total), 0));
+      // Mensagens data
+      const msgMonthsExport = (stats.messagesByMonth || []).map((r: any) => r.month).sort() as string[];
+      const msgTotals = msgMonthsExport.map((m: string) => Number((stats.messagesByMonth || []).find((r: any) => r.month === m)?.total || 0));
 
-    // Build unified rows
-    const allPeriods = Array.from(new Set([...finMonthsExport, ...salesMonthsExport, ...msgMonthsExport])).sort();
-    const headers = ["Per\u00edodo", "Faturamento Pago (R$)", "Faturamento Aberto (R$)", "Vendas", "Mensagens WhatsApp"];
-    const rows = allPeriods.map(p => [
-      p,
-      (finPago[finMonthsExport.indexOf(p)] || 0).toFixed(2).replace(".", ","),
-      (finAberto[finMonthsExport.indexOf(p)] || 0).toFixed(2).replace(".", ","),
-      String(salesTotal[salesMonthsExport.indexOf(p)] || 0),
-      String(msgTotals[msgMonthsExport.indexOf(p)] || 0),
-    ]);
+      // Build unified rows
+      const allPeriods = Array.from(new Set([...finMonthsExport, ...salesMonthsExport, ...msgMonthsExport])).sort();
+      const headers = ["Per\u00edodo", "Faturamento Pago (R$)", "Faturamento Aberto (R$)", "Vendas", "Mensagens WhatsApp"];
+      const rows = allPeriods.map(p => [
+        p,
+        (finPago[finMonthsExport.indexOf(p)] || 0).toFixed(2).replace(".", ","),
+        (finAberto[finMonthsExport.indexOf(p)] || 0).toFixed(2).replace(".", ","),
+        String(salesTotal[salesMonthsExport.indexOf(p)] || 0),
+        String(msgTotals[msgMonthsExport.indexOf(p)] || 0),
+      ]);
 
-    const periodLabel = PERIOD_OPTIONS.find(o => o.value === chartPeriod)?.label || chartPeriod;
-    downloadCSV(`dashboard_${chartPeriod}_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
+      downloadCSV(`dashboard_${chartPeriod}_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
+      const periodLabel = PERIOD_OPTIONS.find(o => o.value === chartPeriod)?.label || chartPeriod;
+      toast.success(`CSV exportado com sucesso (${periodLabel})`, { description: `${allPeriods.length} períodos exportados` });
+    } catch (err) {
+      toast.error("Erro ao exportar CSV");
+    } finally {
+      setTimeout(() => setExporting(false), 1000);
+    }
   };
 
   if (isLoading) return (
@@ -1042,10 +1051,19 @@ function SuperAdminDashboardView({ token }: { token: string }) {
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700 transition-colors"
+            disabled={exporting || !stats}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+              exporting
+                ? "border-green-700 text-green-400 bg-green-900/20 cursor-not-allowed"
+                : "text-gray-400 hover:text-white hover:bg-gray-800 border-gray-700"
+            }`}
             title="Exportar dados dos gráficos em CSV"
           >
-            <Download className="w-3.5 h-3.5" /> Exportar CSV
+            {exporting ? (
+              <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Exportando...</>
+            ) : (
+              <><Download className="w-3.5 h-3.5" /> Exportar CSV</>
+            )}
           </button>
         <div className="flex items-center gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1">
           {PERIOD_OPTIONS.map(opt => (

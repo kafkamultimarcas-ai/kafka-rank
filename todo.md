@@ -2396,3 +2396,6 @@
 
 ## Exportação CSV dos Gráficos Super Admin
 - [x] Botão de exportação CSV nos gráficos do dashboard, respeitando o período filtrado
+
+## Feedback Visual Exportação CSV
+- [x] Toast de sucesso e estado de carregamento no botão de exportar CSV
