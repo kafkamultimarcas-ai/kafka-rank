@@ -406,7 +406,7 @@ export const superAdminRouter = router({
 
   /** Dashboard completo do Super Admin com métricas agregadas */
   dashboardStats: publicProcedure
-    .input(z.object({ token: z.string(), period: z.enum(["7d", "30d", "6m", "year"]).optional() }))
+    .input(z.object({ token: z.string(), period: z.enum(["7d", "30d", "6m", "year"]).optional(), tenantId: z.number().optional() }))
     .query(async ({ input }) => {
       const payload = verifySuperToken(input.token);
       if (!payload) throw new Error("Não autorizado");
@@ -424,24 +424,28 @@ export const superAdminRouter = router({
 
       const allTenants = await withRetry(() => db.select().from(tenants).orderBy(desc(tenants.createdAt)));
 
+      // Tenant filter
+      const tid = input.tenantId;
+
       // Contagens gerais
       const [[{ value: totalSellers }]] = await Promise.all([
-        db.select({ value: count() }).from(sellers).where(eq(sellers.active, true)),
+        db.select({ value: count() }).from(sellers).where(tid ? and(eq(sellers.active, true), eq(sellers.tenantId, tid)) : eq(sellers.active, true)),
       ]);
       const [[{ value: totalVehicles }]] = await Promise.all([
-        db.select({ value: count() }).from(inventoryVehicles),
+        db.select({ value: count() }).from(inventoryVehicles).where(tid ? eq(inventoryVehicles.tenantId, tid) : undefined),
       ]);
       const [[{ value: totalLeads }]] = await Promise.all([
-        db.select({ value: count() }).from(crmLeads),
+        db.select({ value: count() }).from(crmLeads).where(tid ? eq(crmLeads.tenantId, tid) : undefined),
       ]);
       const [[{ value: totalMessages }]] = await Promise.all([
-        db.select({ value: count() }).from(crmMessages),
+        db.select({ value: count() }).from(crmMessages).where(tid ? eq(crmMessages.tenantId, tid) : undefined),
       ]);
       const [[{ value: activeCompetitions }]] = await Promise.all([
-        db.select({ value: count() }).from(competitions).where(eq(competitions.status, "active")),
+        db.select({ value: count() }).from(competitions).where(tid ? and(eq(competitions.status, "active"), eq(competitions.tenantId, tid)) : eq(competitions.status, "active")),
       ]);
 
       // Financeiro interno das lojas
+      const finTenantFilter = tid ? sql` WHERE tenantId = ${tid}` : sql``;
       const [finStats] = await db.execute(sql`
         SELECT 
           COUNT(*) as total_transactions,
@@ -450,7 +454,7 @@ export const superAdminRouter = router({
           COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pagamentos_pendentes,
           COALESCE(SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END), 0) as pagamentos_atrasados,
           COALESCE(SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END), 0) as pagamentos_pagos
-        FROM fin_transactions
+        FROM fin_transactions ${finTenantFilter}
       `);
       const finRow = ((finStats as unknown) as any[])[0] || {};
 
@@ -458,9 +462,10 @@ export const superAdminRouter = router({
       const salesDateFilter = useYearStart
         ? sql`createdAt >= DATE_FORMAT(NOW(), '%Y-01-01')`
         : sql.raw(`createdAt >= DATE_SUB(NOW(), INTERVAL ${intervalSql})`);
+      const salesTenantFilter = tid ? sql` AND tenantId = ${tid}` : sql``;
       const [salesByMonth] = await db.execute(sql`
         SELECT DATE_FORMAT(createdAt, ${sql.raw(`'${dateFormat}'`)}) as month, COUNT(*) as total, tenantId
-        FROM sales WHERE status = 'approved' AND ${salesDateFilter}
+        FROM sales WHERE status = 'approved' AND ${salesDateFilter} ${salesTenantFilter}
         GROUP BY month, tenantId ORDER BY month ASC
       `);
 
@@ -468,12 +473,13 @@ export const superAdminRouter = router({
       const finDateFilter = useYearStart
         ? sql`dueDate >= UNIX_TIMESTAMP(DATE_FORMAT(NOW(), '%Y-01-01')) * 1000`
         : sql.raw(`dueDate >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL ${intervalSql})) * 1000`);
+      const finMonthTenantFilter = tid ? sql` AND tenantId = ${tid}` : sql``;
       const [finByMonth] = await db.execute(sql`
         SELECT DATE_FORMAT(FROM_UNIXTIME(dueDate/1000), ${sql.raw(`'${dateFormat}'`)}) as month,
           COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as pago,
           COALESCE(SUM(CASE WHEN status IN ('pending', 'overdue') THEN amount ELSE 0 END), 0) as aberto,
           tenantId
-        FROM fin_transactions WHERE ${finDateFilter}
+        FROM fin_transactions WHERE ${finDateFilter} ${finMonthTenantFilter}
         GROUP BY month, tenantId ORDER BY month ASC
       `);
 
@@ -496,18 +502,21 @@ export const superAdminRouter = router({
       const platRow = ((platformPayments as unknown) as any[])[0] || {};
 
       // Mensagens por loja
-      const [messagesByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_messages GROUP BY tenantId`);
+      const msgTenantGroupFilter = tid ? sql` WHERE tenantId = ${tid}` : sql``;
+      const [messagesByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_messages ${msgTenantGroupFilter} GROUP BY tenantId`);
       // Mensagens por período
       const msgDateFilter = useYearStart
         ? sql`createdAt >= UNIX_TIMESTAMP(DATE_FORMAT(NOW(), '%Y-01-01')) * 1000`
         : sql.raw(`createdAt >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL ${intervalSql})) * 1000`);
+      const msgMonthTenantFilter = tid ? sql` AND tenantId = ${tid}` : sql``;
       const [messagesByMonth] = await db.execute(sql`
         SELECT DATE_FORMAT(FROM_UNIXTIME(createdAt/1000), ${sql.raw(`'${dateFormat}'`)}) as month, COUNT(*) as total
-        FROM crm_messages WHERE ${msgDateFilter}
+        FROM crm_messages WHERE ${msgDateFilter} ${msgMonthTenantFilter}
         GROUP BY month ORDER BY month ASC
       `);
       // Competições ativas por loja
-      const [competitionsByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM competitions WHERE status = 'active' GROUP BY tenantId`);
+      const compTenantFilter = tid ? sql` AND tenantId = ${tid}` : sql``;
+      const [competitionsByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM competitions WHERE status = 'active' ${compTenantFilter} GROUP BY tenantId`);
 
       // Distribuições
       const planDistribution = (allTenants as any[]).reduce((acc: any, t: any) => {

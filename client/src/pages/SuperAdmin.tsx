@@ -925,9 +925,9 @@ function downloadCSV(filename: string, headers: string[], rows: string[][]) {
 
 function SuperAdminDashboardView({ token }: { token: string }) {
   const [chartPeriod, setChartPeriod] = useState<PeriodValue>("6m");
-  const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod });
-  const [detailModal, setDetailModal] = useState<string | null>(null);
   const [filterTenant, setFilterTenant] = useState<number | null>(null);
+  const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod, tenantId: filterTenant || undefined });
+  const [detailModal, setDetailModal] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
@@ -1016,8 +1016,34 @@ function SuperAdminDashboardView({ token }: { token: string }) {
   const salesMonths = Array.from(new Set((stats?.salesByMonth || []).map((r: any) => r.month))).sort();
   const salesTotalByMonth = salesMonths.map(m => (stats?.salesByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.total), 0));
 
+  // Tenant list for filter
+  const tenantList = (stats?.tenantDetails || []) as { id: number; name: string }[];
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* Store Filter */}
+      <div className="flex items-center gap-3">
+        <Store className="w-4 h-4 text-gray-400" />
+        <select
+          value={filterTenant || ""}
+          onChange={(e) => setFilterTenant(e.target.value ? Number(e.target.value) : null)}
+          className="bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 transition-colors min-w-[200px]"
+        >
+          <option value="">Todas as lojas</option>
+          {tenantList.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        {filterTenant && (
+          <button
+            onClick={() => setFilterTenant(null)}
+            className="text-xs text-gray-400 hover:text-white bg-gray-800 border border-gray-700 rounded-md px-2 py-1.5 transition-colors"
+          >
+            Limpar filtro
+          </button>
+        )}
+      </div>
+
       {/* Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {cards.map(card => {
