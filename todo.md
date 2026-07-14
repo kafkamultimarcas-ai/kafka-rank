@@ -2385,3 +2385,7 @@
 - [x] Fix URL localhost hardcoded no modal de criação de loja → usar window.location.origin
 - [x] Fix modal faturamento/aberto mostrando colunas erradas (veículos/leads) → mostrar dados financeiros por loja
 - [x] Implementar drill-down dos cards Mensagens WhatsApp e Competições Ativas
+
+## Gráficos Visuais Dashboard Super Admin
+- [x] Gráfico de evolução do faturamento ao longo do tempo (Chart.js)
+- [x] Gráfico de evolução do uso de mensagens ao longo do tempo (Chart.js)

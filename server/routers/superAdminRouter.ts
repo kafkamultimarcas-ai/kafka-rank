@@ -482,6 +482,12 @@ export const superAdminRouter = router({
 
       // Mensagens por loja
       const [messagesByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_messages GROUP BY tenantId`);
+      // Mensagens por mês (últimos 6 meses)
+      const [messagesByMonth] = await db.execute(sql`
+        SELECT DATE_FORMAT(FROM_UNIXTIME(createdAt/1000), '%Y-%m') as month, COUNT(*) as total
+        FROM crm_messages WHERE createdAt >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000
+        GROUP BY month ORDER BY month ASC
+      `);
       // Competições ativas por loja
       const [competitionsByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM competitions WHERE status = 'active' GROUP BY tenantId`);
 
@@ -536,6 +542,7 @@ export const superAdminRouter = router({
         tenantDetails,
         messagesByTenant: (messagesByTenant as unknown) as any[],
         competitionsByTenant: (competitionsByTenant as unknown) as any[],
+        messagesByMonth: (messagesByMonth as unknown) as any[],
       };
     }),
 });

@@ -1,4 +1,8 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
+import { Line, Bar } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from "chart.js";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -983,58 +987,150 @@ function SuperAdminDashboardView({ token }: { token: string }) {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Faturamento Chart */}
+        {/* Faturamento Chart - Line */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-green-400" /> Faturamento Mensal (6 meses)
+            <BarChart3 className="w-4 h-4 text-green-400" /> Evolução do Faturamento (6 meses)
           </h3>
-          <div className="space-y-2">
-            {finMonths.length === 0 ? (
-              <p className="text-gray-500 text-sm">Sem dados financeiros</p>
-            ) : finMonths.map((month, i) => {
-              const pago = finPagoByMonth[i];
-              const aberto = finAbertoByMonth[i];
-              const max = Math.max(...finPagoByMonth, ...finAbertoByMonth, 1);
-              return (
-                <div key={month} className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-16">{month}</span>
-                  <div className="flex-1 flex gap-1">
-                    <div className="h-5 rounded bg-green-600/80" style={{ width: `${(pago / max) * 100}%` }} title={`Pago: ${formatCurrency(pago)}`} />
-                    <div className="h-5 rounded bg-red-600/60" style={{ width: `${(aberto / max) * 100}%` }} title={`Aberto: ${formatCurrency(aberto)}`} />
-                  </div>
-                  <span className="text-xs text-gray-400 w-24 text-right">{formatCurrency(pago + aberto)}</span>
-                </div>
-              );
-            })}
-            <div className="flex gap-4 mt-2">
-              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-600/80" /> Pago</span>
-              <span className="text-xs text-gray-400 flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-600/60" /> Em Aberto</span>
+          {finMonths.length === 0 ? (
+            <p className="text-gray-500 text-sm">Sem dados financeiros</p>
+          ) : (
+            <div style={{ height: "220px" }}>
+              <Line
+                data={{
+                  labels: finMonths.map((m: string) => {
+                    const [y, mo] = m.split("-");
+                    return `${mo}/${y.slice(2)}`;
+                  }),
+                  datasets: [
+                    {
+                      label: "Pago",
+                      data: finPagoByMonth,
+                      borderColor: "#22c55e",
+                      backgroundColor: "rgba(34, 197, 94, 0.1)",
+                      fill: true,
+                      tension: 0.4,
+                      pointRadius: 4,
+                      pointBackgroundColor: "#22c55e",
+                    },
+                    {
+                      label: "Em Aberto",
+                      data: finAbertoByMonth,
+                      borderColor: "#ef4444",
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      fill: true,
+                      tension: 0.4,
+                      pointRadius: 4,
+                      pointBackgroundColor: "#ef4444",
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { position: "bottom", labels: { color: "#9ca3af", boxWidth: 12, padding: 16, font: { size: 11 } } },
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx: any) => `${ctx.dataset.label}: R$ ${Number(ctx.raw).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+                      },
+                    },
+                  },
+                  scales: {
+                    x: { ticks: { color: "#6b7280", font: { size: 10 } }, grid: { color: "rgba(75,85,99,0.3)" } },
+                    y: { ticks: { color: "#6b7280", font: { size: 10 }, callback: (v: any) => `R$ ${(Number(v) / 1000).toFixed(0)}k` }, grid: { color: "rgba(75,85,99,0.3)" } },
+                  },
+                }}
+              />
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Vendas Chart */}
+        {/* Mensagens Chart - Line */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-teal-400" /> Evolução de Mensagens WhatsApp (6 meses)
+          </h3>
+          {(() => {
+            const msgMonths = (stats?.messagesByMonth || []).map((r: any) => r.month).sort();
+            const msgTotals = msgMonths.map((m: string) => Number((stats?.messagesByMonth || []).find((r: any) => r.month === m)?.total || 0));
+            if (msgMonths.length === 0) return <p className="text-gray-500 text-sm">Sem dados de mensagens</p>;
+            return (
+              <div style={{ height: "220px" }}>
+                <Line
+                  data={{
+                    labels: msgMonths.map((m: string) => {
+                      const [y, mo] = m.split("-");
+                      return `${mo}/${y.slice(2)}`;
+                    }),
+                    datasets: [{
+                      label: "Mensagens",
+                      data: msgTotals,
+                      borderColor: "#14b8a6",
+                      backgroundColor: "rgba(20, 184, 166, 0.1)",
+                      fill: true,
+                      tension: 0.4,
+                      pointRadius: 4,
+                      pointBackgroundColor: "#14b8a6",
+                    }],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: "bottom", labels: { color: "#9ca3af", boxWidth: 12, padding: 16, font: { size: 11 } } },
+                      tooltip: { callbacks: { label: (ctx: any) => `${Number(ctx.raw).toLocaleString()} mensagens` } },
+                    },
+                    scales: {
+                      x: { ticks: { color: "#6b7280", font: { size: 10 } }, grid: { color: "rgba(75,85,99,0.3)" } },
+                      y: { ticks: { color: "#6b7280", font: { size: 10 } }, grid: { color: "rgba(75,85,99,0.3)" }, beginAtZero: true },
+                    },
+                  }}
+                />
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Vendas Chart - Bar */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-blue-400" /> Vendas Aprovadas (6 meses)
           </h3>
-          <div className="space-y-2">
-            {salesMonths.length === 0 ? (
-              <p className="text-gray-500 text-sm">Sem dados de vendas</p>
-            ) : salesMonths.map((month, i) => {
-              const total = salesTotalByMonth[i];
-              const max = Math.max(...salesTotalByMonth, 1);
-              return (
-                <div key={month} className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400 w-16">{month}</span>
-                  <div className="flex-1">
-                    <div className="h-5 rounded bg-blue-600/80" style={{ width: `${(total / max) * 100}%` }} />
-                  </div>
-                  <span className="text-xs text-gray-400 w-12 text-right">{total}</span>
-                </div>
-              );
-            })}
-          </div>
+          {salesMonths.length === 0 ? (
+            <p className="text-gray-500 text-sm">Sem dados de vendas</p>
+          ) : (
+            <div style={{ height: "220px" }}>
+              <Bar
+                data={{
+                  labels: salesMonths.map((m: string) => {
+                    const [y, mo] = m.split("-");
+                    return `${mo}/${y.slice(2)}`;
+                  }),
+                  datasets: [{
+                    label: "Vendas",
+                    data: salesTotalByMonth,
+                    backgroundColor: "rgba(59, 130, 246, 0.7)",
+                    borderColor: "#3b82f6",
+                    borderWidth: 1,
+                    borderRadius: 4,
+                  }],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx: any) => `${Number(ctx.raw)} vendas` } },
+                  },
+                  scales: {
+                    x: { ticks: { color: "#6b7280", font: { size: 10 } }, grid: { display: false } },
+                    y: { ticks: { color: "#6b7280", font: { size: 10 }, stepSize: 1 }, grid: { color: "rgba(75,85,99,0.3)" }, beginAtZero: true },
+                  },
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Plan Distribution (Pizza) */}
