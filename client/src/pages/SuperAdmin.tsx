@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Line, Bar } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from "chart.js";
 
@@ -929,6 +929,20 @@ function SuperAdminDashboardView({ token }: { token: string }) {
   const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod, tenantId: filterTenant || undefined });
   const [detailModal, setDetailModal] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [storeSearch, setStoreSearch] = useState("");
+  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(e.target as Node)) {
+        setStoreDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
@@ -1024,16 +1038,57 @@ function SuperAdminDashboardView({ token }: { token: string }) {
       {/* Store Filter */}
       <div className="flex items-center gap-3">
         <Store className="w-4 h-4 text-gray-400" />
-        <select
-          value={filterTenant || ""}
-          onChange={(e) => setFilterTenant(e.target.value ? Number(e.target.value) : null)}
-          className="bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 transition-colors min-w-[200px]"
-        >
-          <option value="">Todas as lojas</option>
-          {tenantList.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <div className="relative" ref={storeDropdownRef}>
+          <button
+            onClick={() => { setStoreDropdownOpen(!storeDropdownOpen); setStoreSearch(""); }}
+            className="bg-gray-900/80 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 transition-colors min-w-[240px] flex items-center justify-between gap-2"
+          >
+            <span className="truncate">
+              {filterTenant ? tenantList.find(t => t.id === filterTenant)?.name || "Loja" : "Todas as lojas"}
+            </span>
+            <Search className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+          {storeDropdownOpen && (
+            <div className="absolute z-50 top-full left-0 mt-1 w-[280px] bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+              <div className="p-2 border-b border-gray-800">
+                <input
+                  type="text"
+                  autoFocus
+                  value={storeSearch}
+                  onChange={(e) => setStoreSearch(e.target.value)}
+                  placeholder="Buscar loja..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
+                />
+              </div>
+              <div className="max-h-[240px] overflow-y-auto">
+                <button
+                  onClick={() => { setFilterTenant(null); setStoreDropdownOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-800 transition-colors ${
+                    !filterTenant ? "text-red-400 font-medium" : "text-gray-300"
+                  }`}
+                >
+                  Todas as lojas
+                </button>
+                {tenantList
+                  .filter(t => t.name.toLowerCase().includes(storeSearch.toLowerCase()))
+                  .map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setFilterTenant(t.id); setStoreDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-800 transition-colors ${
+                        filterTenant === t.id ? "text-red-400 font-medium" : "text-gray-300"
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                {tenantList.filter(t => t.name.toLowerCase().includes(storeSearch.toLowerCase())).length === 0 && (
+                  <p className="px-3 py-2 text-sm text-gray-500">Nenhuma loja encontrada</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
         {filterTenant && (
           <button
             onClick={() => setFilterTenant(null)}

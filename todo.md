@@ -2403,3 +2403,6 @@
 ## Filtro por Loja no Dashboard Super Admin
 - [x] Backend: aceitar parâmetro tenantId opcional no dashboardStats para filtrar dados por loja
 - [x] Frontend: dropdown/select de lojas no dashboard para filtrar todos os cards e gráficos
+
+## Busca no Filtro de Lojas
+- [x] Campo de busca dentro do dropdown de filtro de lojas no dashboard Super Admin
