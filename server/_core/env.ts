@@ -14,6 +14,7 @@ export const ENV = {
   asaasApiUrl: process.env.ASAAS_API_URL ?? "https://api-sandbox.asaas.com/v3",
   asaasApiKey: process.env.ASAAS_API_KEY ?? "",
   asaasWebhookToken: process.env.ASAAS_WEBHOOK_TOKEN ?? "",
+  asaasWalletId: process.env.ASAAS_WALLET_ID ?? "",
   // Origem pública da aplicação — usada só por jobs em background (ex: aviso de
   // trial acabando) que precisam montar link absoluto sem ter uma request HTTP
   // de onde derivar o host, diferente de getRequestOrigin(req).

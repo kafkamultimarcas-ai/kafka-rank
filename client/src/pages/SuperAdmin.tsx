@@ -196,7 +196,7 @@ function CreateTenantModal({ token, onClose, onCreated }: { token: string; onClo
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                <p className="mt-1 text-[11px] text-gray-400">Link da loja: `http://localhost:3000/t/{trimmedSlug || "sua-loja"}/login`</p>
+                <p className="mt-1 text-[11px] text-gray-400">Link da loja: {window.location.origin}/t/{trimmedSlug || "sua-loja"}/login</p>
                 <p className="mt-1 text-[11px] text-gray-500">Esse será o acesso principal da equipe comercial da loja.</p>
                 {slugIsValid && debouncedSlug === trimmedSlug && slugAvailability && (
                   <p className={`mt-1 text-[11px] ${slugAvailability.available ? "text-emerald-400" : "text-amber-400"}`}>
@@ -1219,32 +1219,41 @@ function DashboardDetailModal({ cardKey, stats, filterTenant, setFilterTenant, o
         );
       case "faturamento":
       case "aberto":
+        const finTenants = filtered.map((t: any) => {
+          const tenantFin = (stats?.finByMonth || []).filter((r: any) => r.tenantId === t.id);
+          const pago = tenantFin.reduce((s: number, r: any) => s + Number(r.pago), 0);
+          const aberto = tenantFin.reduce((s: number, r: any) => s + Number(r.aberto), 0);
+          return { ...t, pago, aberto };
+        }).filter((t: any) => cardKey === "faturamento" ? t.pago > 0 : t.aberto > 0)
+          .sort((a: any, b: any) => cardKey === "faturamento" ? b.pago - a.pago : b.aberto - a.aberto);
         return (
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <div className="text-lg font-bold text-green-400">{stats?.pagamentosPagos || 0}</div>
-                <div className="text-xs text-gray-400">Pagos</div>
+                <div className="text-lg font-bold text-green-400">{formatCurrency(stats?.faturamentoTotal || 0)}</div>
+                <div className="text-xs text-gray-400">Total Pago</div>
               </div>
               <div className="bg-gray-800/50 rounded-lg p-3 text-center">
                 <div className="text-lg font-bold text-yellow-400">{stats?.pagamentosPendentes || 0}</div>
                 <div className="text-xs text-gray-400">Pendentes</div>
               </div>
               <div className="bg-gray-800/50 rounded-lg p-3 text-center">
-                <div className="text-lg font-bold text-red-400">{stats?.pagamentosAtrasados || 0}</div>
-                <div className="text-xs text-gray-400">Atrasados</div>
+                <div className="text-lg font-bold text-red-400">{formatCurrency(stats?.faturamentoAberto || 0)}</div>
+                <div className="text-xs text-gray-400">Em Aberto</div>
               </div>
             </div>
             <table className="w-full text-sm">
               <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
-                <th className="text-left py-2">Loja</th><th className="text-right py-2">Veículos</th><th className="text-right py-2">Leads</th><th className="text-right py-2">Integrações</th>
+                <th className="text-left py-2">Loja</th><th className="text-left py-2">Plano</th><th className="text-right py-2">Faturado</th><th className="text-right py-2">Em Aberto</th>
               </tr></thead>
-              <tbody>{filtered.map((t: any) => (
+              <tbody>{finTenants.length === 0 ? (
+                <tr><td colSpan={4} className="py-4 text-center text-gray-500 text-xs">Nenhuma transação financeira encontrada.</td></tr>
+              ) : finTenants.map((t: any) => (
                 <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td className="py-2 text-white">{t.name}</td>
-                  <td className="py-2 text-right text-gray-300">{t.vehicles}</td>
-                  <td className="py-2 text-right text-gray-300">{t.leads}</td>
-                  <td className="py-2 text-right text-gray-300">{t.integrations}</td>
+                  <td className="py-2 text-white font-medium">{t.name}</td>
+                  <td className="py-2"><span className="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300 uppercase">{t.plan}</span></td>
+                  <td className="py-2 text-right text-green-400 font-medium">{formatCurrency(t.pago)}</td>
+                  <td className="py-2 text-right text-red-400 font-medium">{t.aberto > 0 ? formatCurrency(t.aberto) : "—"}</td>
                 </tr>
               ))}</tbody>
             </table>
@@ -1284,6 +1293,48 @@ function DashboardDetailModal({ cardKey, stats, filterTenant, setFilterTenant, o
               </div>
             </div>
           </div>
+        );
+      case "mensagens":
+        const msgTenants = filtered.map((t: any) => {
+          const msgs = (stats?.messagesByTenant || []).find((m: any) => m.tenantId === t.id);
+          return { ...t, messages: msgs ? Number(msgs.total) : 0 };
+        }).filter((t: any) => t.messages > 0).sort((a: any, b: any) => b.messages - a.messages);
+        return (
+          <table className="w-full text-sm">
+            <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+              <th className="text-left py-2">Loja</th><th className="text-left py-2">Plano</th><th className="text-right py-2">Mensagens</th>
+            </tr></thead>
+            <tbody>{msgTenants.length === 0 ? (
+              <tr><td colSpan={3} className="py-4 text-center text-gray-500 text-xs">Nenhuma mensagem registrada.</td></tr>
+            ) : msgTenants.map((t: any) => (
+              <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <td className="py-2 text-white font-medium">{t.name}</td>
+                <td className="py-2"><span className="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300 uppercase">{t.plan}</span></td>
+                <td className="py-2 text-right text-teal-400 font-semibold">{t.messages.toLocaleString()}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        );
+      case "competicoes":
+        const compTenants = filtered.map((t: any) => {
+          const comps = (stats?.competitionsByTenant || []).find((c: any) => c.tenantId === t.id);
+          return { ...t, competitions: comps ? Number(comps.total) : 0 };
+        }).filter((t: any) => t.competitions > 0).sort((a: any, b: any) => b.competitions - a.competitions);
+        return (
+          <table className="w-full text-sm">
+            <thead><tr className="text-gray-400 text-xs border-b border-gray-800">
+              <th className="text-left py-2">Loja</th><th className="text-left py-2">Plano</th><th className="text-right py-2">Competições Ativas</th>
+            </tr></thead>
+            <tbody>{compTenants.length === 0 ? (
+              <tr><td colSpan={3} className="py-4 text-center text-gray-500 text-xs">Nenhuma competição ativa no momento.</td></tr>
+            ) : compTenants.map((t: any) => (
+              <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                <td className="py-2 text-white font-medium">{t.name}</td>
+                <td className="py-2"><span className="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300 uppercase">{t.plan}</span></td>
+                <td className="py-2 text-right text-orange-400 font-semibold">{t.competitions}</td>
+              </tr>
+            ))}</tbody>
+          </table>
         );
       default:
         return <p className="text-gray-400 text-sm">Dados detalhados não disponíveis para este card.</p>;

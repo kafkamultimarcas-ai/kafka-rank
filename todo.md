@@ -2380,3 +2380,8 @@
 
 ## Card de Status da Assinatura
 - [x] Card de destaque acima da tabela de faturas com status atual, plano ativo e alerta de pendências
+
+## Correções Dashboard Super Admin
+- [x] Fix URL localhost hardcoded no modal de criação de loja → usar window.location.origin
+- [x] Fix modal faturamento/aberto mostrando colunas erradas (veículos/leads) → mostrar dados financeiros por loja
+- [x] Implementar drill-down dos cards Mensagens WhatsApp e Competições Ativas

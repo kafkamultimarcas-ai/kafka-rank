@@ -480,6 +480,11 @@ export const superAdminRouter = router({
       `);
       const platRow = ((platformPayments as unknown) as any[])[0] || {};
 
+      // Mensagens por loja
+      const [messagesByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_messages GROUP BY tenantId`);
+      // Competições ativas por loja
+      const [competitionsByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM competitions WHERE status = 'active' GROUP BY tenantId`);
+
       // Distribuições
       const planDistribution = (allTenants as any[]).reduce((acc: any, t: any) => {
         acc[t.plan] = (acc[t.plan] || 0) + 1;
@@ -529,6 +534,8 @@ export const superAdminRouter = router({
         salesByMonth: (salesByMonth as unknown) as any[],
         finByMonth: (finByMonth as unknown) as any[],
         tenantDetails,
+        messagesByTenant: (messagesByTenant as unknown) as any[],
+        competitionsByTenant: (competitionsByTenant as unknown) as any[],
       };
     }),
 });
