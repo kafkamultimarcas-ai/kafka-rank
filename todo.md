@@ -2406,3 +2406,6 @@
 
 ## Busca no Filtro de Lojas
 - [x] Campo de busca dentro do dropdown de filtro de lojas no dashboard Super Admin
+
+## Skeletons de Carregamento Dashboard Super Admin
+- [x] Skeletons nos cards e gráficos enquanto dados da loja selecionada estão sendo atualizados

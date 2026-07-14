@@ -926,7 +926,8 @@ function downloadCSV(filename: string, headers: string[], rows: string[][]) {
 function SuperAdminDashboardView({ token }: { token: string }) {
   const [chartPeriod, setChartPeriod] = useState<PeriodValue>("6m");
   const [filterTenant, setFilterTenant] = useState<number | null>(null);
-  const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod, tenantId: filterTenant || undefined });
+  const { data: stats, isLoading, isFetching } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod, tenantId: filterTenant || undefined });
+  const isRefetching = isFetching && !isLoading;
   const [detailModal, setDetailModal] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [storeSearch, setStoreSearch] = useState("");
@@ -1101,27 +1102,41 @@ function SuperAdminDashboardView({ token }: { token: string }) {
 
       {/* Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {cards.map(card => {
-          const Icon = card.icon;
-          return (
-            <button
-              key={card.key}
-              onClick={() => setDetailModal(card.key)}
-              className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 text-left hover:border-gray-600 hover:bg-gray-800/60 transition-all group cursor-pointer"
-            >
+        {isRefetching ? (
+          Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 animate-pulse">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[card.color] || colorMap.blue}`}>
-                  <Icon className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-lg bg-gray-800" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-5 bg-gray-800 rounded w-16" />
+                  <div className="h-3 bg-gray-800/60 rounded w-24" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xl font-bold text-white truncate">{card.value}</div>
-                  <div className="text-xs text-gray-400">{card.label}</div>
-                </div>
-                <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-gray-300 transition-colors" />
               </div>
-            </button>
-          );
-        })}
+            </div>
+          ))
+        ) : (
+          cards.map(card => {
+            const Icon = card.icon;
+            return (
+              <button
+                key={card.key}
+                onClick={() => setDetailModal(card.key)}
+                className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 text-left hover:border-gray-600 hover:bg-gray-800/60 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[card.color] || colorMap.blue}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xl font-bold text-white truncate">{card.value}</div>
+                    <div className="text-xs text-gray-400">{card.label}</div>
+                  </div>
+                  <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-gray-300 transition-colors" />
+                </div>
+              </button>
+            );
+          })
+        )}
       </div>
 
       {/* Period Filter */}
@@ -1166,6 +1181,23 @@ function SuperAdminDashboardView({ token }: { token: string }) {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {isRefetching && (
+          <>
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5 animate-pulse">
+              <div className="h-4 bg-gray-800 rounded w-40 mb-4" />
+              <div className="h-[220px] bg-gray-800/40 rounded-lg" />
+            </div>
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5 animate-pulse">
+              <div className="h-4 bg-gray-800 rounded w-40 mb-4" />
+              <div className="h-[220px] bg-gray-800/40 rounded-lg" />
+            </div>
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5 animate-pulse md:col-span-2">
+              <div className="h-4 bg-gray-800 rounded w-40 mb-4" />
+              <div className="h-[220px] bg-gray-800/40 rounded-lg" />
+            </div>
+          </>
+        )}
+        {!isRefetching && (<>
         {/* Faturamento Chart - Line */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
@@ -1377,6 +1409,7 @@ function SuperAdminDashboardView({ token }: { token: string }) {
             })}
           </div>
         </div>
+        </>)}
       </div>
 
       {/* Detail Modal */}
