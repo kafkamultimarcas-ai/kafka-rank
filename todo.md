@@ -2377,3 +2377,6 @@
 ## Histórico de Faturas na Tela de Assinatura
 - [x] Backend: rota billing.getInvoices para listar faturas confirmadas com link de recibo
 - [x] Frontend: seção "Histórico de Faturas" com tabela de faturas pagas e botão de download
+
+## Card de Status da Assinatura
+- [x] Card de destaque acima da tabela de faturas com status atual, plano ativo e alerta de pendências

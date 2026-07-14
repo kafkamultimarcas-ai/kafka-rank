@@ -39,6 +39,8 @@ import {
   FileText,
   Download,
   ExternalLink,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
 
 const WHATSAPP_CONTACT = "https://wa.me/5500000000000";
@@ -218,6 +220,89 @@ const BILLING_TYPE_LABELS: Record<string, string> = {
   DEBIT_CARD: "Cartão de Débito",
   UNDEFINED: "Não definido",
 };
+
+function SubscriptionStatusCard({
+  myPlan,
+  isPaidActive,
+  isSuspended,
+  checkoutUrl,
+}: {
+  myPlan: any;
+  isPaidActive: boolean;
+  isSuspended: boolean;
+  checkoutUrl?: string | null;
+}) {
+  if (!myPlan) return null;
+
+  const planName = PLAN_CONFIG[myPlan.plan as PaidPlanId]?.name || myPlan.plan;
+  const isTrialing = myPlan.status === "trial";
+  const trialDaysLeft = isTrialing && myPlan.trialEndsAt
+    ? Math.max(0, Math.ceil((myPlan.trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  // Determinar cor e ícone do status
+  let statusColor = "border-muted/30 bg-muted/5";
+  let statusIcon = <Clock className="w-5 h-5 text-muted-foreground" />;
+  let statusLabel = "Indefinido";
+  let statusDescription = "";
+
+  if (isPaidActive) {
+    statusColor = "border-green-500/30 bg-green-500/5";
+    statusIcon = <ShieldCheck className="w-5 h-5 text-green-500" />;
+    statusLabel = "Ativa";
+    statusDescription = `Plano ${planName} — ${formatCentsToBRL(myPlan.monthlyPrice || 0)}/mês`;
+  } else if (isSuspended) {
+    statusColor = "border-destructive/30 bg-destructive/5";
+    statusIcon = <AlertTriangle className="w-5 h-5 text-destructive" />;
+    statusLabel = "Suspensa";
+    statusDescription = "Pagamento em atraso — regularize para reativar o acesso.";
+  } else if (isTrialing) {
+    statusColor = trialDaysLeft <= 3
+      ? "border-yellow-500/30 bg-yellow-500/5"
+      : "border-blue-500/30 bg-blue-500/5";
+    statusIcon = trialDaysLeft <= 3
+      ? <AlertTriangle className="w-5 h-5 text-yellow-500" />
+      : <Clock className="w-5 h-5 text-blue-500" />;
+    statusLabel = "Período de teste";
+    statusDescription = trialDaysLeft > 0
+      ? `${trialDaysLeft} dia${trialDaysLeft !== 1 ? "s" : ""} restante${trialDaysLeft !== 1 ? "s" : ""} no trial`
+      : "Trial expirado — assine um plano para continuar.";
+  }
+
+  return (
+    <div className={`racing-card p-5 ${statusColor} transition-all`}>
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 mt-0.5">
+          {statusIcon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-sm font-bold text-foreground">Status da Assinatura</h3>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+              isPaidActive ? "bg-green-500/20 text-green-400" :
+              isSuspended ? "bg-destructive/20 text-destructive" :
+              trialDaysLeft <= 3 ? "bg-yellow-500/20 text-yellow-500" :
+              "bg-blue-500/20 text-blue-400"
+            }`}>
+              {statusLabel}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">{statusDescription}</p>
+        </div>
+        {isSuspended && checkoutUrl && (
+          <Button
+            size="sm"
+            className="racing-gradient text-white flex-shrink-0"
+            onClick={() => window.location.href = checkoutUrl}
+          >
+            <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+            Pagar agora
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function InvoicesSection() {
   const [invoicePage, setInvoicePage] = useState(0);
@@ -551,6 +636,8 @@ export default function AssinaturaContent({
           </>
         )}
       </div>
+
+      <SubscriptionStatusCard myPlan={myPlan} isPaidActive={isPaidActive} isSuspended={isSuspended} checkoutUrl={checkoutData?.checkoutUrl} />
 
       <InvoicesSection />
 
