@@ -12,7 +12,7 @@ import {
   Store, MapPin, Phone, Mail, Palette, Zap, BarChart3,
   ChevronRight, AlertTriangle, CheckCircle2, Clock, XCircle, EyeOff,
   Key, RefreshCw, X, LayoutDashboard, Car, MessageSquare, DollarSign,
-  Wallet, CreditCard, Trophy, PieChart, TrendingDown, ArrowUpRight
+  Wallet, CreditCard, Trophy, PieChart, TrendingDown, ArrowUpRight, Download
 } from "lucide-react";
 import { slugify, formatPhone, normalizeUsername, isValidEmail, getAvailabilityMessage } from "@/lib/tenantForm";
 import { getDefaultPlanLimits, TRIAL_PLAN_LIMITS } from "@shared/plans";
@@ -911,6 +911,18 @@ const PERIOD_OPTIONS = [
 ] as const;
 type PeriodValue = typeof PERIOD_OPTIONS[number]["value"];
 
+function downloadCSV(filename: string, headers: string[], rows: string[][]) {
+  const bom = "\uFEFF";
+  const csv = bom + [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function SuperAdminDashboardView({ token }: { token: string }) {
   const [chartPeriod, setChartPeriod] = useState<PeriodValue>("6m");
   const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod });
@@ -918,6 +930,34 @@ function SuperAdminDashboardView({ token }: { token: string }) {
   const [filterTenant, setFilterTenant] = useState<number | null>(null);
 
   const formatCurrency = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+  const handleExportCSV = () => {
+    if (!stats) return;
+    // Faturamento data
+    const finMonthsExport = Array.from(new Set((stats.finByMonth || []).map((r: any) => r.month))).sort() as string[];
+    const finPago = finMonthsExport.map(m => (stats.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.pago), 0));
+    const finAberto = finMonthsExport.map(m => (stats.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.aberto), 0));
+    // Vendas data
+    const salesMonthsExport = Array.from(new Set((stats.salesByMonth || []).map((r: any) => r.month))).sort() as string[];
+    const salesTotal = salesMonthsExport.map(m => (stats.salesByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.total), 0));
+    // Mensagens data
+    const msgMonthsExport = (stats.messagesByMonth || []).map((r: any) => r.month).sort() as string[];
+    const msgTotals = msgMonthsExport.map((m: string) => Number((stats.messagesByMonth || []).find((r: any) => r.month === m)?.total || 0));
+
+    // Build unified rows
+    const allPeriods = Array.from(new Set([...finMonthsExport, ...salesMonthsExport, ...msgMonthsExport])).sort();
+    const headers = ["Per\u00edodo", "Faturamento Pago (R$)", "Faturamento Aberto (R$)", "Vendas", "Mensagens WhatsApp"];
+    const rows = allPeriods.map(p => [
+      p,
+      (finPago[finMonthsExport.indexOf(p)] || 0).toFixed(2).replace(".", ","),
+      (finAberto[finMonthsExport.indexOf(p)] || 0).toFixed(2).replace(".", ","),
+      String(salesTotal[salesMonthsExport.indexOf(p)] || 0),
+      String(msgTotals[msgMonthsExport.indexOf(p)] || 0),
+    ]);
+
+    const periodLabel = PERIOD_OPTIONS.find(o => o.value === chartPeriod)?.label || chartPeriod;
+    downloadCSV(`dashboard_${chartPeriod}_${new Date().toISOString().slice(0,10)}.csv`, headers, rows);
+  };
 
   if (isLoading) return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -999,6 +1039,14 @@ function SuperAdminDashboardView({ token }: { token: string }) {
         <h2 className="text-sm font-semibold text-white flex items-center gap-2">
           <BarChart3 className="w-4 h-4 text-gray-400" /> Gráficos de Evolução
         </h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-700 transition-colors"
+            title="Exportar dados dos gráficos em CSV"
+          >
+            <Download className="w-3.5 h-3.5" /> Exportar CSV
+          </button>
         <div className="flex items-center gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1">
           {PERIOD_OPTIONS.map(opt => (
             <button
@@ -1013,6 +1061,7 @@ function SuperAdminDashboardView({ token }: { token: string }) {
               {opt.label}
             </button>
           ))}
+        </div>
         </div>
       </div>
 

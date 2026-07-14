@@ -2393,3 +2393,6 @@
 ## Filtro de Período nos Gráficos Super Admin
 - [x] Backend: aceitar parâmetro de período (7d, 30d, year) no dashboardStats
 - [x] Frontend: botões de filtro de período acima dos gráficos (7 dias, 30 dias, Ano atual)
+
+## Exportação CSV dos Gráficos Super Admin
+- [x] Botão de exportação CSV nos gráficos do dashboard, respeitando o período filtrado
