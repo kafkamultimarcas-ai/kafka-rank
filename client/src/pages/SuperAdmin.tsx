@@ -903,8 +903,17 @@ function PlatformLogsSection({ token, tenants }: { token: string; tenants: any[]
 }
 
 // ===== SUPER ADMIN DASHBOARD VIEW (cards + gráficos + modais) =====
+const PERIOD_OPTIONS = [
+  { value: "7d", label: "7 dias" },
+  { value: "30d", label: "30 dias" },
+  { value: "6m", label: "6 meses" },
+  { value: "year", label: "Ano atual" },
+] as const;
+type PeriodValue = typeof PERIOD_OPTIONS[number]["value"];
+
 function SuperAdminDashboardView({ token }: { token: string }) {
-  const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token });
+  const [chartPeriod, setChartPeriod] = useState<PeriodValue>("6m");
+  const { data: stats, isLoading } = trpc.superAdmin.dashboardStats.useQuery({ token, period: chartPeriod });
   const [detailModal, setDetailModal] = useState<string | null>(null);
   const [filterTenant, setFilterTenant] = useState<number | null>(null);
 
@@ -985,12 +994,34 @@ function SuperAdminDashboardView({ token }: { token: string }) {
         })}
       </div>
 
+      {/* Period Filter */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-gray-400" /> Gráficos de Evolução
+        </h2>
+        <div className="flex items-center gap-1 bg-gray-900/60 border border-gray-800 rounded-lg p-1">
+          {PERIOD_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setChartPeriod(opt.value)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                chartPeriod === opt.value
+                  ? "bg-red-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Faturamento Chart - Line */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-green-400" /> Evolução do Faturamento (6 meses)
+            <BarChart3 className="w-4 h-4 text-green-400" /> Evolução do Faturamento
           </h3>
           {finMonths.length === 0 ? (
             <p className="text-gray-500 text-sm">Sem dados financeiros</p>
@@ -999,8 +1030,9 @@ function SuperAdminDashboardView({ token }: { token: string }) {
               <Line
                 data={{
                   labels: finMonths.map((m: string) => {
-                    const [y, mo] = m.split("-");
-                    return `${mo}/${y.slice(2)}`;
+                    const parts = m.split("-");
+                    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                    return `${parts[1]}/${parts[0].slice(2)}`;
                   }),
                   datasets: [
                     {
@@ -1049,7 +1081,7 @@ function SuperAdminDashboardView({ token }: { token: string }) {
         {/* Mensagens Chart - Line */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-teal-400" /> Evolução de Mensagens WhatsApp (6 meses)
+            <MessageSquare className="w-4 h-4 text-teal-400" /> Evolução de Mensagens WhatsApp
           </h3>
           {(() => {
             const msgMonths = (stats?.messagesByMonth || []).map((r: any) => r.month).sort();
@@ -1060,8 +1092,9 @@ function SuperAdminDashboardView({ token }: { token: string }) {
                 <Line
                   data={{
                     labels: msgMonths.map((m: string) => {
-                      const [y, mo] = m.split("-");
-                      return `${mo}/${y.slice(2)}`;
+                      const parts = m.split("-");
+                      if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                      return `${parts[1]}/${parts[0].slice(2)}`;
                     }),
                     datasets: [{
                       label: "Mensagens",
@@ -1095,7 +1128,7 @@ function SuperAdminDashboardView({ token }: { token: string }) {
         {/* Vendas Chart - Bar */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-blue-400" /> Vendas Aprovadas (6 meses)
+            <TrendingUp className="w-4 h-4 text-blue-400" /> Vendas Aprovadas
           </h3>
           {salesMonths.length === 0 ? (
             <p className="text-gray-500 text-sm">Sem dados de vendas</p>
@@ -1104,8 +1137,9 @@ function SuperAdminDashboardView({ token }: { token: string }) {
               <Bar
                 data={{
                   labels: salesMonths.map((m: string) => {
-                    const [y, mo] = m.split("-");
-                    return `${mo}/${y.slice(2)}`;
+                    const parts = m.split("-");
+                    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+                    return `${parts[1]}/${parts[0].slice(2)}`;
                   }),
                   datasets: [{
                     label: "Vendas",

@@ -406,12 +406,21 @@ export const superAdminRouter = router({
 
   /** Dashboard completo do Super Admin com métricas agregadas */
   dashboardStats: publicProcedure
-    .input(z.object({ token: z.string() }))
+    .input(z.object({ token: z.string(), period: z.enum(["7d", "30d", "6m", "year"]).optional() }))
     .query(async ({ input }) => {
       const payload = verifySuperToken(input.token);
       if (!payload) throw new Error("Não autorizado");
       const db = await getDb();
       if (!db) throw new Error("Database not available");
+
+      // Determine interval SQL based on period
+      const periodMap: Record<string, string> = { "7d": "7 DAY", "30d": "30 DAY", "6m": "6 MONTH", "year": "12 MONTH" };
+      const intervalSql = periodMap[input.period || "6m"] || "6 MONTH";
+      // For "year" we use start of current year
+      const useYearStart = input.period === "year";
+      // Date format: for 7d/30d use daily, for 6m/year use monthly
+      const useDailyFormat = input.period === "7d" || input.period === "30d";
+      const dateFormat = useDailyFormat ? "%Y-%m-%d" : "%Y-%m";
 
       const allTenants = await withRetry(() => db.select().from(tenants).orderBy(desc(tenants.createdAt)));
 
@@ -445,20 +454,26 @@ export const superAdminRouter = router({
       `);
       const finRow = ((finStats as unknown) as any[])[0] || {};
 
-      // Vendas por mês (últimos 6 meses)
+      // Vendas por período
+      const salesDateFilter = useYearStart
+        ? sql`createdAt >= DATE_FORMAT(NOW(), '%Y-01-01')`
+        : sql.raw(`createdAt >= DATE_SUB(NOW(), INTERVAL ${intervalSql})`);
       const [salesByMonth] = await db.execute(sql`
-        SELECT DATE_FORMAT(createdAt, '%Y-%m') as month, COUNT(*) as total, tenantId
-        FROM sales WHERE status = 'approved' AND createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        SELECT DATE_FORMAT(createdAt, ${sql.raw(`'${dateFormat}'`)}) as month, COUNT(*) as total, tenantId
+        FROM sales WHERE status = 'approved' AND ${salesDateFilter}
         GROUP BY month, tenantId ORDER BY month ASC
       `);
 
-      // Faturamento por mês (últimos 6 meses)
+      // Faturamento por período
+      const finDateFilter = useYearStart
+        ? sql`dueDate >= UNIX_TIMESTAMP(DATE_FORMAT(NOW(), '%Y-01-01')) * 1000`
+        : sql.raw(`dueDate >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL ${intervalSql})) * 1000`);
       const [finByMonth] = await db.execute(sql`
-        SELECT DATE_FORMAT(FROM_UNIXTIME(dueDate/1000), '%Y-%m') as month,
+        SELECT DATE_FORMAT(FROM_UNIXTIME(dueDate/1000), ${sql.raw(`'${dateFormat}'`)}) as month,
           COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as pago,
           COALESCE(SUM(CASE WHEN status IN ('pending', 'overdue') THEN amount ELSE 0 END), 0) as aberto,
           tenantId
-        FROM fin_transactions WHERE dueDate >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000
+        FROM fin_transactions WHERE ${finDateFilter}
         GROUP BY month, tenantId ORDER BY month ASC
       `);
 
@@ -482,10 +497,13 @@ export const superAdminRouter = router({
 
       // Mensagens por loja
       const [messagesByTenant] = await db.execute(sql`SELECT tenantId, COUNT(*) as total FROM crm_messages GROUP BY tenantId`);
-      // Mensagens por mês (últimos 6 meses)
+      // Mensagens por período
+      const msgDateFilter = useYearStart
+        ? sql`createdAt >= UNIX_TIMESTAMP(DATE_FORMAT(NOW(), '%Y-01-01')) * 1000`
+        : sql.raw(`createdAt >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL ${intervalSql})) * 1000`);
       const [messagesByMonth] = await db.execute(sql`
-        SELECT DATE_FORMAT(FROM_UNIXTIME(createdAt/1000), '%Y-%m') as month, COUNT(*) as total
-        FROM crm_messages WHERE createdAt >= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 6 MONTH)) * 1000
+        SELECT DATE_FORMAT(FROM_UNIXTIME(createdAt/1000), ${sql.raw(`'${dateFormat}'`)}) as month, COUNT(*) as total
+        FROM crm_messages WHERE ${msgDateFilter}
         GROUP BY month ORDER BY month ASC
       `);
       // Competições ativas por loja

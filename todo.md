@@ -2389,3 +2389,7 @@
 ## Gráficos Visuais Dashboard Super Admin
 - [x] Gráfico de evolução do faturamento ao longo do tempo (Chart.js)
 - [x] Gráfico de evolução do uso de mensagens ao longo do tempo (Chart.js)
+
+## Filtro de Período nos Gráficos Super Admin
+- [x] Backend: aceitar parâmetro de período (7d, 30d, year) no dashboardStats
+- [x] Frontend: botões de filtro de período acima dos gráficos (7 dias, 30 dias, Ano atual)
