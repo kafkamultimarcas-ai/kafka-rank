@@ -946,12 +946,12 @@ function SuperAdminDashboardView({ token }: { token: string }) {
   };
 
   // Aggregate finByMonth for chart
-  const finMonths = [...new Set((stats?.finByMonth || []).map((r: any) => r.month))].sort();
+  const finMonths = Array.from(new Set((stats?.finByMonth || []).map((r: any) => r.month))).sort();
   const finPagoByMonth = finMonths.map(m => (stats?.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.pago), 0));
   const finAbertoByMonth = finMonths.map(m => (stats?.finByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.aberto), 0));
 
   // Aggregate salesByMonth for chart
-  const salesMonths = [...new Set((stats?.salesByMonth || []).map((r: any) => r.month))].sort();
+  const salesMonths = Array.from(new Set((stats?.salesByMonth || []).map((r: any) => r.month))).sort();
   const salesTotalByMonth = salesMonths.map(m => (stats?.salesByMonth || []).filter((r: any) => r.month === m).reduce((s: number, r: any) => s + Number(r.total), 0));
 
   return (

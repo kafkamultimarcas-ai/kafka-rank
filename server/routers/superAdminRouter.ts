@@ -443,7 +443,7 @@ export const superAdminRouter = router({
           COALESCE(SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END), 0) as pagamentos_pagos
         FROM fin_transactions
       `);
-      const finRow = (finStats as any[])[0] || {};
+      const finRow = ((finStats as unknown) as any[])[0] || {};
 
       // Vendas por mês (últimos 6 meses)
       const [salesByMonth] = await db.execute(sql`
@@ -478,7 +478,7 @@ export const superAdminRouter = router({
           COALESCE(SUM(CASE WHEN status = 'PENDING' OR status = 'OVERDUE' THEN value ELSE 0 END), 0) as valor_pendente
         FROM subscription_events
       `);
-      const platRow = (platformPayments as any[])[0] || {};
+      const platRow = ((platformPayments as unknown) as any[])[0] || {};
 
       // Distribuições
       const planDistribution = (allTenants as any[]).reduce((acc: any, t: any) => {
@@ -498,10 +498,10 @@ export const superAdminRouter = router({
         plan: t.plan,
         status: t.tenant_status,
         monthlyPrice: t.monthlyPrice || 0,
-        vehicles: ((vehiclesByTenant as any[]).find((v: any) => v.tenantId === t.id)?.total) || 0,
-        leads: ((leadsByTenant as any[]).find((l: any) => l.tenantId === t.id)?.total) || 0,
-        sellers: ((sellersByTenant as any[]).find((s: any) => s.tenantId === t.id)?.total) || 0,
-        integrations: ((integrationsByTenant as any[]).find((i: any) => i.tenantId === t.id)?.total) || 0,
+        vehicles: (((vehiclesByTenant as unknown) as any[]).find((v: any) => v.tenantId === t.id)?.total) || 0,
+        leads: (((leadsByTenant as unknown) as any[]).find((l: any) => l.tenantId === t.id)?.total) || 0,
+        sellers: (((sellersByTenant as unknown) as any[]).find((s: any) => s.tenantId === t.id)?.total) || 0,
+        integrations: (((integrationsByTenant as unknown) as any[]).find((i: any) => i.tenantId === t.id)?.total) || 0,
       }));
 
       return {
@@ -526,8 +526,8 @@ export const superAdminRouter = router({
         platformValorPendente: Number(platRow.valor_pendente) || 0,
         planDistribution,
         statusDistribution,
-        salesByMonth: salesByMonth as any[],
-        finByMonth: finByMonth as any[],
+        salesByMonth: (salesByMonth as unknown) as any[],
+        finByMonth: (finByMonth as unknown) as any[],
         tenantDetails,
       };
     }),
