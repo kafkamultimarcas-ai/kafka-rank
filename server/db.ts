@@ -1,5 +1,6 @@
 import { eq, desc, asc, and, or, sql, inArray, gte, lt, lte, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import {
   InsertUser, users,
   sellers, InsertSeller,
@@ -53,7 +54,15 @@ export async function getDbInstance() {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const url = process.env.DATABASE_URL;
+      const needsTls = /tidbcloud\.com|[?&]ssl=|sslaccept=strict/i.test(url);
+      if (needsTls) {
+        const [uri] = url.split("?");
+        const pool = mysql.createPool({ uri, ssl: { minVersion: "TLSv1.2", rejectUnauthorized: true } });
+        _db = drizzle(pool) as unknown as ReturnType<typeof drizzle>;
+      } else {
+        _db = drizzle(url) as unknown as ReturnType<typeof drizzle>;
+      }
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

@@ -33,6 +33,9 @@ const AdminMetaIntegration = lazy(() => import("./pages/admin/AdminMetaIntegrati
 const AdminIAM = lazy(() => import("./pages/admin/AdminIAM"));
 const AdminDocumentos = lazy(() => import("./pages/admin/AdminDocumentos"));
 const AdminInventory = lazy(() => import("./pages/admin/AdminInventory"));
+const AdminInventoryCreate = lazy(() => import("./pages/admin/AdminInventoryCreate"));
+const AdminInventoryEdit = lazy(() => import("./pages/admin/AdminInventoryEdit"));
+const AdminInventoryPreview = lazy(() => import("./pages/admin/AdminInventoryPreview"));
 const AdminMonthTurnover = lazy(() => import("./pages/admin/AdminMonthTurnover"));
 const AdminVehicleCosts = lazy(() => import("./pages/admin/AdminVehicleCosts"));
 const Aniversariantes = lazy(() => import("./pages/admin/Aniversariantes"));
@@ -151,6 +154,12 @@ function Router() {
         <Route path="/t/:slug/admin/iam" component={AdminIAM} />
         <Route path="/admin/documentos" component={AdminDocumentos} />
         <Route path="/t/:slug/admin/documentos" component={AdminDocumentos} />
+        <Route path="/admin/estoque/cadastrar" component={AdminInventoryCreate} />
+        <Route path="/t/:slug/admin/estoque/cadastrar" component={AdminInventoryCreate} />
+        <Route path="/admin/estoque/:id/editar" component={AdminInventoryEdit} />
+        <Route path="/t/:slug/admin/estoque/:id/editar" component={AdminInventoryEdit} />
+        <Route path="/admin/estoque/:id/preview" component={AdminInventoryPreview} />
+        <Route path="/t/:slug/admin/estoque/:id/preview" component={AdminInventoryPreview} />
         <Route path="/admin/estoque" component={AdminInventory} />
         <Route path="/t/:slug/admin/estoque" component={AdminInventory} />
         <Route path="/admin/virada-mes" component={AdminMonthTurnover} />

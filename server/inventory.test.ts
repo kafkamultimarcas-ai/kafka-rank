@@ -76,11 +76,19 @@ describe("Inventory Router", () => {
     const { inventoryRouter } = await import("./routers/inventoryRouter");
     const procedures = Object.keys(inventoryRouter._def.procedures);
     expect(procedures).toContain("list");
+    expect(procedures).toContain("adminList");
     expect(procedures).toContain("getById");
+    expect(procedures).toContain("getAdminById");
     expect(procedures).toContain("brands");
     expect(procedures).toContain("stats");
+    expect(procedures).toContain("adminMetrics");
+    expect(procedures).toContain("validateDuplicate");
+    expect(procedures).toContain("auditLogs");
     expect(procedures).toContain("sync");
     expect(procedures).toContain("syncLogs");
+    expect(procedures).toContain("createDetailed");
+    expect(procedures).toContain("updateDetailed");
+    expect(procedures).toContain("delete");
     expect(procedures).toContain("reserve");
     expect(procedures).toContain("markSold");
     expect(procedures).toContain("markAvailable");
@@ -154,12 +162,25 @@ describe("Inventory Multi-Tenant Isolation (static checks)", () => {
   });
 
   it("every inventoryRouter procedure should reference getCurrentTenantId() at least once", () => {
-    const names = ["list", "getById", "brands", "stats", "sync", "syncLogs", "reserve", "markSold", "markAvailable"];
+    const names = ["list", "adminList", "getById", "getAdminById", "brands", "stats", "adminMetrics", "validateDuplicate", "auditLogs", "sync", "syncLogs", "createDetailed", "updateDetailed", "delete", "reserve", "markSold", "markAvailable"];
     for (const name of names) {
       expect(routerSrc, `procedure "${name}" missing`).toContain(`  ${name}:`);
     }
     const occurrences = (routerSrc.match(/getCurrentTenantId\(\)/g) || []).length;
     expect(occurrences).toBeGreaterThanOrEqual(names.length);
+  });
+
+  it("inventory schema should support manual registration metadata for full CRUD", () => {
+    expect(schemaSrc).toContain('sourceType');
+    expect(schemaSrc).toContain('isPublished');
+    expect(schemaSrc).toContain('isFeatured');
+    expect(schemaSrc).toContain('purchasePrice');
+    expect(schemaSrc).toContain('entryDate');
+    expect(schemaSrc).toContain('videoUrl');
+    expect(schemaSrc).toContain('deletedAt');
+    expect(schemaSrc).toContain('deletedBy');
+    expect(schemaSrc).toContain('deletedReason');
+    expect(schemaSrc).toContain('inventoryAuditLogs');
   });
 });
 

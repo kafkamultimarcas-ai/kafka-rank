@@ -1259,17 +1259,33 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   externalId: varchar("externalId", { length: 20 }).notNull(), // ID do veículo no site externo
   brand: varchar("brand", { length: 100 }).notNull(), // Volkswagen, Ford, etc.
   model: varchar("model", { length: 100 }).notNull(), // Saveiro, Ranger, etc.
+  title: varchar("title", { length: 255 }), // título comercial customizado
+  internalCode: varchar("internalCode", { length: 100 }), // código interno do estoque
+  sourceType: varchar("sourceType", { length: 30 }).default("sync").notNull(), // sync, manual, integration
   version: varchar("version", { length: 255 }), // ROBUST TOTAL FLEX, XLS 4X4, etc.
   motor: varchar("motor", { length: 50 }), // 1.6, 2.0, etc.
   year: int("year"), // 2025
+  manufactureYear: int("manufactureYear"), // ano fabricação
+  modelYear: int("modelYear"), // ano modelo
+  chassis: varchar("chassis", { length: 50 }),
+  renavam: varchar("renavam", { length: 50 }),
   color: varchar("color", { length: 50 }), // Branco, Prata, etc.
   fuel: varchar("fuel", { length: 50 }), // Flex, Diesel, Gasolina
   km: int("km").default(0), // quilometragem
   price: int("price").default(0), // preço em reais inteiros
+  purchasePrice: int("purchasePrice").default(0), // custo de compra
+  preparationCost: int("preparationCost").default(0), // custo de preparação
+  documentationCost: int("documentationCost").default(0), // custo documental
+  transportCost: int("transportCost").default(0), // custo transporte
+  otherCosts: int("otherCosts").default(0), // outras despesas
+  minimumSalePrice: int("minimumSalePrice").default(0), // valor mínimo de venda
   photoUrl: text("photoUrl"), // URL da foto principal
   photos: text("photos"), // JSON array de URLs de fotos
   optionals: text("optionals"), // JSON array de opcionais
+  highlightItems: text("highlightItems"), // JSON array de destaques
+  internalTags: text("internalTags"), // JSON array de tags internas
   externalUrl: text("externalUrl"), // link para o veículo no site original
+  videoUrl: text("videoUrl"), // vídeo opcional
   slug: varchar("slug", { length: 500 }), // slug da URL original
   bodyType: varchar("bodyType", { length: 50 }), // Hatch, Sedan, SUV, Picape, etc.
   transmission: varchar("transmission", { length: 50 }), // Manual, Automático
@@ -1280,10 +1296,20 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   vehicleState: varchar("vehicleState", { length: 20 }), // novo, usado
   category: varchar("category", { length: 50 }), // Carro/Camionetas, Moto
   observation: text("observation"), // observações do veículo
+  internalNotes: text("internalNotes"), // observações internas da loja
+  storeLocation: varchar("storeLocation", { length: 120 }), // unidade física
+  entryDate: bigint("entryDate", { mode: "number" }), // data de entrada no estoque
+  isPublished: boolean("isPublished").default(true).notNull(), // aparece no estoque público
+  isFeatured: boolean("isFeatured").default(false).notNull(), // destaque interno/comercial
+  acceptsTradeIn: boolean("acceptsTradeIn").default(false).notNull(),
+  isArmored: boolean("isArmored").default(false).notNull(),
   status: mysqlEnum("inventory_status", ["available", "reserved", "sold"]).default("available").notNull(),
   soldBySellerId: int("soldBySellerId"), // vendedor que vendeu (quando status = sold)
   soldAt: bigint("soldAt", { mode: "number" }), // data da venda
   lastSyncedAt: bigint("lastSyncedAt", { mode: "number" }), // última sincronização
+  deletedAt: bigint("deletedAt", { mode: "number" }), // soft delete
+  deletedBy: int("deletedBy"), // usuário que removeu
+  deletedReason: text("deletedReason"), // motivo da remoção
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
@@ -1293,6 +1319,24 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
 }));
 export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
 export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
+
+export const inventoryAuditLogs = mysqlTable("inventory_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  inventoryId: int("inventoryId").notNull(),
+  action: varchar("action", { length: 40 }).notNull(), // created, updated, status_changed, soft_deleted, restored
+  actorId: int("actorId"),
+  actorName: varchar("actorName", { length: 255 }),
+  summary: varchar("summary", { length: 500 }).notNull(),
+  changedFields: text("changedFields"), // JSON array
+  metadata: text("metadata"), // JSON extra
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+}, (table) => ({
+  tenantIdx: index("idx_inventory_audit_logs_tenant").on(table.tenantId),
+  inventoryIdx: index("idx_inventory_audit_logs_inventory").on(table.inventoryId),
+}));
+export type InventoryAuditLog = typeof inventoryAuditLogs.$inferSelect;
+export type InsertInventoryAuditLog = typeof inventoryAuditLogs.$inferInsert;
 
 // Log de sincronização do estoque
 export const inventorySyncLogs = mysqlTable("inventory_sync_logs", {
