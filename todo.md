@@ -2435,3 +2435,5 @@
 - [x] Criar endpoint GET /api/webhooks/facebook (verificação Meta)
 - [x] Criar endpoint POST /api/webhooks/facebook (receber mensagens/leads)
 - [x] Corrigir TS error sellerId em createLead do Facebook webhook
+- [x] Corrigir testMetaConnection para aceitar tokens Instagram (IGAA...) além de Facebook (EAA...)
+- [x] Corrigir syncMeta para aceitar tokens Instagram (IGAA...) além de Facebook (EAA...)

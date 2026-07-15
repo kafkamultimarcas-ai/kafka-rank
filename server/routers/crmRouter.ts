@@ -700,10 +700,18 @@ export const crmIntegrationsRouter = router({
     try {
       const config = JSON.parse(integration.config);
       if (!config.pageAccessToken) return { success: false, error: "Page Access Token não configurado" };
-      // Test by calling /me endpoint
-      const resp = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${config.pageAccessToken}`);
+      const token = config.pageAccessToken;
+      // Detect if it's an Instagram token (starts with IGAA) or Facebook Page token (starts with EAA)
+      const isInstagramToken = token.startsWith("IGAA");
+      const apiUrl = isInstagramToken
+        ? `https://graph.instagram.com/me?fields=id,username&access_token=${token}`
+        : `https://graph.facebook.com/v21.0/me?access_token=${token}`;
+      const resp = await fetch(apiUrl);
       const data = await resp.json() as any;
       if (data.error) return { success: false, error: data.error.message };
+      if (isInstagramToken) {
+        return { success: true, pageName: data.username || "Instagram conectado", pageId: data.id };
+      }
       return { success: true, pageName: data.name, pageId: data.id };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -844,9 +852,14 @@ export const crmIntegrationsRouter = router({
       let pageName = "";
       if (hasToken) {
         try {
-          const resp = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${config.pageAccessToken}`);
+          const token = config.pageAccessToken;
+          const isIgToken = token.startsWith("IGAA");
+          const apiUrl = isIgToken
+            ? `https://graph.instagram.com/me?fields=id,username&access_token=${token}`
+            : `https://graph.facebook.com/v21.0/me?access_token=${token}`;
+          const resp = await fetch(apiUrl);
           const data = await resp.json() as any;
-          if (!data.error) pageName = data.name || "";
+          if (!data.error) pageName = isIgToken ? (data.username || "Instagram") : (data.name || "");
         } catch {}
       }
       const [leadsResult] = await dbConn.execute(sqlTag`SELECT COUNT(*) as cnt FROM crm_leads WHERE tenantId = ${tenantId} AND source IN ('facebook','instagram','meta') AND createdAt > DATE_SUB(NOW(), INTERVAL 7 DAY)`) as any;
