@@ -173,7 +173,15 @@ async function startServer() {
   app.use("/api/trpc/sellers.uploadPhoto", uploadLimiter);
 
   // Configure body parser with size limit for file uploads (reduzido de 50mb para 16mb)
-  app.use(express.json({ limit: "16mb" }));
+  // Preserve raw body for webhook signature verification (Meta/Facebook/Instagram)
+  app.use(express.json({
+    limit: "16mb",
+    verify: (req: any, _res, buf) => {
+      if (req.url?.includes("/api/webhooks/")) {
+        req.rawBody = buf.toString("utf8");
+      }
+    }
+  }));
   app.use(express.urlencoded({ limit: "16mb", extended: true }));
 
   // Rota de proxy para download direto de imagem (salvar na galeria do celular)

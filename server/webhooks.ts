@@ -654,6 +654,7 @@ export function registerWebhookRoutes(app: Express) {
   // Receive leads from Meta Lead Ads
   app.post("/api/webhooks/meta/leadgen", async (req: Request, res: Response) => {
     const tenantId = await resolveTenantFromQuerySlug(req);
+    console.log(`[Meta Leadgen Webhook] POST received, tenantId=${tenantId}, object=${req.body?.object}, entries=${req.body?.entry?.length || 0}`);
     await withTenantAsync(tenantId, async () => {
     try {
       const body = req.body;
@@ -679,8 +680,8 @@ export function registerWebhookRoutes(app: Express) {
       // Verify X-Hub-Signature-256 if appSecret is configured
       if (appSecret) {
         const signature = req.headers["x-hub-signature-256"] as string;
-        const rawBody = JSON.stringify(body);
-        if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+        const rawBody = (req as any).rawBody || JSON.stringify(body);
+        if (signature && !verifyMetaSignature(rawBody, signature, appSecret)) {
           console.error("Meta webhook signature verification failed");
           res.status(403).json({ error: "Invalid signature" });
           return;
@@ -863,6 +864,7 @@ export function registerWebhookRoutes(app: Express) {
   });
   app.post("/api/webhooks/instagram", async (req: Request, res: Response) => {
     const tenantId = await resolveTenantFromQuerySlug(req);
+    console.log(`[Instagram Webhook] POST received, tenantId=${tenantId}, object=${req.body?.object}, entries=${req.body?.entry?.length || 0}`);
     await withTenantAsync(tenantId, async () => {
       try {
         const body = req.body;
@@ -883,8 +885,8 @@ export function registerWebhookRoutes(app: Express) {
         // Verify signature if appSecret is configured
         if (appSecret) {
           const signature = req.headers["x-hub-signature-256"] as string;
-          const rawBody = JSON.stringify(body);
-          if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+          const rawBody = (req as any).rawBody || JSON.stringify(body);
+          if (signature && !verifyMetaSignature(rawBody, signature, appSecret)) {
             console.error("[Instagram Webhook] Signature verification failed");
             res.status(403).json({ error: "Invalid signature" });
             return;
@@ -892,14 +894,18 @@ export function registerWebhookRoutes(app: Express) {
         }
         // Instagram DM: { object: "instagram", entry: [{ messaging: [...] }] }
         if (body.object === "instagram" && body.entry) {
+          console.log(`[Instagram Webhook] Processing ${body.entry.length} entries`);
           for (const entry of body.entry) {
             if (Array.isArray(entry.messaging)) {
+              console.log(`[Instagram Webhook] Found ${entry.messaging.length} messaging events`);
               for (const messagingEvent of entry.messaging) {
+                console.log(`[Instagram Webhook] DM event: sender=${messagingEvent?.sender?.id}, text=${messagingEvent?.message?.text?.substring(0, 50) || "[media]"}`);
                 await handleMetaMessagingEvent(messagingEvent, "instagram");
               }
             }
             // Comments
             if (Array.isArray(entry.changes)) {
+              console.log(`[Instagram Webhook] Found ${entry.changes.length} changes`);
               for (const change of entry.changes) {
                 if (change.field === "comments") {
                   await handleMetaCommentEvent(change.value, "instagram", commentTriggerWords);
@@ -907,10 +913,12 @@ export function registerWebhookRoutes(app: Express) {
               }
             }
           }
+        } else {
+          console.log(`[Instagram Webhook] Unhandled object type: ${body.object}, body keys: ${Object.keys(body).join(",")}`);
         }
         res.status(200).json({ success: true });
       } catch (err: any) {
-        console.error("[Instagram Webhook] Error:", err.message);
+        console.error("[Instagram Webhook] Error:", err.message, err.stack);
         res.status(200).json({ success: false, error: err.message });
       }
     });
@@ -964,8 +972,8 @@ export function registerWebhookRoutes(app: Express) {
         // Verify signature
         if (appSecret) {
           const signature = req.headers["x-hub-signature-256"] as string;
-          const rawBody = JSON.stringify(body);
-          if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+          const rawBody = (req as any).rawBody || JSON.stringify(body);
+          if (signature && !verifyMetaSignature(rawBody, signature, appSecret)) {
             console.error("[Facebook Webhook] Signature verification failed");
             res.status(403).json({ error: "Invalid signature" });
             return;

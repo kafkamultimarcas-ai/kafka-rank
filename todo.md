@@ -2437,3 +2437,7 @@
 - [x] Corrigir TS error sellerId em createLead do Facebook webhook
 - [x] Corrigir testMetaConnection para aceitar tokens Instagram (IGAA...) além de Facebook (EAA...)
 - [x] Corrigir syncMeta para aceitar tokens Instagram (IGAA...) além de Facebook (EAA...)
+- [x] Corrigir verificação de assinatura webhook Instagram (usar rawBody em vez de JSON.stringify)
+- [x] Adicionar dmEnabled: true na config do banco para tenant kafka-multimarcas
+- [x] Preservar raw body no express.json para webhooks (signature verification)
+- [x] Adicionar logs detalhados no webhook Instagram para diagnóstico
