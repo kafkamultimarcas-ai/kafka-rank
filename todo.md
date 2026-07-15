@@ -2428,3 +2428,10 @@
 - [x] Instance ID corrigido no banco (era URL completa, agora é só o ID)
 - [x] Client Token atualizado para o novo valor
 - [x] Cache de credenciais limpo ao salvar novas credenciais
+
+## Integração Instagram/Facebook Webhook
+- [x] Criar endpoint GET /api/webhooks/instagram (verificação Meta)
+- [x] Criar endpoint POST /api/webhooks/instagram (receber mensagens/comentários)
+- [x] Criar endpoint GET /api/webhooks/facebook (verificação Meta)
+- [x] Criar endpoint POST /api/webhooks/facebook (receber mensagens/leads)
+- [x] Corrigir TS error sellerId em createLead do Facebook webhook

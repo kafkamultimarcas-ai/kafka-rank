@@ -837,6 +837,197 @@ export function registerWebhookRoutes(app: Express) {
     });
   });
 
+  // ===== INSTAGRAM WEBHOOK (unified GET verify + POST messages) =====
+  app.get("/api/webhooks/instagram", async (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"] as string;
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && token) {
+      const tenantId = await resolveTenantFromQuerySlug(req);
+      const metaIntegration = await withTenantAsync(tenantId, () => crmDb.getIntegrationByType("facebook"));
+      if (metaIntegration?.config) {
+        try {
+          const config = JSON.parse(metaIntegration.config);
+          if (config.verifyToken && config.verifyToken !== token) {
+            console.error("[Instagram Webhook] verify_token mismatch");
+            res.status(403).json({ error: "Verification failed: token mismatch" });
+            return;
+          }
+        } catch { /* config parse error, allow */ }
+      }
+      console.log("[Instagram Webhook] Verified successfully");
+      res.status(200).send(challenge);
+    } else {
+      res.status(403).json({ error: "Verification failed" });
+    }
+  });
+  app.post("/api/webhooks/instagram", async (req: Request, res: Response) => {
+    const tenantId = await resolveTenantFromQuerySlug(req);
+    await withTenantAsync(tenantId, async () => {
+      try {
+        const body = req.body;
+        const metaIntegration = await crmDb.getIntegrationByType("facebook");
+        let appSecret = "";
+        let dmEnabled = false;
+        let commentTriggerWords = DEFAULT_COMMENT_TRIGGER_WORDS;
+        if (metaIntegration?.config) {
+          try {
+            const config = JSON.parse(metaIntegration.config);
+            appSecret = config.appSecret || "";
+            dmEnabled = !!config.dmEnabled;
+            if (Array.isArray(config.commentTriggerWords) && config.commentTriggerWords.length > 0) {
+              commentTriggerWords = config.commentTriggerWords;
+            }
+          } catch { /* ignore parse error */ }
+        }
+        // Verify signature if appSecret is configured
+        if (appSecret) {
+          const signature = req.headers["x-hub-signature-256"] as string;
+          const rawBody = JSON.stringify(body);
+          if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+            console.error("[Instagram Webhook] Signature verification failed");
+            res.status(403).json({ error: "Invalid signature" });
+            return;
+          }
+        }
+        // Instagram DM: { object: "instagram", entry: [{ messaging: [...] }] }
+        if (body.object === "instagram" && body.entry) {
+          for (const entry of body.entry) {
+            if (Array.isArray(entry.messaging)) {
+              for (const messagingEvent of entry.messaging) {
+                await handleMetaMessagingEvent(messagingEvent, "instagram");
+              }
+            }
+            // Comments
+            if (Array.isArray(entry.changes)) {
+              for (const change of entry.changes) {
+                if (change.field === "comments") {
+                  await handleMetaCommentEvent(change.value, "instagram", commentTriggerWords);
+                }
+              }
+            }
+          }
+        }
+        res.status(200).json({ success: true });
+      } catch (err: any) {
+        console.error("[Instagram Webhook] Error:", err.message);
+        res.status(200).json({ success: false, error: err.message });
+      }
+    });
+  });
+
+  // ===== FACEBOOK WEBHOOK (unified GET verify + POST messages) =====
+  app.get("/api/webhooks/facebook", async (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"] as string;
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && token) {
+      const tenantId = await resolveTenantFromQuerySlug(req);
+      const metaIntegration = await withTenantAsync(tenantId, () => crmDb.getIntegrationByType("facebook"));
+      if (metaIntegration?.config) {
+        try {
+          const config = JSON.parse(metaIntegration.config);
+          if (config.verifyToken && config.verifyToken !== token) {
+            console.error("[Facebook Webhook] verify_token mismatch");
+            res.status(403).json({ error: "Verification failed: token mismatch" });
+            return;
+          }
+        } catch { /* config parse error, allow */ }
+      }
+      console.log("[Facebook Webhook] Verified successfully");
+      res.status(200).send(challenge);
+    } else {
+      res.status(403).json({ error: "Verification failed" });
+    }
+  });
+  app.post("/api/webhooks/facebook", async (req: Request, res: Response) => {
+    const tenantId = await resolveTenantFromQuerySlug(req);
+    await withTenantAsync(tenantId, async () => {
+      try {
+        const body = req.body;
+        const metaIntegration = await crmDb.getIntegrationByType("facebook");
+        let appSecret = "";
+        let pageAccessToken = "";
+        let dmEnabled = false;
+        let commentTriggerWords = DEFAULT_COMMENT_TRIGGER_WORDS;
+        if (metaIntegration?.config) {
+          try {
+            const config = JSON.parse(metaIntegration.config);
+            appSecret = config.appSecret || "";
+            pageAccessToken = config.pageAccessToken || "";
+            dmEnabled = !!config.dmEnabled;
+            if (Array.isArray(config.commentTriggerWords) && config.commentTriggerWords.length > 0) {
+              commentTriggerWords = config.commentTriggerWords;
+            }
+          } catch { /* ignore parse error */ }
+        }
+        // Verify signature
+        if (appSecret) {
+          const signature = req.headers["x-hub-signature-256"] as string;
+          const rawBody = JSON.stringify(body);
+          if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+            console.error("[Facebook Webhook] Signature verification failed");
+            res.status(403).json({ error: "Invalid signature" });
+            return;
+          }
+        }
+        // Messenger DM: { object: "page", entry: [{ messaging: [...] }] }
+        if (body.object === "page" && body.entry) {
+          for (const entry of body.entry) {
+            if (Array.isArray(entry.messaging)) {
+              for (const messagingEvent of entry.messaging) {
+                await handleMetaMessagingEvent(messagingEvent, "messenger");
+              }
+            }
+            // Lead Ads
+            if (entry.changes) {
+              for (const change of entry.changes) {
+                if (change.field === "leadgen" && pageAccessToken) {
+                  const leadData = change.value;
+                  const leadgenId = leadData.leadgen_id?.toString();
+                  if (leadgenId) {
+                    const url = `https://graph.facebook.com/v21.0/${leadgenId}?access_token=${pageAccessToken}`;
+                    try {
+                      const fbResp = await fetch(url);
+                      const fbData = await fbResp.json() as any;
+                      if (fbData.field_data) {
+                        let leadName = "";
+                        let leadPhone = "";
+                        let leadEmail = "";
+                        for (const field of fbData.field_data) {
+                          const val = Array.isArray(field.values) ? field.values[0] : "";
+                          if (field.name === "full_name" || field.name === "nome") leadName = val;
+                          if (field.name === "phone_number" || field.name === "telefone") leadPhone = val;
+                          if (field.name === "email") leadEmail = val;
+                        }
+                        if (leadPhone || leadName) {
+                          await crmDb.createLead({
+                            name: leadName || "Lead Facebook",
+                            phone: leadPhone || "",
+                            email: leadEmail || null,
+                            source: "facebook_ads",
+                            sellerId: 0,
+                            notes: `Lead via Facebook Lead Ads (ID: ${leadgenId})`,
+                          });
+                        }
+                      }
+                    } catch (e: any) {
+                      console.error("[Facebook Webhook] Error fetching lead:", e.message);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        res.status(200).json({ success: true });
+      } catch (err: any) {
+        console.error("[Facebook Webhook] Error:", err.message);
+        res.status(200).json({ success: false, error: err.message });
+      }
+    });
+  });
+
   // ===== GOOGLE ADS LEAD FORM =====
   app.post("/api/webhooks/google/lead", async (req: Request, res: Response) => {
     const tenantId = await resolveTenantFromQuerySlug(req);
