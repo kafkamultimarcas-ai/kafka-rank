@@ -1,46 +1,31 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
 
-describe("Z-API credentials", () => {
-  it("should have ZAPI_INSTANCE_ID configured", () => {
-    const instanceId = process.env.ZAPI_INSTANCE_ID;
-    expect(instanceId).toBeDefined();
-    expect(instanceId).not.toBe("");
-    expect(instanceId!.length).toBeGreaterThan(10);
+/**
+ * Z-API credentials are now per-tenant (multi-tenant).
+ * Global ENV vars (ZAPI_INSTANCE_ID, ZAPI_TOKEN, ZAPI_CLIENT_TOKEN) are NOT used anymore.
+ * Each loja configures suas próprias credenciais na tela de Integrações.
+ */
+describe("Z-API - credenciais per-tenant (sem ENV global)", () => {
+  it("zapi-service não importa mais ENV para credenciais", () => {
+    const zapiServicePath = path.resolve(__dirname, "./zapi-service.ts");
+    const zapiServiceCode = fs.readFileSync(zapiServicePath, "utf-8");
+    // Não deve ter import de ENV no topo
+    expect(zapiServiceCode).not.toContain('import { ENV } from');
+    // Não deve referenciar ENV.zapiInstanceId, ENV.zapiToken, etc
+    expect(zapiServiceCode).not.toContain('ENV.zapiInstanceId');
+    expect(zapiServiceCode).not.toContain('ENV.zapiToken');
+    expect(zapiServiceCode).not.toContain('ENV.zapiClientToken');
   });
 
-  it("should have ZAPI_TOKEN configured", () => {
-    const token = process.env.ZAPI_TOKEN;
-    expect(token).toBeDefined();
-    expect(token).not.toBe("");
-    expect(token!.length).toBeGreaterThan(10);
-  });
-
-  it("should have ZAPI_CLIENT_TOKEN configured", () => {
-    const clientToken = process.env.ZAPI_CLIENT_TOKEN;
-    expect(clientToken).toBeDefined();
-    expect(clientToken).not.toBe("");
-    expect(clientToken!.length).toBeGreaterThan(10);
-  });
-
-  it("should be able to connect to Z-API and verify instance is connected", async () => {
-    const instanceId = process.env.ZAPI_INSTANCE_ID;
-    const token = process.env.ZAPI_TOKEN;
-    const clientToken = process.env.ZAPI_CLIENT_TOKEN;
-    const apiUrl = process.env.ZAPI_API_URL || "https://api.z-api.io";
-
-    const response = await fetch(
-      `${apiUrl}/instances/${instanceId}/token/${token}/status`,
-      {
-        method: "GET",
-        headers: {
-          "Client-Token": clientToken!,
-        },
-      }
-    );
-
-    expect(response.ok).toBe(true);
-    const data = await response.json();
-    expect(data.connected).toBe(true);
-    console.log("Z-API status:", JSON.stringify(data));
+  it("getTenantCredentials busca credenciais do banco de dados", () => {
+    const zapiServicePath = path.resolve(__dirname, "./zapi-service.ts");
+    const zapiServiceCode = fs.readFileSync(zapiServicePath, "utf-8");
+    // Deve ter lógica de busca no banco
+    expect(zapiServiceCode).toContain('getDb');
+    expect(zapiServiceCode).toContain('tenants.zapiInstanceId');
+    expect(zapiServiceCode).toContain('tenants.zapiToken');
+    expect(zapiServiceCode).toContain('tenants.zapiClientToken');
   });
 });

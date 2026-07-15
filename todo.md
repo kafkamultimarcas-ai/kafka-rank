@@ -2413,3 +2413,18 @@
 ## Confirmação de Sucesso e Loading no Botão de Assinatura
 - [x] Tela de confirmação de sucesso com detalhes do plano após aprovação do pagamento
 - [x] Feedback visual de carregamento no botão de assinatura durante processamento
+
+## Melhorias Tela de Sucesso Pagamento
+- [ ] Efeito de confete/celebração animado na tela de sucesso
+- [ ] Exibir data da próxima cobrança e botão para baixar recibo do pagamento
+- [ ] Redirecionamento automático para o painel após 5 segundos com contador regressivo
+
+## Correções Z-API Multi-Tenant (Jul 2026)
+- [x] Remover fallback global de credenciais Z-API (ENV vars)
+- [x] zapi-service.ts agora busca credenciais SEMPRE do banco por tenant
+- [x] Formulário de Integrações aceita URL completa ou apenas Instance ID
+- [x] Campaign-dispatch agora passa tenantId para usar credenciais corretas
+- [x] Testes atualizados para validar arquitetura per-tenant
+- [x] Instance ID corrigido no banco (era URL completa, agora é só o ID)
+- [x] Client Token atualizado para o novo valor
+- [x] Cache de credenciais limpo ao salvar novas credenciais

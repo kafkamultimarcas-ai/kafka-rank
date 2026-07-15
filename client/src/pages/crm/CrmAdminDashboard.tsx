@@ -2561,8 +2561,8 @@ function WhatsAppZapiPanel() {
               </p>
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground mb-1 block">Instance ID</label>
-              <Input placeholder="Ex: 3C7A1B2D3E4F..." value={zapiForm.zapiInstanceId}
+              <label className="text-[10px] text-muted-foreground mb-1 block">Instance ID <span className="text-muted-foreground/60">(ou cole a URL completa da API)</span></label>
+              <Input placeholder="Cole a URL da API ou apenas o ID (ex: 3C7A1B2D3E4F...)" value={zapiForm.zapiInstanceId}
                 onChange={e => setZapiForm({ ...zapiForm, zapiInstanceId: e.target.value })} className="h-9 text-sm font-mono" />
             </div>
             <div>

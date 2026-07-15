@@ -408,11 +408,46 @@ type AssinaturaContentProps = {
   showLogoutButton?: boolean;
 };
 
-function PaymentSuccessScreen({ planName, onDismiss }: { planName: string; onDismiss: () => void }) {
+function PaymentSuccessScreen({ planName, receiptUrl, onDismiss }: { planName: string; receiptUrl?: string | null; onDismiss: () => void }) {
+  const [countdown, setCountdown] = useState(10);
+
+  // Confetti effect on mount
+  useEffect(() => {
+    let mounted = true;
+    import("canvas-confetti").then((mod) => {
+      if (!mounted) return;
+      const confetti = mod.default;
+      // First burst
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      // Second burst after 300ms
+      setTimeout(() => {
+        if (mounted) confetti({ particleCount: 50, spread: 100, origin: { y: 0.5, x: 0.3 } });
+      }, 300);
+      setTimeout(() => {
+        if (mounted) confetti({ particleCount: 50, spread: 100, origin: { y: 0.5, x: 0.7 } });
+      }, 600);
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  // Auto-redirect countdown
+  useEffect(() => {
+    if (countdown <= 0) {
+      onDismiss();
+      return;
+    }
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, onDismiss]);
+
+  // Next billing date (30 days from now)
+  const nextBillingDate = new Date();
+  nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 animate-fade-in">
       <div className="relative mb-6">
-        <div className="w-20 h-20 rounded-full bg-green-500/15 flex items-center justify-center">
+        <div className="w-20 h-20 rounded-full bg-green-500/15 flex items-center justify-center animate-pulse">
           <CheckCircle2 className="w-10 h-10 text-green-500" />
         </div>
         <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
@@ -442,13 +477,33 @@ function PaymentSuccessScreen({ planName, onDismiss }: { planName: string; onDis
             <span className="text-xs text-muted-foreground">Ativado em</span>
             <span className="text-xs text-foreground">{new Date().toLocaleDateString("pt-BR")}</span>
           </div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Próxima cobrança</span>
+            <span className="text-xs text-foreground">{nextBillingDate.toLocaleDateString("pt-BR")}</span>
+          </div>
         </div>
       </div>
 
-      <Button onClick={onDismiss} className="racing-gradient text-white">
+      {receiptUrl && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mb-4"
+          onClick={() => window.open(receiptUrl, "_blank")}
+        >
+          <Download className="w-3.5 h-3.5 mr-1.5" />
+          Baixar recibo do pagamento
+        </Button>
+      )}
+
+      <Button onClick={onDismiss} className="racing-gradient text-white mb-4">
         Ir para o painel
         <ArrowRight className="w-4 h-4 ml-1.5" />
       </Button>
+
+      <p className="text-[11px] text-muted-foreground">
+        Redirecionando automaticamente em <span className="font-bold text-foreground">{countdown}s</span>
+      </p>
     </div>
   );
 }

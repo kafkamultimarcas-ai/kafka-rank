@@ -21,7 +21,7 @@ vi.mock("./db", async () => {
 
 import * as zapi from "./zapi-service";
 
-describe("zapi-service - fallback automático de tenant via ALS", () => {
+describe("zapi-service - credenciais sempre por loja (multi-tenant, sem fallback global)", () => {
   beforeEach(() => {
     zapi.clearCredentialsCache();
   });
@@ -39,16 +39,22 @@ describe("zapi-service - fallback automático de tenant via ALS", () => {
     expect(calls[0]).toContain("tenant2-token");
   });
 
-  it("usa credenciais globais quando não há contexto de tenant explícito (default = 1)", async () => {
+  it("sem ALS explícito, usa tenant padrão (1) e busca credenciais do banco, nunca de ENV", async () => {
     const calls: string[] = [];
     global.fetch = vi.fn(async (url: any) => {
       calls.push(url.toString());
       return { ok: true, json: async () => ({ messageId: "abc" }) } as any;
     }) as any;
 
+    // Sem contexto explícito de ALS, getCurrentTenantId() retorna 1 (default)
+    // O sistema busca credenciais do banco para tenant 1 (não usa ENV global)
     await zapi.sendText("47999999999", "oi");
 
-    expect(calls[0]).not.toContain("tenant2-instance");
+    // O mock retorna fakeTenantRow para qualquer query, então a URL usará essas credenciais
+    // O importante é que NÃO usa variáveis de ambiente globais
+    expect(calls.length).toBeGreaterThan(0);
+    // Confirma que buscou do banco (mock retorna tenant2-instance para qualquer tenant)
+    expect(calls[0]).toContain("tenant2-instance");
   });
 
   it("tenantId explícito continua tendo prioridade sobre o ALS", async () => {

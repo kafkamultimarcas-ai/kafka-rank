@@ -1,4 +1,3 @@
-import { ENV } from "./_core/env";
 import { getDb } from "./db";
 import { tenants } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -19,32 +18,40 @@ const credentialsCache = new Map<number, { creds: ZapiCredentials; expiresAt: nu
 const CACHE_TTL = 5 * 60 * 1000;
 
 /**
- * Get Z-API credentials for a specific tenant, fallback to global ENV.
+ * Get Z-API credentials for a specific tenant from the database.
+ * SEMPRE usa as credenciais configuradas por loja (multi-tenant) na tela de Integrações.
+ * NÃO usa mais variáveis de ambiente globais como fallback.
+ *
  * Quando tenantId não é passado explicitamente, usa o tenant resolvido da request
  * atual (AsyncLocalStorage) — isso cobre automaticamente qualquer chamador que
  * rode dentro de um contexto tRPC ou de um webhook já tenantizado, sem precisar
  * que cada um dos pontos de chamada passe o tenantId manualmente.
  */
 async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials> {
-  // Default global credentials
-  const globalCreds: ZapiCredentials = {
-    instanceId: ENV.zapiInstanceId || "",
-    token: ENV.zapiToken || "",
-    clientToken: ENV.zapiClientToken || "",
-    apiUrl: ENV.zapiApiUrl || "https://api.z-api.io",
+  const emptyCreds: ZapiCredentials = {
+    instanceId: "",
+    token: "",
+    clientToken: "",
+    apiUrl: "https://api.z-api.io",
   };
 
   const effectiveTenantId = tenantId ?? getCurrentTenantId();
-  if (!effectiveTenantId || effectiveTenantId <= 1) return globalCreds;
+  if (!effectiveTenantId) {
+    console.warn("[Z-API] Nenhum tenantId resolvido — credenciais não disponíveis.");
+    return emptyCreds;
+  }
 
   // Check cache
   const cached = credentialsCache.get(effectiveTenantId);
   if (cached && cached.expiresAt > Date.now()) return cached.creds;
 
-  // Fetch from DB
+  // Fetch from DB — cada loja tem suas próprias credenciais Z-API
   try {
     const db = await getDb();
-    if (!db) return globalCreds;
+    if (!db) {
+      console.warn("[Z-API] DB indisponível — credenciais não disponíveis.");
+      return emptyCreds;
+    }
     const [tenant] = await db.select({
       zapiInstanceId: tenants.zapiInstanceId,
       zapiToken: tenants.zapiToken,
@@ -52,8 +59,13 @@ async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials>
     }).from(tenants).where(eq(tenants.id, effectiveTenantId)).limit(1);
 
     if (tenant?.zapiInstanceId && tenant?.zapiToken) {
+      // Handle case where instanceId might be stored as full URL
+      let instanceId = tenant.zapiInstanceId;
+      const urlMatch = instanceId.match(/instances\/([A-F0-9]+)/i);
+      if (urlMatch) instanceId = urlMatch[1];
+
       const creds: ZapiCredentials = {
-        instanceId: tenant.zapiInstanceId,
+        instanceId,
         token: decryptSecret(tenant.zapiToken),
         clientToken: decryptSecret(tenant.zapiClientToken),
         apiUrl: "https://api.z-api.io",
@@ -61,11 +73,13 @@ async function getTenantCredentials(tenantId?: number): Promise<ZapiCredentials>
       credentialsCache.set(effectiveTenantId, { creds, expiresAt: Date.now() + CACHE_TTL });
       return creds;
     }
-  } catch (err) {
-    console.warn("[Z-API] Failed to fetch tenant credentials, using global:", err);
-  }
 
-  return globalCreds;
+    console.warn(`[Z-API] Tenant ${effectiveTenantId} não tem credenciais Z-API configuradas.`);
+    return emptyCreds;
+  } catch (err) {
+    console.warn("[Z-API] Falha ao buscar credenciais do tenant:", err);
+    return emptyCreds;
+  }
 }
 
 function makeBase(creds: ZapiCredentials): string {

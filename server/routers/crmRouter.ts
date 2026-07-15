@@ -10,9 +10,11 @@ import { storagePut } from "../storage";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 import * as zapi from "../zapi-service";
+import { clearCredentialsCache as clearZapiCredentialsCache } from "../zapi-service";
 import { sellers } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getCurrentTenantId } from "../tenantDb";
+import { encryptSecret, decryptSecret } from "../_core/secretCrypto";
 import { getTenantLimits } from "../tenantService";
 
 // ===== HELPER: Notify seller via WhatsApp when they receive a new lead =====
@@ -1139,6 +1141,7 @@ export const crmCampaignsRouter = router({
         maxPerDay: campaign.antiBanMaxPerDay || 80,
         startHour: campaign.antiBanStartHour || 8,
         endHour: campaign.antiBanEndHour || 20,
+        tenantId: getCurrentTenantId(),
       },
       recipients.map((r: any) => ({ id: r.id, phone: r.phone, name: r.name, leadId: r.leadId })),
       dbConn,
@@ -2456,9 +2459,32 @@ export const crmPerformanceRouter = router({
     for (const [k, v] of Object.entries(input)) {
       if (v !== undefined && v !== '') cleanUpdates[k] = v;
     }
+
+    // Parse Z-API URL: if user pastes the full API URL, extract instanceId and token
+    if (cleanUpdates.zapiInstanceId) {
+      const urlMatch = cleanUpdates.zapiInstanceId.match(/instances\/([A-F0-9]+)\/token\/([A-F0-9]+)/i);
+      if (urlMatch) {
+        cleanUpdates.zapiInstanceId = urlMatch[1];
+        // If token wasn't explicitly provided, extract from URL
+        if (!cleanUpdates.zapiToken) {
+          cleanUpdates.zapiToken = urlMatch[2];
+        }
+      }
+    }
+
+    // Encrypt sensitive tokens before storing
+    if (cleanUpdates.zapiToken) cleanUpdates.zapiToken = encryptSecret(cleanUpdates.zapiToken);
+    if (cleanUpdates.zapiClientToken) cleanUpdates.zapiClientToken = encryptSecret(cleanUpdates.zapiClientToken);
+
     if (Object.keys(cleanUpdates).length > 0) {
       await dbConn.update(tenants).set(cleanUpdates).where(eq(tenants.id, tenantId));
     }
+
+    // Clear Z-API credentials cache so new values take effect immediately
+    if (cleanUpdates.zapiInstanceId || cleanUpdates.zapiToken || cleanUpdates.zapiClientToken) {
+      clearZapiCredentialsCache(tenantId);
+    }
+
     return { success: true };
   }),
 
@@ -2477,9 +2503,15 @@ export const crmPerformanceRouter = router({
       return { success: false, error: "Credenciais Z-API não configuradas" };
     }
     try {
-      const url = `https://api.z-api.io/instances/${t.zapiInstanceId}/token/${t.zapiToken}/status`;
+      const token = decryptSecret(t.zapiToken);
+      const clientToken = decryptSecret(t.zapiClientToken);
+      // Handle case where instanceId might be a full URL
+      let instanceId = t.zapiInstanceId;
+      const urlMatch = instanceId.match(/instances\/([A-F0-9]+)/i);
+      if (urlMatch) instanceId = urlMatch[1];
+      const url = `https://api.z-api.io/instances/${instanceId}/token/${token}/status`;
       const resp = await fetch(url, {
-        headers: { 'Client-Token': t.zapiClientToken },
+        headers: { 'Client-Token': clientToken },
       });
       const data = await resp.json() as any;
       if (data.connected || data.smartphoneConnected) {

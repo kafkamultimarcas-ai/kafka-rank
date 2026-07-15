@@ -10,6 +10,7 @@
 
 import * as zapi from "./zapi-service";
 import { sql } from "drizzle-orm";
+import { withTenantAsync } from "./tenantDb";
 
 interface CampaignConfig {
   campaignId: number;
@@ -21,6 +22,7 @@ interface CampaignConfig {
   maxPerDay: number;
   startHour: number; // 0-23
   endHour: number; // 0-23
+  tenantId: number; // ID da loja para usar credenciais Z-API corretas
 }
 
 interface Recipient {
@@ -124,6 +126,8 @@ export async function startCampaignDispatch(
   dbConn: any,
   onProgress?: (sent: number, total: number, current: string, success: boolean) => void
 ): Promise<{ sent: number; failed: number; cancelled: boolean }> {
+  // Wrap entire dispatch in tenant context so all Z-API calls use per-store credentials
+  return withTenantAsync(config.tenantId, async () => {
   const state = { cancelled: false };
   activeDispatches.set(config.campaignId, state);
 
@@ -227,4 +231,5 @@ export async function startCampaignDispatch(
   }
 
   return { sent, failed, cancelled: state.cancelled };
+  }); // end withTenantAsync
 }
