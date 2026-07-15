@@ -740,7 +740,7 @@ export const crmIntegrationsRouter = router({
       const connected = statusResult.connected;
       const phone = "";
       const { sql: sqlTag } = await import("drizzle-orm");
-      const [convResult] = await dbConn.execute(sqlTag`SELECT COUNT(*) as cnt FROM crm_conversations WHERE tenantId = ${tenantId} AND updatedAt > DATE_SUB(NOW(), INTERVAL 24 HOUR)`) as any;
+      const [convResult] = await dbConn.execute(sqlTag`SELECT COUNT(DISTINCT leadId) as cnt FROM crm_messages WHERE tenantId = ${tenantId} AND createdAt > DATE_SUB(NOW(), INTERVAL 24 HOUR)`) as any;
       const conversations24h = convResult?.[0]?.cnt || 0;
       const duration = Date.now() - start;
       const summary = connected
