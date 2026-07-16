@@ -880,6 +880,7 @@ export function registerWebhookRoutes(app: Express) {
     // Handle OAuth callback from Instagram Business Login
     if (oauthCode) {
       console.log("[Instagram OAuth] Received authorization code, exchanging for token...");
+      console.log("[Instagram OAuth] Code length:", oauthCode.length, "Code starts:", oauthCode.substring(0, 20));
       try {
         // Find the facebook integration config to get appSecret
         const tenantId = await resolveTenantFromQuerySlug(req) || 1;
@@ -895,22 +896,50 @@ export function registerWebhookRoutes(app: Express) {
           res.status(500).json({ error: "appSecret not configured" });
           return;
         }
+        // CRITICAL: redirect_uri must EXACTLY match what was used in the authorize URL
+        // AND what is registered in Meta App Dashboard > Business login settings > OAuth redirect URIs
         const redirectUri = "https://kafkarank.com/api/webhooks/instagram";
         
-        // Step 1: Exchange code for short-lived token
+        console.log("[Instagram OAuth] Exchange params:", JSON.stringify({ client_id: clientId, redirect_uri: redirectUri, code_length: oauthCode.length }));
+        
+        // Step 1: Exchange code for short-lived token using multipart/form-data (as per Meta docs)
+        const formData = new URLSearchParams();
+        formData.append("client_id", clientId);
+        formData.append("client_secret", clientSecret);
+        formData.append("grant_type", "authorization_code");
+        formData.append("redirect_uri", redirectUri);
+        formData.append("code", oauthCode);
+        
         const tokenResp = await fetch("https://api.instagram.com/oauth/access_token", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            grant_type: "authorization_code",
-            redirect_uri: redirectUri,
-            code: oauthCode,
-          }).toString(),
+          body: formData.toString(),
         });
         const tokenData = await tokenResp.json() as any;
         console.log("[Instagram OAuth] Short-lived token response:", JSON.stringify(tokenData));
+        
+        // If redirect_uri mismatch, try with trailing slash
+        if (tokenData.error_message && tokenData.error_message.includes("redirect_uri")) {
+          console.log("[Instagram OAuth] Retrying with trailing slash...");
+          const formData2 = new URLSearchParams();
+          formData2.append("client_id", clientId);
+          formData2.append("client_secret", clientSecret);
+          formData2.append("grant_type", "authorization_code");
+          formData2.append("redirect_uri", redirectUri + "/");
+          formData2.append("code", oauthCode);
+          
+          const tokenResp2 = await fetch("https://api.instagram.com/oauth/access_token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: formData2.toString(),
+          });
+          const tokenData2 = await tokenResp2.json() as any;
+          console.log("[Instagram OAuth] Retry response (with slash):", JSON.stringify(tokenData2));
+          
+          if (tokenData2.access_token || (tokenData2.data && tokenData2.data[0]?.access_token)) {
+            Object.assign(tokenData, tokenData2);
+          }
+        }
         
         if (tokenData.error_message || tokenData.error) {
           res.status(400).json({ error: "Token exchange failed", details: tokenData.error_message || tokenData.error });
