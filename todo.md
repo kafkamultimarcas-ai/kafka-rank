@@ -2480,3 +2480,7 @@
 - [x] Filtros de data (período) e status na aba Histórico Financeiro do fornecedor
 - [x] Botão de exportação PDF e CSV na aba Histórico Financeiro
 - [x] Combobox de fornecedores cadastrados no campo Fornecedor da tela de contas (Admin e Financeiro)
+
+## Bug Fix - Fornecedores Layout
+- [x] Fornecedores deve exibir o menu do sistema (DashboardLayout) ao ser acessado via rota direta (admin e financeiro)
+- [x] Aba Fornecedores dentro do Financeiro deve renderizar apenas o conteúdo sem layout duplicado

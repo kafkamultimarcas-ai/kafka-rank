@@ -1660,11 +1660,11 @@ function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void;
 
 
 // ===== FORNECEDORES TAB =====
-const LazyFornecedores = lazy(() => import("./Fornecedores"));
+const LazyFornecedoresContent = lazy(() => import("./Fornecedores").then(m => ({ default: m.FornecedoresContent })));
 function FornecedoresTab() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Carregando...</div>}>
-      <LazyFornecedores />
+      <LazyFornecedoresContent />
     </Suspense>
   );
 }

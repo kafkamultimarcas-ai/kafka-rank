@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,7 +98,19 @@ const EMPTY_FORM = {
   notes: "",
 };
 
+export function FornecedoresContent() {
+  return <FornecedoresInner />;
+}
+
 export default function Fornecedores() {
+  return (
+    <DashboardLayout>
+      <FornecedoresInner />
+    </DashboardLayout>
+  );
+}
+
+function FornecedoresInner() {
   // Filters & pagination
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
