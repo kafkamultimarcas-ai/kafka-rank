@@ -2468,3 +2468,9 @@
 - [x] Botão de ações (editar, excluir, detalhes) em cada linha
 - [x] Integrar rota no App.tsx acessível pelo Admin e Financeiro
 - [x] Adicionar link na navegação lateral (Admin + Financeiro)
+
+## Melhorias Fornecedores - Máscaras e Histórico
+- [x] Implementar máscara de formatação automática para CPF (000.000.000-00) e CNPJ (00.000.000/0000-00)
+- [x] Validação real de CPF e CNPJ (algoritmo de dígitos verificadores)
+- [x] Feedback visual de validação (borda verde/vermelha + mensagem de erro)
+- [x] Aba de histórico de pagamentos/notas fiscais vinculadas no modal de detalhes do fornecedor

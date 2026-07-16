@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,47 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "@/components/PaginationControls";
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, User } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, User, Receipt, FileText, CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { isValidCPF, isValidCNPJ } from "@shared/validators";
+
+// ===== CPF/CNPJ MASK & VALIDATION HELPERS =====
+function maskCPF(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function maskCNPJ(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 14);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+}
+
+function maskCpfCnpj(value: string, type: "fisica" | "juridica"): string {
+  return type === "juridica" ? maskCNPJ(value) : maskCPF(value);
+}
+
+function validateCpfCnpj(value: string, type: "fisica" | "juridica"): { valid: boolean; message: string } {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return { valid: true, message: "" }; // empty is ok (not required)
+  if (type === "fisica") {
+    if (digits.length < 11) return { valid: false, message: "CPF incompleto" };
+    if (!isValidCPF(digits)) return { valid: false, message: "CPF inválido" };
+    return { valid: true, message: "CPF válido" };
+  } else {
+    if (digits.length < 14) return { valid: false, message: "CNPJ incompleto" };
+    if (!isValidCNPJ(digits)) return { valid: false, message: "CNPJ inválido" };
+    return { valid: true, message: "CNPJ válido" };
+  }
+}
 
 type Supplier = {
   id: number;
@@ -119,7 +157,7 @@ export default function Fornecedores() {
     setForm({
       personType: s.personType,
       name: s.name,
-      cpfCnpj: s.cpfCnpj || "",
+      cpfCnpj: s.cpfCnpj ? maskCpfCnpj(s.cpfCnpj, s.personType) : "",
       rg: s.rg || "",
       nationality: s.nationality || "",
       profession: s.profession || "",
@@ -153,10 +191,15 @@ export default function Fornecedores() {
 
   function handleSubmitCreate() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    // Validate CPF/CNPJ if provided
+    if (form.cpfCnpj) {
+      const validation = validateCpfCnpj(form.cpfCnpj, form.personType);
+      if (!validation.valid) { toast.error(validation.message); return; }
+    }
     createMut.mutate({
       personType: form.personType,
       name: form.name.trim(),
-      cpfCnpj: form.cpfCnpj || undefined,
+      cpfCnpj: form.cpfCnpj ? form.cpfCnpj.replace(/\D/g, "") : undefined,
       rg: form.rg || undefined,
       nationality: form.nationality || undefined,
       profession: form.profession || undefined,
@@ -180,11 +223,16 @@ export default function Fornecedores() {
   function handleSubmitEdit() {
     if (!selectedSupplier) return;
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    // Validate CPF/CNPJ if provided
+    if (form.cpfCnpj) {
+      const validation = validateCpfCnpj(form.cpfCnpj, form.personType);
+      if (!validation.valid) { toast.error(validation.message); return; }
+    }
     updateMut.mutate({
       id: selectedSupplier.id,
       personType: form.personType,
       name: form.name.trim(),
-      cpfCnpj: form.cpfCnpj || undefined,
+      cpfCnpj: form.cpfCnpj ? form.cpfCnpj.replace(/\D/g, "") : undefined,
       rg: form.rg || undefined,
       nationality: form.nationality || undefined,
       profession: form.profession || undefined,
@@ -283,7 +331,7 @@ export default function Fornecedores() {
                     {s.personType === "juridica" ? "Jurídica" : "Física"}
                   </span>
                 </td>
-                <td className="p-3 text-muted-foreground">{s.cpfCnpj || "—"}</td>
+                <td className="p-3 text-muted-foreground">{s.cpfCnpj ? maskCpfCnpj(s.cpfCnpj, s.personType) : "—"}</td>
                 <td className="p-3 text-muted-foreground">{s.mobile || s.phone || "—"}</td>
                 <td className="p-3 text-muted-foreground">{s.city && s.state ? `${s.city}/${s.state}` : s.city || "—"}</td>
                 <td className="p-3 text-muted-foreground">{s.email || "—"}</td>
@@ -338,11 +386,24 @@ export default function Fornecedores() {
         </DialogContent>
       </Dialog>
 
-      {/* DETAILS MODAL */}
+      {/* DETAILS MODAL with Tabs */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalhes do Fornecedor</DialogTitle></DialogHeader>
-          {selectedSupplier && <SupplierDetails supplier={selectedSupplier} />}
+          {selectedSupplier && (
+            <Tabs defaultValue="dados" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="dados" className="gap-2"><User className="w-4 h-4" /> Dados Cadastrais</TabsTrigger>
+                <TabsTrigger value="historico" className="gap-2"><Receipt className="w-4 h-4" /> Histórico Financeiro</TabsTrigger>
+              </TabsList>
+              <TabsContent value="dados" className="mt-4">
+                <SupplierDetails supplier={selectedSupplier} />
+              </TabsContent>
+              <TabsContent value="historico" className="mt-4">
+                <SupplierHistory supplier={selectedSupplier} />
+              </TabsContent>
+            </Tabs>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDetails(false)}>Fechar</Button>
           </DialogFooter>
@@ -369,6 +430,18 @@ export default function Fornecedores() {
 // ===== FORM COMPONENT =====
 function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM; setForm: (fn: any) => void; onCepLookup: () => void }) {
   const upd = (field: string, value: string) => setForm((f: any) => ({ ...f, [field]: value }));
+  
+  // CPF/CNPJ validation state
+  const cpfCnpjValidation = useMemo(() => {
+    return validateCpfCnpj(form.cpfCnpj, form.personType);
+  }, [form.cpfCnpj, form.personType]);
+
+  const hasDigits = form.cpfCnpj.replace(/\D/g, "").length > 0;
+
+  function handleCpfCnpjChange(rawValue: string) {
+    const masked = maskCpfCnpj(rawValue, form.personType);
+    upd("cpfCnpj", masked);
+  }
 
   return (
     <div className="space-y-6">
@@ -377,11 +450,11 @@ function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM;
         <Label className="font-semibold">Tipo</Label>
         <div className="flex gap-4 mt-2">
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" checked={form.personType === "fisica"} onChange={() => upd("personType", "fisica")} className="accent-primary" />
+            <input type="radio" checked={form.personType === "fisica"} onChange={() => { upd("personType", "fisica"); upd("cpfCnpj", ""); }} className="accent-primary" />
             <span>Pessoa Física</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" checked={form.personType === "juridica"} onChange={() => upd("personType", "juridica")} className="accent-primary" />
+            <input type="radio" checked={form.personType === "juridica"} onChange={() => { upd("personType", "juridica"); upd("cpfCnpj", ""); }} className="accent-primary" />
             <span>Pessoa Jurídica</span>
           </label>
         </div>
@@ -391,7 +464,18 @@ function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM;
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <Label>{form.personType === "juridica" ? "CNPJ" : "CPF"}</Label>
-          <Input value={form.cpfCnpj} onChange={e => upd("cpfCnpj", e.target.value)} placeholder={form.personType === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"} />
+          <Input
+            value={form.cpfCnpj}
+            onChange={e => handleCpfCnpjChange(e.target.value)}
+            placeholder={form.personType === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"}
+            maxLength={form.personType === "juridica" ? 18 : 14}
+            className={hasDigits ? (cpfCnpjValidation.valid ? "border-green-500/50 focus-visible:ring-green-500/30" : "border-red-500/50 focus-visible:ring-red-500/30") : ""}
+          />
+          {hasDigits && (
+            <p className={`text-xs mt-1 ${cpfCnpjValidation.valid ? "text-green-500" : "text-red-500"}`}>
+              {cpfCnpjValidation.message}
+            </p>
+          )}
         </div>
         <div className="lg:col-span-2">
           <Label>{form.personType === "juridica" ? "Razão Social *" : "Nome Completo *"}</Label>
@@ -524,7 +608,7 @@ function SupplierDetails({ supplier }: { supplier: Supplier }) {
 
   const fields = [
     { label: "Tipo", value: supplier.personType === "juridica" ? "Pessoa Jurídica" : "Pessoa Física" },
-    { label: supplier.personType === "juridica" ? "CNPJ" : "CPF", value: supplier.cpfCnpj },
+    { label: supplier.personType === "juridica" ? "CNPJ" : "CPF", value: supplier.cpfCnpj ? maskCpfCnpj(supplier.cpfCnpj, supplier.personType) : null },
     { label: supplier.personType === "juridica" ? "Razão Social" : "Nome Completo", value: supplier.name },
     { label: supplier.personType === "juridica" ? "IE" : "RG", value: supplier.rg },
     ...(supplier.personType === "fisica" ? [
@@ -556,6 +640,140 @@ function SupplierDetails({ supplier }: { supplier: Supplier }) {
           <p className="font-medium mt-0.5">{f.value || "—"}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ===== HISTORY COMPONENT =====
+function SupplierHistory({ supplier }: { supplier: Supplier }) {
+  // Query financial transactions linked to this supplier by name match
+  const { data, isLoading } = trpc.finTransactions.list.useQuery({
+    search: supplier.name,
+    page: 1,
+    pageSize: 50,
+  });
+
+  const transactions = data?.items || [];
+
+  const formatCurrency = (value: string | number) => {
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
+  };
+
+  const formatDate = (d: any) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  };
+
+  const typeLabels: Record<string, { label: string; color: string }> = {
+    payable: { label: "A Pagar", color: "text-red-400" },
+    receivable: { label: "A Receber", color: "text-green-400" },
+    paid: { label: "Pago", color: "text-blue-400" },
+  };
+
+  const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
+    pending: { label: "Pendente", icon: Clock, color: "text-yellow-400" },
+    paid: { label: "Pago", icon: CheckCircle, color: "text-green-400" },
+    overdue: { label: "Vencido", icon: AlertTriangle, color: "text-red-400" },
+    cancelled: { label: "Cancelado", icon: AlertTriangle, color: "text-gray-400" },
+  };
+
+  // Calculate totals
+  const totals = useMemo(() => {
+    let totalPayable = 0;
+    let totalReceivable = 0;
+    let totalPaid = 0;
+    transactions.forEach((t: any) => {
+      const amt = parseFloat(t.amount) || 0;
+      if (t.type === "payable") totalPayable += amt;
+      else if (t.type === "receivable") totalReceivable += amt;
+      else if (t.type === "paid") totalPaid += amt;
+    });
+    return { totalPayable, totalReceivable, totalPaid };
+  }, [transactions]);
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Carregando histórico...</div>;
+  }
+
+  // Filter only transactions where supplier field matches this supplier's name
+  const filteredTransactions = transactions.filter((t: any) => 
+    t.supplier && t.supplier.toLowerCase().includes(supplier.name.toLowerCase())
+  );
+
+  if (filteredTransactions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+        <p className="text-muted-foreground">Nenhum lançamento financeiro vinculado a este fornecedor.</p>
+        <p className="text-xs text-muted-foreground/70 mt-1">Os lançamentos aparecem aqui quando o campo "Fornecedor" da conta corresponde ao nome deste cadastro.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-center">
+          <p className="text-xs text-muted-foreground">A Pagar</p>
+          <p className="text-sm font-bold text-red-400">{formatCurrency(totals.totalPayable)}</p>
+        </div>
+        <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 text-center">
+          <p className="text-xs text-muted-foreground">A Receber</p>
+          <p className="text-sm font-bold text-green-400">{formatCurrency(totals.totalReceivable)}</p>
+        </div>
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-center">
+          <p className="text-xs text-muted-foreground">Pago</p>
+          <p className="text-sm font-bold text-blue-400">{formatCurrency(totals.totalPaid)}</p>
+        </div>
+      </div>
+
+      {/* Transaction list */}
+      <div className="rounded-lg border border-border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left p-2.5 font-medium text-xs">Descrição</th>
+              <th className="text-left p-2.5 font-medium text-xs">Tipo</th>
+              <th className="text-left p-2.5 font-medium text-xs">Valor</th>
+              <th className="text-left p-2.5 font-medium text-xs">Vencimento</th>
+              <th className="text-left p-2.5 font-medium text-xs">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredTransactions.map((t: any) => {
+              const typeInfo = typeLabels[t.type] || { label: t.type, color: "text-gray-400" };
+              const statusInfo = statusConfig[t.status] || { label: t.status, icon: Clock, color: "text-gray-400" };
+              const StatusIcon = statusInfo.icon;
+              return (
+                <tr key={t.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="p-2.5">
+                    <p className="font-medium text-xs">{t.description}</p>
+                    {t.receiptUrl && (
+                      <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1 mt-0.5">
+                        <FileText className="w-3 h-3" /> Ver comprovante
+                      </a>
+                    )}
+                  </td>
+                  <td className={`p-2.5 text-xs font-medium ${typeInfo.color}`}>{typeInfo.label}</td>
+                  <td className="p-2.5 text-xs font-bold">{formatCurrency(t.amount)}</td>
+                  <td className="p-2.5 text-xs text-muted-foreground">{formatDate(t.dueDate)}</td>
+                  <td className="p-2.5">
+                    <span className={`inline-flex items-center gap-1 text-xs ${statusInfo.color}`}>
+                      <StatusIcon className="w-3 h-3" /> {statusInfo.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[10px] text-muted-foreground/60 text-center">
+        Exibindo {filteredTransactions.length} lançamento(s) vinculado(s) ao fornecedor "{supplier.name}"
+      </p>
     </div>
   );
 }
