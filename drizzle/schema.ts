@@ -901,7 +901,7 @@ export type InsertFinCategory = typeof finCategories.$inferInsert;
 // Transações financeiras (contas a pagar e receber)
 export const finTransactions = mysqlTable("fin_transactions", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["payable", "receivable", "paid"]).notNull(),
+  type: mysqlEnum("type", ["payable", "receivable"]).notNull(),
   description: varchar("description", { length: 500 }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   dueDate: bigint("dueDate", { mode: "number" }).notNull(), // timestamp vencimento
@@ -920,8 +920,6 @@ export const finTransactions = mysqlTable("fin_transactions", {
   approvalStatus: mysqlEnum("approvalStatus", ["none", "pending_approval", "approved", "rejected"]).default("none"), // status da autorização
   approvedBy: varchar("approvedBy", { length: 255 }), // quem autorizou
   approvedAt: bigint("approvedAt", { mode: "number" }), // quando autorizou
-  sellerId: int("sellerId"), // colaborador responsável pela conta
-  sellerName: varchar("sellerName", { length: 255 }), // nome do colaborador
   createdBy: int("createdBy"), // admin que criou
   createdByName: varchar("createdByName", { length: 255 }), // nome de quem criou
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -932,6 +930,40 @@ export const finTransactions = mysqlTable("fin_transactions", {
 }));
 export type FinTransaction = typeof finTransactions.$inferSelect;
 export type InsertFinTransaction = typeof finTransactions.$inferInsert;
+
+// ===== FORNECEDORES =====
+export const finSuppliers = mysqlTable("fin_suppliers", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  personType: mysqlEnum("person_type", ["fisica", "juridica"]).notNull().default("fisica"),
+  name: varchar("name", { length: 255 }).notNull(),
+  cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
+  rg: varchar("rg", { length: 30 }),
+  nationality: varchar("nationality", { length: 100 }),
+  profession: varchar("profession", { length: 150 }),
+  birthDate: bigint("birth_date", { mode: "number" }),
+  gender: mysqlEnum("gender", ["masculino", "feminino", "outro"]),
+  maritalStatus: mysqlEnum("marital_status", ["solteiro", "casado", "divorciado", "viuvo", "outro"]),
+  cep: varchar("cep", { length: 10 }),
+  state: varchar("state", { length: 2 }),
+  city: varchar("city", { length: 150 }),
+  neighborhood: varchar("neighborhood", { length: 150 }),
+  street: varchar("street", { length: 255 }),
+  number: varchar("number", { length: 20 }),
+  complement: varchar("complement", { length: 150 }),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 20 }),
+  mobile: varchar("mobile", { length: 20 }),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_fin_suppliers_tenant").on(table.tenantId),
+  nameIdx: index("idx_fin_suppliers_name").on(table.tenantId, table.name),
+}));
+export type FinSupplier = typeof finSuppliers.$inferSelect;
+export type InsertFinSupplier = typeof finSuppliers.$inferInsert;
 
 
 // ===== MÓDULO PÓS-VENDA =====
@@ -1261,17 +1293,33 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   externalId: varchar("externalId", { length: 20 }).notNull(), // ID do veículo no site externo
   brand: varchar("brand", { length: 100 }).notNull(), // Volkswagen, Ford, etc.
   model: varchar("model", { length: 100 }).notNull(), // Saveiro, Ranger, etc.
+  title: varchar("title", { length: 255 }), // título comercial customizado
+  internalCode: varchar("internalCode", { length: 100 }), // código interno do estoque
+  sourceType: varchar("sourceType", { length: 30 }).default("sync").notNull(), // sync, manual, integration
   version: varchar("version", { length: 255 }), // ROBUST TOTAL FLEX, XLS 4X4, etc.
   motor: varchar("motor", { length: 50 }), // 1.6, 2.0, etc.
   year: int("year"), // 2025
+  manufactureYear: int("manufactureYear"), // ano fabricação
+  modelYear: int("modelYear"), // ano modelo
+  chassis: varchar("chassis", { length: 50 }),
+  renavam: varchar("renavam", { length: 50 }),
   color: varchar("color", { length: 50 }), // Branco, Prata, etc.
   fuel: varchar("fuel", { length: 50 }), // Flex, Diesel, Gasolina
   km: int("km").default(0), // quilometragem
   price: int("price").default(0), // preço em reais inteiros
+  purchasePrice: int("purchasePrice").default(0), // custo de compra
+  preparationCost: int("preparationCost").default(0), // custo de preparação
+  documentationCost: int("documentationCost").default(0), // custo documental
+  transportCost: int("transportCost").default(0), // custo transporte
+  otherCosts: int("otherCosts").default(0), // outras despesas
+  minimumSalePrice: int("minimumSalePrice").default(0), // valor mínimo de venda
   photoUrl: text("photoUrl"), // URL da foto principal
   photos: text("photos"), // JSON array de URLs de fotos
   optionals: text("optionals"), // JSON array de opcionais
+  highlightItems: text("highlightItems"), // JSON array de destaques
+  internalTags: text("internalTags"), // JSON array de tags internas
   externalUrl: text("externalUrl"), // link para o veículo no site original
+  videoUrl: text("videoUrl"), // vídeo opcional
   slug: varchar("slug", { length: 500 }), // slug da URL original
   bodyType: varchar("bodyType", { length: 50 }), // Hatch, Sedan, SUV, Picape, etc.
   transmission: varchar("transmission", { length: 50 }), // Manual, Automático
@@ -1282,40 +1330,23 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   vehicleState: varchar("vehicleState", { length: 20 }), // novo, usado
   category: varchar("category", { length: 50 }), // Carro/Camionetas, Moto
   observation: text("observation"), // observações do veículo
+  internalNotes: text("internalNotes"), // observações internas da loja
+  storeLocation: varchar("storeLocation", { length: 120 }), // unidade física
+  entryDate: bigint("entryDate", { mode: "number" }), // data de entrada no estoque
+  isPublished: boolean("isPublished").default(true).notNull(), // aparece no estoque público
+  isFeatured: boolean("isFeatured").default(false).notNull(), // destaque interno/comercial
+  acceptsTradeIn: boolean("acceptsTradeIn").default(false).notNull(),
+  isArmored: boolean("isArmored").default(false).notNull(),
   status: mysqlEnum("inventory_status", ["available", "reserved", "sold"]).default("available").notNull(),
   soldBySellerId: int("soldBySellerId"), // vendedor que vendeu (quando status = sold)
   soldAt: bigint("soldAt", { mode: "number" }), // data da venda
   lastSyncedAt: bigint("lastSyncedAt", { mode: "number" }), // última sincronização
+  deletedAt: bigint("deletedAt", { mode: "number" }), // soft delete
+  deletedBy: int("deletedBy"), // usuário que removeu
+  deletedReason: text("deletedReason"), // motivo da remoção
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
-  // === Campos do cadastro manual de estoque ===
-  title: varchar("title", { length: 255 }), // título do anúncio
-  internalCode: varchar("internalCode", { length: 100 }), // código interno da loja
-  sourceType: varchar("sourceType", { length: 30 }).notNull().default("sync"), // sync | manual
-  manufactureYear: int("manufactureYear"), // ano de fabricação
-  modelYear: int("modelYear"), // ano do modelo
-  chassis: varchar("chassis", { length: 50 }), // chassi
-  renavam: varchar("renavam", { length: 50 }), // RENAVAM
-  purchasePrice: int("purchasePrice").default(0), // preço de compra em centavos
-  preparationCost: int("preparationCost").default(0), // custo de preparação
-  documentationCost: int("documentationCost").default(0), // custo de documentação
-  transportCost: int("transportCost").default(0), // custo de transporte
-  otherCosts: int("otherCosts").default(0), // outros custos
-  minimumSalePrice: int("minimumSalePrice").default(0), // preço mínimo de venda
-  highlightItems: text("highlightItems"), // JSON array de destaques
-  internalTags: text("internalTags"), // JSON array de tags internas
-  videoUrl: text("videoUrl"), // URL do vídeo
-  internalNotes: text("internalNotes"), // notas internas
-  storeLocation: varchar("storeLocation", { length: 120 }), // localização na loja/pátio
-  entryDate: bigint("entryDate", { mode: "number" }), // data de entrada no estoque
-  isPublished: boolean("isPublished").notNull().default(true), // publicado no site?
-  isFeatured: boolean("isFeatured").notNull().default(false), // destaque?
-  acceptsTradeIn: boolean("acceptsTradeIn").notNull().default(false), // aceita troca?
-  isArmored: boolean("isArmored").notNull().default(false), // blindado?
-  deletedAt: bigint("deletedAt", { mode: "number" }), // soft delete
-  deletedBy: int("deletedBy"), // quem excluiu
-  deletedReason: text("deletedReason"), // motivo da exclusão
 }, (table) => ({
   tenantIdx: index("idx_inventory_vehicles_tenant").on(table.tenantId),
   tenantExternalIdx: uniqueIndex("idx_inventory_vehicles_tenant_external").on(table.tenantId, table.externalId),
@@ -1323,21 +1354,20 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
 export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
 export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
 
-// Log de auditoria do estoque
 export const inventoryAuditLogs = mysqlTable("inventory_audit_logs", {
   id: int("id").autoincrement().primaryKey(),
   inventoryId: int("inventoryId").notNull(),
-  action: varchar("action", { length: 50 }).notNull(), // create, update, delete, status_change
+  action: varchar("action", { length: 40 }).notNull(), // created, updated, status_changed, soft_deleted, restored
   actorId: int("actorId"),
-  actorName: varchar("actorName", { length: 100 }),
-  summary: text("summary"),
-  changedFields: text("changedFields"), // JSON das alterações
-  metadata: text("metadata"), // JSON de metadados adicionais
+  actorName: varchar("actorName", { length: 255 }),
+  summary: varchar("summary", { length: 500 }).notNull(),
+  changedFields: text("changedFields"), // JSON array
+  metadata: text("metadata"), // JSON extra
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
 }, (table) => ({
-  inventoryIdx: index("idx_audit_inventory").on(table.inventoryId),
-  tenantIdx: index("idx_audit_tenant").on(table.tenantId),
+  tenantIdx: index("idx_inventory_audit_logs_tenant").on(table.tenantId),
+  inventoryIdx: index("idx_inventory_audit_logs_inventory").on(table.inventoryId),
 }));
 export type InventoryAuditLog = typeof inventoryAuditLogs.$inferSelect;
 export type InsertInventoryAuditLog = typeof inventoryAuditLogs.$inferInsert;
@@ -1893,42 +1923,3 @@ export const integrationSyncLogs = mysqlTable("integration_sync_logs", {
 }));
 export type IntegrationSyncLog = typeof integrationSyncLogs.$inferSelect;
 export type InsertIntegrationSyncLog = typeof integrationSyncLogs.$inferInsert;
-
-// ===== FORNECEDORES (Suppliers) =====
-export const finSuppliers = mysqlTable("fin_suppliers", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenantId").notNull().default(1),
-  // Tipo: fisica ou juridica
-  personType: mysqlEnum("person_type", ["fisica", "juridica"]).notNull().default("fisica"),
-  // Dados pessoais / empresa
-  name: varchar("name", { length: 255 }).notNull(),
-  cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
-  rg: varchar("rg", { length: 30 }),
-  nationality: varchar("nationality", { length: 100 }),
-  profession: varchar("profession", { length: 150 }),
-  birthDate: bigint("birth_date", { mode: "number" }),
-  gender: mysqlEnum("gender", ["masculino", "feminino", "outro"]),
-  maritalStatus: mysqlEnum("marital_status", ["solteiro", "casado", "divorciado", "viuvo", "outro"]),
-  // Endereço
-  cep: varchar("cep", { length: 10 }),
-  state: varchar("state", { length: 2 }),
-  city: varchar("city", { length: 150 }),
-  neighborhood: varchar("neighborhood", { length: 150 }),
-  street: varchar("street", { length: 255 }),
-  number: varchar("number", { length: 20 }),
-  complement: varchar("complement", { length: 150 }),
-  // Contato
-  email: varchar("email", { length: 320 }),
-  phone: varchar("phone", { length: 20 }),
-  mobile: varchar("mobile", { length: 20 }),
-  // Extras
-  notes: text("notes"),
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => ({
-  tenantIdx: index("idx_fin_suppliers_tenant").on(table.tenantId),
-  nameIdx: index("idx_fin_suppliers_name").on(table.tenantId, table.name),
-}));
-export type FinSupplier = typeof finSuppliers.$inferSelect;
-export type InsertFinSupplier = typeof finSuppliers.$inferInsert;

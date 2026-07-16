@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, gte, lte, or, like } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, or } from "drizzle-orm";
 import { finCategories, InsertFinCategory, finTransactions, InsertFinTransaction, fuelRecords, type InsertFuelRecord } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -31,45 +31,34 @@ export async function updateFinCategory(id: number, data: Partial<{ name: string
 // ===== TRANSACTIONS =====
 
 export async function listFinTransactions(filters: {
-  type?: "payable" | "receivable" | "paid";
+  type?: "payable" | "receivable";
   status?: "pending" | "paid" | "overdue" | "cancelled";
   categoryId?: number;
-  sellerId?: number;
   startDate?: number;
   endDate?: number;
-  search?: string;
   limit?: number;
   offset?: number;
 }) {
   const db = await getDb();
   if (!db) return { items: [], total: 0 };
   
-  const tenantId = getCurrentTenantId();
-  const conditions: any[] = [eq(finTransactions.tenantId, tenantId)];
+  const conditions = [];
   if (filters.type) conditions.push(eq(finTransactions.type, filters.type));
   if (filters.status) conditions.push(eq(finTransactions.status, filters.status));
   if (filters.categoryId) conditions.push(eq(finTransactions.categoryId, filters.categoryId));
   if (filters.startDate) conditions.push(gte(finTransactions.dueDate, filters.startDate));
   if (filters.endDate) conditions.push(lte(finTransactions.dueDate, filters.endDate));
-  if (filters.sellerId) conditions.push(eq(finTransactions.sellerId, filters.sellerId));
-  if (filters.search) {
-    const term = `%${filters.search}%`;
-    conditions.push(or(
-      like(finTransactions.description, term),
-      like(finTransactions.supplier, term),
-      like(finTransactions.notes, term)
-    ));
-  }
   
-  const where = and(...conditions);
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
   
   const [items, countResult] = await Promise.all([
     db.select().from(finTransactions)
       .where(where)
-      .orderBy(desc(finTransactions.createdAt))
-      .limit(filters.limit || 20)
+      .orderBy(asc(finTransactions.dueDate))
+      .limit(filters.limit || 50)
       .offset(filters.offset || 0),
-    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(where),
+    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), where)),
+
   ]);
   
   return { items, total: Number(countResult[0]?.count || 0) };
@@ -83,7 +72,7 @@ export async function getFinTransaction(id: number) {
 }
 
 export async function createFinTransaction(data: {
-  type: "payable" | "receivable" | "paid";
+  type: "payable" | "receivable";
   description: string;
   amount: string;
   dueDate: number;
@@ -101,8 +90,6 @@ export async function createFinTransaction(data: {
   needsApproval?: boolean;
   approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
   createdByName?: string;
-  sellerId?: number;
-  sellerName?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -126,8 +113,6 @@ export async function updateFinTransaction(id: number, data: Partial<{
   approvalStatus: "none" | "pending_approval" | "approved" | "rejected";
   approvedBy: string;
   approvedAt: number;
-  sellerId: number;
-  sellerName: string;
 }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -182,7 +167,7 @@ export async function getFinDashboard(month?: number, year?: number) {
   // Upcoming due (next 7 days)
   const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000;
   const upcomingDue = await db.select().from(finTransactions)
-    .where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.status, "pending"), gte(finTransactions.dueDate, now), lte(finTransactions.dueDate, sevenDaysFromNow)))
+    .where(and(eq(finTransactions.status, "pending"), gte(finTransactions.dueDate, now), lte(finTransactions.dueDate, sevenDaysFromNow)))
     .orderBy(asc(finTransactions.dueDate))
     .limit(10);
   
@@ -245,7 +230,7 @@ export async function getOverdueTransactions() {
   if (!db) return [];
   const now = Date.now();
   return db.select().from(finTransactions)
-    .where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)))
+    .where(and(eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)))
     .orderBy(asc(finTransactions.dueDate));
 }
 

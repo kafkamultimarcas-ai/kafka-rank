@@ -21,7 +21,6 @@ import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter, crmAiRouter, aiMetricsRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter, fuelRouter } from "./routers/finRouter";
-import { supplierRouter } from "./routers/supplierRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
@@ -37,6 +36,7 @@ import { billingRouter } from "./routers/billingRouter";
 import { subscriptionLogsRouter } from "./routers/subscriptionLogsRouter";
 import { platformLogsRouter } from "./routers/platformLogsRouter";
 import { vehicleCostRouter } from "./routers/vehicleCostRouter";
+import { supplierRouter } from "./routers/supplierRouter";
 import * as zapi from "./zapi-service";
 import { sendPushNewSale, sendPushSaleApproved, sendPushOvertake, sendPushPendingSale, sendPushPendingRecord, sendPushAppointmentExpiring, sendPushRescueAlert, sendPushInactivityAlert, sendPushAttendanceApproved, sendPushToSeller, sendPushDocsPendentes, sendPushDocTransferido } from "./pushService";
 import { buildCurrentTenantPath, buildSellerTenantPath } from "./tenantUrls";
@@ -2870,8 +2870,8 @@ export const appRouter = router({
   crmSellerStats: crmSellerStatsRouter,
   finCategories: finCategoriesRouter,
   finTransactions: finTransactionsRouter,
-  suppliers: supplierRouter,
   fuel: fuelRouter,
+  suppliers: supplierRouter,
   pvChamados: pvChamadosRouter,
   pvGastos: pvGastosRouter,
   pvOrcamentos: pvOrcamentosRouter,

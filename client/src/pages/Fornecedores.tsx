@@ -705,11 +705,11 @@ function SupplierHistory({ supplier }: { supplier: Supplier }) {
     status: statusFilter !== "all" ? statusFilter as any : undefined,
     startDate: startDate ? new Date(startDate).getTime() : undefined,
     endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
-    page: 1,
-    pageSize: 100,
+    limit: 100,
+    offset: 0,
   });
 
-  const transactions = data?.items || [];
+  const transactions = (data as any)?.items || (Array.isArray(data) ? data : []);
 
   const formatCurrency = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;

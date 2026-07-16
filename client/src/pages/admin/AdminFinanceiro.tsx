@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { SupplierCombobox } from "@/components/SupplierCombobox";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SupplierCombobox } from "@/components/SupplierCombobox";
 
 function formatCurrencyVal(val: string): string {
   const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
@@ -30,7 +30,6 @@ import {
   Clock, Trash2, Edit2, Eye, Receipt, Tag, Folder, X, ChevronLeft, ChevronRight,
   TrendingDown, TrendingUp, Banknote, CreditCard
 } from "lucide-react";
-import { PaginationControls } from "@/components/PaginationControls";
 
 type TabView = "all" | "category";
 
@@ -101,17 +100,12 @@ export default function AdminFinanceiro() {
   const [txDescription, setTxDescription] = useState("");
   const [txAmount, setTxAmount] = useState("");
   const [txDueDate, setTxDueDate] = useState("");
-  const [txType, setTxType] = useState<"payable" | "receivable" | "paid">("payable");
+  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
   const [txSupplier, setTxSupplier] = useState("");
   const [txBarcode, setTxBarcode] = useState("");
   const [txNotes, setTxNotes] = useState("");
   const [txRecurrence, setTxRecurrence] = useState<"none" | "monthly" | "weekly" | "yearly">("none");
-  const [txSellerId, setTxSellerId] = useState<number | null>(null);
-  const [sellerFilterId, setSellerFilterId] = useState<number | null>(null);
-  // Paginação server-side
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
 
   // Month range
   const startOfMonth = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getTime(), [selectedMonth]);
@@ -119,18 +113,13 @@ export default function AdminFinanceiro() {
 
   // Queries
   const categoriesQuery = trpc.finCategories.list.useQuery(undefined);
-  const sellersQuery = trpc.sellers.list.useQuery({ activeOnly: true });
-  const sellersList = sellersQuery.data || [];
   const transactionsQuery = trpc.finTransactions.list.useQuery({
     startDate: startOfMonth,
     endDate: endOfMonth,
     ...(activeCategoryId && activeTab === "category" ? { categoryId: activeCategoryId } : {}),
     ...(statusFilter !== "all" ? { status: statusFilter as any } : {}),
     ...(typeFilter !== "all" ? { type: typeFilter as any } : {}),
-    ...(sellerFilterId ? { sellerId: sellerFilterId } : {}),
-    ...(searchText.trim() ? { search: searchText.trim() } : {}),
-    page,
-    pageSize,
+    limit: 200,
   });
   const dashboardQuery = trpc.finTransactions.dashboard.useQuery({
     month: selectedMonth.getMonth() + 1,
@@ -242,7 +231,6 @@ export default function AdminFinanceiro() {
     setTxDueDate("");
     setTxType("payable");
     setTxCategoryId(null);
-    setTxSellerId(null);
     setTxSupplier("");
     setTxBarcode("");
     setTxNotes("");
@@ -256,7 +244,6 @@ export default function AdminFinanceiro() {
     setTxDueDate(new Date(tx.dueDate).toISOString().split("T")[0]);
     setTxType(tx.type);
     setTxCategoryId(tx.categoryId);
-    setTxSellerId(tx.sellerId || null);
     setTxSupplier(tx.supplier || "");
     setTxBarcode(tx.barcode || "");
     setTxNotes(tx.notes || "");
@@ -305,7 +292,7 @@ export default function AdminFinanceiro() {
 
         {/* Dashboard Cards - Clicáveis */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card onClick={() => { setTypeFilter('payable'); setStatusFilter('pending'); setPage(1); }} className={`bg-card/50 border-red-500/20 cursor-pointer transition-all ${typeFilter === 'payable' && statusFilter === 'pending' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
+          <Card onClick={() => { setTypeFilter('payable'); setStatusFilter('pending'); }} className={`bg-card/50 border-red-500/20 cursor-pointer transition-all ${typeFilter === 'payable' && statusFilter === 'pending' ? 'ring-2 ring-red-400' : 'hover:ring-1 hover:ring-red-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <TrendingDown className="w-4 h-4 text-red-400" /> A Pagar
@@ -314,7 +301,7 @@ export default function AdminFinanceiro() {
               <div className="text-xs text-muted-foreground mt-1">Total: {formatCurrency(dashboard?.totalPayable || 0)}</div>
             </CardContent>
           </Card>
-          <Card onClick={() => { setTypeFilter('all'); setStatusFilter('paid'); setPage(1); }} className={`bg-card/50 border-green-500/20 cursor-pointer transition-all ${statusFilter === 'paid' ? 'ring-2 ring-green-400' : 'hover:ring-1 hover:ring-green-400/50'}`}>
+          <Card onClick={() => { setTypeFilter('all'); setStatusFilter('paid'); }} className={`bg-card/50 border-green-500/20 cursor-pointer transition-all ${statusFilter === 'paid' ? 'ring-2 ring-green-400' : 'hover:ring-1 hover:ring-green-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <CheckCircle className="w-4 h-4 text-green-400" /> Pago
@@ -322,7 +309,7 @@ export default function AdminFinanceiro() {
               <div className="text-xl font-bold text-green-400">{formatCurrency(dashboard?.totalPaid || 0)}</div>
             </CardContent>
           </Card>
-          <Card onClick={() => { setTypeFilter('receivable'); setStatusFilter('pending'); setPage(1); }} className={`bg-card/50 border-blue-500/20 cursor-pointer transition-all ${typeFilter === 'receivable' && statusFilter === 'pending' ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-blue-400/50'}`}>
+          <Card onClick={() => { setTypeFilter('receivable'); setStatusFilter('pending'); }} className={`bg-card/50 border-blue-500/20 cursor-pointer transition-all ${typeFilter === 'receivable' && statusFilter === 'pending' ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-blue-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <TrendingUp className="w-4 h-4 text-blue-400" /> A Receber
@@ -331,7 +318,7 @@ export default function AdminFinanceiro() {
               <div className="text-xs text-muted-foreground mt-1">Total: {formatCurrency(dashboard?.totalReceivable || 0)}</div>
             </CardContent>
           </Card>
-          <Card onClick={() => { setTypeFilter('all'); setStatusFilter('overdue'); setPage(1); }} className={`bg-card/50 border-yellow-500/20 cursor-pointer transition-all ${statusFilter === 'overdue' ? 'ring-2 ring-yellow-400' : 'hover:ring-1 hover:ring-yellow-400/50'}`}>
+          <Card onClick={() => { setTypeFilter('all'); setStatusFilter('overdue'); }} className={`bg-card/50 border-yellow-500/20 cursor-pointer transition-all ${statusFilter === 'overdue' ? 'ring-2 ring-yellow-400' : 'hover:ring-1 hover:ring-yellow-400/50'}`}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <AlertTriangle className="w-4 h-4 text-yellow-400" /> Vencidas
@@ -396,7 +383,7 @@ export default function AdminFinanceiro() {
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os status</SelectItem>
@@ -407,22 +394,12 @@ export default function AdminFinanceiro() {
               <SelectItem value="pending_approval">Aguardando Autoriza\u00e7\u00e3o</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="payable">A Pagar</SelectItem>
               <SelectItem value="receivable">A Receber</SelectItem>
-              <SelectItem value="paid">Pago</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sellerFilterId?.toString() || "_all"} onValueChange={(v) => { setSellerFilterId(v === "_all" ? null : Number(v)); setPage(1); }}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Colaborador" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all">Todos colaboradores</SelectItem>
-              {sellersList.map((s: any) => (
-                <SelectItem key={s.id} value={s.id.toString()}>{s.nickname || s.name}</SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </div>
@@ -447,8 +424,8 @@ export default function AdminFinanceiro() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${tx.type === "payable" ? "bg-red-500/20" : tx.type === "paid" ? "bg-emerald-500/20" : "bg-green-500/20"}`}>
-                          {tx.type === "payable" ? <TrendingDown className="w-5 h-5 text-red-400" /> : tx.type === "paid" ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <TrendingUp className="w-5 h-5 text-green-400" />}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${tx.type === "payable" ? "bg-red-500/20" : "bg-green-500/20"}`}>
+                          {tx.type === "payable" ? <TrendingDown className="w-5 h-5 text-red-400" /> : <TrendingUp className="w-5 h-5 text-green-400" />}
                         </div>
                         <div className="min-w-0">
                           <div className="font-medium truncate">{tx.description}</div>
@@ -480,7 +457,7 @@ export default function AdminFinanceiro() {
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusInfo.label}
                         </Badge>
-                        <span className={`font-bold text-lg ${tx.type === "payable" ? "text-red-400" : tx.type === "paid" ? "text-emerald-400" : "text-green-400"}`}>
+                        <span className={`font-bold text-lg ${tx.type === "payable" ? "text-red-400" : "text-green-400"}`}>
                           {tx.type === "payable" ? "-" : "+"}{formatCurrency(tx.amount)}
                         </span>
                       </div>
@@ -490,21 +467,10 @@ export default function AdminFinanceiro() {
               );
             })
           )}
-                </div>
-
-        {/* Paginação Server-Side */}
-        {(transactionsQuery.data as any)?.totalPages > 0 && (
-          <PaginationControls
-            page={page}
-            totalPages={(transactionsQuery.data as any)?.totalPages || 1}
-            total={(transactionsQuery.data as any)?.total || 0}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          />
-        )}
+        </div>
 
         {/* ===== DIALOGS ===== */}
+
         {/* New/Edit Category Dialog */}
         <Dialog open={showNewCategory || !!editingCategory} onOpenChange={(open) => { if (!open) { setShowNewCategory(false); setEditingCategory(null); resetCategoryForm(); } }}>
           <DialogContent className="max-w-md">
@@ -578,7 +544,6 @@ export default function AdminFinanceiro() {
                     <SelectContent>
                       <SelectItem value="payable">A Pagar</SelectItem>
                       <SelectItem value="receivable">A Receber</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -616,7 +581,7 @@ export default function AdminFinanceiro() {
               </div>
               <div>
                 <Label>Fornecedor / Empresa</Label>
-                <SupplierCombobox value={txSupplier} onChange={setTxSupplier} placeholder="Selecione o fornecedor..." />
+                <SupplierCombobox value={txSupplier} onChange={setTxSupplier} />
               </div>
               <div>
                 <Label>Código de Barras</Label>
@@ -638,18 +603,6 @@ export default function AdminFinanceiro() {
                 <Label>Observações</Label>
                 <Textarea placeholder="Notas adicionais..." value={txNotes} onChange={(e) => setTxNotes(e.target.value)} />
               </div>
-              <div>
-                <Label>Colaborador</Label>
-                <Select value={txSellerId?.toString() || "_none"} onValueChange={(v) => setTxSellerId(v === "_none" ? null : Number(v))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o colaborador" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Nenhum</SelectItem>
-                    {sellersList.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id.toString()}>{s.nickname || s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             <DialogFooter>
               <Button
@@ -666,8 +619,6 @@ export default function AdminFinanceiro() {
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
                     recurrence: txRecurrence,
-                    sellerId: txSellerId,
-                    sellerName: txSellerId ? (sellersList.find((s: any) => s.id === txSellerId)?.nickname || sellersList.find((s: any) => s.id === txSellerId)?.name) : undefined,
                   });
                 }}
                 disabled={createTransaction.isPending}
@@ -693,7 +644,6 @@ export default function AdminFinanceiro() {
                     <SelectContent>
                       <SelectItem value="payable">A Pagar</SelectItem>
                       <SelectItem value="receivable">A Receber</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -731,7 +681,7 @@ export default function AdminFinanceiro() {
               </div>
               <div>
                 <Label>Fornecedor</Label>
-                <SupplierCombobox value={txSupplier} onChange={setTxSupplier} placeholder="Selecione o fornecedor..." />
+                <SupplierCombobox value={txSupplier} onChange={setTxSupplier} />
               </div>
               <div>
                 <Label>Código de Barras</Label>
@@ -740,18 +690,6 @@ export default function AdminFinanceiro() {
               <div>
                 <Label>Observações</Label>
                 <Textarea value={txNotes} onChange={(e) => setTxNotes(e.target.value)} />
-              </div>
-              <div>
-                <Label>Colaborador</Label>
-                <Select value={txSellerId?.toString() || "_none"} onValueChange={(v) => setTxSellerId(v === "_none" ? null : Number(v))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o colaborador" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Nenhum</SelectItem>
-                    {sellersList.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id.toString()}>{s.nickname || s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             <DialogFooter>
@@ -768,8 +706,6 @@ export default function AdminFinanceiro() {
                     supplier: txSupplier || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
-                    sellerId: txSellerId,
-                    sellerName: txSellerId ? (sellersList.find((s: any) => s.id === txSellerId)?.nickname || sellersList.find((s: any) => s.id === txSellerId)?.name) : undefined,
                   });
                 }}
                 disabled={updateTransaction.isPending}
@@ -798,13 +734,13 @@ export default function AdminFinanceiro() {
                       <StatusIcon className="w-3 h-3 mr-1" />
                       {statusInfo.label}
                     </Badge>
-                    <span className={`font-bold text-2xl ${tx.type === "payable" ? "text-red-400" : tx.type === "paid" ? "text-emerald-400" : "text-green-400"}`}>
+                    <span className={`font-bold text-2xl ${tx.type === "payable" ? "text-red-400" : "text-green-400"}`}>
                       {formatCurrency(tx.amount)}
                     </span>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between"><span className="text-muted-foreground">Descrição</span><span className="font-medium">{tx.description}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Tipo</span><span>{tx.type === "payable" ? "A Pagar" : tx.type === "paid" ? "Pago" : "A Receber"}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Tipo</span><span>{tx.type === "payable" ? "A Pagar" : "A Receber"}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Vencimento</span><span>{formatDate(tx.dueDate)}</span></div>
                     {tx.paidDate && <div className="flex justify-between"><span className="text-muted-foreground">Data Pagamento</span><span>{formatDate(tx.paidDate)}</span></div>}
                     {cat && <div className="flex justify-between"><span className="text-muted-foreground">Categoria</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color || undefined }} />{cat.name}</span></div>}

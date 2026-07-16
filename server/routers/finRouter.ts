@@ -47,30 +47,16 @@ export const finCategoriesRouter = router({
 // ===== TRANSACTIONS ROUTER =====
 export const finTransactionsRouter = router({
   list: publicProcedure.input(z.object({
-    type: z.enum(["payable", "receivable", "paid"]).optional(),
+    type: z.enum(["payable", "receivable"]).optional(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
     categoryId: z.number().optional(),
-    sellerId: z.number().optional(),
     startDate: z.number().optional(),
     endDate: z.number().optional(),
     search: z.string().optional(),
-    page: z.number().int().min(1).default(1),
-    pageSize: z.number().int().min(1).max(100).default(20),
+    limit: z.number().optional(),
+    offset: z.number().optional(),
   }).optional()).query(async ({ input }) => {
-    const params: any = input || {};
-    const page: number = params.page || 1;
-    const pageSize: number = params.pageSize || 20;
-    const result = await listFinTransactions({
-      ...params,
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
-    });
-    return {
-      ...result,
-      page,
-      pageSize,
-      totalPages: Math.ceil(result.total / pageSize),
-    };
+    return listFinTransactions(input || {});
   }),
   
   get: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
@@ -80,7 +66,7 @@ export const finTransactionsRouter = router({
   }),
   
   create: publicProcedure.input(z.object({
-    type: z.enum(["payable", "receivable", "paid"]),
+    type: z.enum(["payable", "receivable"]),
     description: z.string().min(1),
     amount: z.string(),
     dueDate: z.number(),
@@ -96,15 +82,11 @@ export const finTransactionsRouter = router({
     installmentTotal: z.number().optional(),
     needsApproval: z.boolean().optional(),
     createdByName: z.string().optional(),
-    sellerId: z.number().nullable().optional(),
-    sellerName: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
     const approvalStatus = input.needsApproval ? "pending_approval" as const : "none" as const;
     const id = await createFinTransaction({
       ...input,
       categoryId: input.categoryId ?? undefined,
-      sellerId: input.sellerId ?? undefined,
-      sellerName: input.sellerName || undefined,
       createdBy: ctx.user?.id,
       approvalStatus,
     });
@@ -131,11 +113,9 @@ export const finTransactionsRouter = router({
     notes: z.string().optional(),
     receiptUrl: z.string().optional(),
     receiptKey: z.string().optional(),
-    sellerId: z.number().nullable().optional(),
-    sellerName: z.string().optional(),
   })).mutation(async ({ input }) => {
     const { id, ...data } = input;
-    await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined, sellerId: data.sellerId ?? undefined, sellerName: data.sellerName || undefined });
+    await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined });
     return { success: true };
   }),
   

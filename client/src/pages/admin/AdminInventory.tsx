@@ -1,966 +1,567 @@
-import { useState, useMemo } from "react";
-import { trpc } from "@/lib/trpc";
+import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { Car, Search, RefreshCw, Loader2, Calendar, Gauge, Fuel, Palette, DollarSign, ExternalLink, ChevronLeft, ChevronRight, Package, CheckCircle, Clock, XCircle, Eye, Tag, TrendingUp, Copy, Plus, Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
+import { trpc } from "@/lib/trpc";
+import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
+import { inventorySourceTypes, inventorySortFields } from "@shared/inventory";
+import { ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
-function formatPrice(value: number | null | undefined): string {
+function formatPrice(value: number | null | undefined) {
   if (!value) return "Consulte";
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 0,
+  });
 }
 
-function formatKm(km: number | null | undefined): string {
-  if (!km) return "0 km";
-  return `${km.toLocaleString("pt-BR")} km`;
+function formatKm(value: number | null | undefined) {
+  if (!value) return "-";
+  return `${Number(value).toLocaleString("pt-BR")} km`;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
-    available: { label: "Disponível", className: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: CheckCircle },
-    reserved: { label: "Reservado", className: "bg-amber-500/20 text-amber-400 border-amber-500/30", icon: Clock },
-    sold: { label: "Vendido", className: "bg-red-500/20 text-red-400 border-red-500/30", icon: XCircle },
-  };
-  const c = config[status] || config.available;
-  const Icon = c.icon;
-  return (
-    <Badge variant="outline" className={c.className}>
-      <Icon className="w-3 h-3 mr-1" />
-      {c.label}
-    </Badge>
-  );
+function formatDate(value: number | null | undefined) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("pt-BR");
 }
+
+function statusLabel(status: string) {
+  if (status === "sold") return "Vendido";
+  if (status === "reserved") return "Reservado";
+  return "Disponível";
+}
+
+function sourceLabel(sourceType: string) {
+  if (sourceType === "integration") return "Integração";
+  if (sourceType === "sync") return "Sync";
+  return "Manual";
+}
+
+const sortFieldLabels: Record<(typeof inventorySortFields)[number], string> = {
+  createdAt: "Cadastro",
+  entryDate: "Entrada",
+  price: "Preço",
+  km: "KM",
+  margin: "Margem",
+  published: "Publicação",
+  featured: "Destaque",
+  sourceType: "Origem",
+  status: "Status",
+};
 
 export default function AdminInventory() {
+  const [, setLocation] = useLocation();
+  const tenantSlug = getCurrentTenantSlug();
+  const utils = trpc.useUtils();
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("available");
-  const [brandFilter, setBrandFilter] = useState("all");
-  const [page, setPage] = useState(0);
-  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
-  const [photoIndex, setPhotoIndex] = useState(0);
-  const [showCreate, setShowCreate] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    brand: "", model: "", version: "", motor: "", year: "", manufactureYear: "", modelYear: "",
-    color: "", fuel: "", km: "", price: "", plate: "", chassis: "", renavam: "",
-    bodyType: "", transmission: "", doors: "", vehicleState: "usado", category: "Carro/Camionetas",
-    observation: "", title: "", internalCode: "", purchasePrice: "", preparationCost: "",
-    documentationCost: "", transportCost: "", otherCosts: "", minimumSalePrice: "",
-    fipePrice: "", offerPrice: "", videoUrl: "", internalNotes: "", storeLocation: "",
-  });
-  const [editForm, setEditForm] = useState<any>({});
+  const [status, setStatus] = useState<"all" | "available" | "reserved" | "sold">("all");
+  const [brand, setBrand] = useState("all");
+  const [sourceType, setSourceType] = useState<"all" | (typeof inventorySourceTypes)[number]>("all");
+  const [sortBy, setSortBy] = useState<(typeof inventorySortFields)[number]>("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [detailsId, setDetailsId] = useState<number | null>(null);
 
-  const { data: vehicles, isLoading, refetch } = trpc.inventory.list.useQuery({
-    status: statusFilter === "all" ? "all" : statusFilter as any,
+  const adminListQuery = trpc.inventory.adminList.useQuery({
+    page,
+    pageSize,
     search: search || undefined,
-    brand: brandFilter !== "all" ? brandFilter : undefined,
-  });
-  const { data: brands } = trpc.inventory.brands.useQuery();
-  const { data: stats } = trpc.inventory.stats.useQuery();
-  const { data: syncLogs } = trpc.inventory.syncLogs.useQuery();
-  const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
-
-  const createMutation = trpc.inventory.create.useMutation({
-    onSuccess: () => {
-      toast.success("Veículo cadastrado com sucesso!");
-      setShowCreate(false);
-      setCreateForm({
-        brand: "", model: "", version: "", motor: "", year: "", manufactureYear: "", modelYear: "",
-        color: "", fuel: "", km: "", price: "", plate: "", chassis: "", renavam: "",
-        bodyType: "", transmission: "", doors: "", vehicleState: "usado", category: "Carro/Camionetas",
-        observation: "", title: "", internalCode: "", purchasePrice: "", preparationCost: "",
-        documentationCost: "", transportCost: "", otherCosts: "", minimumSalePrice: "",
-        fipePrice: "", offerPrice: "", videoUrl: "", internalNotes: "", storeLocation: "",
-      });
-      refetch();
-    },
-    onError: (err) => toast.error("Erro ao cadastrar: " + err.message),
+    status,
+    brand: brand !== "all" ? brand : undefined,
+    sourceType,
+    publishedState: "all",
+    featuredState: "all",
+    visibility: "active",
+    sortBy,
+    sortOrder,
   });
 
-  const updateMutation = trpc.inventory.update.useMutation({
-    onSuccess: () => {
-      toast.success("Veículo atualizado!");
-      setShowEdit(false);
-      setSelectedVehicle(null);
-      refetch();
+  const brandsQuery = trpc.inventory.brands.useQuery();
+  const detailsQuery = trpc.inventory.getAdminById.useQuery(
+    { id: detailsId || 0 },
+    { enabled: !!detailsId }
+  );
+
+  const invalidateInventory = async () => {
+    await Promise.all([
+      utils.inventory.adminList.invalidate(),
+      utils.inventory.adminMetrics.invalidate(),
+      utils.inventory.stats.invalidate(),
+      utils.inventory.list.invalidate(),
+      utils.inventory.getAdminById.invalidate(),
+    ]);
+  };
+
+  const syncMutation = trpc.inventory.sync.useMutation({
+    onSuccess: async (result) => {
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`Sincronização concluída: ${result.added} novos, ${result.updated} atualizados.`);
+      await invalidateInventory();
     },
-    onError: (err) => toast.error("Erro ao atualizar: " + err.message),
+    onError: (error) => toast.error(error.message),
   });
 
   const deleteMutation = trpc.inventory.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Veículo excluído!");
-      setSelectedVehicle(null);
-      refetch();
+    onSuccess: async () => {
+      toast.success("Veículo excluído com soft delete.");
+      setDeleteId(null);
+      setDeleteReason("");
+      await invalidateInventory();
     },
-    onError: (err) => toast.error("Erro ao excluir: " + err.message),
+    onError: (error) => toast.error(error.message),
   });
 
-  const syncMutation = trpc.inventory.sync.useMutation({
-    onSuccess: (result) => {
-      if (result.error) {
-        toast.error(`Erro na sincronização: ${result.error}`);
-      } else {
-        toast.success(`Sincronizado! ${result.found} veículos encontrados, ${result.added} novos, ${result.updated} atualizados`);
-      }
-      refetch();
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const items = adminListQuery.data?.items || [];
+  const totalPages = adminListQuery.data?.totalPages || 0;
+  const total = adminListQuery.data?.total || 0;
 
-  const reserveMutation = trpc.inventory.reserve.useMutation({
-    onSuccess: () => { toast.success("Veículo reservado!"); refetch(); setSelectedVehicle(null); },
-    onError: (err) => toast.error(err.message),
-  });
+  const canGoPrev = page > 1;
+  const canGoNext = totalPages > 0 && page < totalPages;
 
-  const markSoldMutation = trpc.inventory.markSold.useMutation({
-    onSuccess: () => { toast.success("Veículo marcado como vendido!"); refetch(); setSelectedVehicle(null); },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const markAvailableMutation = trpc.inventory.markAvailable.useMutation({
-    onSuccess: () => { toast.success("Veículo disponível novamente!"); refetch(); setSelectedVehicle(null); },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const filteredVehicles = vehicles || [];
-  const totalPages = Math.ceil(filteredVehicles.length / PAGE_SIZE);
-  const pagedVehicles = filteredVehicles.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const lastSync = syncLogs?.[0];
-  const lastSyncTime = lastSync?.createdAt ? new Date(lastSync.createdAt).toLocaleString("pt-BR") : "Nunca";
-
-  const selectedPhotos = useMemo(() => {
-    if (!selectedVehicle?.photos) return [];
-    try { return JSON.parse(selectedVehicle.photos); } catch { return []; }
-  }, [selectedVehicle]);
-
-  const selectedOptionals = useMemo(() => {
-    if (!selectedVehicle?.optionals) return [];
-    try { return JSON.parse(selectedVehicle.optionals); } catch { return []; }
-  }, [selectedVehicle]);
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 1) return [1];
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
+    const pages: number[] = [];
+    for (let current = start; current <= end; current += 1) pages.push(current);
+    if (!pages.includes(1)) pages.unshift(1);
+    if (!pages.includes(totalPages)) pages.push(totalPages);
+    return Array.from(new Set(pages));
+  }, [page, totalPages]);
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <Car className="w-7 h-7 text-blue-400" />
-              Estoque de Veículos
-            </h1>
-            <p className="text-gray-400 text-sm mt-1">
-              Sincronizado do site kafkamultimarcas.com.br | Última sync: {lastSyncTime}
+        <div className="flex flex-col gap-4 border-b border-border/60 pb-5 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Estoque</h1>
+            <p className="text-sm text-muted-foreground">
+              {total} veículo(s) no estoque
             </p>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={() => setShowCreate(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Cadastrar Veículo
-            </Button>
-            <Button
+              variant="outline"
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="gap-2"
             >
-              {syncMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              Sincronizar Agora
+              {syncMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Sincronizar
+            </Button>
+            <Button
+              className="gap-2"
+              onClick={() => setLocation(buildTenantPath(tenantSlug, "/admin/estoque/cadastrar"))}
+            >
+              <Plus className="h-4 w-4" />
+              Cadastrar
             </Button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card onClick={() => setStatusFilter('all')} className={`bg-gray-900/50 border-gray-800 cursor-pointer transition-all ${statusFilter === 'all' ? 'ring-2 ring-blue-400' : 'hover:ring-1 hover:ring-blue-400/50'}`}>
-            <CardContent className="p-4 text-center">
-              <Package className="w-5 h-5 mx-auto text-blue-400 mb-1" />
-              <p className="text-2xl font-bold text-white">{stats?.total || 0}</p>
-              <p className="text-xs text-gray-400">Total</p>
-            </CardContent>
-          </Card>
-          <Card onClick={() => setStatusFilter('available')} className={`bg-gray-900/50 border-gray-800 cursor-pointer transition-all ${statusFilter === 'available' ? 'ring-2 ring-emerald-400' : 'hover:ring-1 hover:ring-emerald-400/50'}`}>
-            <CardContent className="p-4 text-center">
-              <CheckCircle className="w-5 h-5 mx-auto text-emerald-400 mb-1" />
-              <p className="text-2xl font-bold text-emerald-400">{stats?.available || 0}</p>
-              <p className="text-xs text-gray-400">Disponíveis</p>
-            </CardContent>
-          </Card>
-          <Card onClick={() => setStatusFilter('reserved')} className={`bg-gray-900/50 border-gray-800 cursor-pointer transition-all ${statusFilter === 'reserved' ? 'ring-2 ring-amber-400' : 'hover:ring-1 hover:ring-amber-400/50'}`}>
-            <CardContent className="p-4 text-center">
-              <Clock className="w-5 h-5 mx-auto text-amber-400 mb-1" />
-              <p className="text-2xl font-bold text-amber-400">{stats?.reserved || 0}</p>
-              <p className="text-xs text-gray-400">Reservados</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gray-900/50 border-gray-800">
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="w-5 h-5 mx-auto text-purple-400 mb-1" />
-              <p className="text-2xl font-bold text-white">{formatPrice(stats?.avgPrice)}</p>
-              <p className="text-xs text-gray-400">Preço Médio</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.2fr)_repeat(5,minmax(0,1fr))]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-              placeholder="Buscar por marca, modelo, cor..."
-              className="pl-10 bg-gray-900 border-gray-700 text-white"
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9"
+              placeholder="Buscar por marca, modelo, placa ou código"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
-            <SelectTrigger className="w-[160px] bg-gray-900 border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
+
+          <Select value={status} onValueChange={(value) => { setStatus(value as typeof status); setPage(1); }}>
+            <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all">Todos os status</SelectItem>
               <SelectItem value="available">Disponíveis</SelectItem>
               <SelectItem value="reserved">Reservados</SelectItem>
               <SelectItem value="sold">Vendidos</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={brandFilter} onValueChange={(v) => { setBrandFilter(v); setPage(0); }}>
-            <SelectTrigger className="w-[180px] bg-gray-900 border-gray-700 text-white">
-              <SelectValue placeholder="Marca" />
-            </SelectTrigger>
+
+          <Select value={brand} onValueChange={(value) => { setBrand(value); setPage(1); }}>
+            <SelectTrigger><SelectValue placeholder="Marca" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as marcas</SelectItem>
-              {(brands || []).map((b) => (
-                <SelectItem key={b.brand} value={b.brand}>
-                  {b.brand} ({b.count})
+              {(brandsQuery.data || []).map((item) => (
+                <SelectItem key={item.brand} value={item.brand}>
+                  {item.brand} ({item.count})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={sourceType} onValueChange={(value) => { setSourceType(value as typeof sourceType); setPage(1); }}>
+            <SelectTrigger><SelectValue placeholder="Origem" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as origens</SelectItem>
+              <SelectItem value="manual">Manual</SelectItem>
+              <SelectItem value="integration">Integração</SelectItem>
+              <SelectItem value="sync">Sync</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={(value) => { setSortBy(value as typeof sortBy); setPage(1); }}>
+            <SelectTrigger><SelectValue placeholder="Ordenar por" /></SelectTrigger>
+            <SelectContent>
+              {inventorySortFields.map((field) => (
+                <SelectItem key={field} value={field}>
+                  {sortFieldLabels[field]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select value={sortOrder} onValueChange={(value) => { setSortOrder(value as typeof sortOrder); setPage(1); }}>
+              <SelectTrigger><SelectValue placeholder="Ordem" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Desc</SelectItem>
+                <SelectItem value="asc">Asc</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={String(pageSize)} onValueChange={(value) => { setPageSize(Number(value)); setPage(1); }}>
+              <SelectTrigger><SelectValue placeholder="Itens" /></SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}/página
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Vehicle Grid */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-background">
+          {adminListQuery.isLoading ? (
+            <div className="flex min-h-[280px] items-center justify-center">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+              <p className="text-base font-medium text-foreground">Nenhum veículo encontrado.</p>
+              <p className="text-sm text-muted-foreground">Ajuste os filtros ou cadastre um novo veículo no estoque.</p>
+              <Button onClick={() => setLocation(buildTenantPath(tenantSlug, "/admin/estoque/cadastrar"))}>
+                Cadastrar veículo
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border/60 text-sm">
+                <thead className="bg-muted/35">
+                  <tr className="text-left text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">Veículo</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Origem</th>
+                    <th className="px-4 py-3 font-medium">Preço</th>
+                    <th className="px-4 py-3 font-medium">KM</th>
+                    <th className="px-4 py-3 font-medium">Ano</th>
+                    <th className="px-4 py-3 font-medium">Entrada</th>
+                    <th className="px-4 py-3 font-medium">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {items.map((vehicle: any) => (
+                    <tr key={vehicle.id} className="transition-colors hover:bg-muted/25">
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex min-w-[260px] items-start gap-3">
+                          <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted">
+                            {vehicle.photoUrl ? (
+                              <img
+                                src={vehicle.photoUrl}
+                                alt={`${vehicle.brand} ${vehicle.model}`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-foreground">
+                              {(vehicle.title || `${vehicle.brand} ${vehicle.model}`).trim()}
+                            </p>
+                            <p className="truncate text-muted-foreground">
+                              {[vehicle.version, vehicle.plate, vehicle.internalCode].filter(Boolean).join(" • ") || "Sem complemento"}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge variant="outline">{vehicle.isPublished ? "Publicado" : "Rascunho"}</Badge>
+                              {vehicle.isFeatured ? <Badge variant="outline">Destaque</Badge> : null}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-top text-foreground">{statusLabel(vehicle.status)}</td>
+                      <td className="px-4 py-4 align-top text-foreground">{sourceLabel(vehicle.sourceType)}</td>
+                      <td className="px-4 py-4 align-top font-medium text-foreground">{formatPrice(vehicle.price)}</td>
+                      <td className="px-4 py-4 align-top text-foreground">{formatKm(vehicle.km)}</td>
+                      <td className="px-4 py-4 align-top text-foreground">{vehicle.modelYear || vehicle.year || "-"}</td>
+                      <td className="px-4 py-4 align-top text-foreground">{formatDate(vehicle.entryDate)}</td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setLocation(buildTenantPath(tenantSlug, `/admin/estoque/${vehicle.id}/editar`))}
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setDetailsId(vehicle.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            Detalhes
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteId(vehicle.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Excluir
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {totalPages > 1 ? (
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Exibindo página {page} de {totalPages} • {total} veículo(s)
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => canGoPrev && setPage((current) => current - 1)}
+                disabled={!canGoPrev}
+                className="gap-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+
+              {pageNumbers.map((pageNumber, index) => {
+                const prev = pageNumbers[index - 1];
+                const showGap = prev && pageNumber - prev > 1;
+                return (
+                  <div key={pageNumber} className="flex items-center gap-2">
+                    {showGap ? <span className="px-1 text-muted-foreground">…</span> : null}
+                    <Button
+                      variant={pageNumber === page ? "default" : "outline"}
+                      onClick={() => setPage(pageNumber)}
+                      className="min-w-10"
+                    >
+                      {pageNumber}
+                    </Button>
+                  </div>
+                );
+              })}
+
+              <Button
+                variant="outline"
+                onClick={() => canGoNext && setPage((current) => current + 1)}
+                disabled={!canGoNext}
+                className="gap-2"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        ) : pagedVehicles.length === 0 ? (
-          <Card className="bg-gray-900/50 border-gray-800">
-            <CardContent className="p-12 text-center">
-              <Car className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-              <p className="text-gray-400">Nenhum veículo encontrado</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {pagedVehicles.map((v) => (
-                <Card
-                  key={v.id}
-                  className="bg-gray-900/50 border-gray-800 hover:border-blue-500/50 transition-all cursor-pointer overflow-hidden group"
-                  onClick={() => { setSelectedVehicle(v); setPhotoIndex(0); }}
-                >
-                  {/* Photo */}
-                  <div className="relative aspect-[16/10] bg-gray-800 overflow-hidden">
-                    {v.photoUrl ? (
-                      <img
-                        src={v.photoUrl}
-                        alt={`${v.brand} ${v.model}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Car className="w-12 h-12 text-gray-600" />
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2">
-                      <StatusBadge status={v.status} />
-                    </div>
-                    {Number(v.fipePrice) > 0 && Number(v.price) > 0 && Number(v.price) < Number(v.fipePrice) && (
-                      <div className="absolute top-2 left-2">
-                        <Badge className="bg-green-600/90 text-white text-[10px]">
-                          <Tag className="w-3 h-3 mr-1" />
-                          Abaixo FIPE
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-bold text-white text-sm truncate">
-                      {v.brand} {v.model}
-                    </h3>
-                    <p className="text-gray-400 text-xs truncate">{v.version}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-lg font-bold text-emerald-400">
-                        {formatPrice(v.price)}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {v.year} | {formatKm(v.km)}
-                      </span>
-                    </div>
-                    <div className="flex gap-1 mt-2 flex-wrap">
-                      {v.transmission && (
-                        <Badge variant="outline" className="text-[10px] border-gray-700 text-gray-400">
-                          {v.transmission}
-                        </Badge>
-                      )}
-                      {v.fuel && (
-                        <Badge variant="outline" className="text-[10px] border-gray-700 text-gray-400">
-                          {v.fuel}
-                        </Badge>
-                      )}
-                      {v.color && (
-                        <Badge variant="outline" className="text-[10px] border-gray-700 text-gray-400">
-                          {v.color}
-                        </Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="border-gray-700"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-gray-400 text-sm">
-                  Página {page + 1} de {totalPages} ({filteredVehicles.length} veículos)
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  className="border-gray-700"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Vehicle Detail Dialog */}
-        <Dialog open={!!selectedVehicle} onOpenChange={(open) => { if (!open) setSelectedVehicle(null); }}>
-          <DialogContent className="max-w-2xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
-            {selectedVehicle && (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="text-xl">
-                    {selectedVehicle.brand} {selectedVehicle.model}
-                  </DialogTitle>
-                  <p className="text-gray-400">{selectedVehicle.version}</p>
-                </DialogHeader>
-
-                {/* Photo Gallery */}
-                {selectedPhotos.length > 0 && (
-                  <div className="relative">
-                    <div className="aspect-video bg-gray-800 rounded-lg overflow-hidden">
-                      <img
-                        src={selectedPhotos[photoIndex]}
-                        alt={`Foto ${photoIndex + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {selectedPhotos.length > 1 && (
-                      <div className="flex items-center justify-between mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPhotoIndex(i => (i - 1 + selectedPhotos.length) % selectedPhotos.length)}
-                          className="border-gray-700"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-gray-400 text-sm">
-                          {photoIndex + 1} / {selectedPhotos.length}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPhotoIndex(i => (i + 1) % selectedPhotos.length)}
-                          className="border-gray-700"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Vehicle Info */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-400" />
-                    <span className="text-gray-400">Ano:</span>
-                    <span className="font-semibold">{selectedVehicle.year}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Gauge className="w-4 h-4 text-blue-400" />
-                    <span className="text-gray-400">KM:</span>
-                    <span className="font-semibold">{formatKm(selectedVehicle.km)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Fuel className="w-4 h-4 text-blue-400" />
-                    <span className="text-gray-400">Combustível:</span>
-                    <span className="font-semibold">{selectedVehicle.fuel || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-blue-400" />
-                    <span className="text-gray-400">Cor:</span>
-                    <span className="font-semibold">{selectedVehicle.color || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Car className="w-4 h-4 text-blue-400" />
-                    <span className="text-gray-400">Câmbio:</span>
-                    <span className="font-semibold">{selectedVehicle.transmission || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Car className="w-4 h-4 text-blue-400" />
-                    <span className="text-gray-400">Motor:</span>
-                    <span className="font-semibold">{selectedVehicle.motor || "N/A"}</span>
-                  </div>
-                </div>
-
-                {/* Prices */}
-                <div className="bg-gray-800/50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Preço:</span>
-                    <span className="text-xl font-bold text-emerald-400">{formatPrice(selectedVehicle.price)}</span>
-                  </div>
-                  {selectedVehicle.fipePrice > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">FIPE:</span>
-                      <span className="text-sm text-gray-300">{formatPrice(selectedVehicle.fipePrice)}</span>
-                    </div>
-                  )}
-                  {selectedVehicle.offerPrice > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Oferta:</span>
-                      <span className="text-sm text-orange-400">{formatPrice(selectedVehicle.offerPrice)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Optionals */}
-                {selectedOptionals.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-300 mb-2">Opcionais</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedOptionals.map((opt: string, i: number) => (
-                        <Badge key={i} variant="outline" className="text-[10px] border-gray-700 text-gray-400">
-                          {opt}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Status & Actions */}
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={selectedVehicle.status} />
-                  {selectedVehicle.plate && (
-                    <Badge variant="outline" className="border-gray-700 text-gray-400">
-                      Placa: {selectedVehicle.plate}
-                    </Badge>
-                  )}
-                </div>
-
-                <DialogFooter className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    className="border-gray-700"
-                    onClick={() => {
-                      const link = `${window.location.origin}${buildTenantPath(getCurrentTenantSlug(), "/estoque")}?veiculo=${selectedVehicle.id}&utm_source=veiculo&utm_medium=link_direto`;
-                      navigator.clipboard.writeText(link);
-                      toast.success("Link do veículo copiado!");
-                    }}
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copiar Link
-                  </Button>
-                  {selectedVehicle.externalUrl && (
-                    <Button
-                      variant="outline"
-                      className="border-gray-700"
-                      onClick={() => window.open(selectedVehicle.externalUrl, "_blank")}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Ver no Site
-                    </Button>
-                  )}
-                  {selectedVehicle.status === "available" && (
-                    <>
-                      <Button
-                        className="bg-amber-600 hover:bg-amber-700"
-                        onClick={() => reserveMutation.mutate({ id: selectedVehicle.id })}
-                        disabled={reserveMutation.isPending}
-                      >
-                        <Clock className="w-4 h-4 mr-2" />
-                        Reservar
-                      </Button>
-                      <Select onValueChange={(sellerId) => {
-                        markSoldMutation.mutate({ id: selectedVehicle.id, sellerId: parseInt(sellerId) });
-                      }}>
-                        <SelectTrigger className="w-[200px] bg-red-600/20 border-red-500/30 text-red-400">
-                          <SelectValue placeholder="Marcar como vendido..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(sellers || []).filter(s => s.department === "vendas").map(s => (
-                            <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </>
-                  )}
-                  {(selectedVehicle.status === "reserved" || selectedVehicle.status === "sold") && (
-                    <Button
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => markAvailableMutation.mutate({ id: selectedVehicle.id })}
-                      disabled={markAvailableMutation.isPending}
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Disponibilizar
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    className="border-blue-500/30 text-blue-400"
-                    onClick={() => {
-                      setEditForm({
-                        id: selectedVehicle.id,
-                        brand: selectedVehicle.brand || "",
-                        model: selectedVehicle.model || "",
-                        version: selectedVehicle.version || "",
-                        motor: selectedVehicle.motor || "",
-                        year: selectedVehicle.year?.toString() || "",
-                        manufactureYear: selectedVehicle.manufactureYear?.toString() || "",
-                        modelYear: selectedVehicle.modelYear?.toString() || "",
-                        color: selectedVehicle.color || "",
-                        fuel: selectedVehicle.fuel || "",
-                        km: selectedVehicle.km?.toString() || "",
-                        price: selectedVehicle.price?.toString() || "",
-                        plate: selectedVehicle.plate || "",
-                        chassis: selectedVehicle.chassis || "",
-                        renavam: selectedVehicle.renavam || "",
-                        bodyType: selectedVehicle.bodyType || "",
-                        transmission: selectedVehicle.transmission || "",
-                        doors: selectedVehicle.doors || "",
-                        vehicleState: selectedVehicle.vehicleState || "usado",
-                        category: selectedVehicle.category || "Carro/Camionetas",
-                        observation: selectedVehicle.observation || "",
-                        title: selectedVehicle.title || "",
-                        internalCode: selectedVehicle.internalCode || "",
-                        purchasePrice: selectedVehicle.purchasePrice?.toString() || "",
-                        minimumSalePrice: selectedVehicle.minimumSalePrice?.toString() || "",
-                        fipePrice: selectedVehicle.fipePrice?.toString() || "",
-                        offerPrice: selectedVehicle.offerPrice?.toString() || "",
-                        internalNotes: selectedVehicle.internalNotes || "",
-                        storeLocation: selectedVehicle.storeLocation || "",
-                      });
-                      setSelectedVehicle(null);
-                      setShowEdit(true);
-                    }}
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-red-500/30 text-red-400"
-                    onClick={() => {
-                      if (confirm("Tem certeza que deseja excluir este veículo?")) {
-                        deleteMutation.mutate({ id: selectedVehicle.id });
-                      }
-                    }}
-                    disabled={deleteMutation.isPending}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
-        {/* Create Vehicle Dialog */}
-        <Dialog open={showCreate} onOpenChange={setShowCreate}>
-          <DialogContent className="max-w-3xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-emerald-400" />
-                Cadastrar Veículo
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-              <div>
-                <Label className="text-gray-300">Marca *</Label>
-                <Input placeholder="Volkswagen" value={createForm.brand} onChange={(e) => setCreateForm({...createForm, brand: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Modelo *</Label>
-                <Input placeholder="Saveiro" value={createForm.model} onChange={(e) => setCreateForm({...createForm, model: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Versão</Label>
-                <Input placeholder="ROBUST 1.6 FLEX" value={createForm.version} onChange={(e) => setCreateForm({...createForm, version: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Motor</Label>
-                <Input placeholder="1.6" value={createForm.motor} onChange={(e) => setCreateForm({...createForm, motor: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Ano</Label>
-                <Input type="number" placeholder="2024" value={createForm.year} onChange={(e) => setCreateForm({...createForm, year: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Ano Fabricação</Label>
-                <Input type="number" placeholder="2023" value={createForm.manufactureYear} onChange={(e) => setCreateForm({...createForm, manufactureYear: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Ano Modelo</Label>
-                <Input type="number" placeholder="2024" value={createForm.modelYear} onChange={(e) => setCreateForm({...createForm, modelYear: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Cor</Label>
-                <Input placeholder="Branco" value={createForm.color} onChange={(e) => setCreateForm({...createForm, color: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Combustível</Label>
-                <Select value={createForm.fuel} onValueChange={(v) => setCreateForm({...createForm, fuel: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Flex">Flex</SelectItem>
-                    <SelectItem value="Gasolina">Gasolina</SelectItem>
-                    <SelectItem value="Etanol">Etanol</SelectItem>
-                    <SelectItem value="Diesel">Diesel</SelectItem>
-                    <SelectItem value="Elétrico">Elétrico</SelectItem>
-                    <SelectItem value="Híbrido">Híbrido</SelectItem>
-                    <SelectItem value="GNV">GNV</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">KM</Label>
-                <Input type="number" placeholder="50000" value={createForm.km} onChange={(e) => setCreateForm({...createForm, km: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço Venda (R$)</Label>
-                <Input type="number" placeholder="89990" value={createForm.price} onChange={(e) => setCreateForm({...createForm, price: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Placa</Label>
-                <Input placeholder="ABC1D23" value={createForm.plate} onChange={(e) => setCreateForm({...createForm, plate: e.target.value.toUpperCase()})} maxLength={8} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Chassi</Label>
-                <Input placeholder="9BWZZZ377VT004251" value={createForm.chassis} onChange={(e) => setCreateForm({...createForm, chassis: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">RENAVAM</Label>
-                <Input placeholder="00123456789" value={createForm.renavam} onChange={(e) => setCreateForm({...createForm, renavam: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Tipo Carroceria</Label>
-                <Select value={createForm.bodyType} onValueChange={(v) => setCreateForm({...createForm, bodyType: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Hatch">Hatch</SelectItem>
-                    <SelectItem value="Sedan">Sedan</SelectItem>
-                    <SelectItem value="SUV">SUV</SelectItem>
-                    <SelectItem value="Picape">Picape</SelectItem>
-                    <SelectItem value="Van">Van</SelectItem>
-                    <SelectItem value="Caminhão">Caminhão</SelectItem>
-                    <SelectItem value="Moto">Moto</SelectItem>
-                    <SelectItem value="Outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">Câmbio</Label>
-                <Select value={createForm.transmission} onValueChange={(v) => setCreateForm({...createForm, transmission: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="auto">Automático</SelectItem>
-                    <SelectItem value="cvt">CVT</SelectItem>
-                    <SelectItem value="automatizado">Automatizado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">Portas</Label>
-                <Select value={createForm.doors} onValueChange={(v) => setCreateForm({...createForm, doors: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2">2</SelectItem>
-                    <SelectItem value="3">3</SelectItem>
-                    <SelectItem value="4">4</SelectItem>
-                    <SelectItem value="5">5</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">Estado</Label>
-                <Select value={createForm.vehicleState} onValueChange={(v) => setCreateForm({...createForm, vehicleState: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="novo">Novo</SelectItem>
-                    <SelectItem value="usado">Usado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">Categoria</Label>
-                <Select value={createForm.category} onValueChange={(v) => setCreateForm({...createForm, category: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Carro/Camionetas">Carro/Camionetas</SelectItem>
-                    <SelectItem value="Moto">Moto</SelectItem>
-                    <SelectItem value="Caminhão">Caminhão</SelectItem>
-                    <SelectItem value="Van">Van</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço Compra (R$)</Label>
-                <Input type="number" placeholder="75000" value={createForm.purchasePrice} onChange={(e) => setCreateForm({...createForm, purchasePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço Mínimo Venda (R$)</Label>
-                <Input type="number" placeholder="85000" value={createForm.minimumSalePrice} onChange={(e) => setCreateForm({...createForm, minimumSalePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço FIPE (R$)</Label>
-                <Input type="number" placeholder="92000" value={createForm.fipePrice} onChange={(e) => setCreateForm({...createForm, fipePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Código Interno</Label>
-                <Input placeholder="VH-001" value={createForm.internalCode} onChange={(e) => setCreateForm({...createForm, internalCode: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Local no Pátio</Label>
-                <Input placeholder="Vaga A3" value={createForm.storeLocation} onChange={(e) => setCreateForm({...createForm, storeLocation: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div className="col-span-2 sm:col-span-3">
-                <Label className="text-gray-300">Observações</Label>
-                <Textarea placeholder="Observações sobre o veículo..." value={createForm.observation} onChange={(e) => setCreateForm({...createForm, observation: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div className="col-span-2 sm:col-span-3">
-                <Label className="text-gray-300">Notas Internas</Label>
-                <Textarea placeholder="Notas internas (não visível ao público)..." value={createForm.internalNotes} onChange={(e) => setCreateForm({...createForm, internalNotes: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" className="border-gray-700" onClick={() => setShowCreate(false)}>Cancelar</Button>
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => createMutation.mutate({
-                  brand: createForm.brand,
-                  model: createForm.model,
-                  version: createForm.version || undefined,
-                  motor: createForm.motor || undefined,
-                  year: createForm.year ? parseInt(createForm.year) : undefined,
-                  manufactureYear: createForm.manufactureYear ? parseInt(createForm.manufactureYear) : undefined,
-                  modelYear: createForm.modelYear ? parseInt(createForm.modelYear) : undefined,
-                  color: createForm.color || undefined,
-                  fuel: createForm.fuel || undefined,
-                  km: createForm.km ? parseInt(createForm.km) : undefined,
-                  price: createForm.price ? parseInt(createForm.price) : undefined,
-                  plate: createForm.plate || undefined,
-                  chassis: createForm.chassis || undefined,
-                  renavam: createForm.renavam || undefined,
-                  bodyType: createForm.bodyType || undefined,
-                  transmission: createForm.transmission || undefined,
-                  doors: createForm.doors || undefined,
-                  vehicleState: createForm.vehicleState || undefined,
-                  category: createForm.category || undefined,
-                  observation: createForm.observation || undefined,
-                  title: createForm.title || undefined,
-                  internalCode: createForm.internalCode || undefined,
-                  purchasePrice: createForm.purchasePrice ? parseInt(createForm.purchasePrice) : undefined,
-                  minimumSalePrice: createForm.minimumSalePrice ? parseInt(createForm.minimumSalePrice) : undefined,
-                  fipePrice: createForm.fipePrice ? parseInt(createForm.fipePrice) : undefined,
-                  offerPrice: createForm.offerPrice ? parseInt(createForm.offerPrice) : undefined,
-                  internalNotes: createForm.internalNotes || undefined,
-                  storeLocation: createForm.storeLocation || undefined,
-                  entryDate: Date.now(),
-                })}
-                disabled={!createForm.brand || !createForm.model || createMutation.isPending}
-              >
-                {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Cadastrar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Vehicle Dialog */}
-        <Dialog open={showEdit} onOpenChange={setShowEdit}>
-          <DialogContent className="max-w-3xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Edit className="w-5 h-5 text-blue-400" />
-                Editar Veículo
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-              <div>
-                <Label className="text-gray-300">Marca *</Label>
-                <Input value={editForm.brand || ""} onChange={(e) => setEditForm({...editForm, brand: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Modelo *</Label>
-                <Input value={editForm.model || ""} onChange={(e) => setEditForm({...editForm, model: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Versão</Label>
-                <Input value={editForm.version || ""} onChange={(e) => setEditForm({...editForm, version: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Motor</Label>
-                <Input value={editForm.motor || ""} onChange={(e) => setEditForm({...editForm, motor: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Ano</Label>
-                <Input type="number" value={editForm.year || ""} onChange={(e) => setEditForm({...editForm, year: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Cor</Label>
-                <Input value={editForm.color || ""} onChange={(e) => setEditForm({...editForm, color: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Combustível</Label>
-                <Select value={editForm.fuel || ""} onValueChange={(v) => setEditForm({...editForm, fuel: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Flex">Flex</SelectItem>
-                    <SelectItem value="Gasolina">Gasolina</SelectItem>
-                    <SelectItem value="Etanol">Etanol</SelectItem>
-                    <SelectItem value="Diesel">Diesel</SelectItem>
-                    <SelectItem value="Elétrico">Elétrico</SelectItem>
-                    <SelectItem value="Híbrido">Híbrido</SelectItem>
-                    <SelectItem value="GNV">GNV</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">KM</Label>
-                <Input type="number" value={editForm.km || ""} onChange={(e) => setEditForm({...editForm, km: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço Venda (R$)</Label>
-                <Input type="number" value={editForm.price || ""} onChange={(e) => setEditForm({...editForm, price: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Placa</Label>
-                <Input value={editForm.plate || ""} onChange={(e) => setEditForm({...editForm, plate: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Chassi</Label>
-                <Input value={editForm.chassis || ""} onChange={(e) => setEditForm({...editForm, chassis: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">RENAVAM</Label>
-                <Input value={editForm.renavam || ""} onChange={(e) => setEditForm({...editForm, renavam: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Câmbio</Label>
-                <Select value={editForm.transmission || ""} onValueChange={(v) => setEditForm({...editForm, transmission: v})}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="auto">Automático</SelectItem>
-                    <SelectItem value="cvt">CVT</SelectItem>
-                    <SelectItem value="automatizado">Automatizado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço Compra (R$)</Label>
-                <Input type="number" value={editForm.purchasePrice || ""} onChange={(e) => setEditForm({...editForm, purchasePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Preço Mínimo (R$)</Label>
-                <Input type="number" value={editForm.minimumSalePrice || ""} onChange={(e) => setEditForm({...editForm, minimumSalePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Código Interno</Label>
-                <Input value={editForm.internalCode || ""} onChange={(e) => setEditForm({...editForm, internalCode: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div>
-                <Label className="text-gray-300">Local no Pátio</Label>
-                <Input value={editForm.storeLocation || ""} onChange={(e) => setEditForm({...editForm, storeLocation: e.target.value})} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div className="col-span-2 sm:col-span-3">
-                <Label className="text-gray-300">Observações</Label>
-                <Textarea value={editForm.observation || ""} onChange={(e) => setEditForm({...editForm, observation: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
-              </div>
-              <div className="col-span-2 sm:col-span-3">
-                <Label className="text-gray-300">Notas Internas</Label>
-                <Textarea value={editForm.internalNotes || ""} onChange={(e) => setEditForm({...editForm, internalNotes: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" className="border-gray-700" onClick={() => setShowEdit(false)}>Cancelar</Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => updateMutation.mutate({
-                  id: editForm.id,
-                  brand: editForm.brand || undefined,
-                  model: editForm.model || undefined,
-                  version: editForm.version || undefined,
-                  motor: editForm.motor || undefined,
-                  year: editForm.year ? parseInt(editForm.year) : undefined,
-                  color: editForm.color || undefined,
-                  fuel: editForm.fuel || undefined,
-                  km: editForm.km ? parseInt(editForm.km) : undefined,
-                  price: editForm.price ? parseInt(editForm.price) : undefined,
-                  plate: editForm.plate || undefined,
-                  chassis: editForm.chassis || undefined,
-                  renavam: editForm.renavam || undefined,
-                  transmission: editForm.transmission || undefined,
-                  purchasePrice: editForm.purchasePrice ? parseInt(editForm.purchasePrice) : undefined,
-                  minimumSalePrice: editForm.minimumSalePrice ? parseInt(editForm.minimumSalePrice) : undefined,
-                  internalCode: editForm.internalCode || undefined,
-                  storeLocation: editForm.storeLocation || undefined,
-                  observation: editForm.observation || undefined,
-                  internalNotes: editForm.internalNotes || undefined,
-                })}
-                disabled={!editForm.brand || !editForm.model || updateMutation.isPending}
-              >
-                {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Salvar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        ) : null}
       </div>
+
+      <Dialog open={detailsId !== null} onOpenChange={(open) => !open && setDetailsId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes do veículo</DialogTitle>
+          </DialogHeader>
+
+          {detailsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : !detailsQuery.data ? (
+            <p className="text-sm text-muted-foreground">Veículo não encontrado.</p>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex flex-col gap-4 md:flex-row">
+                <div className="h-44 w-full overflow-hidden rounded-xl border border-border/60 bg-muted md:w-72">
+                  {detailsQuery.data.photoUrl ? (
+                    <img
+                      src={detailsQuery.data.photoUrl}
+                      alt={`${detailsQuery.data.brand} ${detailsQuery.data.model}`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                </div>
+
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <p className="text-lg font-semibold text-foreground">
+                      {(detailsQuery.data.title || `${detailsQuery.data.brand} ${detailsQuery.data.model}`).trim()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {[detailsQuery.data.version, detailsQuery.data.plate, detailsQuery.data.internalCode].filter(Boolean).join(" • ") || "Sem complemento"}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Preço</p>
+                      <p className="font-medium text-foreground">{formatPrice(detailsQuery.data.price)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Status</p>
+                      <p className="font-medium text-foreground">{statusLabel(detailsQuery.data.status)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Origem</p>
+                      <p className="font-medium text-foreground">{sourceLabel(detailsQuery.data.sourceType)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Entrada</p>
+                      <p className="font-medium text-foreground">{formatDate(detailsQuery.data.entryDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">KM</p>
+                      <p className="font-medium text-foreground">{formatKm(detailsQuery.data.km)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Ano</p>
+                      <p className="font-medium text-foreground">{detailsQuery.data.modelYear || detailsQuery.data.year || "-"}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 border-t border-border/60 pt-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Checklist</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {detailsQuery.data.checklist?.completeness || 0}% completo
+                  </p>
+                  {detailsQuery.data.checklist?.missingItems?.length ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Faltando: {detailsQuery.data.checklist.missingItems.join(", ")}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted-foreground">Pronto para publicação.</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Observação</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {detailsQuery.data.observation || "Sem descrição cadastrada."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => setLocation(buildTenantPath(tenantSlug, `/admin/estoque/${detailsQuery.data.id}/editar`))}
+                >
+                  Editar veículo
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(buildTenantPath(tenantSlug, `/admin/estoque/${detailsQuery.data.id}/preview`), "_blank")}
+                >
+                  Abrir preview público
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir veículo do estoque?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A exclusão é lógica. O veículo sai da operação e permanece registrado para auditoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-reason">Motivo da exclusão</Label>
+            <Textarea
+              id="delete-reason"
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              rows={3}
+              placeholder="Ex: cadastro duplicado, veículo vendido fora da plataforma..."
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteReason("")}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                if (!deleteId) return;
+                if (deleteReason.trim().length < 3) {
+                  toast.error("Informe um motivo para a exclusão.");
+                  return;
+                }
+                deleteMutation.mutate({ id: deleteId, reason: deleteReason.trim() });
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

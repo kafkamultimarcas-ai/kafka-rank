@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
@@ -10,13 +10,12 @@ import {
   Fuel, Mic, MicOff, Loader2, Shield, ShieldCheck, ShieldAlert, Edit2, Trash2,
   Download, Printer, BarChart3, PieChart, Filter, Check, XCircle, Eye,
   ChevronLeft, ChevronRight, CircleDollarSign, Banknote, CreditCard,
-  FileSpreadsheet, ArrowUpDown, MoreVertical, RefreshCw, Truck
+  FileSpreadsheet, ArrowUpDown, MoreVertical, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SupplierCombobox } from "@/components/SupplierCombobox";
 import { Input } from "@/components/ui/input";
 import { useBranding } from "@/contexts/TenantContext";
-import { PaginationControls } from "@/components/PaginationControls";
-import { SupplierCombobox } from "@/components/SupplierCombobox";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
   aberto: { label: "Aberto", color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/40", emoji: "🔵" },
@@ -41,7 +40,7 @@ function formatCurrency(value: string | number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
 }
 
-type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios" | "fornecedores";
+type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios";
 
 export default function Financeiro() {
   const { logoUrl } = useBranding();
@@ -58,7 +57,6 @@ export default function Financeiro() {
     { key: "pos-venda", label: "Pós-Venda", icon: Wrench, color: "orange" },
     { key: "gasolina", label: "Gasolina", icon: Fuel, color: "yellow" },
     { key: "relatorios", label: "Relatórios", icon: FileSpreadsheet, color: "purple" },
-    { key: "fornecedores", label: "Fornecedores", icon: Truck, color: "sky" },
   ];
 
   return (
@@ -120,7 +118,6 @@ export default function Financeiro() {
       {mainTab === "pos-venda" && <PosVendaTab />}
       {mainTab === "gasolina" && <GasolinaTab />}
       {mainTab === "relatorios" && <RelatoriosTab />}
-      {mainTab === "fornecedores" && <FornecedoresTab />}
     </div>
   );
 }
@@ -268,7 +265,7 @@ function DashboardTab() {
                     <div className="flex-1 min-w-0">
                       <p className="text-gray-200 font-medium truncate">{t.description}</p>
                       <p className="text-[10px] text-yellow-300/70">
-                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : t.type === 'paid' ? 'Pago' : 'A Receber'}
+                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : 'A Receber'}
                       </p>
                     </div>
                     <span className="text-yellow-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
@@ -285,7 +282,7 @@ function DashboardTab() {
                     <div className="flex-1 min-w-0">
                       <p className="text-gray-200 font-medium truncate">{t.description}</p>
                       <p className="text-[10px] text-orange-300/70">
-                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : t.type === 'paid' ? 'Pago' : 'A Receber'}
+                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : 'A Receber'}
                       </p>
                     </div>
                     <span className="text-orange-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
@@ -378,47 +375,29 @@ function DashboardTab() {
 // ===== CONTAS TAB (Exclusivo Financeiro) =====
 function ContasTab() {
   const { data: categories } = trpc.finCategories.list.useQuery();
-  const { data: sellersList } = trpc.sellers.list.useQuery({ activeOnly: true });
   const utils = trpc.useUtils();
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
   const [filterYear, setFilterYear] = useState(now.getFullYear());
   const startDate = useMemo(() => new Date(filterYear, filterMonth - 1, 1).getTime(), [filterMonth, filterYear]);
   const endDate = useMemo(() => new Date(filterYear, filterMonth, 0, 23, 59, 59).getTime(), [filterMonth, filterYear]);
+  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery({ startDate, endDate });
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable" | "paid">("all");
-  const [sellerFilter, setSellerFilter] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  // Paginação server-side
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const queryParams = useMemo(() => ({
-    startDate,
-    endDate,
-    page,
-    pageSize,
-    ...(typeFilter !== "all" ? { type: typeFilter as "payable" | "receivable" | "paid" } : {}),
-    ...(filter === "pending" ? { status: "pending" as const } : {}),
-    ...(filter === "paid" ? { status: "paid" as const } : {}),
-    ...(filter === "overdue" ? { status: "overdue" as const } : {}),
-    ...(sellerFilter ? { sellerId: sellerFilter } : {}),
-    ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
-  }), [startDate, endDate, page, pageSize, typeFilter, filter, sellerFilter, searchQuery]);
-  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery(queryParams);
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   
   // Form state
-  const [txType, setTxType] = useState<"payable" | "receivable" | "paid">("payable");
+  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
   const [txDescription, setTxDescription] = useState("");
   const [txAmount, setTxAmount] = useState("");
   const [txDueDate, setTxDueDate] = useState("");
   const [txSupplier, setTxSupplier] = useState("");
   const [txNotes, setTxNotes] = useState("");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
-  const [txSellerId, setTxSellerId] = useState<number | null>(null);
   const [txNeedsApproval, setTxNeedsApproval] = useState(false);
   const [txRecurrence, setTxRecurrence] = useState("none");
   
@@ -446,7 +425,7 @@ function ContasTab() {
   const resetForm = () => {
     setTxType("payable"); setTxDescription(""); setTxAmount("");
     setTxDueDate(""); setTxSupplier(""); setTxNotes("");
-    setTxCategoryId(null); setTxSellerId(null); setTxNeedsApproval(false); setTxRecurrence("none");
+    setTxCategoryId(null); setTxNeedsApproval(false); setTxRecurrence("none");
   };
 
   const startEdit = (t: any) => {
@@ -458,46 +437,38 @@ function ContasTab() {
     setTxSupplier(t.supplier || "");
     setTxNotes(t.notes || "");
     setTxCategoryId(t.categoryId);
-    setTxSellerId(t.sellerId || null);
     setShowForm(true);
   };
 
   const allTransactions: any[] = (transactionsData as any)?.items || (Array.isArray(transactionsData) ? transactionsData : []);
-  const paginationInfo = transactionsData as any;
   
-  // Filtragem "approval" é client-side pois não é um status do banco
   const filtered = useMemo(() => {
     let list = allTransactions;
-    if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
-    return list;
-  }, [allTransactions, filter]);
+    const now = Date.now();
+    if (typeFilter !== "all") list = list.filter((t: any) => t.type === typeFilter);
+    if (filter === "pending") list = list.filter((t: any) => t.status === "pending");
+    else if (filter === "paid") list = list.filter((t: any) => t.status === "paid");
+    else if (filter === "overdue") list = list.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
+    else if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((t: any) => t.description?.toLowerCase().includes(q) || t.supplier?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q));
+    }
+    return list.sort((a: any, b: any) => a.dueDate - b.dueDate);
+  }, [allTransactions, filter, typeFilter, searchQuery]);
 
-  // Reset page quando filtros mudam
-  const handleFilterChange = (setter: any, value: any) => {
-    setter(value);
-    setPage(1);
-  };
-
-  // Stats vem do dashboard endpoint (independente da paginação)
-  const { data: dashboardData } = trpc.finTransactions.dashboard.useQuery({ month: filterMonth, year: filterYear });
-  // Contagens por status via query separada (sem paginação)
-  const { data: countAll } = trpc.finTransactions.list.useQuery({ startDate, endDate, pageSize: 1, page: 1 });
-  const { data: countPending } = trpc.finTransactions.list.useQuery({ startDate, endDate, status: "pending", pageSize: 1, page: 1 });
-  const { data: countPaid } = trpc.finTransactions.list.useQuery({ startDate, endDate, status: "paid", pageSize: 1, page: 1 });
-  const { data: countOverdue } = trpc.finTransactions.list.useQuery({ startDate, endDate, status: "overdue", pageSize: 1, page: 1 });
   const stats = useMemo(() => {
-    const d = dashboardData as any;
-    return {
-      pending: (countPending as any)?.total || 0,
-      paid: (countPaid as any)?.total || 0,
-      overdue: (countOverdue as any)?.total || (d?.overdue || 0),
-      needApproval: 0,
-      totalPayable: d?.totalPayable || 0,
-      totalReceivable: d?.totalReceivable || 0,
-      totalPaid: d?.totalPaid || 0,
-      totalReceived: d?.totalReceived || 0,
-    };
-  }, [dashboardData, countPending, countPaid, countOverdue]);
+    const now = Date.now();
+    const pending = allTransactions.filter((t: any) => t.status === "pending");
+    const paid = allTransactions.filter((t: any) => t.status === "paid");
+    const overdue = allTransactions.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
+    const needApproval = allTransactions.filter((t: any) => t.approvalStatus === "pending_approval");
+    const totalPayable = allTransactions.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    const totalReceivable = allTransactions.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    const totalPaid = paid.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    const totalReceived = paid.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+    return { pending: pending.length, paid: paid.length, overdue: overdue.length, needApproval: needApproval.length, totalPayable, totalReceivable, totalPaid, totalReceived };
+  }, [allTransactions]);
 
   const getCategoryName = (catId: number) => {
     const cat = (categories || []).find((c: any) => c.id === catId);
@@ -526,12 +497,10 @@ function ContasTab() {
   const prevMonth = () => {
     if (filterMonth === 1) { setFilterMonth(12); setFilterYear(filterYear - 1); }
     else setFilterMonth(filterMonth - 1);
-    setPage(1);
   };
   const nextMonth = () => {
     if (filterMonth === 12) { setFilterMonth(1); setFilterYear(filterYear + 1); }
     else setFilterMonth(filterMonth + 1);
-    setPage(1);
   };
 
   return (
@@ -570,7 +539,7 @@ function ContasTab() {
           { key: "paid" as const, label: "Pagas", count: stats.paid, color: "emerald" },
           { key: "approval" as const, label: "Autorizar", count: stats.needApproval, color: "purple" },
         ].map(f => (
-          <button key={f.key} onClick={() => { setFilter(filter === f.key ? "all" : f.key); setPage(1); }}
+          <button key={f.key} onClick={() => setFilter(filter === f.key ? "all" : f.key)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
               filter === f.key
                 ? `bg-${f.color}-500/30 text-${f.color}-400 ring-1 ring-${f.color}-500/50`
@@ -589,9 +558,8 @@ function ContasTab() {
           { key: "all" as const, label: "Todos", icon: CircleDollarSign },
           { key: "payable" as const, label: "A Pagar", icon: TrendingDown },
           { key: "receivable" as const, label: "A Receber", icon: TrendingUp },
-          { key: "paid" as const, label: "Pago", icon: CheckCircle },
         ].map(f => (
-          <button key={f.key} onClick={() => { setTypeFilter(typeFilter === f.key ? "all" : f.key); setPage(1); }}
+          <button key={f.key} onClick={() => setTypeFilter(typeFilter === f.key ? "all" : f.key)}
             className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
               typeFilter === f.key ? "bg-gray-700 text-white" : "bg-gray-800/50 text-gray-500"
             }`}
@@ -599,26 +567,6 @@ function ContasTab() {
             <f.icon className="h-3 w-3" /> {f.label}
           </button>
         ))}
-      </div>
-
-      {/* Colaborador Filter */}
-      <div className="flex items-center gap-2">
-        <User className="h-3.5 w-3.5 text-gray-500" />
-        <select
-          value={sellerFilter?.toString() || ""}
-          onChange={e => { setSellerFilter(e.target.value ? Number(e.target.value) : null); setPage(1); }}
-          className="flex-1 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white h-8 px-2 focus:border-emerald-500 focus:outline-none"
-        >
-          <option value="">Todos os colaboradores</option>
-          {(sellersList || []).map((s: any) => (
-            <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
-          ))}
-        </select>
-        {sellerFilter && (
-          <button onClick={() => setSellerFilter(null)} className="text-gray-500 hover:text-white">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
 
       {/* Botão Nova Conta + Audio */}
@@ -646,7 +594,6 @@ function ContasTab() {
                 className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
                 <option value="payable">A Pagar</option>
                 <option value="receivable">A Receber</option>
-                <option value="paid">Pago</option>
               </select>
             </div>
             <div>
@@ -679,17 +626,7 @@ function ContasTab() {
           </div>
           <div>
             <label className="text-[10px] text-gray-500 uppercase font-bold">Fornecedor</label>
-            <SupplierCombobox value={txSupplier} onChange={setTxSupplier} placeholder="Selecione o fornecedor..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-500 uppercase font-bold">Colaborador</label>
-            <select value={txSellerId?.toString() || ""} onChange={e => setTxSellerId(e.target.value ? Number(e.target.value) : null)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
-              <option value="">Selecione o colaborador</option>
-              {(sellersList || []).map((s: any) => (
-                <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
-              ))}
-            </select>
+            <SupplierCombobox value={txSupplier} onChange={setTxSupplier} />
           </div>
           {!editingTx && (
             <div>
@@ -738,8 +675,6 @@ function ContasTab() {
                 categoryId: txCategoryId,
                 supplier: txSupplier || undefined,
                 notes: txNotes || undefined,
-                sellerId: txSellerId,
-                sellerName: txSellerId ? (sellersList || []).find((s: any) => s.id === txSellerId)?.nickname || (sellersList || []).find((s: any) => s.id === txSellerId)?.name || undefined : undefined,
               });
             } else {
               createTransaction.mutate({
@@ -753,8 +688,6 @@ function ContasTab() {
                 recurrence: txRecurrence as any,
                 needsApproval: txNeedsApproval,
                 createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
-                sellerId: txSellerId,
-                sellerName: txSellerId ? (sellersList || []).find((s: any) => s.id === txSellerId)?.nickname || (sellersList || []).find((s: any) => s.id === txSellerId)?.name || undefined : undefined,
               });
             }
           }} disabled={createTransaction.isPending || updateTransaction.isPending}
@@ -768,7 +701,7 @@ function ContasTab() {
       {/* Busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-        <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Buscar por descrição, fornecedor..."
           className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none" />
       </div>
@@ -823,7 +756,6 @@ function ContasTab() {
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-3">
                     {t.notes && <p className="text-xs text-gray-400">{t.notes}</p>}
-                    {t.sellerName && <p className="text-[10px] text-cyan-400">Colaborador: {t.sellerName}</p>}
                     {t.createdByName && <p className="text-[10px] text-gray-600">Lançado por: {t.createdByName}</p>}
                     {t.receiptUrl && (
                       <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-cyan-400 hover:underline">
@@ -884,27 +816,16 @@ function ContasTab() {
             );
           })}
         </div>
-            ) : (
+      ) : (
         <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-10 text-center">
           <Receipt className="w-10 h-10 text-gray-700 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">Nenhuma conta encontrada para {MONTH_NAMES[filterMonth - 1]} {filterYear}.</p>
         </div>
       )}
-
-      {/* Paginação Server-Side */}
-      {paginationInfo?.totalPages > 0 && (
-        <PaginationControls
-          page={page}
-          totalPages={paginationInfo.totalPages || 1}
-          total={paginationInfo.total || 0}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-        />
-      )}
     </div>
   );
 }
+
 // ===== RELATÓRIOS TAB =====
 function RelatoriosTab() {
   const { name: brandName } = useBranding();
@@ -913,7 +834,7 @@ function RelatoriosTab() {
   const [year, setYear] = useState(now.getFullYear());
   const startDate = useMemo(() => new Date(year, month - 1, 1).getTime(), [month, year]);
   const endDate = useMemo(() => new Date(year, month, 0, 23, 59, 59).getTime(), [month, year]);
-  const { data: transactionsData } = trpc.finTransactions.list.useQuery({ startDate, endDate, pageSize: 100 });
+  const { data: transactionsData } = trpc.finTransactions.list.useQuery({ startDate, endDate, limit: 500 });
   const { data: categories } = trpc.finCategories.list.useQuery();
   const { data: fuelRecords } = trpc.fuel.list.useQuery({ month, year });
   const { data: pvGastos } = trpc.pvGastos.list.useQuery({ chamadoId: 0 });
@@ -1054,7 +975,7 @@ function RelatoriosTab() {
   const handleExportCSV = () => {
     const headers = "Data,Tipo,Descrição,Fornecedor,Categoria,Valor,Status\n";
     const rows = allTx.sort((a: any, b: any) => a.dueDate - b.dueDate).map((t: any) =>
-      `${formatDateFull(t.dueDate)},${t.type === "payable" ? "A Pagar" : t.type === "paid" ? "Pago" : "A Receber"},"${t.description}","${t.supplier || ""}","${getCategoryName(t.categoryId)}",${t.amount},${t.status === "paid" ? "Pago" : t.status === "overdue" ? "Vencido" : "Pendente"}`
+      `${formatDateFull(t.dueDate)},${t.type === "payable" ? "A Pagar" : "A Receber"},"${t.description}","${t.supplier || ""}","${getCategoryName(t.categoryId)}",${t.amount},${t.status === "paid" ? "Pago" : t.status === "overdue" ? "Vencido" : "Pendente"}`
     ).join("\n");
     const blob = new Blob(["\uFEFF" + headers + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -1655,16 +1576,5 @@ function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void;
         </button>
       )}
     </div>
-  );
-}
-
-
-// ===== FORNECEDORES TAB =====
-const LazyFornecedoresContent = lazy(() => import("./Fornecedores").then(m => ({ default: m.FornecedoresContent })));
-function FornecedoresTab() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Carregando...</div>}>
-      <LazyFornecedoresContent />
-    </Suspense>
   );
 }

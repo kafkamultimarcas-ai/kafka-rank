@@ -1,1 +1,0 @@
-ALTER TABLE `fin_transactions` MODIFY COLUMN `type` enum('payable','receivable','paid') NOT NULL;
