@@ -105,6 +105,8 @@ export default function AdminFinanceiro() {
   const [txBarcode, setTxBarcode] = useState("");
   const [txNotes, setTxNotes] = useState("");
   const [txRecurrence, setTxRecurrence] = useState<"none" | "monthly" | "weekly" | "yearly">("none");
+  const [txSellerId, setTxSellerId] = useState<number | null>(null);
+  const [sellerFilterId, setSellerFilterId] = useState<number | null>(null);
 
   // Month range
   const startOfMonth = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getTime(), [selectedMonth]);
@@ -112,12 +114,15 @@ export default function AdminFinanceiro() {
 
   // Queries
   const categoriesQuery = trpc.finCategories.list.useQuery(undefined);
+  const sellersQuery = trpc.sellers.list.useQuery({ activeOnly: true });
+  const sellersList = sellersQuery.data || [];
   const transactionsQuery = trpc.finTransactions.list.useQuery({
     startDate: startOfMonth,
     endDate: endOfMonth,
     ...(activeCategoryId && activeTab === "category" ? { categoryId: activeCategoryId } : {}),
     ...(statusFilter !== "all" ? { status: statusFilter as any } : {}),
     ...(typeFilter !== "all" ? { type: typeFilter as any } : {}),
+    ...(sellerFilterId ? { sellerId: sellerFilterId } : {}),
     limit: 200,
   });
   const dashboardQuery = trpc.finTransactions.dashboard.useQuery({
@@ -230,6 +235,7 @@ export default function AdminFinanceiro() {
     setTxDueDate("");
     setTxType("payable");
     setTxCategoryId(null);
+    setTxSellerId(null);
     setTxSupplier("");
     setTxBarcode("");
     setTxNotes("");
@@ -243,6 +249,7 @@ export default function AdminFinanceiro() {
     setTxDueDate(new Date(tx.dueDate).toISOString().split("T")[0]);
     setTxType(tx.type);
     setTxCategoryId(tx.categoryId);
+    setTxSellerId(tx.sellerId || null);
     setTxSupplier(tx.supplier || "");
     setTxBarcode(tx.barcode || "");
     setTxNotes(tx.notes || "");
@@ -399,6 +406,15 @@ export default function AdminFinanceiro() {
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="payable">A Pagar</SelectItem>
               <SelectItem value="receivable">A Receber</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sellerFilterId?.toString() || "_all"} onValueChange={(v) => setSellerFilterId(v === "_all" ? null : Number(v))}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Colaborador" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Todos colaboradores</SelectItem>
+              {sellersList.map((s: any) => (
+                <SelectItem key={s.id} value={s.id.toString()}>{s.nickname || s.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -602,6 +618,18 @@ export default function AdminFinanceiro() {
                 <Label>Observações</Label>
                 <Textarea placeholder="Notas adicionais..." value={txNotes} onChange={(e) => setTxNotes(e.target.value)} />
               </div>
+              <div>
+                <Label>Colaborador</Label>
+                <Select value={txSellerId?.toString() || "_none"} onValueChange={(v) => setTxSellerId(v === "_none" ? null : Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o colaborador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Nenhum</SelectItem>
+                    {sellersList.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.nickname || s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -618,6 +646,8 @@ export default function AdminFinanceiro() {
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
                     recurrence: txRecurrence,
+                    sellerId: txSellerId,
+                    sellerName: txSellerId ? (sellersList.find((s: any) => s.id === txSellerId)?.nickname || sellersList.find((s: any) => s.id === txSellerId)?.name) : undefined,
                   });
                 }}
                 disabled={createTransaction.isPending}
@@ -690,6 +720,18 @@ export default function AdminFinanceiro() {
                 <Label>Observações</Label>
                 <Textarea value={txNotes} onChange={(e) => setTxNotes(e.target.value)} />
               </div>
+              <div>
+                <Label>Colaborador</Label>
+                <Select value={txSellerId?.toString() || "_none"} onValueChange={(v) => setTxSellerId(v === "_none" ? null : Number(v))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o colaborador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Nenhum</SelectItem>
+                    {sellersList.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.nickname || s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -705,6 +747,8 @@ export default function AdminFinanceiro() {
                     supplier: txSupplier || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
+                    sellerId: txSellerId,
+                    sellerName: txSellerId ? (sellersList.find((s: any) => s.id === txSellerId)?.nickname || sellersList.find((s: any) => s.id === txSellerId)?.name) : undefined,
                   });
                 }}
                 disabled={updateTransaction.isPending}

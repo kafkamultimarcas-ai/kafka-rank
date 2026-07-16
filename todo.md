@@ -2441,3 +2441,7 @@
 - [x] Adicionar dmEnabled: true na config do banco para tenant kafka-multimarcas
 - [x] Preservar raw body no express.json para webhooks (signature verification)
 - [x] Adicionar logs detalhados no webhook Instagram para diagnóstico
+- [x] Adicionar campo Colaborador (combobox) na tela de contas do Financeiro
+- [x] Gravar colaborador no banco de dados (nova coluna sellerId + sellerName)
+- [x] Criar filtro por colaborador na tela de Financeiro
+- [x] Corrigir fluxo de salvar contas (bug: listFinTransactions não filtrava por tenantId)

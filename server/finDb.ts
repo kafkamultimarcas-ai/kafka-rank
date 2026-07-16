@@ -34,6 +34,7 @@ export async function listFinTransactions(filters: {
   type?: "payable" | "receivable";
   status?: "pending" | "paid" | "overdue" | "cancelled";
   categoryId?: number;
+  sellerId?: number;
   startDate?: number;
   endDate?: number;
   limit?: number;
@@ -42,23 +43,24 @@ export async function listFinTransactions(filters: {
   const db = await getDb();
   if (!db) return { items: [], total: 0 };
   
-  const conditions = [];
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(finTransactions.tenantId, tenantId)];
   if (filters.type) conditions.push(eq(finTransactions.type, filters.type));
   if (filters.status) conditions.push(eq(finTransactions.status, filters.status));
   if (filters.categoryId) conditions.push(eq(finTransactions.categoryId, filters.categoryId));
   if (filters.startDate) conditions.push(gte(finTransactions.dueDate, filters.startDate));
   if (filters.endDate) conditions.push(lte(finTransactions.dueDate, filters.endDate));
+  if (filters.sellerId) conditions.push(eq(finTransactions.sellerId, filters.sellerId));
   
-  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const where = and(...conditions);
   
   const [items, countResult] = await Promise.all([
     db.select().from(finTransactions)
       .where(where)
       .orderBy(asc(finTransactions.dueDate))
-      .limit(filters.limit || 50)
+      .limit(filters.limit || 200)
       .offset(filters.offset || 0),
-    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), where)),
-
+    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(where),
   ]);
   
   return { items, total: Number(countResult[0]?.count || 0) };
@@ -90,6 +92,8 @@ export async function createFinTransaction(data: {
   needsApproval?: boolean;
   approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
   createdByName?: string;
+  sellerId?: number;
+  sellerName?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -113,6 +117,8 @@ export async function updateFinTransaction(id: number, data: Partial<{
   approvalStatus: "none" | "pending_approval" | "approved" | "rejected";
   approvedBy: string;
   approvedAt: number;
+  sellerId: number;
+  sellerName: string;
 }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

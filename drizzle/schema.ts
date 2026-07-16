@@ -920,6 +920,8 @@ export const finTransactions = mysqlTable("fin_transactions", {
   approvalStatus: mysqlEnum("approvalStatus", ["none", "pending_approval", "approved", "rejected"]).default("none"), // status da autorização
   approvedBy: varchar("approvedBy", { length: 255 }), // quem autorizou
   approvedAt: bigint("approvedAt", { mode: "number" }), // quando autorizou
+  sellerId: int("sellerId"), // colaborador responsável pela conta
+  sellerName: varchar("sellerName", { length: 255 }), // nome do colaborador
   createdBy: int("createdBy"), // admin que criou
   createdByName: varchar("createdByName", { length: 255 }), // nome de quem criou
   createdAt: timestamp("createdAt").defaultNow().notNull(),

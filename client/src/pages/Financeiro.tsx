@@ -374,6 +374,7 @@ function DashboardTab() {
 // ===== CONTAS TAB (Exclusivo Financeiro) =====
 function ContasTab() {
   const { data: categories } = trpc.finCategories.list.useQuery();
+  const { data: sellersList } = trpc.sellers.list.useQuery({ activeOnly: true });
   const utils = trpc.useUtils();
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
@@ -384,6 +385,7 @@ function ContasTab() {
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable">("all");
+  const [sellerFilter, setSellerFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
@@ -397,6 +399,7 @@ function ContasTab() {
   const [txSupplier, setTxSupplier] = useState("");
   const [txNotes, setTxNotes] = useState("");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
+  const [txSellerId, setTxSellerId] = useState<number | null>(null);
   const [txNeedsApproval, setTxNeedsApproval] = useState(false);
   const [txRecurrence, setTxRecurrence] = useState("none");
   
@@ -424,7 +427,7 @@ function ContasTab() {
   const resetForm = () => {
     setTxType("payable"); setTxDescription(""); setTxAmount("");
     setTxDueDate(""); setTxSupplier(""); setTxNotes("");
-    setTxCategoryId(null); setTxNeedsApproval(false); setTxRecurrence("none");
+    setTxCategoryId(null); setTxSellerId(null); setTxNeedsApproval(false); setTxRecurrence("none");
   };
 
   const startEdit = (t: any) => {
@@ -436,6 +439,7 @@ function ContasTab() {
     setTxSupplier(t.supplier || "");
     setTxNotes(t.notes || "");
     setTxCategoryId(t.categoryId);
+    setTxSellerId(t.sellerId || null);
     setShowForm(true);
   };
 
@@ -445,6 +449,7 @@ function ContasTab() {
     let list = allTransactions;
     const now = Date.now();
     if (typeFilter !== "all") list = list.filter((t: any) => t.type === typeFilter);
+    if (sellerFilter) list = list.filter((t: any) => t.sellerId === sellerFilter);
     if (filter === "pending") list = list.filter((t: any) => t.status === "pending");
     else if (filter === "paid") list = list.filter((t: any) => t.status === "paid");
     else if (filter === "overdue") list = list.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
@@ -454,7 +459,7 @@ function ContasTab() {
       list = list.filter((t: any) => t.description?.toLowerCase().includes(q) || t.supplier?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q));
     }
     return list.sort((a: any, b: any) => a.dueDate - b.dueDate);
-  }, [allTransactions, filter, typeFilter, searchQuery]);
+  }, [allTransactions, filter, typeFilter, sellerFilter, searchQuery]);
 
   const stats = useMemo(() => {
     const now = Date.now();
@@ -568,6 +573,26 @@ function ContasTab() {
         ))}
       </div>
 
+      {/* Colaborador Filter */}
+      <div className="flex items-center gap-2">
+        <User className="h-3.5 w-3.5 text-gray-500" />
+        <select
+          value={sellerFilter?.toString() || ""}
+          onChange={e => setSellerFilter(e.target.value ? Number(e.target.value) : null)}
+          className="flex-1 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white h-8 px-2 focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="">Todos os colaboradores</option>
+          {(sellersList || []).map((s: any) => (
+            <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+          ))}
+        </select>
+        {sellerFilter && (
+          <button onClick={() => setSellerFilter(null)} className="text-gray-500 hover:text-white">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Botão Nova Conta + Audio */}
       <div className="space-y-2">
         <button
@@ -628,6 +653,16 @@ function ContasTab() {
             <Input value={txSupplier} onChange={e => setTxSupplier(e.target.value)}
               placeholder="Ex: CEMIG, Imobiliária..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
           </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase font-bold">Colaborador</label>
+            <select value={txSellerId?.toString() || ""} onChange={e => setTxSellerId(e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
+              <option value="">Selecione o colaborador</option>
+              {(sellersList || []).map((s: any) => (
+                <option key={s.id} value={s.id}>{s.nickname || s.name}</option>
+              ))}
+            </select>
+          </div>
           {!editingTx && (
             <div>
               <label className="text-[10px] text-gray-500 uppercase font-bold">Recorrência</label>
@@ -675,6 +710,8 @@ function ContasTab() {
                 categoryId: txCategoryId,
                 supplier: txSupplier || undefined,
                 notes: txNotes || undefined,
+                sellerId: txSellerId,
+                sellerName: txSellerId ? (sellersList || []).find((s: any) => s.id === txSellerId)?.nickname || (sellersList || []).find((s: any) => s.id === txSellerId)?.name || undefined : undefined,
               });
             } else {
               createTransaction.mutate({
@@ -688,6 +725,8 @@ function ContasTab() {
                 recurrence: txRecurrence as any,
                 needsApproval: txNeedsApproval,
                 createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
+                sellerId: txSellerId,
+                sellerName: txSellerId ? (sellersList || []).find((s: any) => s.id === txSellerId)?.nickname || (sellersList || []).find((s: any) => s.id === txSellerId)?.name || undefined : undefined,
               });
             }
           }} disabled={createTransaction.isPending || updateTransaction.isPending}
@@ -756,6 +795,7 @@ function ContasTab() {
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-gray-800/50 pt-3 space-y-3">
                     {t.notes && <p className="text-xs text-gray-400">{t.notes}</p>}
+                    {t.sellerName && <p className="text-[10px] text-cyan-400">Colaborador: {t.sellerName}</p>}
                     {t.createdByName && <p className="text-[10px] text-gray-600">Lançado por: {t.createdByName}</p>}
                     {t.receiptUrl && (
                       <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-cyan-400 hover:underline">

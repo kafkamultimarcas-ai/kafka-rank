@@ -50,6 +50,7 @@ export const finTransactionsRouter = router({
     type: z.enum(["payable", "receivable"]).optional(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
     categoryId: z.number().optional(),
+    sellerId: z.number().optional(),
     startDate: z.number().optional(),
     endDate: z.number().optional(),
     search: z.string().optional(),
@@ -82,11 +83,15 @@ export const finTransactionsRouter = router({
     installmentTotal: z.number().optional(),
     needsApproval: z.boolean().optional(),
     createdByName: z.string().optional(),
+    sellerId: z.number().nullable().optional(),
+    sellerName: z.string().optional(),
   })).mutation(async ({ input, ctx }) => {
     const approvalStatus = input.needsApproval ? "pending_approval" as const : "none" as const;
     const id = await createFinTransaction({
       ...input,
       categoryId: input.categoryId ?? undefined,
+      sellerId: input.sellerId ?? undefined,
+      sellerName: input.sellerName || undefined,
       createdBy: ctx.user?.id,
       approvalStatus,
     });
@@ -113,9 +118,11 @@ export const finTransactionsRouter = router({
     notes: z.string().optional(),
     receiptUrl: z.string().optional(),
     receiptKey: z.string().optional(),
+    sellerId: z.number().nullable().optional(),
+    sellerName: z.string().optional(),
   })).mutation(async ({ input }) => {
     const { id, ...data } = input;
-    await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined });
+    await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined, sellerId: data.sellerId ?? undefined, sellerName: data.sellerName || undefined });
     return { success: true };
   }),
   
