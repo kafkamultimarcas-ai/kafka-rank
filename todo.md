@@ -2484,3 +2484,7 @@
 ## Bug Fix - Fornecedores Layout
 - [x] Fornecedores deve exibir o menu do sistema (DashboardLayout) ao ser acessado via rota direta (admin e financeiro)
 - [x] Aba Fornecedores dentro do Financeiro deve renderizar apenas o conteúdo sem layout duplicado
+
+## Melhorias Fornecedores - Pesquisa/Paginação e Cadastro Rápido
+- [x] Garantir barra de pesquisa e paginação na listagem de fornecedores (já existiam)
+- [x] Botão de cadastro rápido de fornecedor ao lado do combobox nas telas de contas (Admin e Financeiro)
