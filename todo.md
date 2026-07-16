@@ -2454,3 +2454,8 @@
 - [x] Verificar se mensagens do Instagram estão aparecendo corretamente na tela de Conversas
 - [x] Exibir foto de perfil e username do Instagram no chat
 - [x] Filtro na tela de leads (Todos os Clientes) por origem
+
+## Melhorias CrmChat - Contador, Link Instagram, Ordenação (Jul 16)
+- [x] Contador numérico de mensagens não lidas nos chips de filtro de origem (ex: "Instagram (3)")
+- [x] Link clicável no username do Instagram no cabeçalho do chat (abre https://instagram.com/{username} em nova aba)
+- [x] Ordenação da lista de leads filtrada por mensagem mais recente no topo

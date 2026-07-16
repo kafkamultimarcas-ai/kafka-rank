@@ -362,6 +362,24 @@ function LeadList({
     return Array.from(new Set(allLeads.map((l: any) => l.source).filter(Boolean)));
   }, [allLeads]);
 
+  // Unread count per source
+  const unreadBySource = useMemo(() => {
+    if (!allLeads) return {} as Record<string, number>;
+    const map: Record<string, number> = {};
+    const filtered = sellerId && !isSdr ? allLeads.filter((l: any) => l.sellerId === sellerId) : allLeads;
+    for (const l of filtered) {
+      const count = l.unreadCount || 0;
+      if (count > 0 && l.source) {
+        map[l.source] = (map[l.source] || 0) + count;
+      }
+    }
+    return map;
+  }, [allLeads, sellerId, isSdr]);
+
+  const totalUnread = useMemo(() => {
+    return Object.values(unreadBySource).reduce((sum, c) => sum + c, 0);
+  }, [unreadBySource]);
+
   const leads = useMemo(() => {
     let base = searchQuery.length >= 2 ? searchResults : allLeads;
     if (!base) return [];
@@ -473,16 +491,27 @@ function LeadList({
         {availableSources.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             <button onClick={() => setFilterSource(null)}
-              className={`px-2.5 py-1 rounded-xl text-[10px] font-medium border transition-all whitespace-nowrap ${!filterSource ? "bg-primary/15 border-primary/40 text-primary" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
+              className={`px-2.5 py-1 rounded-xl text-[10px] font-medium border transition-all whitespace-nowrap flex items-center gap-1 ${!filterSource ? "bg-primary/15 border-primary/40 text-primary" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
               Todas origens
+              {totalUnread > 0 && (
+                <span className="min-w-[16px] h-4 px-1 rounded-full bg-green-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </button>
             {availableSources.map((src: string) => {
               const cfg = SOURCE_CFG[src] || { label: src, color: "text-gray-400" };
+              const srcUnread = unreadBySource[src] || 0;
               return (
                 <button key={src} onClick={() => setFilterSource(filterSource === src ? null : src)}
                   className={`px-2.5 py-1 rounded-xl text-[10px] font-medium border transition-all whitespace-nowrap flex items-center gap-1 ${filterSource === src ? "bg-accent/60 border-current " + cfg.color : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
                   <ChannelIcon source={src} size={12} />
                   {cfg.label}
+                  {srcUnread > 0 && (
+                    <span className="min-w-[16px] h-4 px-1 rounded-full bg-green-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {srcUnread > 99 ? "99+" : srcUnread}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1089,6 +1118,20 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
             <div className="flex items-center gap-2 text-[11px]">
               {lead.phone && (
                 <span className="font-mono text-green-400/80">{formatPhoneDisplay(lead.phone)}</span>
+              )}
+              {lead.socialUsername && lead.source === "instagram" && (
+                <>
+                  <span className="text-muted-foreground/30">|</span>
+                  <a
+                    href={`https://instagram.com/${lead.socialUsername.replace(/^@/, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pink-400 hover:text-pink-300 hover:underline transition-colors flex items-center gap-0.5"
+                    title="Abrir perfil no Instagram"
+                  >
+                    @{lead.socialUsername.replace(/^@/, "")}
+                  </a>
+                </>
               )}
               {lead.vehicleInterest && (
                 <>
