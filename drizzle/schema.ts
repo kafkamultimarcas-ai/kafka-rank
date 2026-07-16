@@ -1289,12 +1289,58 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
+  // === Campos do cadastro manual de estoque ===
+  title: varchar("title", { length: 255 }), // título do anúncio
+  internalCode: varchar("internalCode", { length: 100 }), // código interno da loja
+  sourceType: varchar("sourceType", { length: 30 }).notNull().default("sync"), // sync | manual
+  manufactureYear: int("manufactureYear"), // ano de fabricação
+  modelYear: int("modelYear"), // ano do modelo
+  chassis: varchar("chassis", { length: 50 }), // chassi
+  renavam: varchar("renavam", { length: 50 }), // RENAVAM
+  purchasePrice: int("purchasePrice").default(0), // preço de compra em centavos
+  preparationCost: int("preparationCost").default(0), // custo de preparação
+  documentationCost: int("documentationCost").default(0), // custo de documentação
+  transportCost: int("transportCost").default(0), // custo de transporte
+  otherCosts: int("otherCosts").default(0), // outros custos
+  minimumSalePrice: int("minimumSalePrice").default(0), // preço mínimo de venda
+  highlightItems: text("highlightItems"), // JSON array de destaques
+  internalTags: text("internalTags"), // JSON array de tags internas
+  videoUrl: text("videoUrl"), // URL do vídeo
+  internalNotes: text("internalNotes"), // notas internas
+  storeLocation: varchar("storeLocation", { length: 120 }), // localização na loja/pátio
+  entryDate: bigint("entryDate", { mode: "number" }), // data de entrada no estoque
+  isPublished: boolean("isPublished").notNull().default(true), // publicado no site?
+  isFeatured: boolean("isFeatured").notNull().default(false), // destaque?
+  acceptsTradeIn: boolean("acceptsTradeIn").notNull().default(false), // aceita troca?
+  isArmored: boolean("isArmored").notNull().default(false), // blindado?
+  deletedAt: bigint("deletedAt", { mode: "number" }), // soft delete
+  deletedBy: int("deletedBy"), // quem excluiu
+  deletedReason: text("deletedReason"), // motivo da exclusão
 }, (table) => ({
   tenantIdx: index("idx_inventory_vehicles_tenant").on(table.tenantId),
   tenantExternalIdx: uniqueIndex("idx_inventory_vehicles_tenant_external").on(table.tenantId, table.externalId),
 }));
 export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
 export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
+
+// Log de auditoria do estoque
+export const inventoryAuditLogs = mysqlTable("inventory_audit_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  inventoryId: int("inventoryId").notNull(),
+  action: varchar("action", { length: 50 }).notNull(), // create, update, delete, status_change
+  actorId: int("actorId"),
+  actorName: varchar("actorName", { length: 100 }),
+  summary: text("summary"),
+  changedFields: text("changedFields"), // JSON das alterações
+  metadata: text("metadata"), // JSON de metadados adicionais
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  tenantId: int("tenantId").notNull().default(1),
+}, (table) => ({
+  inventoryIdx: index("idx_audit_inventory").on(table.inventoryId),
+  tenantIdx: index("idx_audit_tenant").on(table.tenantId),
+}));
+export type InventoryAuditLog = typeof inventoryAuditLogs.$inferSelect;
+export type InsertInventoryAuditLog = typeof inventoryAuditLogs.$inferInsert;
 
 // Log de sincronização do estoque
 export const inventorySyncLogs = mysqlTable("inventory_sync_logs", {

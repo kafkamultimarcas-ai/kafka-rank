@@ -2488,3 +2488,10 @@
 ## Melhorias Fornecedores - Pesquisa/Paginação e Cadastro Rápido
 - [x] Garantir barra de pesquisa e paginação na listagem de fornecedores (já existiam)
 - [x] Botão de cadastro rápido de fornecedor ao lado do combobox nas telas de contas (Admin e Financeiro)
+
+## Estoque - Sync e Schema (Jul 16)
+- [x] Git pull da main e analisar cadastro de estoque
+- [x] Atualizar schema Drizzle com campos extras do banco (title, internalCode, sourceType, manufactureYear, modelYear, chassis, renavam, purchasePrice, preparationCost, documentationCost, transportCost, otherCosts, minimumSalePrice, highlightItems, internalTags, videoUrl, internalNotes, storeLocation, entryDate, isPublished, isFeatured, acceptsTradeIn, isArmored, deletedAt, deletedBy, deletedReason)
+- [x] Adicionar tabela inventoryAuditLogs ao schema
+- [x] Remover índice antigo uq_external_id que causava erro de duplicidade no tenant 90001
+- [x] Confirmar sincronização funcionando (tenant 1: 133 veículos, tenant 90001: 133 veículos)
