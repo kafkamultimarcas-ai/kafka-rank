@@ -1094,6 +1094,7 @@ export function registerWebhookRoutes(app: Express) {
         const body = req.body;
         const metaIntegration = await crmDb.getIntegrationByType("facebook");
         let appSecret = "";
+        let igAppSecret = "";
         let pageAccessToken = "";
         let dmEnabled = false;
         let commentTriggerWords = DEFAULT_COMMENT_TRIGGER_WORDS;
@@ -1101,6 +1102,7 @@ export function registerWebhookRoutes(app: Express) {
           try {
             const config = JSON.parse(metaIntegration.config);
             appSecret = config.appSecret || "";
+            igAppSecret = config.igAppSecret || "";
             pageAccessToken = config.pageAccessToken || "";
             dmEnabled = !!config.dmEnabled;
             if (Array.isArray(config.commentTriggerWords) && config.commentTriggerWords.length > 0) {
@@ -1108,15 +1110,18 @@ export function registerWebhookRoutes(app: Express) {
             }
           } catch { /* ignore parse error */ }
         }
-        // Verify signature
-        if (appSecret) {
-          const signature = req.headers["x-hub-signature-256"] as string;
-          const rawBody = (req as any).rawBody || JSON.stringify(body);
-          if (signature && !verifyMetaSignature(rawBody, signature, appSecret)) {
-            console.error("[Facebook Webhook] Signature verification failed");
+        // Verify signature - try both Facebook and Instagram app secrets
+        const signature = req.headers["x-hub-signature-256"] as string;
+        const rawBody = (req as any).rawBody || JSON.stringify(body);
+        if (signature) {
+          const fbValid = appSecret ? verifyMetaSignature(rawBody, signature, appSecret) : false;
+          const igValid = igAppSecret ? verifyMetaSignature(rawBody, signature, igAppSecret) : false;
+          if (!fbValid && !igValid) {
+            console.error("[Facebook Webhook] Signature verification failed with both secrets");
             res.status(403).json({ error: "Invalid signature" });
             return;
           }
+          console.log(`[Facebook Webhook] Signature verified with ${fbValid ? 'Facebook' : 'Instagram'} app secret`);
         }
         // Messenger DM: { object: "page", entry: [{ messaging: [...] }] }
         // Instagram DM: { object: "instagram", entry: [{ messaging: [...] }] }
