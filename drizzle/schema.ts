@@ -550,6 +550,8 @@ export const crmLeads = mysqlTable("crm_leads", {
   lastMessageAt: bigint("lastMessageAt", { mode: "number" }), // timestamp da última mensagem
   lastCampaignId: int("lastCampaignId"), // ID da última campanha enviada
   isCampaignResponse: boolean("isCampaignResponse").default(false), // se respondeu a uma campanha
+  profilePicUrl: varchar("profilePicUrl", { length: 512 }), // URL da foto de perfil (Instagram/Facebook)
+  socialUsername: varchar("socialUsername", { length: 100 }), // username do Instagram ou Facebook
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),

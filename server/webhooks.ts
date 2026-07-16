@@ -65,7 +65,7 @@ function verifyMetaSignature(payload: string, signature: string, appSecret: stri
 // Messenger e Instagram DM). Reaproveita o mesmo padrao de dedup/lock/debounce
 // e o mesmo fluxo de criar-ou-atualizar lead usado pelo webhook do WhatsApp,
 // so troca a identidade do contato (phone) pelo PSID/IGSID do remetente.
-async function handleMetaMessagingEvent(messagingEvent: any, source: "instagram" | "messenger"): Promise<void> {
+async function handleMetaMessagingEvent(messagingEvent: any, source: "instagram" | "messenger", pageAccessToken?: string): Promise<void> {
   const message = messagingEvent?.message;
   if (!message) return; // postbacks/read receipts sem `message` - fora do escopo do MVP
 
@@ -176,8 +176,30 @@ async function handleMetaMessagingEvent(messagingEvent: any, source: "instagram"
     }
   }
 
+  // Try to fetch Instagram/Messenger profile (name, username, profile_pic)
+  let profileName = `${source === "instagram" ? "Instagram" : "Messenger"} ${contactId}`;
+  let profilePicUrl: string | null = null;
+  let socialUsername: string | null = null;
+  if (pageAccessToken && contactId) {
+    try {
+      const profileUrl = source === "instagram"
+        ? `https://graph.instagram.com/v21.0/${contactId}?fields=name,username,profile_pic&access_token=${pageAccessToken}`
+        : `https://graph.facebook.com/v21.0/${contactId}?fields=name,profile_pic&access_token=${pageAccessToken}`;
+      const profileRes = await fetch(profileUrl);
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        if (profileData.name) profileName = profileData.name;
+        if (profileData.username) socialUsername = profileData.username;
+        if (profileData.profile_pic) profilePicUrl = profileData.profile_pic;
+        console.log(`[Meta Profile] Fetched ${source} profile for ${contactId}: name=${profileData.name}, username=${profileData.username || "N/A"}`);
+      }
+    } catch (err: any) {
+      console.warn(`[Meta Profile] Failed to fetch ${source} profile for ${contactId}:`, err.message);
+    }
+  }
+
   const leadId = await crmDb.createLead({
-    name: `${source === "instagram" ? "Instagram" : "Messenger"} ${contactId}`,
+    name: profileName,
     phone: contactId,
     email: null,
     vehicleInterest: vehicleInterestFromRef,
@@ -189,6 +211,16 @@ async function handleMetaMessagingEvent(messagingEvent: any, source: "instagram"
     sellerId: 0,
     notes: (messageText ? `Primeira mensagem: ${messageText.substring(0, 500)}` : "") + referralNotes || null,
   });
+
+  // Update lead with profile pic and social username if available
+  if (profilePicUrl || socialUsername) {
+    try {
+      await crmDb.updateLead(leadId, {
+        ...(profilePicUrl ? { profilePicUrl } : {}),
+        ...(socialUsername ? { socialUsername } : {}),
+      });
+    } catch { /* non-critical */ }
+  }
 
   await crmDb.createMessage({
     leadId, phone: contactId, direction: "inbound", messageType,
@@ -693,7 +725,7 @@ export function registerWebhookRoutes(app: Express) {
         for (const entry of body.entry) {
           if (Array.isArray(entry.messaging)) {
             for (const messagingEvent of entry.messaging) {
-              await handleMetaMessagingEvent(messagingEvent, "messenger");
+              await handleMetaMessagingEvent(messagingEvent, "messenger", pageAccessToken);
             }
           }
         }
@@ -704,7 +736,7 @@ export function registerWebhookRoutes(app: Express) {
         for (const entry of body.entry) {
           if (Array.isArray(entry.messaging)) {
             for (const messagingEvent of entry.messaging) {
-              await handleMetaMessagingEvent(messagingEvent, "instagram");
+              await handleMetaMessagingEvent(messagingEvent, "instagram", pageAccessToken);
             }
           }
         }
@@ -870,12 +902,14 @@ export function registerWebhookRoutes(app: Express) {
         const body = req.body;
         const metaIntegration = await crmDb.getIntegrationByType("facebook");
         let appSecret = "";
+        let pageAccessToken = "";
         let dmEnabled = false;
         let commentTriggerWords = DEFAULT_COMMENT_TRIGGER_WORDS;
         if (metaIntegration?.config) {
           try {
             const config = JSON.parse(metaIntegration.config);
             appSecret = config.appSecret || "";
+            pageAccessToken = config.pageAccessToken || "";
             dmEnabled = !!config.dmEnabled;
             if (Array.isArray(config.commentTriggerWords) && config.commentTriggerWords.length > 0) {
               commentTriggerWords = config.commentTriggerWords;
@@ -900,7 +934,7 @@ export function registerWebhookRoutes(app: Express) {
               console.log(`[Instagram Webhook] Found ${entry.messaging.length} messaging events`);
               for (const messagingEvent of entry.messaging) {
                 console.log(`[Instagram Webhook] DM event: sender=${messagingEvent?.sender?.id}, text=${messagingEvent?.message?.text?.substring(0, 50) || "[media]"}`);
-                await handleMetaMessagingEvent(messagingEvent, "instagram");
+                await handleMetaMessagingEvent(messagingEvent, "instagram", pageAccessToken);
               }
             }
             // Comments
@@ -988,7 +1022,7 @@ export function registerWebhookRoutes(app: Express) {
           for (const entry of body.entry) {
             if (Array.isArray(entry.messaging)) {
               for (const messagingEvent of entry.messaging) {
-                await handleMetaMessagingEvent(messagingEvent, source);
+                await handleMetaMessagingEvent(messagingEvent, source, pageAccessToken);
               }
             }
             // Instagram comments via same endpoint

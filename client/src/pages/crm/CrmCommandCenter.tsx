@@ -823,7 +823,7 @@ export default function CrmCommandCenter() {
 
   // Leads with urgency alerts + assignment filter
   const { urgentLeads, warningLeads, normalLeads, filteredLeads, assignmentStats, acceptedCount, pendingCount } = useMemo(() => {
-    const displayLeads = searchQuery.length >= 2 ? searchResults : leads;
+    const displayLeads = (searchQuery.length >= 2 ? searchResults : leads) as typeof leads;
     if (!displayLeads) return { urgentLeads: [], warningLeads: [], normalLeads: [], filteredLeads: [], assignmentStats: { total: 0, unassigned: 0, assigned: 0 }, acceptedCount: 0, pendingCount: 0 };
 
     // Assignment stats

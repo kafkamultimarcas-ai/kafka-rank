@@ -2447,3 +2447,10 @@
 - [x] Causa raiz: URL de callback no Meta aponta para /api/webhooks/facebook mas handler só processava object=page
 - [x] Corrigir handler de /api/webhooks/facebook para aceitar object=instagram também
 - [x] Testar localmente com POST simulado - leads criados com sucesso
+
+## Filtro de Origem e Tags Visuais na Tela de Conversas (Jul 16)
+- [x] Filtro por origem na tela de Conversas (WhatsApp, Instagram, Facebook)
+- [x] Tag visual diferenciando origem (WhatsApp verde, Instagram gradiente, Facebook azul) na lista de leads
+- [x] Verificar se mensagens do Instagram estão aparecendo corretamente na tela de Conversas
+- [x] Exibir foto de perfil e username do Instagram no chat
+- [x] Filtro na tela de leads (Todos os Clientes) por origem

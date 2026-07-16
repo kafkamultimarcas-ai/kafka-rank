@@ -209,6 +209,7 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterScore, setFilterScore] = useState<string | null>(null);
+  const [filterSource, setFilterSource] = useState<string | null>(null);
   const [showMobileChat, setShowMobileChat] = useState(false);
 
   const handleSelectLead = (id: number) => {
@@ -233,6 +234,8 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
           setSearchQuery={setSearchQuery}
           filterScore={filterScore}
           setFilterScore={setFilterScore}
+          filterSource={filterSource}
+          setFilterSource={setFilterSource}
         />
       </div>
 
@@ -250,7 +253,7 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
 
 // ===== LEAD LIST - REDESIGNED =====
 function LeadList({
-  sellerId, isSdr, selectedLeadId, onSelectLead, searchQuery, setSearchQuery, filterScore, setFilterScore
+  sellerId, isSdr, selectedLeadId, onSelectLead, searchQuery, setSearchQuery, filterScore, setFilterScore, filterSource, setFilterSource
 }: {
   sellerId?: number;
   isSdr?: boolean;
@@ -260,6 +263,8 @@ function LeadList({
   setSearchQuery: (q: string) => void;
   filterScore: string | null;
   setFilterScore: (s: string | null) => void;
+  filterSource: string | null;
+  setFilterSource: (s: string | null) => void;
 }) {
   const { name: brandName } = useBranding();
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -352,6 +357,11 @@ function LeadList({
 
   const alertLeadIds = useMemo(() => new Set(alerts?.map((a: any) => a.id) || []), [alerts]);
 
+  const availableSources = useMemo(() => {
+    if (!allLeads) return [];
+    return Array.from(new Set(allLeads.map((l: any) => l.source).filter(Boolean)));
+  }, [allLeads]);
+
   const leads = useMemo(() => {
     let base = searchQuery.length >= 2 ? searchResults : allLeads;
     if (!base) return [];
@@ -361,6 +371,9 @@ function LeadList({
     if (filterScore) {
       base = base.filter((l: any) => l.score === filterScore);
     }
+    if (filterSource) {
+      base = base.filter((l: any) => l.source === filterSource);
+    }
     // Sort: ALWAYS by most recent message timestamp DESC (WhatsApp style)
     // Leads with newest messages go to the top, no exceptions
     return [...base].sort((a: any, b: any) => {
@@ -368,7 +381,7 @@ function LeadList({
       const bTime = b.lastMessageTimestamp || b.updatedAt || b.createdAt || 0;
       return Number(bTime) - Number(aTime);
     });
-  }, [allLeads, searchResults, searchQuery, sellerId, isSdr, filterScore, alertLeadIds]);
+  }, [allLeads, searchResults, searchQuery, sellerId, isSdr, filterScore, filterSource, alertLeadIds]);
 
   const stats = useMemo(() => {
     if (!allLeads) return { total: 0, hot: 0, warm: 0, cold: 0, unassigned: 0 };
@@ -455,6 +468,26 @@ function LeadList({
             </div>
           )}
         </div>
+
+        {/* Source/Origin filter chips */}
+        {availableSources.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+            <button onClick={() => setFilterSource(null)}
+              className={`px-2.5 py-1 rounded-xl text-[10px] font-medium border transition-all whitespace-nowrap ${!filterSource ? "bg-primary/15 border-primary/40 text-primary" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
+              Todas origens
+            </button>
+            {availableSources.map((src: string) => {
+              const cfg = SOURCE_CFG[src] || { label: src, color: "text-gray-400" };
+              return (
+                <button key={src} onClick={() => setFilterSource(filterSource === src ? null : src)}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-medium border transition-all whitespace-nowrap flex items-center gap-1 ${filterSource === src ? "bg-accent/60 border-current " + cfg.color : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
+                  <ChannelIcon source={src} size={12} />
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Divider */}
@@ -587,8 +620,14 @@ function LeadList({
                         {sellerName}
                       </span>
                     )}
-                    {/* Source tag */}
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-accent/40 text-muted-foreground/70 border border-border/30 flex items-center gap-0.5">
+                    {/* Source tag - colored by channel */}
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-md border flex items-center gap-0.5 font-medium ${
+                      lead.source === "whatsapp" ? "bg-green-500/15 text-green-400 border-green-500/25" :
+                      lead.source === "instagram" ? "bg-gradient-to-r from-purple-500/15 to-pink-500/15 text-pink-400 border-pink-500/25" :
+                      lead.source === "facebook" || lead.source === "messenger" ? "bg-blue-500/15 text-blue-400 border-blue-500/25" :
+                      lead.source === "olx" ? "bg-orange-500/15 text-orange-400 border-orange-500/25" :
+                      "bg-accent/40 text-muted-foreground/70 border-border/30"
+                    }`}>
                       <ChannelIcon source={lead.source} size={10} />
                       {SOURCE_CFG[lead.source]?.label || lead.source}
                     </span>

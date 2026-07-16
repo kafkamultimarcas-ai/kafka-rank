@@ -197,6 +197,8 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
     lastMessageAt: crmLeads.lastMessageAt,
     lastCampaignId: crmLeads.lastCampaignId,
     isCampaignResponse: crmLeads.isCampaignResponse,
+    profilePicUrl: crmLeads.profilePicUrl,
+    socialUsername: crmLeads.socialUsername,
     lastMessageContent: sql<string | null>`(SELECT content FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
     lastMessageDirection: sql<string | null>`(SELECT direction FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
     lastMessageTimestamp: sql<number | null>`(SELECT timestamp FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
