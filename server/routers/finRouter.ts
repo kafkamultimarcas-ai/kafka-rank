@@ -54,10 +54,23 @@ export const finTransactionsRouter = router({
     startDate: z.number().optional(),
     endDate: z.number().optional(),
     search: z.string().optional(),
-    limit: z.number().optional(),
-    offset: z.number().optional(),
+    page: z.number().int().min(1).default(1),
+    pageSize: z.number().int().min(1).max(100).default(20),
   }).optional()).query(async ({ input }) => {
-    return listFinTransactions(input || {});
+    const params = input || {};
+    const page = params.page || 1;
+    const pageSize = params.pageSize || 20;
+    const result = await listFinTransactions({
+      ...params,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    });
+    return {
+      ...result,
+      page,
+      pageSize,
+      totalPages: Math.ceil(result.total / pageSize),
+    };
   }),
   
   get: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {

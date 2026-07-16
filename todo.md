@@ -2445,3 +2445,10 @@
 - [x] Gravar colaborador no banco de dados (nova coluna sellerId + sellerName)
 - [x] Criar filtro por colaborador na tela de Financeiro
 - [x] Corrigir fluxo de salvar contas (bug: listFinTransactions não filtrava por tenantId)
+
+## Paginação Server-Side + Multitenancy Padrão
+- [ ] Criar helper/utilitário de paginação reutilizável no backend (paginate util)
+- [ ] Criar middleware de multitenancy que injeta tenantId automaticamente em toda query
+- [ ] Aplicar paginação server-side na listagem de contas (finTransactions)
+- [ ] Criar componente de paginação reutilizável no frontend
+- [ ] Garantir que toda consulta ao banco filtre por tenantId automaticamente

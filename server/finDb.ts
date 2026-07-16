@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, gte, lte, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, or, like } from "drizzle-orm";
 import { finCategories, InsertFinCategory, finTransactions, InsertFinTransaction, fuelRecords, type InsertFuelRecord } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -37,6 +37,7 @@ export async function listFinTransactions(filters: {
   sellerId?: number;
   startDate?: number;
   endDate?: number;
+  search?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -44,13 +45,21 @@ export async function listFinTransactions(filters: {
   if (!db) return { items: [], total: 0 };
   
   const tenantId = getCurrentTenantId();
-  const conditions = [eq(finTransactions.tenantId, tenantId)];
+  const conditions: any[] = [eq(finTransactions.tenantId, tenantId)];
   if (filters.type) conditions.push(eq(finTransactions.type, filters.type));
   if (filters.status) conditions.push(eq(finTransactions.status, filters.status));
   if (filters.categoryId) conditions.push(eq(finTransactions.categoryId, filters.categoryId));
   if (filters.startDate) conditions.push(gte(finTransactions.dueDate, filters.startDate));
   if (filters.endDate) conditions.push(lte(finTransactions.dueDate, filters.endDate));
   if (filters.sellerId) conditions.push(eq(finTransactions.sellerId, filters.sellerId));
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    conditions.push(or(
+      like(finTransactions.description, term),
+      like(finTransactions.supplier, term),
+      like(finTransactions.notes, term)
+    ));
+  }
   
   const where = and(...conditions);
   

@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBranding } from "@/contexts/TenantContext";
+import { PaginationControls } from "@/components/PaginationControls";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
   aberto: { label: "Aberto", color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/40", emoji: "🔵" },
@@ -381,12 +382,27 @@ function ContasTab() {
   const [filterYear, setFilterYear] = useState(now.getFullYear());
   const startDate = useMemo(() => new Date(filterYear, filterMonth - 1, 1).getTime(), [filterMonth, filterYear]);
   const endDate = useMemo(() => new Date(filterYear, filterMonth, 0, 23, 59, 59).getTime(), [filterMonth, filterYear]);
-  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery({ startDate, endDate });
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable">("all");
   const [sellerFilter, setSellerFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  // Paginação server-side
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const queryParams = useMemo(() => ({
+    startDate,
+    endDate,
+    page,
+    pageSize,
+    ...(typeFilter !== "all" ? { type: typeFilter as "payable" | "receivable" } : {}),
+    ...(filter === "pending" ? { status: "pending" as const } : {}),
+    ...(filter === "paid" ? { status: "paid" as const } : {}),
+    ...(filter === "overdue" ? { status: "overdue" as const } : {}),
+    ...(sellerFilter ? { sellerId: sellerFilter } : {}),
+    ...(searchQuery.trim() ? { search: searchQuery.trim() } : {}),
+  }), [startDate, endDate, page, pageSize, typeFilter, filter, sellerFilter, searchQuery]);
+  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery(queryParams);
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<any>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -444,35 +460,41 @@ function ContasTab() {
   };
 
   const allTransactions: any[] = (transactionsData as any)?.items || (Array.isArray(transactionsData) ? transactionsData : []);
+  const paginationInfo = transactionsData as any;
   
+  // Filtragem "approval" é client-side pois não é um status do banco
   const filtered = useMemo(() => {
     let list = allTransactions;
-    const now = Date.now();
-    if (typeFilter !== "all") list = list.filter((t: any) => t.type === typeFilter);
-    if (sellerFilter) list = list.filter((t: any) => t.sellerId === sellerFilter);
-    if (filter === "pending") list = list.filter((t: any) => t.status === "pending");
-    else if (filter === "paid") list = list.filter((t: any) => t.status === "paid");
-    else if (filter === "overdue") list = list.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
-    else if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter((t: any) => t.description?.toLowerCase().includes(q) || t.supplier?.toLowerCase().includes(q) || t.notes?.toLowerCase().includes(q));
-    }
-    return list.sort((a: any, b: any) => a.dueDate - b.dueDate);
-  }, [allTransactions, filter, typeFilter, sellerFilter, searchQuery]);
+    if (filter === "approval") list = list.filter((t: any) => t.approvalStatus === "pending_approval");
+    return list;
+  }, [allTransactions, filter]);
 
+  // Reset page quando filtros mudam
+  const handleFilterChange = (setter: any, value: any) => {
+    setter(value);
+    setPage(1);
+  };
+
+  // Stats vem do dashboard endpoint (independente da paginação)
+  const { data: dashboardData } = trpc.finTransactions.dashboard.useQuery({ month: filterMonth, year: filterYear });
+  // Contagens por status via query separada (sem paginação)
+  const { data: countAll } = trpc.finTransactions.list.useQuery({ startDate, endDate, pageSize: 1, page: 1 });
+  const { data: countPending } = trpc.finTransactions.list.useQuery({ startDate, endDate, status: "pending", pageSize: 1, page: 1 });
+  const { data: countPaid } = trpc.finTransactions.list.useQuery({ startDate, endDate, status: "paid", pageSize: 1, page: 1 });
+  const { data: countOverdue } = trpc.finTransactions.list.useQuery({ startDate, endDate, status: "overdue", pageSize: 1, page: 1 });
   const stats = useMemo(() => {
-    const now = Date.now();
-    const pending = allTransactions.filter((t: any) => t.status === "pending");
-    const paid = allTransactions.filter((t: any) => t.status === "paid");
-    const overdue = allTransactions.filter((t: any) => (t.status === "pending" || t.status === "overdue") && t.dueDate < now);
-    const needApproval = allTransactions.filter((t: any) => t.approvalStatus === "pending_approval");
-    const totalPayable = allTransactions.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    const totalReceivable = allTransactions.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    const totalPaid = paid.filter((t: any) => t.type === "payable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    const totalReceived = paid.filter((t: any) => t.type === "receivable").reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-    return { pending: pending.length, paid: paid.length, overdue: overdue.length, needApproval: needApproval.length, totalPayable, totalReceivable, totalPaid, totalReceived };
-  }, [allTransactions]);
+    const d = dashboardData as any;
+    return {
+      pending: (countPending as any)?.total || 0,
+      paid: (countPaid as any)?.total || 0,
+      overdue: (countOverdue as any)?.total || (d?.overdue || 0),
+      needApproval: 0,
+      totalPayable: d?.totalPayable || 0,
+      totalReceivable: d?.totalReceivable || 0,
+      totalPaid: d?.totalPaid || 0,
+      totalReceived: d?.totalReceived || 0,
+    };
+  }, [dashboardData, countPending, countPaid, countOverdue]);
 
   const getCategoryName = (catId: number) => {
     const cat = (categories || []).find((c: any) => c.id === catId);
@@ -501,10 +523,12 @@ function ContasTab() {
   const prevMonth = () => {
     if (filterMonth === 1) { setFilterMonth(12); setFilterYear(filterYear - 1); }
     else setFilterMonth(filterMonth - 1);
+    setPage(1);
   };
   const nextMonth = () => {
     if (filterMonth === 12) { setFilterMonth(1); setFilterYear(filterYear + 1); }
     else setFilterMonth(filterMonth + 1);
+    setPage(1);
   };
 
   return (
@@ -543,7 +567,7 @@ function ContasTab() {
           { key: "paid" as const, label: "Pagas", count: stats.paid, color: "emerald" },
           { key: "approval" as const, label: "Autorizar", count: stats.needApproval, color: "purple" },
         ].map(f => (
-          <button key={f.key} onClick={() => setFilter(filter === f.key ? "all" : f.key)}
+          <button key={f.key} onClick={() => { setFilter(filter === f.key ? "all" : f.key); setPage(1); }}
             className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
               filter === f.key
                 ? `bg-${f.color}-500/30 text-${f.color}-400 ring-1 ring-${f.color}-500/50`
@@ -563,7 +587,7 @@ function ContasTab() {
           { key: "payable" as const, label: "A Pagar", icon: TrendingDown },
           { key: "receivable" as const, label: "A Receber", icon: TrendingUp },
         ].map(f => (
-          <button key={f.key} onClick={() => setTypeFilter(typeFilter === f.key ? "all" : f.key)}
+          <button key={f.key} onClick={() => { setTypeFilter(typeFilter === f.key ? "all" : f.key); setPage(1); }}
             className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
               typeFilter === f.key ? "bg-gray-700 text-white" : "bg-gray-800/50 text-gray-500"
             }`}
@@ -578,7 +602,7 @@ function ContasTab() {
         <User className="h-3.5 w-3.5 text-gray-500" />
         <select
           value={sellerFilter?.toString() || ""}
-          onChange={e => setSellerFilter(e.target.value ? Number(e.target.value) : null)}
+          onChange={e => { setSellerFilter(e.target.value ? Number(e.target.value) : null); setPage(1); }}
           className="flex-1 bg-gray-900 border border-gray-800 rounded-lg text-xs text-white h-8 px-2 focus:border-emerald-500 focus:outline-none"
         >
           <option value="">Todos os colaboradores</option>
@@ -740,7 +764,7 @@ function ContasTab() {
       {/* Busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+        <input type="text" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
           placeholder="Buscar por descrição, fornecedor..."
           className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none" />
       </div>
@@ -856,16 +880,27 @@ function ContasTab() {
             );
           })}
         </div>
-      ) : (
+            ) : (
         <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-10 text-center">
           <Receipt className="w-10 h-10 text-gray-700 mx-auto mb-3" />
           <p className="text-gray-500 text-sm">Nenhuma conta encontrada para {MONTH_NAMES[filterMonth - 1]} {filterYear}.</p>
         </div>
       )}
+
+      {/* Paginação Server-Side */}
+      {paginationInfo?.totalPages > 0 && (
+        <PaginationControls
+          page={page}
+          totalPages={paginationInfo.totalPages || 1}
+          total={paginationInfo.total || 0}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
+      )}
     </div>
   );
 }
-
 // ===== RELATÓRIOS TAB =====
 function RelatoriosTab() {
   const { name: brandName } = useBranding();
