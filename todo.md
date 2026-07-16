@@ -2495,3 +2495,11 @@
 - [x] Adicionar tabela inventoryAuditLogs ao schema
 - [x] Remover índice antigo uq_external_id que causava erro de duplicidade no tenant 90001
 - [x] Confirmar sincronização funcionando (tenant 1: 133 veículos, tenant 90001: 133 veículos)
+
+## Estoque - Botão Cadastrar Veículo
+- [x] Adicionar botão "Cadastrar Veículo" no header da página AdminInventory
+- [x] Criar modal/dialog de cadastro com campos completos (marca, modelo, versão, ano fab/modelo, cor, combustível, km, preço, placa, chassi, renavam, etc.)
+- [x] Criar procedure create no inventoryRouter com todos os campos do cadastro manual
+- [x] Criar procedure update no inventoryRouter para edição completa
+- [x] Criar procedure delete (soft delete) no inventoryRouter
+- [x] Botões Editar e Excluir no modal de detalhes do veículo

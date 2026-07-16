@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Car, Search, RefreshCw, Loader2, Calendar, Gauge, Fuel, Palette, DollarSign, ExternalLink, ChevronLeft, ChevronRight, Package, CheckCircle, Clock, XCircle, Eye, Tag, TrendingUp, Copy } from "lucide-react";
+import { Car, Search, RefreshCw, Loader2, Calendar, Gauge, Fuel, Palette, DollarSign, ExternalLink, ChevronLeft, ChevronRight, Package, CheckCircle, Clock, XCircle, Eye, Tag, TrendingUp, Copy, Plus, Edit, Trash2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { getCurrentTenantSlug, buildTenantPath } from "@/lib/tenant";
 
 const PAGE_SIZE = 20;
@@ -46,6 +48,17 @@ export default function AdminInventory() {
   const [page, setPage] = useState(0);
   const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [showCreate, setShowCreate] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    brand: "", model: "", version: "", motor: "", year: "", manufactureYear: "", modelYear: "",
+    color: "", fuel: "", km: "", price: "", plate: "", chassis: "", renavam: "",
+    bodyType: "", transmission: "", doors: "", vehicleState: "usado", category: "Carro/Camionetas",
+    observation: "", title: "", internalCode: "", purchasePrice: "", preparationCost: "",
+    documentationCost: "", transportCost: "", otherCosts: "", minimumSalePrice: "",
+    fipePrice: "", offerPrice: "", videoUrl: "", internalNotes: "", storeLocation: "",
+  });
+  const [editForm, setEditForm] = useState<any>({});
 
   const { data: vehicles, isLoading, refetch } = trpc.inventory.list.useQuery({
     status: statusFilter === "all" ? "all" : statusFilter as any,
@@ -56,6 +69,42 @@ export default function AdminInventory() {
   const { data: stats } = trpc.inventory.stats.useQuery();
   const { data: syncLogs } = trpc.inventory.syncLogs.useQuery();
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
+
+  const createMutation = trpc.inventory.create.useMutation({
+    onSuccess: () => {
+      toast.success("Veículo cadastrado com sucesso!");
+      setShowCreate(false);
+      setCreateForm({
+        brand: "", model: "", version: "", motor: "", year: "", manufactureYear: "", modelYear: "",
+        color: "", fuel: "", km: "", price: "", plate: "", chassis: "", renavam: "",
+        bodyType: "", transmission: "", doors: "", vehicleState: "usado", category: "Carro/Camionetas",
+        observation: "", title: "", internalCode: "", purchasePrice: "", preparationCost: "",
+        documentationCost: "", transportCost: "", otherCosts: "", minimumSalePrice: "",
+        fipePrice: "", offerPrice: "", videoUrl: "", internalNotes: "", storeLocation: "",
+      });
+      refetch();
+    },
+    onError: (err) => toast.error("Erro ao cadastrar: " + err.message),
+  });
+
+  const updateMutation = trpc.inventory.update.useMutation({
+    onSuccess: () => {
+      toast.success("Veículo atualizado!");
+      setShowEdit(false);
+      setSelectedVehicle(null);
+      refetch();
+    },
+    onError: (err) => toast.error("Erro ao atualizar: " + err.message),
+  });
+
+  const deleteMutation = trpc.inventory.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Veículo excluído!");
+      setSelectedVehicle(null);
+      refetch();
+    },
+    onError: (err) => toast.error("Erro ao excluir: " + err.message),
+  });
 
   const syncMutation = trpc.inventory.sync.useMutation({
     onSuccess: (result) => {
@@ -115,14 +164,23 @@ export default function AdminInventory() {
               Sincronizado do site kafkamultimarcas.com.br | Última sync: {lastSyncTime}
             </p>
           </div>
-          <Button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {syncMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            Sincronizar Agora
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Cadastrar Veículo
+            </Button>
+            <Button
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {syncMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              Sincronizar Agora
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -490,9 +548,416 @@ export default function AdminInventory() {
                       Disponibilizar
                     </Button>
                   )}
+                  <Button
+                    variant="outline"
+                    className="border-blue-500/30 text-blue-400"
+                    onClick={() => {
+                      setEditForm({
+                        id: selectedVehicle.id,
+                        brand: selectedVehicle.brand || "",
+                        model: selectedVehicle.model || "",
+                        version: selectedVehicle.version || "",
+                        motor: selectedVehicle.motor || "",
+                        year: selectedVehicle.year?.toString() || "",
+                        manufactureYear: selectedVehicle.manufactureYear?.toString() || "",
+                        modelYear: selectedVehicle.modelYear?.toString() || "",
+                        color: selectedVehicle.color || "",
+                        fuel: selectedVehicle.fuel || "",
+                        km: selectedVehicle.km?.toString() || "",
+                        price: selectedVehicle.price?.toString() || "",
+                        plate: selectedVehicle.plate || "",
+                        chassis: selectedVehicle.chassis || "",
+                        renavam: selectedVehicle.renavam || "",
+                        bodyType: selectedVehicle.bodyType || "",
+                        transmission: selectedVehicle.transmission || "",
+                        doors: selectedVehicle.doors || "",
+                        vehicleState: selectedVehicle.vehicleState || "usado",
+                        category: selectedVehicle.category || "Carro/Camionetas",
+                        observation: selectedVehicle.observation || "",
+                        title: selectedVehicle.title || "",
+                        internalCode: selectedVehicle.internalCode || "",
+                        purchasePrice: selectedVehicle.purchasePrice?.toString() || "",
+                        minimumSalePrice: selectedVehicle.minimumSalePrice?.toString() || "",
+                        fipePrice: selectedVehicle.fipePrice?.toString() || "",
+                        offerPrice: selectedVehicle.offerPrice?.toString() || "",
+                        internalNotes: selectedVehicle.internalNotes || "",
+                        storeLocation: selectedVehicle.storeLocation || "",
+                      });
+                      setSelectedVehicle(null);
+                      setShowEdit(true);
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-red-500/30 text-red-400"
+                    onClick={() => {
+                      if (confirm("Tem certeza que deseja excluir este veículo?")) {
+                        deleteMutation.mutate({ id: selectedVehicle.id });
+                      }
+                    }}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir
+                  </Button>
                 </DialogFooter>
               </>
             )}
+          </DialogContent>
+        </Dialog>
+        {/* Create Vehicle Dialog */}
+        <Dialog open={showCreate} onOpenChange={setShowCreate}>
+          <DialogContent className="max-w-3xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Plus className="w-5 h-5 text-emerald-400" />
+                Cadastrar Veículo
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+              <div>
+                <Label className="text-gray-300">Marca *</Label>
+                <Input placeholder="Volkswagen" value={createForm.brand} onChange={(e) => setCreateForm({...createForm, brand: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Modelo *</Label>
+                <Input placeholder="Saveiro" value={createForm.model} onChange={(e) => setCreateForm({...createForm, model: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Versão</Label>
+                <Input placeholder="ROBUST 1.6 FLEX" value={createForm.version} onChange={(e) => setCreateForm({...createForm, version: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Motor</Label>
+                <Input placeholder="1.6" value={createForm.motor} onChange={(e) => setCreateForm({...createForm, motor: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Ano</Label>
+                <Input type="number" placeholder="2024" value={createForm.year} onChange={(e) => setCreateForm({...createForm, year: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Ano Fabricação</Label>
+                <Input type="number" placeholder="2023" value={createForm.manufactureYear} onChange={(e) => setCreateForm({...createForm, manufactureYear: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Ano Modelo</Label>
+                <Input type="number" placeholder="2024" value={createForm.modelYear} onChange={(e) => setCreateForm({...createForm, modelYear: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Cor</Label>
+                <Input placeholder="Branco" value={createForm.color} onChange={(e) => setCreateForm({...createForm, color: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Combustível</Label>
+                <Select value={createForm.fuel} onValueChange={(v) => setCreateForm({...createForm, fuel: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Flex">Flex</SelectItem>
+                    <SelectItem value="Gasolina">Gasolina</SelectItem>
+                    <SelectItem value="Etanol">Etanol</SelectItem>
+                    <SelectItem value="Diesel">Diesel</SelectItem>
+                    <SelectItem value="Elétrico">Elétrico</SelectItem>
+                    <SelectItem value="Híbrido">Híbrido</SelectItem>
+                    <SelectItem value="GNV">GNV</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">KM</Label>
+                <Input type="number" placeholder="50000" value={createForm.km} onChange={(e) => setCreateForm({...createForm, km: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço Venda (R$)</Label>
+                <Input type="number" placeholder="89990" value={createForm.price} onChange={(e) => setCreateForm({...createForm, price: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Placa</Label>
+                <Input placeholder="ABC1D23" value={createForm.plate} onChange={(e) => setCreateForm({...createForm, plate: e.target.value.toUpperCase()})} maxLength={8} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Chassi</Label>
+                <Input placeholder="9BWZZZ377VT004251" value={createForm.chassis} onChange={(e) => setCreateForm({...createForm, chassis: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">RENAVAM</Label>
+                <Input placeholder="00123456789" value={createForm.renavam} onChange={(e) => setCreateForm({...createForm, renavam: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Tipo Carroceria</Label>
+                <Select value={createForm.bodyType} onValueChange={(v) => setCreateForm({...createForm, bodyType: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Hatch">Hatch</SelectItem>
+                    <SelectItem value="Sedan">Sedan</SelectItem>
+                    <SelectItem value="SUV">SUV</SelectItem>
+                    <SelectItem value="Picape">Picape</SelectItem>
+                    <SelectItem value="Van">Van</SelectItem>
+                    <SelectItem value="Caminhão">Caminhão</SelectItem>
+                    <SelectItem value="Moto">Moto</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">Câmbio</Label>
+                <Select value={createForm.transmission} onValueChange={(v) => setCreateForm({...createForm, transmission: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="auto">Automático</SelectItem>
+                    <SelectItem value="cvt">CVT</SelectItem>
+                    <SelectItem value="automatizado">Automatizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">Portas</Label>
+                <Select value={createForm.doors} onValueChange={(v) => setCreateForm({...createForm, doors: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">Estado</Label>
+                <Select value={createForm.vehicleState} onValueChange={(v) => setCreateForm({...createForm, vehicleState: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="novo">Novo</SelectItem>
+                    <SelectItem value="usado">Usado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">Categoria</Label>
+                <Select value={createForm.category} onValueChange={(v) => setCreateForm({...createForm, category: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Carro/Camionetas">Carro/Camionetas</SelectItem>
+                    <SelectItem value="Moto">Moto</SelectItem>
+                    <SelectItem value="Caminhão">Caminhão</SelectItem>
+                    <SelectItem value="Van">Van</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço Compra (R$)</Label>
+                <Input type="number" placeholder="75000" value={createForm.purchasePrice} onChange={(e) => setCreateForm({...createForm, purchasePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço Mínimo Venda (R$)</Label>
+                <Input type="number" placeholder="85000" value={createForm.minimumSalePrice} onChange={(e) => setCreateForm({...createForm, minimumSalePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço FIPE (R$)</Label>
+                <Input type="number" placeholder="92000" value={createForm.fipePrice} onChange={(e) => setCreateForm({...createForm, fipePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Código Interno</Label>
+                <Input placeholder="VH-001" value={createForm.internalCode} onChange={(e) => setCreateForm({...createForm, internalCode: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Local no Pátio</Label>
+                <Input placeholder="Vaga A3" value={createForm.storeLocation} onChange={(e) => setCreateForm({...createForm, storeLocation: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div className="col-span-2 sm:col-span-3">
+                <Label className="text-gray-300">Observações</Label>
+                <Textarea placeholder="Observações sobre o veículo..." value={createForm.observation} onChange={(e) => setCreateForm({...createForm, observation: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div className="col-span-2 sm:col-span-3">
+                <Label className="text-gray-300">Notas Internas</Label>
+                <Textarea placeholder="Notas internas (não visível ao público)..." value={createForm.internalNotes} onChange={(e) => setCreateForm({...createForm, internalNotes: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" className="border-gray-700" onClick={() => setShowCreate(false)}>Cancelar</Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => createMutation.mutate({
+                  brand: createForm.brand,
+                  model: createForm.model,
+                  version: createForm.version || undefined,
+                  motor: createForm.motor || undefined,
+                  year: createForm.year ? parseInt(createForm.year) : undefined,
+                  manufactureYear: createForm.manufactureYear ? parseInt(createForm.manufactureYear) : undefined,
+                  modelYear: createForm.modelYear ? parseInt(createForm.modelYear) : undefined,
+                  color: createForm.color || undefined,
+                  fuel: createForm.fuel || undefined,
+                  km: createForm.km ? parseInt(createForm.km) : undefined,
+                  price: createForm.price ? parseInt(createForm.price) : undefined,
+                  plate: createForm.plate || undefined,
+                  chassis: createForm.chassis || undefined,
+                  renavam: createForm.renavam || undefined,
+                  bodyType: createForm.bodyType || undefined,
+                  transmission: createForm.transmission || undefined,
+                  doors: createForm.doors || undefined,
+                  vehicleState: createForm.vehicleState || undefined,
+                  category: createForm.category || undefined,
+                  observation: createForm.observation || undefined,
+                  title: createForm.title || undefined,
+                  internalCode: createForm.internalCode || undefined,
+                  purchasePrice: createForm.purchasePrice ? parseInt(createForm.purchasePrice) : undefined,
+                  minimumSalePrice: createForm.minimumSalePrice ? parseInt(createForm.minimumSalePrice) : undefined,
+                  fipePrice: createForm.fipePrice ? parseInt(createForm.fipePrice) : undefined,
+                  offerPrice: createForm.offerPrice ? parseInt(createForm.offerPrice) : undefined,
+                  internalNotes: createForm.internalNotes || undefined,
+                  storeLocation: createForm.storeLocation || undefined,
+                  entryDate: Date.now(),
+                })}
+                disabled={!createForm.brand || !createForm.model || createMutation.isPending}
+              >
+                {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Cadastrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Vehicle Dialog */}
+        <Dialog open={showEdit} onOpenChange={setShowEdit}>
+          <DialogContent className="max-w-3xl bg-gray-900 border-gray-800 text-white max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Edit className="w-5 h-5 text-blue-400" />
+                Editar Veículo
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+              <div>
+                <Label className="text-gray-300">Marca *</Label>
+                <Input value={editForm.brand || ""} onChange={(e) => setEditForm({...editForm, brand: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Modelo *</Label>
+                <Input value={editForm.model || ""} onChange={(e) => setEditForm({...editForm, model: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Versão</Label>
+                <Input value={editForm.version || ""} onChange={(e) => setEditForm({...editForm, version: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Motor</Label>
+                <Input value={editForm.motor || ""} onChange={(e) => setEditForm({...editForm, motor: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Ano</Label>
+                <Input type="number" value={editForm.year || ""} onChange={(e) => setEditForm({...editForm, year: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Cor</Label>
+                <Input value={editForm.color || ""} onChange={(e) => setEditForm({...editForm, color: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Combustível</Label>
+                <Select value={editForm.fuel || ""} onValueChange={(v) => setEditForm({...editForm, fuel: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Flex">Flex</SelectItem>
+                    <SelectItem value="Gasolina">Gasolina</SelectItem>
+                    <SelectItem value="Etanol">Etanol</SelectItem>
+                    <SelectItem value="Diesel">Diesel</SelectItem>
+                    <SelectItem value="Elétrico">Elétrico</SelectItem>
+                    <SelectItem value="Híbrido">Híbrido</SelectItem>
+                    <SelectItem value="GNV">GNV</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">KM</Label>
+                <Input type="number" value={editForm.km || ""} onChange={(e) => setEditForm({...editForm, km: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço Venda (R$)</Label>
+                <Input type="number" value={editForm.price || ""} onChange={(e) => setEditForm({...editForm, price: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Placa</Label>
+                <Input value={editForm.plate || ""} onChange={(e) => setEditForm({...editForm, plate: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Chassi</Label>
+                <Input value={editForm.chassis || ""} onChange={(e) => setEditForm({...editForm, chassis: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">RENAVAM</Label>
+                <Input value={editForm.renavam || ""} onChange={(e) => setEditForm({...editForm, renavam: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Câmbio</Label>
+                <Select value={editForm.transmission || ""} onValueChange={(v) => setEditForm({...editForm, transmission: v})}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="auto">Automático</SelectItem>
+                    <SelectItem value="cvt">CVT</SelectItem>
+                    <SelectItem value="automatizado">Automatizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço Compra (R$)</Label>
+                <Input type="number" value={editForm.purchasePrice || ""} onChange={(e) => setEditForm({...editForm, purchasePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Preço Mínimo (R$)</Label>
+                <Input type="number" value={editForm.minimumSalePrice || ""} onChange={(e) => setEditForm({...editForm, minimumSalePrice: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Código Interno</Label>
+                <Input value={editForm.internalCode || ""} onChange={(e) => setEditForm({...editForm, internalCode: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div>
+                <Label className="text-gray-300">Local no Pátio</Label>
+                <Input value={editForm.storeLocation || ""} onChange={(e) => setEditForm({...editForm, storeLocation: e.target.value})} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div className="col-span-2 sm:col-span-3">
+                <Label className="text-gray-300">Observações</Label>
+                <Textarea value={editForm.observation || ""} onChange={(e) => setEditForm({...editForm, observation: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
+              </div>
+              <div className="col-span-2 sm:col-span-3">
+                <Label className="text-gray-300">Notas Internas</Label>
+                <Textarea value={editForm.internalNotes || ""} onChange={(e) => setEditForm({...editForm, internalNotes: e.target.value})} rows={2} className="bg-gray-800 border-gray-700" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" className="border-gray-700" onClick={() => setShowEdit(false)}>Cancelar</Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => updateMutation.mutate({
+                  id: editForm.id,
+                  brand: editForm.brand || undefined,
+                  model: editForm.model || undefined,
+                  version: editForm.version || undefined,
+                  motor: editForm.motor || undefined,
+                  year: editForm.year ? parseInt(editForm.year) : undefined,
+                  color: editForm.color || undefined,
+                  fuel: editForm.fuel || undefined,
+                  km: editForm.km ? parseInt(editForm.km) : undefined,
+                  price: editForm.price ? parseInt(editForm.price) : undefined,
+                  plate: editForm.plate || undefined,
+                  chassis: editForm.chassis || undefined,
+                  renavam: editForm.renavam || undefined,
+                  transmission: editForm.transmission || undefined,
+                  purchasePrice: editForm.purchasePrice ? parseInt(editForm.purchasePrice) : undefined,
+                  minimumSalePrice: editForm.minimumSalePrice ? parseInt(editForm.minimumSalePrice) : undefined,
+                  internalCode: editForm.internalCode || undefined,
+                  storeLocation: editForm.storeLocation || undefined,
+                  observation: editForm.observation || undefined,
+                  internalNotes: editForm.internalNotes || undefined,
+                })}
+                disabled={!editForm.brand || !editForm.model || updateMutation.isPending}
+              >
+                {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Salvar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
