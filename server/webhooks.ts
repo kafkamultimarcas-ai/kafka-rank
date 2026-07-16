@@ -895,7 +895,7 @@ export function registerWebhookRoutes(app: Express) {
           res.status(500).json({ error: "appSecret not configured" });
           return;
         }
-        const redirectUri = `${req.protocol}://${req.get("host")}/api/webhooks/instagram`;
+        const redirectUri = "https://kafkarank.com/api/webhooks/instagram";
         
         // Step 1: Exchange code for short-lived token
         const tokenResp = await fetch("https://api.instagram.com/oauth/access_token", {
