@@ -980,11 +980,23 @@ export function registerWebhookRoutes(app: Express) {
           }
         }
         // Messenger DM: { object: "page", entry: [{ messaging: [...] }] }
-        if (body.object === "page" && body.entry) {
+        // Instagram DM: { object: "instagram", entry: [{ messaging: [...] }] }
+        // Nota: A Meta pode enviar ambos para a mesma URL de callback
+        if ((body.object === "page" || body.object === "instagram") && body.entry) {
+          const source: "instagram" | "messenger" = body.object === "instagram" ? "instagram" : "messenger";
+          console.log(`[Facebook Webhook] Processing ${body.entry.length} entries, object=${body.object}, source=${source}`);
           for (const entry of body.entry) {
             if (Array.isArray(entry.messaging)) {
               for (const messagingEvent of entry.messaging) {
-                await handleMetaMessagingEvent(messagingEvent, "messenger");
+                await handleMetaMessagingEvent(messagingEvent, source);
+              }
+            }
+            // Instagram comments via same endpoint
+            if (body.object === "instagram" && Array.isArray(entry.changes)) {
+              for (const change of entry.changes) {
+                if (change.field === "comments") {
+                  await handleMetaCommentEvent(change.value, "instagram", commentTriggerWords);
+                }
               }
             }
             // Lead Ads

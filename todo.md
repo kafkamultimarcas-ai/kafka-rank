@@ -2441,3 +2441,9 @@
 - [x] Adicionar dmEnabled: true na config do banco para tenant kafka-multimarcas
 - [x] Preservar raw body no express.json para webhooks (signature verification)
 - [x] Adicionar logs detalhados no webhook Instagram para diagnóstico
+
+## Instagram Webhook Fix (Jul 16)
+- [x] Diagnosticar por que mensagens do Instagram não chegam no CRM (Facebook funciona)
+- [x] Causa raiz: URL de callback no Meta aponta para /api/webhooks/facebook mas handler só processava object=page
+- [x] Corrigir handler de /api/webhooks/facebook para aceitar object=instagram também
+- [x] Testar localmente com POST simulado - leads criados com sucesso
