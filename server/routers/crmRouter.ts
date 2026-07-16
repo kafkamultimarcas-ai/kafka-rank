@@ -10,6 +10,7 @@ import { storagePut } from "../storage";
 import { transcribeAudio } from "../_core/voiceTranscription";
 import { sendPushNewLead, sendPushLeadTransferred } from "../pushService";
 import * as zapi from "../zapi-service";
+import * as metaMessaging from "../metaMessagingService";
 import { clearCredentialsCache as clearZapiCredentialsCache } from "../zapi-service";
 import { sellers } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -1342,7 +1343,7 @@ export const crmChatRouter = router({
     return crmDb.listMessagesByLead(input.leadId, 200);
   }),
 
-  // Send a message via Z-API and save to DB
+  // Send a message via Z-API (WhatsApp) or Meta Send API (Instagram/Messenger) and save to DB
   sendMessage: publicProcedure.input(z.object({
     leadId: z.number(),
     message: z.string(),
@@ -1351,8 +1352,22 @@ export const crmChatRouter = router({
     const lead = await crmDb.getLeadById(input.leadId);
     if (!lead || !lead.phone) throw new Error("Lead sem telefone");
     
-    const result = await zapi.sendText(lead.phone, input.message);
-    if (!result.success) throw new Error(result.error || "Erro ao enviar mensagem");
+    const isMetaChannel = lead.source === "instagram" || lead.source === "messenger" || lead.source === "facebook";
+    let result: { success: boolean; messageId?: string; error?: string };
+    
+    if (isMetaChannel) {
+      // Instagram/Messenger/Facebook leads: send via Meta Graph API
+      result = await metaMessaging.sendText(lead.phone, input.message);
+      if (!result.success) {
+        console.error(`[Meta Send] Failed to send to lead #${input.leadId} (${lead.source}, recipientId=${lead.phone}): ${result.error}`);
+        throw new Error(result.error || "Erro ao enviar mensagem via Instagram/Messenger");
+      }
+      console.log(`[Meta Send] Message sent to lead #${input.leadId} (${lead.source}, recipientId=${lead.phone})`);
+    } else {
+      // WhatsApp/other leads: send via Z-API
+      result = await zapi.sendText(lead.phone, input.message);
+      if (!result.success) throw new Error(result.error || "Erro ao enviar mensagem");
+    }
     
     await crmDb.createMessage({
       leadId: input.leadId,
@@ -1373,7 +1388,7 @@ export const crmChatRouter = router({
     return { success: true, messageId: result.messageId };
   }),
 
-  // Send image via Z-API
+  // Send image via Z-API or Meta Send API
   sendImage: publicProcedure.input(z.object({
     leadId: z.number(),
     imageUrl: z.string(),
@@ -1383,8 +1398,14 @@ export const crmChatRouter = router({
     const lead = await crmDb.getLeadById(input.leadId);
     if (!lead || !lead.phone) throw new Error("Lead sem telefone");
     
-    const result = await zapi.sendImage(lead.phone, input.imageUrl, input.caption);
-    if (!result.success) throw new Error("Erro ao enviar imagem");
+    const isMetaChannel = lead.source === "instagram" || lead.source === "messenger" || lead.source === "facebook";
+    if (isMetaChannel) {
+      const result = await metaMessaging.sendImage(lead.phone, input.imageUrl, input.caption);
+      if (!result.success) throw new Error(result.error || "Erro ao enviar imagem via Instagram/Messenger");
+    } else {
+      const result = await zapi.sendImage(lead.phone, input.imageUrl, input.caption);
+      if (!result.success) throw new Error("Erro ao enviar imagem");
+    }
     
     await crmDb.createMessage({
       leadId: input.leadId,
@@ -1491,7 +1512,12 @@ export const crmChatRouter = router({
       `\n_Kafka Multimarcas_`;
     
     // Send text first
-    await zapi.sendText(lead.phone, msg);
+    const isMetaChannel = lead.source === "instagram" || lead.source === "messenger" || lead.source === "facebook";
+    if (isMetaChannel) {
+      await metaMessaging.sendText(lead.phone, msg);
+    } else {
+      await zapi.sendText(lead.phone, msg);
+    }
     
     // Collect ALL photo URLs from photos[] JSON array, fallback to photoUrl
     let photoUrls: string[] = [];
@@ -1525,23 +1551,30 @@ export const crmChatRouter = router({
       }
     }
     
-    // Send ALL photos - proxy each through S3 then send via Z-API
+    // Send ALL photos - proxy each through S3 then send via Z-API or Meta API
     let sentCount = 0;
     const sentPhotoUrls: string[] = [];
     for (let i = 0; i < photoUrls.length; i++) {
       try {
-        // First try direct URL
         let sendUrl = photoUrls[i];
-        let result = await zapi.sendImage(lead.phone, sendUrl, i === 0 ? `${v.brand} ${v.model}` : "");
-        if (!result.success) {
-          // If direct fails, proxy through S3
+        if (isMetaChannel) {
+          // For Meta channels, proxy to S3 first (Meta requires publicly accessible URLs)
           const s3Url = await proxyImageToS3(photoUrls[i], i);
-          if (s3Url) {
-            sendUrl = s3Url;
-            result = await zapi.sendImage(lead.phone, s3Url, i === 0 ? `${v.brand} ${v.model}` : "");
+          if (s3Url) sendUrl = s3Url;
+          const result = await metaMessaging.sendImage(lead.phone, sendUrl, i === 0 ? `${v.brand} ${v.model}` : undefined);
+          if (result.success) { sentCount++; sentPhotoUrls.push(sendUrl); }
+        } else {
+          // WhatsApp via Z-API
+          let result = await zapi.sendImage(lead.phone, sendUrl, i === 0 ? `${v.brand} ${v.model}` : "");
+          if (!result.success) {
+            const s3Url = await proxyImageToS3(photoUrls[i], i);
+            if (s3Url) {
+              sendUrl = s3Url;
+              result = await zapi.sendImage(lead.phone, s3Url, i === 0 ? `${v.brand} ${v.model}` : "");
+            }
           }
+          if (result.success) { sentCount++; sentPhotoUrls.push(sendUrl); }
         }
-        if (result.success) { sentCount++; sentPhotoUrls.push(sendUrl); }
         // Small delay between images to avoid rate limiting
         if (i < photoUrls.length - 1) await new Promise(r => setTimeout(r, 500));
       } catch {}

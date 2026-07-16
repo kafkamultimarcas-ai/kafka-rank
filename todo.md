@@ -2466,3 +2466,9 @@
 - [ ] Otimizar índices no banco para crm_messages (leadId + timestamp)
 - [ ] Reduzir payload inicial - carregar apenas dados essenciais na primeira página
 - [ ] Implementar staleTime/cacheTime no tRPC useQuery para evitar refetch desnecessário
+
+## Fix Instagram DM Outbound (Jul 16)
+- [x] Diagnosticar por que mensagens enviadas pelo CRM não chegam no Instagram do cliente
+- [x] Causa raiz: sendMessage/sendImage/sendVehicle usavam Z-API (WhatsApp) para todos os leads, inclusive Instagram
+- [x] Fix: rotear leads com source=instagram/messenger/facebook para metaMessaging.sendText/sendImage (Meta Graph API)
+- [x] Adicionar logging detalhado no metaMessagingService para debug de envio

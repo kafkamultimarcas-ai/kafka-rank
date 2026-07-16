@@ -40,7 +40,10 @@ async function getPageAccessToken(): Promise<string | null> {
 export async function sendText(recipientId: string, text: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const token = await getPageAccessToken();
-    if (!token) return { success: false, error: "Page Access Token nao configurado" };
+    if (!token) {
+      console.error(`[Meta Send API] No pageAccessToken found for tenant ${getCurrentTenantId()}`);
+      return { success: false, error: "Page Access Token nao configurado" };
+    }
     const res = await fetch(`${GRAPH_API_BASE}/me/messages?access_token=${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,10 +55,13 @@ export async function sendText(recipientId: string, text: string): Promise<{ suc
     });
     const data = await res.json() as any;
     if (!res.ok || data.error) {
+      console.error(`[Meta Send API] Error sending to ${recipientId}: ${data.error?.message || `HTTP ${res.status}`}`, data.error);
       return { success: false, error: data.error?.message || `HTTP ${res.status}` };
     }
+    console.log(`[Meta Send API] Successfully sent message to ${recipientId}, messageId=${data.message_id}`);
     return { success: true, messageId: data.message_id };
   } catch (err: any) {
+    console.error(`[Meta Send API] Exception sending to ${recipientId}:`, err.message);
     return { success: false, error: err.message };
   }
 }
