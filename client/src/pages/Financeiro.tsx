@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBranding } from "@/contexts/TenantContext";
 import { PaginationControls } from "@/components/PaginationControls";
+import { SupplierCombobox } from "@/components/SupplierCombobox";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
   aberto: { label: "Aberto", color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/40", emoji: "🔵" },
@@ -678,8 +679,7 @@ function ContasTab() {
           </div>
           <div>
             <label className="text-[10px] text-gray-500 uppercase font-bold">Fornecedor</label>
-            <Input value={txSupplier} onChange={e => setTxSupplier(e.target.value)}
-              placeholder="Ex: CEMIG, Imobiliária..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
+            <SupplierCombobox value={txSupplier} onChange={setTxSupplier} placeholder="Selecione o fornecedor..." className="bg-gray-800 border-gray-700 text-white h-9 text-sm" />
           </div>
           <div>
             <label className="text-[10px] text-gray-500 uppercase font-bold">Colaborador</label>

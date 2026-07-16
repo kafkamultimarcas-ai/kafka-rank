@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SupplierCombobox } from "@/components/SupplierCombobox";
 
 function formatCurrencyVal(val: string): string {
   const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
@@ -615,7 +616,7 @@ export default function AdminFinanceiro() {
               </div>
               <div>
                 <Label>Fornecedor / Empresa</Label>
-                <Input placeholder="Ex: CEMIG, Imobiliária XYZ..." value={txSupplier} onChange={(e) => setTxSupplier(e.target.value)} />
+                <SupplierCombobox value={txSupplier} onChange={setTxSupplier} placeholder="Selecione o fornecedor..." />
               </div>
               <div>
                 <Label>Código de Barras</Label>
@@ -730,7 +731,7 @@ export default function AdminFinanceiro() {
               </div>
               <div>
                 <Label>Fornecedor</Label>
-                <Input value={txSupplier} onChange={(e) => setTxSupplier(e.target.value)} />
+                <SupplierCombobox value={txSupplier} onChange={setTxSupplier} placeholder="Selecione o fornecedor..." />
               </div>
               <div>
                 <Label>Código de Barras</Label>

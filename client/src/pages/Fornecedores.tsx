@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "@/components/PaginationControls";
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, User, Receipt, FileText, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, User, Receipt, FileText, CheckCircle, Clock, AlertTriangle, Download, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { isValidCPF, isValidCNPJ } from "@shared/validators";
 
@@ -430,6 +430,7 @@ export default function Fornecedores() {
 // ===== FORM COMPONENT =====
 function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM; setForm: (fn: any) => void; onCepLookup: () => void }) {
   const upd = (field: string, value: string) => setForm((f: any) => ({ ...f, [field]: value }));
+  const [cnpjLoading, setCnpjLoading] = useState(false);
   
   // CPF/CNPJ validation state
   const cpfCnpjValidation = useMemo(() => {
@@ -438,9 +439,41 @@ function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM;
 
   const hasDigits = form.cpfCnpj.replace(/\D/g, "").length > 0;
 
+  // Auto-fill company data when a valid CNPJ is entered
+  async function lookupCnpj(cnpjDigits: string) {
+    if (cnpjDigits.length !== 14 || !isValidCNPJ(cnpjDigits)) return;
+    setCnpjLoading(true);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjDigits}`);
+      if (res.ok) {
+        const d = await res.json();
+        setForm((f: any) => ({
+          ...f,
+          name: d.razao_social || f.name,
+          cep: d.cep ? d.cep.replace(/\D/g, "") : f.cep,
+          state: d.uf || f.state,
+          city: d.municipio || f.city,
+          neighborhood: d.bairro || f.neighborhood,
+          street: d.logradouro || f.street,
+          number: d.numero || f.number,
+          complement: d.complemento || f.complement,
+        }));
+        toast.success("Dados da empresa preenchidos automaticamente!");
+      }
+    } catch { /* silent */ }
+    setCnpjLoading(false);
+  }
+
   function handleCpfCnpjChange(rawValue: string) {
     const masked = maskCpfCnpj(rawValue, form.personType);
     upd("cpfCnpj", masked);
+    // Auto-lookup when CNPJ is complete and valid
+    if (form.personType === "juridica") {
+      const digits = rawValue.replace(/\D/g, "");
+      if (digits.length === 14 && isValidCNPJ(digits)) {
+        lookupCnpj(digits);
+      }
+    }
   }
 
   return (
@@ -464,13 +497,16 @@ function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM;
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <Label>{form.personType === "juridica" ? "CNPJ" : "CPF"}</Label>
-          <Input
-            value={form.cpfCnpj}
-            onChange={e => handleCpfCnpjChange(e.target.value)}
-            placeholder={form.personType === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"}
-            maxLength={form.personType === "juridica" ? 18 : 14}
-            className={hasDigits ? (cpfCnpjValidation.valid ? "border-green-500/50 focus-visible:ring-green-500/30" : "border-red-500/50 focus-visible:ring-red-500/30") : ""}
-          />
+          <div className="relative">
+            <Input
+              value={form.cpfCnpj}
+              onChange={e => handleCpfCnpjChange(e.target.value)}
+              placeholder={form.personType === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"}
+              maxLength={form.personType === "juridica" ? 18 : 14}
+              className={hasDigits ? (cpfCnpjValidation.valid ? "border-green-500/50 focus-visible:ring-green-500/30" : "border-red-500/50 focus-visible:ring-red-500/30") : ""}
+            />
+            {cnpjLoading && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />}
+          </div>
           {hasDigits && (
             <p className={`text-xs mt-1 ${cpfCnpjValidation.valid ? "text-green-500" : "text-red-500"}`}>
               {cpfCnpjValidation.message}
@@ -646,11 +682,18 @@ function SupplierDetails({ supplier }: { supplier: Supplier }) {
 
 // ===== HISTORY COMPONENT =====
 function SupplierHistory({ supplier }: { supplier: Supplier }) {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   // Query financial transactions linked to this supplier by name match
   const { data, isLoading } = trpc.finTransactions.list.useQuery({
     search: supplier.name,
+    status: statusFilter !== "all" ? statusFilter as any : undefined,
+    startDate: startDate ? new Date(startDate).getTime() : undefined,
+    endDate: endDate ? new Date(endDate + "T23:59:59").getTime() : undefined,
     page: 1,
-    pageSize: 50,
+    pageSize: 100,
   });
 
   const transactions = data?.items || [];
@@ -663,6 +706,11 @@ function SupplierHistory({ supplier }: { supplier: Supplier }) {
   const formatDate = (d: any) => {
     if (!d) return "—";
     return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  };
+
+  const formatDateFull = (d: any) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
   };
 
   const typeLabels: Record<string, { label: string; color: string }> = {
@@ -678,41 +726,101 @@ function SupplierHistory({ supplier }: { supplier: Supplier }) {
     cancelled: { label: "Cancelado", icon: AlertTriangle, color: "text-gray-400" },
   };
 
-  // Calculate totals
+  // Filter only transactions where supplier field matches this supplier's name
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((t: any) => 
+      t.supplier && t.supplier.toLowerCase().includes(supplier.name.toLowerCase())
+    );
+  }, [transactions, supplier.name]);
+
+  // Calculate totals from filtered transactions
   const totals = useMemo(() => {
     let totalPayable = 0;
     let totalReceivable = 0;
     let totalPaid = 0;
-    transactions.forEach((t: any) => {
+    filteredTransactions.forEach((t: any) => {
       const amt = parseFloat(t.amount) || 0;
       if (t.type === "payable") totalPayable += amt;
       else if (t.type === "receivable") totalReceivable += amt;
       else if (t.type === "paid") totalPaid += amt;
     });
     return { totalPayable, totalReceivable, totalPaid };
-  }, [transactions]);
+  }, [filteredTransactions]);
+
+  // Export CSV
+  function handleExportCSV() {
+    if (filteredTransactions.length === 0) { toast.error("Nenhum lançamento para exportar."); return; }
+    const headers = "Descrição,Tipo,Valor,Vencimento,Status,Comprovante\n";
+    const rows = filteredTransactions.map((t: any) => {
+      const typeInfo = typeLabels[t.type] || { label: t.type };
+      const statusInfo = statusConfig[t.status] || { label: t.status };
+      return `"${t.description || ""}","${typeInfo.label}",${t.amount},"${formatDateFull(t.dueDate)}","${statusInfo.label}","${t.receiptUrl || ""}"`;
+    }).join("\n");
+    const blob = new Blob(["\uFEFF" + headers + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `historico-fornecedor-${supplier.name.replace(/\s+/g, "-").toLowerCase()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado com sucesso!");
+  }
+
+  // Export PDF (print-based)
+  function handleExportPDF() {
+    if (filteredTransactions.length === 0) { toast.error("Nenhum lançamento para exportar."); return; }
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) { toast.error("Bloqueador de pop-ups impediu a exportação."); return; }
+    const tableRows = filteredTransactions.map((t: any) => {
+      const typeInfo = typeLabels[t.type] || { label: t.type };
+      const statusInfo = statusConfig[t.status] || { label: t.status };
+      return `<tr><td>${t.description || ""}</td><td>${typeInfo.label}</td><td style="text-align:right">${formatCurrency(t.amount)}</td><td>${formatDateFull(t.dueDate)}</td><td>${statusInfo.label}</td></tr>`;
+    }).join("");
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Histórico - ${supplier.name}</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:12px}h1{font-size:16px;margin-bottom:4px}h2{font-size:13px;color:#666;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left}th{background:#f5f5f5;font-weight:bold}.summary{display:flex;gap:20px;margin-bottom:12px}.summary div{padding:8px 12px;border-radius:4px;font-size:11px}.s-red{background:#fef2f2;color:#dc2626}.s-green{background:#f0fdf4;color:#16a34a}.s-blue{background:#eff6ff;color:#2563eb}</style></head><body><h1>Histórico Financeiro</h1><h2>Fornecedor: ${supplier.name}</h2><div class="summary"><div class="s-red">A Pagar: ${formatCurrency(totals.totalPayable)}</div><div class="s-green">A Receber: ${formatCurrency(totals.totalReceivable)}</div><div class="s-blue">Pago: ${formatCurrency(totals.totalPaid)}</div></div><table><thead><tr><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Vencimento</th><th>Status</th></tr></thead><tbody>${tableRows}</tbody></table><p style="margin-top:16px;font-size:10px;color:#999">Gerado em ${new Date().toLocaleDateString("pt-BR")} | Total: ${filteredTransactions.length} lançamento(s)</p></body></html>`);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.print(); }, 300);
+    toast.success("PDF gerado! Use Ctrl+P para salvar.");
+  }
 
   if (isLoading) {
     return <div className="text-center py-8 text-muted-foreground">Carregando histórico...</div>;
   }
 
-  // Filter only transactions where supplier field matches this supplier's name
-  const filteredTransactions = transactions.filter((t: any) => 
-    t.supplier && t.supplier.toLowerCase().includes(supplier.name.toLowerCase())
-  );
-
-  if (filteredTransactions.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-        <p className="text-muted-foreground">Nenhum lançamento financeiro vinculado a este fornecedor.</p>
-        <p className="text-xs text-muted-foreground/70 mt-1">Os lançamentos aparecem aqui quando o campo "Fornecedor" da conta corresponde ao nome deste cadastro.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex-1 min-w-[120px]">
+          <label className="text-[10px] text-muted-foreground uppercase font-medium">Status</label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pending">Pendente</SelectItem>
+              <SelectItem value="paid">Pago</SelectItem>
+              <SelectItem value="overdue">Vencido</SelectItem>
+              <SelectItem value="cancelled">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-[130px]">
+          <label className="text-[10px] text-muted-foreground uppercase font-medium">De</label>
+          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 text-xs" />
+        </div>
+        <div className="min-w-[130px]">
+          <label className="text-[10px] text-muted-foreground uppercase font-medium">Até</label>
+          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 text-xs" />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleExportCSV}>
+            <Download className="w-3 h-3" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleExportPDF}>
+            <FileText className="w-3 h-3" /> PDF
+          </Button>
+        </div>
+      </div>
+
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-center">
@@ -730,50 +838,60 @@ function SupplierHistory({ supplier }: { supplier: Supplier }) {
       </div>
 
       {/* Transaction list */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left p-2.5 font-medium text-xs">Descrição</th>
-              <th className="text-left p-2.5 font-medium text-xs">Tipo</th>
-              <th className="text-left p-2.5 font-medium text-xs">Valor</th>
-              <th className="text-left p-2.5 font-medium text-xs">Vencimento</th>
-              <th className="text-left p-2.5 font-medium text-xs">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredTransactions.map((t: any) => {
-              const typeInfo = typeLabels[t.type] || { label: t.type, color: "text-gray-400" };
-              const statusInfo = statusConfig[t.status] || { label: t.status, icon: Clock, color: "text-gray-400" };
-              const StatusIcon = statusInfo.icon;
-              return (
-                <tr key={t.id} className="border-t border-border hover:bg-muted/30">
-                  <td className="p-2.5">
-                    <p className="font-medium text-xs">{t.description}</p>
-                    {t.receiptUrl && (
-                      <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1 mt-0.5">
-                        <FileText className="w-3 h-3" /> Ver comprovante
-                      </a>
-                    )}
-                  </td>
-                  <td className={`p-2.5 text-xs font-medium ${typeInfo.color}`}>{typeInfo.label}</td>
-                  <td className="p-2.5 text-xs font-bold">{formatCurrency(t.amount)}</td>
-                  <td className="p-2.5 text-xs text-muted-foreground">{formatDate(t.dueDate)}</td>
-                  <td className="p-2.5">
-                    <span className={`inline-flex items-center gap-1 text-xs ${statusInfo.color}`}>
-                      <StatusIcon className="w-3 h-3" /> {statusInfo.label}
-                    </span>
-                  </td>
+      {filteredTransactions.length === 0 ? (
+        <div className="text-center py-12">
+          <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+          <p className="text-muted-foreground">Nenhum lançamento encontrado com os filtros aplicados.</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">Tente ajustar o período ou status para ver mais resultados.</p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-2.5 font-medium text-xs">Descrição</th>
+                  <th className="text-left p-2.5 font-medium text-xs">Tipo</th>
+                  <th className="text-left p-2.5 font-medium text-xs">Valor</th>
+                  <th className="text-left p-2.5 font-medium text-xs">Vencimento</th>
+                  <th className="text-left p-2.5 font-medium text-xs">Status</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {filteredTransactions.map((t: any) => {
+                  const typeInfo = typeLabels[t.type] || { label: t.type, color: "text-gray-400" };
+                  const statusInfo = statusConfig[t.status] || { label: t.status, icon: Clock, color: "text-gray-400" };
+                  const StatusIcon = statusInfo.icon;
+                  return (
+                    <tr key={t.id} className="border-t border-border hover:bg-muted/30">
+                      <td className="p-2.5">
+                        <p className="font-medium text-xs">{t.description}</p>
+                        {t.receiptUrl && (
+                          <a href={t.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline flex items-center gap-1 mt-0.5">
+                            <FileText className="w-3 h-3" /> Ver comprovante
+                          </a>
+                        )}
+                      </td>
+                      <td className={`p-2.5 text-xs font-medium ${typeInfo.color}`}>{typeInfo.label}</td>
+                      <td className="p-2.5 text-xs font-bold">{formatCurrency(t.amount)}</td>
+                      <td className="p-2.5 text-xs text-muted-foreground">{formatDate(t.dueDate)}</td>
+                      <td className="p-2.5">
+                        <span className={`inline-flex items-center gap-1 text-xs ${statusInfo.color}`}>
+                          <StatusIcon className="w-3 h-3" /> {statusInfo.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-      <p className="text-[10px] text-muted-foreground/60 text-center">
-        Exibindo {filteredTransactions.length} lançamento(s) vinculado(s) ao fornecedor "{supplier.name}"
-      </p>
+          <p className="text-[10px] text-muted-foreground/60 text-center">
+            Exibindo {filteredTransactions.length} lançamento(s) vinculado(s) ao fornecedor "{supplier.name}"
+          </p>
+        </>
+      )}
     </div>
   );
 }

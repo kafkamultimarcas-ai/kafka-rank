@@ -2474,3 +2474,9 @@
 - [x] Validação real de CPF e CNPJ (algoritmo de dígitos verificadores)
 - [x] Feedback visual de validação (borda verde/vermelha + mensagem de erro)
 - [x] Aba de histórico de pagamentos/notas fiscais vinculadas no modal de detalhes do fornecedor
+
+## Melhorias Fornecedores - Auto CNPJ, Filtros, Exportação e Combobox
+- [x] Auto-preenchimento de dados da empresa (Razão Social, Endereço) ao digitar CNPJ válido (API ReceitaWS/BrasilAPI)
+- [x] Filtros de data (período) e status na aba Histórico Financeiro do fornecedor
+- [x] Botão de exportação PDF e CSV na aba Histórico Financeiro
+- [x] Combobox de fornecedores cadastrados no campo Fornecedor da tela de contas (Admin e Financeiro)
