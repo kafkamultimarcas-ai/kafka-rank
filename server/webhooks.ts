@@ -875,6 +875,82 @@ export function registerWebhookRoutes(app: Express) {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"] as string;
     const challenge = req.query["hub.challenge"];
+    const oauthCode = req.query["code"] as string;
+
+    // Handle OAuth callback from Instagram Business Login
+    if (oauthCode) {
+      console.log("[Instagram OAuth] Received authorization code, exchanging for token...");
+      try {
+        // Find the facebook integration config to get appSecret
+        const tenantId = await resolveTenantFromQuerySlug(req) || 1;
+        const metaIntegration = await withTenantAsync(tenantId, () => crmDb.getIntegrationByType("facebook"));
+        if (!metaIntegration?.config) {
+          res.status(500).json({ error: "No Meta integration configured" });
+          return;
+        }
+        const config = JSON.parse(metaIntegration.config);
+        const clientId = config.pageId || "1557963362633013";
+        const clientSecret = config.appSecret;
+        if (!clientSecret) {
+          res.status(500).json({ error: "appSecret not configured" });
+          return;
+        }
+        const redirectUri = `${req.protocol}://${req.get("host")}/api/webhooks/instagram`;
+        
+        // Step 1: Exchange code for short-lived token
+        const tokenResp = await fetch("https://api.instagram.com/oauth/access_token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: "authorization_code",
+            redirect_uri: redirectUri,
+            code: oauthCode,
+          }).toString(),
+        });
+        const tokenData = await tokenResp.json() as any;
+        console.log("[Instagram OAuth] Short-lived token response:", JSON.stringify(tokenData));
+        
+        if (tokenData.error_message || tokenData.error) {
+          res.status(400).json({ error: "Token exchange failed", details: tokenData.error_message || tokenData.error });
+          return;
+        }
+        
+        if (tokenData.access_token) {
+          // Step 2: Exchange for long-lived token
+          const longResp = await fetch(`https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${clientSecret}&access_token=${tokenData.access_token}`);
+          const longData = await longResp.json() as any;
+          console.log("[Instagram OAuth] Long-lived token response:", JSON.stringify({ expires_in: longData.expires_in, has_token: !!longData.access_token }));
+          
+          const finalToken = longData.access_token || tokenData.access_token;
+          config.pageAccessToken = finalToken;
+          if (tokenData.user_id) config.igUserId = String(tokenData.user_id);
+          
+          // Save to database
+          await withTenantAsync(tenantId, async () => {
+            const db = (await import("./db")).getDb;
+            const dbConn = await db();
+            if (dbConn) {
+              const { crmIntegrations } = await import("../drizzle/schema");
+              const { eq, and } = await import("drizzle-orm");
+              await dbConn.update(crmIntegrations)
+                .set({ config: JSON.stringify(config) })
+                .where(and(eq(crmIntegrations.tenantId, tenantId), eq(crmIntegrations.type, "facebook")));
+            }
+          });
+          
+          console.log(`[Instagram OAuth] SUCCESS! Token saved for tenant ${tenantId}, igUserId=${tokenData.user_id}, expires_in=${longData.expires_in || 'short-lived'}`);
+          res.status(200).send(`<html><body style="font-family:sans-serif;text-align:center;padding:50px;"><h1>✅ Instagram conectado com sucesso!</h1><p>Token salvo. Você pode fechar esta aba.</p><p>IG User ID: ${tokenData.user_id || 'N/A'}</p><p>Expira em: ${longData.expires_in ? Math.round(longData.expires_in/86400) + ' dias' : 'curta duração'}</p></body></html>`);
+          return;
+        }
+      } catch (err: any) {
+        console.error("[Instagram OAuth] Error:", err.message);
+        res.status(500).json({ error: "OAuth exchange failed", details: err.message });
+        return;
+      }
+    }
+
     if (mode === "subscribe" && token) {
       const tenantId = await resolveTenantFromQuerySlug(req);
       const metaIntegration = await withTenantAsync(tenantId, () => crmDb.getIntegrationByType("facebook"));

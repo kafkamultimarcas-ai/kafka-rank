@@ -2459,3 +2459,10 @@
 - [x] Contador numérico de mensagens não lidas nos chips de filtro de origem (ex: "Instagram (3)")
 - [x] Link clicável no username do Instagram no cabeçalho do chat (abre https://instagram.com/{username} em nova aba)
 - [x] Ordenação da lista de leads filtrada por mensagem mais recente no topo
+
+## Performance - Tela de Conversas (CrmChat) muito lenta (Jul 16)
+- [ ] Analisar gargalos na query listAllLeads (subqueries N+1 para lastMessage e unreadCount)
+- [ ] Implementar cache server-side para listAllLeads (stale-while-revalidate)
+- [ ] Otimizar índices no banco para crm_messages (leadId + timestamp)
+- [ ] Reduzir payload inicial - carregar apenas dados essenciais na primeira página
+- [ ] Implementar staleTime/cacheTime no tRPC useQuery para evitar refetch desnecessário
