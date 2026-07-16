@@ -909,7 +909,7 @@ function RelatoriosTab() {
   const [year, setYear] = useState(now.getFullYear());
   const startDate = useMemo(() => new Date(year, month - 1, 1).getTime(), [month, year]);
   const endDate = useMemo(() => new Date(year, month, 0, 23, 59, 59).getTime(), [month, year]);
-  const { data: transactionsData } = trpc.finTransactions.list.useQuery({ startDate, endDate, limit: 500 });
+  const { data: transactionsData } = trpc.finTransactions.list.useQuery({ startDate, endDate, pageSize: 100 });
   const { data: categories } = trpc.finCategories.list.useQuery();
   const { data: fuelRecords } = trpc.fuel.list.useQuery({ month, year });
   const { data: pvGastos } = trpc.pvGastos.list.useQuery({ chamadoId: 0 });
