@@ -57,9 +57,9 @@ export const finTransactionsRouter = router({
     page: z.number().int().min(1).default(1),
     pageSize: z.number().int().min(1).max(100).default(20),
   }).optional()).query(async ({ input }) => {
-    const params = input || {};
-    const page = params.page || 1;
-    const pageSize = params.pageSize || 20;
+    const params: any = input || {};
+    const page: number = params.page || 1;
+    const pageSize: number = params.pageSize || 20;
     const result = await listFinTransactions({
       ...params,
       limit: pageSize,
