@@ -47,7 +47,7 @@ export const finCategoriesRouter = router({
 // ===== TRANSACTIONS ROUTER =====
 export const finTransactionsRouter = router({
   list: publicProcedure.input(z.object({
-    type: z.enum(["payable", "receivable"]).optional(),
+    type: z.enum(["payable", "receivable", "paid"]).optional(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
     categoryId: z.number().optional(),
     sellerId: z.number().optional(),
@@ -80,7 +80,7 @@ export const finTransactionsRouter = router({
   }),
   
   create: publicProcedure.input(z.object({
-    type: z.enum(["payable", "receivable"]),
+    type: z.enum(["payable", "receivable", "paid"]),
     description: z.string().min(1),
     amount: z.string(),
     dueDate: z.number(),

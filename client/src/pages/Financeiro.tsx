@@ -265,7 +265,7 @@ function DashboardTab() {
                     <div className="flex-1 min-w-0">
                       <p className="text-gray-200 font-medium truncate">{t.description}</p>
                       <p className="text-[10px] text-yellow-300/70">
-                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : 'A Receber'}
+                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : t.type === 'paid' ? 'Pago' : 'A Receber'}
                       </p>
                     </div>
                     <span className="text-yellow-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
@@ -282,7 +282,7 @@ function DashboardTab() {
                     <div className="flex-1 min-w-0">
                       <p className="text-gray-200 font-medium truncate">{t.description}</p>
                       <p className="text-[10px] text-orange-300/70">
-                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : 'A Receber'}
+                        {t.supplier && `${t.supplier} • `}{t.type === 'payable' ? 'A Pagar' : t.type === 'paid' ? 'Pago' : 'A Receber'}
                       </p>
                     </div>
                     <span className="text-orange-400 font-bold ml-2 whitespace-nowrap">{formatCurrency(t.amount)}</span>
@@ -384,7 +384,7 @@ function ContasTab() {
   const endDate = useMemo(() => new Date(filterYear, filterMonth, 0, 23, 59, 59).getTime(), [filterMonth, filterYear]);
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue" | "approval">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "payable" | "receivable" | "paid">("all");
   const [sellerFilter, setSellerFilter] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   // Paginação server-side
@@ -395,7 +395,7 @@ function ContasTab() {
     endDate,
     page,
     pageSize,
-    ...(typeFilter !== "all" ? { type: typeFilter as "payable" | "receivable" } : {}),
+    ...(typeFilter !== "all" ? { type: typeFilter as "payable" | "receivable" | "paid" } : {}),
     ...(filter === "pending" ? { status: "pending" as const } : {}),
     ...(filter === "paid" ? { status: "paid" as const } : {}),
     ...(filter === "overdue" ? { status: "overdue" as const } : {}),
@@ -408,7 +408,7 @@ function ContasTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   
   // Form state
-  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
+  const [txType, setTxType] = useState<"payable" | "receivable" | "paid">("payable");
   const [txDescription, setTxDescription] = useState("");
   const [txAmount, setTxAmount] = useState("");
   const [txDueDate, setTxDueDate] = useState("");
@@ -586,6 +586,7 @@ function ContasTab() {
           { key: "all" as const, label: "Todos", icon: CircleDollarSign },
           { key: "payable" as const, label: "A Pagar", icon: TrendingDown },
           { key: "receivable" as const, label: "A Receber", icon: TrendingUp },
+          { key: "paid" as const, label: "Pago", icon: CheckCircle },
         ].map(f => (
           <button key={f.key} onClick={() => { setTypeFilter(typeFilter === f.key ? "all" : f.key); setPage(1); }}
             className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
@@ -642,6 +643,7 @@ function ContasTab() {
                 className="w-full bg-gray-800 border border-gray-700 rounded-md text-white h-9 text-sm px-2">
                 <option value="payable">A Pagar</option>
                 <option value="receivable">A Receber</option>
+                <option value="paid">Pago</option>
               </select>
             </div>
             <div>
@@ -1050,7 +1052,7 @@ function RelatoriosTab() {
   const handleExportCSV = () => {
     const headers = "Data,Tipo,Descrição,Fornecedor,Categoria,Valor,Status\n";
     const rows = allTx.sort((a: any, b: any) => a.dueDate - b.dueDate).map((t: any) =>
-      `${formatDateFull(t.dueDate)},${t.type === "payable" ? "A Pagar" : "A Receber"},"${t.description}","${t.supplier || ""}","${getCategoryName(t.categoryId)}",${t.amount},${t.status === "paid" ? "Pago" : t.status === "overdue" ? "Vencido" : "Pendente"}`
+      `${formatDateFull(t.dueDate)},${t.type === "payable" ? "A Pagar" : t.type === "paid" ? "Pago" : "A Receber"},"${t.description}","${t.supplier || ""}","${getCategoryName(t.categoryId)}",${t.amount},${t.status === "paid" ? "Pago" : t.status === "overdue" ? "Vencido" : "Pendente"}`
     ).join("\n");
     const blob = new Blob(["\uFEFF" + headers + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

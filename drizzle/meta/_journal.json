@@ -547,6 +547,13 @@
       "when": 1784223323899,
       "tag": "0077_fat_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "5",
+      "when": 1784225187742,
+      "tag": "0078_sudden_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

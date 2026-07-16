@@ -100,7 +100,7 @@ export default function AdminFinanceiro() {
   const [txDescription, setTxDescription] = useState("");
   const [txAmount, setTxAmount] = useState("");
   const [txDueDate, setTxDueDate] = useState("");
-  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
+  const [txType, setTxType] = useState<"payable" | "receivable" | "paid">("payable");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
   const [txSupplier, setTxSupplier] = useState("");
   const [txBarcode, setTxBarcode] = useState("");
@@ -412,6 +412,7 @@ export default function AdminFinanceiro() {
               <SelectItem value="all">Todos os tipos</SelectItem>
               <SelectItem value="payable">A Pagar</SelectItem>
               <SelectItem value="receivable">A Receber</SelectItem>
+              <SelectItem value="paid">Pago</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sellerFilterId?.toString() || "_all"} onValueChange={(v) => { setSellerFilterId(v === "_all" ? null : Number(v)); setPage(1); }}>
@@ -445,8 +446,8 @@ export default function AdminFinanceiro() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${tx.type === "payable" ? "bg-red-500/20" : "bg-green-500/20"}`}>
-                          {tx.type === "payable" ? <TrendingDown className="w-5 h-5 text-red-400" /> : <TrendingUp className="w-5 h-5 text-green-400" />}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${tx.type === "payable" ? "bg-red-500/20" : tx.type === "paid" ? "bg-emerald-500/20" : "bg-green-500/20"}`}>
+                          {tx.type === "payable" ? <TrendingDown className="w-5 h-5 text-red-400" /> : tx.type === "paid" ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <TrendingUp className="w-5 h-5 text-green-400" />}
                         </div>
                         <div className="min-w-0">
                           <div className="font-medium truncate">{tx.description}</div>
@@ -478,7 +479,7 @@ export default function AdminFinanceiro() {
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusInfo.label}
                         </Badge>
-                        <span className={`font-bold text-lg ${tx.type === "payable" ? "text-red-400" : "text-green-400"}`}>
+                        <span className={`font-bold text-lg ${tx.type === "payable" ? "text-red-400" : tx.type === "paid" ? "text-emerald-400" : "text-green-400"}`}>
                           {tx.type === "payable" ? "-" : "+"}{formatCurrency(tx.amount)}
                         </span>
                       </div>
@@ -576,6 +577,7 @@ export default function AdminFinanceiro() {
                     <SelectContent>
                       <SelectItem value="payable">A Pagar</SelectItem>
                       <SelectItem value="receivable">A Receber</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -690,6 +692,7 @@ export default function AdminFinanceiro() {
                     <SelectContent>
                       <SelectItem value="payable">A Pagar</SelectItem>
                       <SelectItem value="receivable">A Receber</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -794,13 +797,13 @@ export default function AdminFinanceiro() {
                       <StatusIcon className="w-3 h-3 mr-1" />
                       {statusInfo.label}
                     </Badge>
-                    <span className={`font-bold text-2xl ${tx.type === "payable" ? "text-red-400" : "text-green-400"}`}>
+                    <span className={`font-bold text-2xl ${tx.type === "payable" ? "text-red-400" : tx.type === "paid" ? "text-emerald-400" : "text-green-400"}`}>
                       {formatCurrency(tx.amount)}
                     </span>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between"><span className="text-muted-foreground">Descrição</span><span className="font-medium">{tx.description}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Tipo</span><span>{tx.type === "payable" ? "A Pagar" : "A Receber"}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Tipo</span><span>{tx.type === "payable" ? "A Pagar" : tx.type === "paid" ? "Pago" : "A Receber"}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Vencimento</span><span>{formatDate(tx.dueDate)}</span></div>
                     {tx.paidDate && <div className="flex justify-between"><span className="text-muted-foreground">Data Pagamento</span><span>{formatDate(tx.paidDate)}</span></div>}
                     {cat && <div className="flex justify-between"><span className="text-muted-foreground">Categoria</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color || undefined }} />{cat.name}</span></div>}

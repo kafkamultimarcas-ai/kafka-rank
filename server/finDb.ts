@@ -31,7 +31,7 @@ export async function updateFinCategory(id: number, data: Partial<{ name: string
 // ===== TRANSACTIONS =====
 
 export async function listFinTransactions(filters: {
-  type?: "payable" | "receivable";
+  type?: "payable" | "receivable" | "paid";
   status?: "pending" | "paid" | "overdue" | "cancelled";
   categoryId?: number;
   sellerId?: number;
@@ -66,8 +66,8 @@ export async function listFinTransactions(filters: {
   const [items, countResult] = await Promise.all([
     db.select().from(finTransactions)
       .where(where)
-      .orderBy(asc(finTransactions.dueDate))
-      .limit(filters.limit || 200)
+      .orderBy(desc(finTransactions.createdAt))
+      .limit(filters.limit || 20)
       .offset(filters.offset || 0),
     db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(where),
   ]);
@@ -83,7 +83,7 @@ export async function getFinTransaction(id: number) {
 }
 
 export async function createFinTransaction(data: {
-  type: "payable" | "receivable";
+  type: "payable" | "receivable" | "paid";
   description: string;
   amount: string;
   dueDate: number;
@@ -182,7 +182,7 @@ export async function getFinDashboard(month?: number, year?: number) {
   // Upcoming due (next 7 days)
   const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000;
   const upcomingDue = await db.select().from(finTransactions)
-    .where(and(eq(finTransactions.status, "pending"), gte(finTransactions.dueDate, now), lte(finTransactions.dueDate, sevenDaysFromNow)))
+    .where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.status, "pending"), gte(finTransactions.dueDate, now), lte(finTransactions.dueDate, sevenDaysFromNow)))
     .orderBy(asc(finTransactions.dueDate))
     .limit(10);
   
@@ -245,7 +245,7 @@ export async function getOverdueTransactions() {
   if (!db) return [];
   const now = Date.now();
   return db.select().from(finTransactions)
-    .where(and(eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)))
+    .where(and(eq(finTransactions.tenantId, getCurrentTenantId()), eq(finTransactions.status, "pending"), lte(finTransactions.dueDate, now)))
     .orderBy(asc(finTransactions.dueDate));
 }
 

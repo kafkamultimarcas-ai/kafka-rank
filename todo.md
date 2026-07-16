@@ -2447,8 +2447,12 @@
 - [x] Corrigir fluxo de salvar contas (bug: listFinTransactions não filtrava por tenantId)
 
 ## Paginação Server-Side + Multitenancy Padrão
-- [ ] Criar helper/utilitário de paginação reutilizável no backend (paginate util)
-- [ ] Criar middleware de multitenancy que injeta tenantId automaticamente em toda query
-- [ ] Aplicar paginação server-side na listagem de contas (finTransactions)
-- [ ] Criar componente de paginação reutilizável no frontend
-- [ ] Garantir que toda consulta ao banco filtre por tenantId automaticamente
+- [x] Criar helper/utilitário de paginação reutilizável no backend (shared/pagination.ts + server/lib/paginate.ts)
+- [x] Multitenancy via getCurrentTenantId() padrão em toda query (corrigido queries faltantes)
+- [x] Aplicar paginação server-side na listagem de contas (finTransactions)
+- [x] Criar componente PaginationControls reutilizável no frontend
+- [x] Garantir que toda consulta ao banco filtre por tenantId (corrigido getOverdue, getUpcoming, dashboard)
+- [x] Ordenação por data de lançamento decrescente (createdAt DESC) no listFinTransactions
+- [x] Paginação de 20 em 20 como padrão
+- [x] Adicionar opção "Pago" no tipo de conta (payable, receivable, paid)
+- [x] Aplicar ajustes no Financeiro e AdminFinanceiro

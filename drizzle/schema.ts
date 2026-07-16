@@ -901,7 +901,7 @@ export type InsertFinCategory = typeof finCategories.$inferInsert;
 // Transações financeiras (contas a pagar e receber)
 export const finTransactions = mysqlTable("fin_transactions", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["payable", "receivable"]).notNull(),
+  type: mysqlEnum("type", ["payable", "receivable", "paid"]).notNull(),
   description: varchar("description", { length: 500 }).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   dueDate: bigint("dueDate", { mode: "number" }).notNull(), // timestamp vencimento
