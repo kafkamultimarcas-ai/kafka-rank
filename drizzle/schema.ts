@@ -1847,3 +1847,42 @@ export const integrationSyncLogs = mysqlTable("integration_sync_logs", {
 }));
 export type IntegrationSyncLog = typeof integrationSyncLogs.$inferSelect;
 export type InsertIntegrationSyncLog = typeof integrationSyncLogs.$inferInsert;
+
+// ===== FORNECEDORES (Suppliers) =====
+export const finSuppliers = mysqlTable("fin_suppliers", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  // Tipo: fisica ou juridica
+  personType: mysqlEnum("person_type", ["fisica", "juridica"]).notNull().default("fisica"),
+  // Dados pessoais / empresa
+  name: varchar("name", { length: 255 }).notNull(),
+  cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
+  rg: varchar("rg", { length: 30 }),
+  nationality: varchar("nationality", { length: 100 }),
+  profession: varchar("profession", { length: 150 }),
+  birthDate: bigint("birth_date", { mode: "number" }),
+  gender: mysqlEnum("gender", ["masculino", "feminino", "outro"]),
+  maritalStatus: mysqlEnum("marital_status", ["solteiro", "casado", "divorciado", "viuvo", "outro"]),
+  // Endereço
+  cep: varchar("cep", { length: 10 }),
+  state: varchar("state", { length: 2 }),
+  city: varchar("city", { length: 150 }),
+  neighborhood: varchar("neighborhood", { length: 150 }),
+  street: varchar("street", { length: 255 }),
+  number: varchar("number", { length: 20 }),
+  complement: varchar("complement", { length: 150 }),
+  // Contato
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 20 }),
+  mobile: varchar("mobile", { length: 20 }),
+  // Extras
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_fin_suppliers_tenant").on(table.tenantId),
+  nameIdx: index("idx_fin_suppliers_name").on(table.tenantId, table.name),
+}));
+export type FinSupplier = typeof finSuppliers.$inferSelect;
+export type InsertFinSupplier = typeof finSuppliers.$inferInsert;

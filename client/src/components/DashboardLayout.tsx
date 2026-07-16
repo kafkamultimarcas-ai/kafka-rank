@@ -23,7 +23,7 @@ import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, Truck } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -55,6 +55,7 @@ const menuItems = [
   { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
   { icon: Users, label: "Financeiro Vendedores", path: "/admin/financeiro-vendedores" },
   { icon: DollarSign, label: "Caixa da Loja", path: "/financeiro" },
+  { icon: Truck, label: "Fornecedores", path: "/admin/fornecedores" },
   { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
   { icon: Bot, label: "Ajustar IA", path: "/admin/iam" },
   { icon: FileText, label: "Documentos", path: "/admin/documentos" },

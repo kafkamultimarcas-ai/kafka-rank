@@ -21,6 +21,7 @@ import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter, crmAiRouter, aiMetricsRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter, fuelRouter } from "./routers/finRouter";
+import { supplierRouter } from "./routers/supplierRouter";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
@@ -2869,6 +2870,7 @@ export const appRouter = router({
   crmSellerStats: crmSellerStatsRouter,
   finCategories: finCategoriesRouter,
   finTransactions: finTransactionsRouter,
+  suppliers: supplierRouter,
   fuel: fuelRouter,
   pvChamados: pvChamadosRouter,
   pvGastos: pvGastosRouter,

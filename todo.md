@@ -2456,3 +2456,15 @@
 - [x] Paginação de 20 em 20 como padrão
 - [x] Adicionar opção "Pago" no tipo de conta (payable, receivable, paid)
 - [x] Aplicar ajustes no Financeiro e AdminFinanceiro
+
+## Cadastro de Fornecedor (CRUD Completo)
+- [x] Criar tabela fin_suppliers no banco (tipo, cpf/cnpj, nome, rg, nacionalidade, profissão, nascimento, sexo, estado civil, cep, uf, cidade, bairro, endereço, número, complemento, email, telefone, celular, observações)
+- [x] Criar db helpers (create, list, getById, update, delete) com paginação e tenantId
+- [x] Criar router tRPC com procedures CRUD (list, create, update, delete, getById)
+- [x] Criar página Fornecedores.tsx com listagem paginada, busca, filtros
+- [x] Criar modal de cadastro com todos os campos (Física/Jurídica)
+- [x] Criar modal de edição com todos os campos
+- [x] Criar modal de detalhes exibindo todos os campos
+- [x] Botão de ações (editar, excluir, detalhes) em cada linha
+- [x] Integrar rota no App.tsx acessível pelo Admin e Financeiro
+- [x] Adicionar link na navegação lateral (Admin + Financeiro)

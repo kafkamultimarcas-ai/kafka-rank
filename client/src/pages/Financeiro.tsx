@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { toast } from "sonner";
@@ -10,7 +10,7 @@ import {
   Fuel, Mic, MicOff, Loader2, Shield, ShieldCheck, ShieldAlert, Edit2, Trash2,
   Download, Printer, BarChart3, PieChart, Filter, Check, XCircle, Eye,
   ChevronLeft, ChevronRight, CircleDollarSign, Banknote, CreditCard,
-  FileSpreadsheet, ArrowUpDown, MoreVertical, RefreshCw
+  FileSpreadsheet, ArrowUpDown, MoreVertical, RefreshCw, Truck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ function formatCurrency(value: string | number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
 }
 
-type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios";
+type MainTab = "dashboard" | "contas" | "pos-venda" | "gasolina" | "relatorios" | "fornecedores";
 
 export default function Financeiro() {
   const { logoUrl } = useBranding();
@@ -57,6 +57,7 @@ export default function Financeiro() {
     { key: "pos-venda", label: "Pós-Venda", icon: Wrench, color: "orange" },
     { key: "gasolina", label: "Gasolina", icon: Fuel, color: "yellow" },
     { key: "relatorios", label: "Relatórios", icon: FileSpreadsheet, color: "purple" },
+    { key: "fornecedores", label: "Fornecedores", icon: Truck, color: "sky" },
   ];
 
   return (
@@ -118,6 +119,7 @@ export default function Financeiro() {
       {mainTab === "pos-venda" && <PosVendaTab />}
       {mainTab === "gasolina" && <GasolinaTab />}
       {mainTab === "relatorios" && <RelatoriosTab />}
+      {mainTab === "fornecedores" && <FornecedoresTab />}
     </div>
   );
 }
@@ -1653,5 +1655,16 @@ function AudioLauncher({ onResult, context }: { onResult: (parsed: any) => void;
         </button>
       )}
     </div>
+  );
+}
+
+
+// ===== FORNECEDORES TAB =====
+const LazyFornecedores = lazy(() => import("./Fornecedores"));
+function FornecedoresTab() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Carregando...</div>}>
+      <LazyFornecedores />
+    </Suspense>
   );
 }

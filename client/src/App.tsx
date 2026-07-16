@@ -58,6 +58,7 @@ const GerentePanel = lazy(() => import("./pages/GerentePanel"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const FinanceiroPage = lazy(() => import("./pages/Financeiro"));
+const Fornecedores = lazy(() => import("./pages/Fornecedores"));
 const AssinaturaPage = lazy(() => import("./pages/Assinatura"));
 const CentralResultados = lazy(() => import("./pages/CentralResultados"));
 const AdminBonusVehicles = lazy(() => import("./pages/admin/AdminBonusVehicles"));
@@ -165,6 +166,8 @@ function Router() {
         <Route path="/t/:slug/admin/bonus-veiculos" component={AdminBonusVehicles} />
         <Route path="/admin/financeiro-vendedores" component={FinanceiroVendedores} />
         <Route path="/t/:slug/admin/financeiro-vendedores" component={FinanceiroVendedores} />
+        <Route path="/admin/fornecedores" component={Fornecedores} />
+        <Route path="/t/:slug/admin/fornecedores" component={Fornecedores} />
         {/* CRM Routes */}
         <Route path="/crm" component={CrmCommandCenter} />
         <Route path="/t/:slug/crm" component={CrmCommandCenter} />
@@ -198,6 +201,8 @@ function Router() {
         <Route path="/t/:slug/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
         <Route path="/t/:slug/financeiro" component={FinanceiroPage} />
+        <Route path="/fornecedores" component={Fornecedores} />
+        <Route path="/t/:slug/fornecedores" component={Fornecedores} />
         <Route path="/assinatura" component={AssinaturaPage} />
         <Route path="/t/:slug/assinatura" component={AssinaturaPage} />
         <Route path="/feirao" component={RankingFeirao} />

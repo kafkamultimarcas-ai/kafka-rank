@@ -554,6 +554,13 @@
       "when": 1784225187742,
       "tag": "0078_sudden_invisible_woman",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "5",
+      "when": 1784225794929,
+      "tag": "0079_black_mephisto",
+      "breakpoints": true
     }
   ]
 }
