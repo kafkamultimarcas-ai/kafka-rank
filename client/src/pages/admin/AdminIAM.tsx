@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,7 @@ export default function AdminIAM() {
   }
 
   return (
+    <DashboardLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
@@ -290,5 +292,6 @@ export default function AdminIAM() {
         </Button>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

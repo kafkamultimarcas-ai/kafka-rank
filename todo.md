@@ -2480,3 +2480,12 @@
 - [x] Melhorar UX de carregamento (skeleton UI ao invés de spinner)
 - [x] Adicionar markAsRead mutation para resetar unreadCount ao abrir chat
 - [x] Aumentar refetchInterval de 5s para 10s para reduzir carga
+
+## Fix Navegação - Botão Voltar em todas as telas (Jul 17)
+- [x] AdminMonthTurnover (Virada de Mês): adicionado DashboardLayout com sidebar
+- [x] AdminIAM (Configurar IA): adicionado DashboardLayout com sidebar
+- [x] Lista de Ligação (print window): adicionado botão "← Voltar" no header
+- [x] Criado componente reutilizável PageBackHeader para futuras páginas
+- [x] Verificado: CrmAdminDashboard já tem ≡ menu com sidebar + links para Painel Admin/Gerente
+- [x] Verificado: CrmCommandCenter já tem ArrowLeft para voltar à Minha Área
+- [x] Verificado: todas as páginas de vendedor (MinhaArea, Estoque, Financeiro, etc.) já têm back button

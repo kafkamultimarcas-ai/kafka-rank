@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
+import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,6 +60,7 @@ export default function AdminMonthTurnover() {
   }, [availableMonths, previousMonth, previousYear]);
 
   return (
+    <DashboardLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -332,5 +334,6 @@ export default function AdminMonthTurnover() {
         )}
       </Card>
     </div>
+    </DashboardLayout>
   );
 }

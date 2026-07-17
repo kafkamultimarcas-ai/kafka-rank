@@ -824,7 +824,7 @@ function LeadList({
                     <div class="header">
                       <div><h1>📋 Lista de Ligação - ${brandName}</h1>
                       <p class="subtitle">Gerada em ${dateStr} às ${timeStr} | ${printLeads.length} contatos${periodLabel ? " | " + periodLabel : ""}</p></div>
-                      <button class="btn no-print" onclick="window.print()">🖨️ Imprimir</button>
+                      <div class="no-print" style="display:flex;gap:8px;"><button class="btn" onclick="window.close()" style="background:#666;">← Voltar</button><button class="btn" onclick="window.print()">🖨️ Imprimir</button></div>
                     </div>
                     <table><thead><tr>
                       <th>#</th><th>Nome</th><th>Telefone</th><th>Veículo</th><th>Vendedor</th><th>Temp.</th><th>Ligou?</th>
