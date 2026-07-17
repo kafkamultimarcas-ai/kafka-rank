@@ -212,9 +212,12 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
   const [filterSource, setFilterSource] = useState<string | null>(null);
   const [showMobileChat, setShowMobileChat] = useState(false);
 
+  const markAsRead = trpc.crmChat.markAsRead.useMutation();
   const handleSelectLead = (id: number) => {
     setSelectedLeadId(id);
     setShowMobileChat(true);
+    // Reset unread count when opening chat
+    markAsRead.mutate({ leadId: id });
   };
 
   const handleBack = () => {
@@ -281,7 +284,7 @@ function LeadList({
   // Initial load - first page
   const { data: firstPageData, isLoading: isFirstLoading } = trpc.crmLeads.listAll.useQuery(
     { archived: false, limit: PAGE_SIZE, offset: 0 },
-    { refetchInterval: 5000 }
+    { refetchInterval: 10000 }
   );
 
   // Load more pages
@@ -525,9 +528,17 @@ function LeadList({
       {/* Lead list */}
       <div className="flex-1 overflow-y-auto" ref={listRef} onScroll={handleScroll}>
         {isFirstLoading && (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <span className="ml-2 text-xs text-muted-foreground">Carregando leads...</span>
+          <div className="space-y-1 p-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 rounded-lg animate-pulse">
+                <div className="w-10 h-10 rounded-full bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 bg-muted rounded w-2/3" />
+                  <div className="h-3 bg-muted/60 rounded w-4/5" />
+                </div>
+                <div className="h-3 bg-muted/40 rounded w-10" />
+              </div>
+            ))}
           </div>
         )}
         {leads.map((lead: any) => {

@@ -199,12 +199,12 @@ export async function listAllLeads(opts?: { archived?: boolean; department?: str
     isCampaignResponse: crmLeads.isCampaignResponse,
     profilePicUrl: crmLeads.profilePicUrl,
     socialUsername: crmLeads.socialUsername,
-    lastMessageContent: sql<string | null>`(SELECT content FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
-    lastMessageDirection: sql<string | null>`(SELECT direction FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
-    lastMessageTimestamp: sql<number | null>`(SELECT timestamp FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
-    lastMessageType: sql<string | null>`(SELECT messageType FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
-    lastMessageSender: sql<string | null>`(SELECT senderName FROM crm_messages WHERE crm_messages.leadId = crm_leads.id ORDER BY timestamp DESC LIMIT 1)`,
-    unreadCount: sql<number>`(SELECT COUNT(*) FROM crm_messages WHERE crm_messages.leadId = crm_leads.id AND crm_messages.direction = 'inbound' AND crm_messages.timestamp > COALESCE(crm_leads.acknowledgedAt, crm_leads.lastAutoTransferAt, 0))`,
+    lastMessageContent: crmLeads.lastMessageContent,
+    lastMessageDirection: crmLeads.lastMessageDirection,
+    lastMessageTimestamp: crmLeads.lastMessageAt,
+    lastMessageType: crmLeads.lastMessageType,
+    lastMessageSender: crmLeads.lastMessageSender,
+    unreadCount: crmLeads.unreadCount,
   }).from(crmLeads).where(and(eq(crmLeads.tenantId, tid), where)).orderBy(
     desc(crmLeads.lastMessageAt),
     desc(crmLeads.updatedAt)
@@ -524,7 +524,31 @@ export async function getMarketingStats(startDate?: number, endDate?: number) {
 export async function createMessage(data: InsertCrmMessage) {
   const db = await getDb();
   if (!db) return 0;
-  const [result] = await db.insert(crmMessages).values({...data, tenantId: getCurrentTenantId()}).$returningId();
+  const tid = getCurrentTenantId();
+  const [result] = await db.insert(crmMessages).values({...data, tenantId: tid}).$returningId();
+  // Denormalize: update lead with last message info + unread count
+  if (data.leadId) {
+    const updateData: any = {
+      lastMessageAt: data.timestamp || Date.now(),
+      lastMessageContent: data.content ? data.content.substring(0, 500) : null,
+      lastMessageDirection: data.direction,
+      lastMessageType: data.messageType,
+      lastMessageSender: data.senderName || null,
+    };
+    if (data.direction === "inbound") {
+      // Increment unread count for inbound messages
+      await db.execute(sql`UPDATE crm_leads SET 
+        lastMessageAt = ${updateData.lastMessageAt},
+        lastMessageContent = ${updateData.lastMessageContent},
+        lastMessageDirection = ${updateData.lastMessageDirection},
+        lastMessageType = ${updateData.lastMessageType},
+        lastMessageSender = ${updateData.lastMessageSender},
+        unreadCount = unreadCount + 1
+        WHERE id = ${data.leadId} AND tenantId = ${tid}`);
+    } else {
+      await db.update(crmLeads).set(updateData).where(and(eq(crmLeads.id, data.leadId), eq(crmLeads.tenantId, tid)));
+    }
+  }
   return result.id;
 }
 

@@ -548,6 +548,11 @@ export const crmLeads = mysqlTable("crm_leads", {
   aiCreditAppId: int("aiCreditAppId"), // ID da ficha de crédito criada pela IA
   aiAppointmentId: int("aiAppointmentId"), // ID do agendamento criado pela IA
   lastMessageAt: bigint("lastMessageAt", { mode: "number" }), // timestamp da última mensagem
+  lastMessageContent: varchar("lastMessageContent", { length: 500 }), // conteúdo da última mensagem (denormalizado)
+  lastMessageDirection: varchar("lastMessageDirection", { length: 10 }), // direction da última mensagem
+  lastMessageType: varchar("lastMessageType", { length: 20 }), // tipo da última mensagem
+  lastMessageSender: varchar("lastMessageSender", { length: 100 }), // sender da última mensagem
+  unreadCount: int("unreadCount").notNull().default(0), // contagem de msgs não lidas (denormalizado)
   lastCampaignId: int("lastCampaignId"), // ID da última campanha enviada
   isCampaignResponse: boolean("isCampaignResponse").default(false), // se respondeu a uma campanha
   profilePicUrl: varchar("profilePicUrl", { length: 512 }), // URL da foto de perfil (Instagram/Facebook)

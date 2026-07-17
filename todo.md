@@ -2472,3 +2472,11 @@
 - [x] Causa raiz: sendMessage/sendImage/sendVehicle usavam Z-API (WhatsApp) para todos os leads, inclusive Instagram
 - [x] Fix: rotear leads com source=instagram/messenger/facebook para metaMessaging.sendText/sendImage (Meta Graph API)
 - [x] Adicionar logging detalhado no metaMessagingService para debug de envio
+
+## Otimização Performance CRM Conversas (Jul 17)
+- [x] Investigar query lenta de carregamento de leads na tela de Conversas
+- [x] Otimizar query backend: denormalizar lastMessage* e unreadCount na tabela crm_leads (elimina 6 subqueries correlacionadas)
+- [x] Criar índices compostos (crm_messages.leadId+timestamp, crm_leads.tenantId+archived+lastMessageAt)
+- [x] Melhorar UX de carregamento (skeleton UI ao invés de spinner)
+- [x] Adicionar markAsRead mutation para resetar unreadCount ao abrir chat
+- [x] Aumentar refetchInterval de 5s para 10s para reduzir carga

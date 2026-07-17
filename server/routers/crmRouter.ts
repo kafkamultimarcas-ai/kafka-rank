@@ -450,7 +450,7 @@ export const crmLeadsRouter = router({
     leadId: z.number(),
     sellerId: z.number(),
   })).mutation(async ({ input }) => {
-    await crmDb.updateLead(input.leadId, { acknowledgedAt: Date.now() });
+    await crmDb.updateLead(input.leadId, { acknowledgedAt: Date.now(), unreadCount: 0 } as any);
     await crmDb.createActivity({
       leadId: input.leadId,
       sellerId: input.sellerId,
@@ -1336,6 +1336,14 @@ export const crmVoiceRouter = router({
 import { invokeLLM } from "../_core/llm";
 
 export const crmChatRouter = router({
+  // Mark lead as read (reset unread count)
+  markAsRead: publicProcedure.input(z.object({
+    leadId: z.number(),
+  })).mutation(async ({ input }) => {
+    await crmDb.updateLead(input.leadId, { acknowledgedAt: Date.now(), unreadCount: 0 } as any);
+    return { success: true };
+  }),
+
   // Get messages for a lead
   getMessages: publicProcedure.input(z.object({
     leadId: z.number(),
