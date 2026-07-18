@@ -2516,3 +2516,14 @@
 - [x] 0 erros TypeScript
 - [ ] PENDENTE: Verificar se o token IGAAWI tem permissão instagram_business_manage_messages
 - [ ] PENDENTE: Se token expirado, usuário precisa refazer OAuth do Instagram Business Login
+
+## Fix Instagram DM Send (Jul 18, 2026)
+- [x] Fix metaMessagingService to use correct API endpoint (graph.instagram.com/me/messages) for Instagram tokens
+- [x] Test Instagram token validity via API - confirmed VALID (account: kafkamultimarcas)
+- [x] Add validateToken() function to metaMessagingService
+- [x] Add getMetaTokenStatus query endpoint in crmIntegrationsRouter
+- [x] Add token status indicator banner in AdminMetaIntegration page
+- [x] Improve sendMessage error handling in CrmChat.tsx with user-friendly messages
+- [x] Improve sendMessage error handling in CrmCommandCenter.tsx with user-friendly messages
+- [x] Handle expired token errors with actionable guidance to user
+- [x] Handle 24h messaging window errors with explanation
