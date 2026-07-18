@@ -15,6 +15,7 @@ export function useContasState(initialContaId?: number | null) {
   const [filterYear, setFilterYear] = useState(now.getFullYear());
   const [filter, setFilter] = useState<ContasFilter>("all");
   const [typeFilter, setTypeFilter] = useState<ContasTypeFilter>("all");
+  const [filterVehicle, setFilterVehicle] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -27,10 +28,12 @@ export function useContasState(initialContaId?: number | null) {
   const [txAmount, setTxAmount] = useState("");
   const [txDueDate, setTxDueDate] = useState("");
   const [txSupplier, setTxSupplier] = useState("");
+  const [txVehicle, setTxVehicle] = useState("");
   const [txNotes, setTxNotes] = useState("");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
   const [txNeedsApproval, setTxNeedsApproval] = useState(false);
   const [txRecurrence, setTxRecurrence] = useState("none");
+  const [txRecurrenceMonths, setTxRecurrenceMonths] = useState(2);
   const [txIsVale, setTxIsVale] = useState(false);
   const [txSellerId, setTxSellerId] = useState<number | null>(null);
 
@@ -61,10 +64,12 @@ export function useContasState(initialContaId?: number | null) {
     setTxAmount("");
     setTxDueDate("");
     setTxSupplier("");
+    setTxVehicle("");
     setTxNotes("");
     setTxCategoryId(null);
     setTxNeedsApproval(false);
     setTxRecurrence("none");
+    setTxRecurrenceMonths(2);
     setTxIsVale(false);
     setTxSellerId(null);
   };
@@ -132,6 +137,7 @@ export function useContasState(initialContaId?: number | null) {
     setTxAmount(String(transaction.amount));
     setTxDueDate(transaction.dueDate ? new Date(transaction.dueDate).toISOString().split("T")[0] : "");
     setTxSupplier(transaction.supplier || "");
+    setTxVehicle((transaction as any).vehicle || "");
     setTxNotes(transaction.notes || "");
     setTxCategoryId(transaction.categoryId);
     setTxIsVale(!!transaction.sellerId);
@@ -147,6 +153,10 @@ export function useContasState(initialContaId?: number | null) {
 
     if (typeFilter !== "all") {
       list = list.filter((transaction) => transaction.type === typeFilter);
+    }
+
+    if (filterVehicle) {
+      list = list.filter((transaction) => (transaction as any).vehicle === filterVehicle);
     }
 
     if (filter === "pending") {
@@ -179,12 +189,13 @@ export function useContasState(initialContaId?: number | null) {
       list = list.filter((transaction) =>
         transaction.description?.toLowerCase().includes(query) ||
         transaction.supplier?.toLowerCase().includes(query) ||
+        (transaction as any).vehicle?.toLowerCase().includes(query) ||
         transaction.notes?.toLowerCase().includes(query)
       );
     }
 
     return [...list].sort((a, b) => a.dueDate - b.dueDate);
-  }, [allTransactions, filter, searchQuery, typeFilter]);
+  }, [allTransactions, filter, searchQuery, typeFilter, filterVehicle]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
 
@@ -278,7 +289,7 @@ export function useContasState(initialContaId?: number | null) {
 
   useEffect(() => {
     setPage(1);
-  }, [filterMonth, filterYear, filter, typeFilter, searchQuery, pageSize]);
+  }, [filterMonth, filterYear, filter, typeFilter, filterVehicle, searchQuery, pageSize]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -370,6 +381,7 @@ export function useContasState(initialContaId?: number | null) {
         dueDate: normalizedDueDate,
         categoryId: txCategoryId,
         supplier: txSupplier || undefined,
+        vehicle: txVehicle || undefined,
         notes: txNotes || undefined,
         status: persistedStatus,
         paidDate: persistedPaidDate,
@@ -386,8 +398,10 @@ export function useContasState(initialContaId?: number | null) {
       paidDate: persistedPaidDate,
       categoryId: txCategoryId,
       supplier: txSupplier || undefined,
+      vehicle: txVehicle || undefined,
       notes: txNotes || undefined,
       recurrence: txRecurrence as "none" | "monthly" | "weekly" | "yearly",
+      recurrenceMonths: txRecurrence === "monthly" ? Math.max(1, Number(txRecurrenceMonths) || 1) : undefined,
       needsApproval: txNeedsApproval,
       createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
       sellerId: txIsVale && txSellerId ? txSellerId : undefined,
@@ -435,6 +449,8 @@ export function useContasState(initialContaId?: number | null) {
     setFilter,
     typeFilter,
     setTypeFilter,
+    filterVehicle,
+    setFilterVehicle,
     searchQuery,
     setSearchQuery,
     stats,
@@ -451,6 +467,8 @@ export function useContasState(initialContaId?: number | null) {
     setTxDueDate,
     txSupplier,
     setTxSupplier,
+    txVehicle,
+    setTxVehicle,
     txNotes,
     setTxNotes,
     txCategoryId,
@@ -459,6 +477,8 @@ export function useContasState(initialContaId?: number | null) {
     setTxNeedsApproval,
     txRecurrence,
     setTxRecurrence,
+    txRecurrenceMonths,
+    setTxRecurrenceMonths,
     txIsVale,
     setTxIsVale,
     txSellerId,

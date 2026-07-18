@@ -2,6 +2,7 @@ import { Banknote, Edit2, Loader2, Receipt, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SupplierCombobox } from "@/components/SupplierCombobox";
+import { VehicleCombobox } from "@/components/VehicleCombobox";
 import { AudioLauncher } from "@/features/financeiro/components/AudioLauncher";
 import type { AudioLauncherContext } from "@/features/financeiro/components/AudioLauncher";
 import type { ContaFormType } from "@/features/financeiro/contas/useContasState";
@@ -23,6 +24,8 @@ interface ContaFormProps {
   setTxDueDate: (value: string) => void;
   txSupplier: string;
   setTxSupplier: (value: string) => void;
+  txVehicle: string;
+  setTxVehicle: (value: string) => void;
   txNotes: string;
   setTxNotes: (value: string) => void;
   txCategoryId: number | null;
@@ -31,6 +34,8 @@ interface ContaFormProps {
   setTxNeedsApproval: (value: boolean) => void;
   txRecurrence: string;
   setTxRecurrence: (value: string) => void;
+  txRecurrenceMonths: number;
+  setTxRecurrenceMonths: (value: number) => void;
   txIsVale: boolean;
   setTxIsVale: (value: boolean) => void;
   txSellerId: number | null;
@@ -56,6 +61,8 @@ export function ContaForm(props: ContaFormProps) {
     setTxDueDate,
     txSupplier,
     setTxSupplier,
+    txVehicle,
+    setTxVehicle,
     txNotes,
     setTxNotes,
     txCategoryId,
@@ -64,6 +71,8 @@ export function ContaForm(props: ContaFormProps) {
     setTxNeedsApproval,
     txRecurrence,
     setTxRecurrence,
+    txRecurrenceMonths,
+    setTxRecurrenceMonths,
     txIsVale,
     setTxIsVale,
     txSellerId,
@@ -198,19 +207,41 @@ export function ContaForm(props: ContaFormProps) {
         <SupplierCombobox value={txSupplier} onChange={setTxSupplier} />
       </div>
 
+      <div>
+        <label className="text-[10px] font-bold uppercase text-gray-500">Veículo</label>
+        <VehicleCombobox value={txVehicle} onChange={setTxVehicle} />
+      </div>
+
       {!editingTx && (
-        <div>
-          <label className="text-[10px] font-bold uppercase text-gray-500">Recorrência</label>
-          <select
-            value={txRecurrence}
-            onChange={(event) => setTxRecurrence(event.target.value)}
-            className="h-10 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-white"
-          >
-            <option value="none">Sem recorrência</option>
-            <option value="monthly">Mensal</option>
-            <option value="weekly">Semanal</option>
-            <option value="yearly">Anual</option>
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-500">Recorrência</label>
+            <select
+              value={txRecurrence}
+              onChange={(event) => setTxRecurrence(event.target.value)}
+              className="h-10 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-white"
+            >
+              <option value="none">Sem recorrência</option>
+              <option value="monthly">Mensal</option>
+              <option value="weekly">Semanal</option>
+              <option value="yearly">Anual</option>
+            </select>
+          </div>
+          {txRecurrence === "monthly" && (
+            <div>
+              <label className="text-[10px] font-bold uppercase text-gray-500">Qtd. de meses *</label>
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={txRecurrenceMonths}
+                onChange={(event) => setTxRecurrenceMonths(Math.max(1, Math.min(60, Number(event.target.value) || 1)))}
+                inputMode="numeric"
+                className="h-10 border-gray-700 bg-gray-800 text-sm text-white"
+              />
+              <p className="mt-1 text-[10px] text-gray-500">Gera 1 conta por mês.</p>
+            </div>
+          )}
         </div>
       )}
 
