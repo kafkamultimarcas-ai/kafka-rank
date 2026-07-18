@@ -136,7 +136,7 @@ export default function MinhaArea() {
   const [, navigate] = useLocation();
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
-  const { name: tenantName } = useBranding();
+  const { name: tenantName, logoUrl } = useBranding();
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId }, { enabled: sellerId > 0 });
@@ -514,7 +514,10 @@ export default function MinhaArea() {
               {uploadingPhoto && <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /></div>}
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{tenantName}</p>
+              <div className="flex items-center gap-1.5">
+                <img src={logoUrl} alt={tenantName} className="h-3.5 w-3.5 rounded object-contain" />
+                <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{tenantName}</p>
+              </div>
               <p className="text-white font-bold text-sm">{sellerDisplayName}</p>
               <p className={`text-xs ${deptInfo.color}`}>{deptInfo.label}</p>
             </div>

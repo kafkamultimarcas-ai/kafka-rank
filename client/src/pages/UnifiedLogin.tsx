@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
@@ -30,6 +30,43 @@ export default function UnifiedLogin() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [debouncedEmail, setDebouncedEmail] = useState("");
+
+  // Primeiro acesso via link de convite (?invite=TOKEN) — vendedor define a própria senha.
+  const inviteToken = useMemo(
+    () => (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") || "" : ""),
+    []
+  );
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePassword, setInvitePassword] = useState("");
+  const [inviteConfirm, setInviteConfirm] = useState("");
+  const inviteQuery = trpc.sellers.getInvite.useQuery(
+    { inviteToken },
+    { enabled: !!inviteToken, retry: false, refetchOnWindowFocus: false }
+  );
+  useEffect(() => {
+    if (inviteQuery.data?.email) setInviteEmail(inviteQuery.data.email);
+  }, [inviteQuery.data?.email]);
+  const firstAccessMutation = trpc.sellers.firstAccessByEmail.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Bem-vindo, ${data.nickname || data.name}!`);
+      const slug = (window.location.pathname.match(/^\/t\/([^/]+)/) || [])[1] || "";
+      const base = slug ? `/t/${slug}` : "";
+      if (data.department === "pos_venda") window.location.href = `${base}/pos-venda`;
+      else if (data.department === "financeiro") window.location.href = `${base}/financeiro`;
+      else if (data.sellerRole === "gerente") window.location.href = `${base}/gerente`;
+      else window.location.href = `${base}/minha-area/${data.sellerId}`;
+    },
+    onError: (err) => toast.error(err.message || "Erro ao criar login"),
+  });
+
+  const handleFirstAccess = (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailValue = inviteEmail.trim().toLowerCase();
+    if (!emailValue || !emailValue.includes("@")) { toast.error("Informe um e-mail válido"); return; }
+    if (invitePassword.length < 4) { toast.error("A senha deve ter pelo menos 4 caracteres."); return; }
+    if (invitePassword !== inviteConfirm) { toast.error("As senhas não coincidem."); return; }
+    firstAccessMutation.mutate({ inviteToken, email: emailValue, password: invitePassword });
+  };
 
   // Auto-redirect: if seller session already exists, redirect to their area
   const { data: sellerSession, isLoading: sellerLoading } = trpc.sellers.me.useQuery(undefined, {
@@ -155,6 +192,107 @@ export default function UnifiedLogin() {
     }
     changePasswordMutation.mutate({ token: pendingAdminToken, newPassword });
   };
+
+  // Fluxo de primeiro acesso via link de convite (?invite=TOKEN)
+  if (inviteToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
+          <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-8 shadow-2xl backdrop-blur-md">
+            <div className="flex flex-col items-center mb-6">
+              <img src={LOGO_URL} alt="Kafka Rank" className="h-16 w-auto mb-3" />
+              <h1 className="text-xl font-black text-white tracking-wider uppercase">
+                Primeiro Acesso
+              </h1>
+              <p className="text-sm text-gray-400 mt-1 text-center">
+                Defina sua senha para acessar sua conta.
+              </p>
+            </div>
+
+            {inviteQuery.isLoading ? (
+              <p className="text-center text-sm text-gray-400 py-8">Carregando convite...</p>
+            ) : !inviteQuery.data ? (
+              <div className="text-center space-y-4">
+                <div className="rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-300">
+                  Convite inválido ou expirado. Peça um novo link pro seu gerente/admin, ou entre com e-mail e senha se você já tem login.
+                </div>
+                <Button
+                  onClick={() => { navigate(window.location.pathname); window.location.search = ""; }}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Ir para o login
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleFirstAccess} className="space-y-4">
+                <div className="rounded-xl border border-sky-500/25 bg-sky-500/10 p-3 text-sm text-sky-100">
+                  Olá, <strong>{inviteQuery.data.name}</strong>! Confirme seu e-mail e crie sua senha.
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
+                    <Mail className="w-4 h-4 text-sky-400" />
+                    E-mail
+                  </label>
+                  <Input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="voce@email.com"
+                    className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
+                    autoComplete="email"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
+                    <Lock className="w-4 h-4 text-sky-400" />
+                    Crie sua senha
+                  </label>
+                  <Input
+                    type="password"
+                    value={invitePassword}
+                    onChange={(e) => setInvitePassword(e.target.value)}
+                    placeholder="Mínimo 4 caracteres"
+                    className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-1.5">
+                    <Lock className="w-4 h-4 text-sky-400" />
+                    Confirme a senha
+                  </label>
+                  <Input
+                    type="password"
+                    value={inviteConfirm}
+                    onChange={(e) => setInviteConfirm(e.target.value)}
+                    placeholder="Repita a senha"
+                    className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
+                    autoComplete="new-password"
+                  />
+                  {inviteConfirm && invitePassword !== inviteConfirm && (
+                    <p className="text-xs text-red-400 mt-1">As senhas não coincidem.</p>
+                  )}
+                </div>
+                <Button
+                  type="submit"
+                  disabled={firstAccessMutation.isPending || invitePassword.length < 4 || invitePassword !== inviteConfirm}
+                  className="w-full bg-gradient-to-r from-sky-600 to-blue-500 hover:from-sky-500 hover:to-blue-400 text-white font-bold py-3 text-base uppercase tracking-wider"
+                >
+                  {firstAccessMutation.isPending ? (
+                    <span className="flex items-center gap-2"><span className="animate-spin">...</span> Criando login...</span>
+                  ) : (
+                    <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" /> Criar login e entrar</span>
+                  )}
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (step === "change_password") {
     return (

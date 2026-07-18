@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { PaginationControls } from "@/components/PaginationControls";
 import { SupplierCombobox } from "@/components/SupplierCombobox";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -75,12 +76,22 @@ function getStatusInfo(status: string, dueDate: number) {
 }
 
 export default function AdminFinanceiro() {
+  return (
+    <DashboardLayout>
+      <AdminFinanceiroInner />
+    </DashboardLayout>
+  );
+}
+
+export function AdminFinanceiroInner() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date());
   const [activeTab, setActiveTab] = useState<TabView>("all");
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Dialogs
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -100,7 +111,7 @@ export default function AdminFinanceiro() {
   const [txDescription, setTxDescription] = useState("");
   const [txAmount, setTxAmount] = useState("");
   const [txDueDate, setTxDueDate] = useState("");
-  const [txType, setTxType] = useState<"payable" | "receivable">("payable");
+  const [txType, setTxType] = useState<"payable" | "receivable" | "paid">("payable");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
   const [txSupplier, setTxSupplier] = useState("");
   const [txBarcode, setTxBarcode] = useState("");
@@ -268,8 +279,17 @@ export default function AdminFinanceiro() {
 
   const monthLabel = selectedMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
+  // Paginação da lista de transações (mesmo padrão da tela de Contas).
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
+  const paginatedTransactions = useMemo(
+    () => filteredTransactions.slice((page - 1) * pageSize, page * pageSize),
+    [filteredTransactions, page, pageSize]
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [searchText, statusFilter, typeFilter, activeCategoryId, activeTab, selectedMonth, pageSize]);
+
   return (
-    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -415,7 +435,7 @@ export default function AdminFinanceiro() {
               </CardContent>
             </Card>
           ) : (
-            filteredTransactions.map((tx: any) => {
+            paginatedTransactions.map((tx: any) => {
               const statusInfo = getStatusInfo(tx.status, tx.dueDate);
               const StatusIcon = statusInfo.icon;
               const cat = categories.find((c: any) => c.id === tx.categoryId);
@@ -468,6 +488,17 @@ export default function AdminFinanceiro() {
             })
           )}
         </div>
+
+        {filteredTransactions.length > 0 && (
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            total={filteredTransactions.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
 
         {/* ===== DIALOGS ===== */}
 
@@ -544,6 +575,7 @@ export default function AdminFinanceiro() {
                     <SelectContent>
                       <SelectItem value="payable">A Pagar</SelectItem>
                       <SelectItem value="receivable">A Receber</SelectItem>
+                      <SelectItem value="paid">Paga</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -609,17 +641,23 @@ export default function AdminFinanceiro() {
                 className="bg-green-600 hover:bg-green-700"
                 onClick={() => {
                   if (!txDescription.trim() || !txAmount || !txDueDate) return toast.error("Preencha descrição, valor e vencimento");
+                  const normalizedDueDate = new Date(txDueDate + "T12:00:00").getTime();
+                  const persistedType = txType === "paid" ? "payable" : txType;
+                  const persistedStatus = txType === "paid" ? "paid" : undefined;
+                  const persistedPaidDate = txType === "paid" ? normalizedDueDate : undefined;
                   createTransaction.mutate({
-                    type: txType,
+                    type: persistedType,
                     description: txDescription,
                     amount: parseCurrencyStr(txAmount),
-                    dueDate: new Date(txDueDate + "T12:00:00").getTime(),
+                    dueDate: normalizedDueDate,
+                    status: persistedStatus,
+                    paidDate: persistedPaidDate,
                     categoryId: txCategoryId,
                     supplier: txSupplier || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
                     recurrence: txRecurrence,
-                  });
+                  } as any);
                 }}
                 disabled={createTransaction.isPending}
               >
@@ -644,6 +682,7 @@ export default function AdminFinanceiro() {
                     <SelectContent>
                       <SelectItem value="payable">A Pagar</SelectItem>
                       <SelectItem value="receivable">A Receber</SelectItem>
+                      <SelectItem value="paid">Paga</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -697,16 +736,21 @@ export default function AdminFinanceiro() {
                 className="bg-green-600 hover:bg-green-700"
                 onClick={() => {
                   if (!editingTransaction) return;
+                  const normalizedDueDate = new Date(txDueDate + "T12:00:00").getTime();
+                  const persistedStatus = txType === "paid" ? "paid" : undefined;
+                  const persistedPaidDate = txType === "paid" ? normalizedDueDate : undefined;
                   updateTransaction.mutate({
                     id: editingTransaction.id,
                     description: txDescription,
                     amount: parseCurrencyStr(txAmount),
-                    dueDate: new Date(txDueDate + "T12:00:00").getTime(),
+                    dueDate: normalizedDueDate,
+                    status: persistedStatus,
+                    paidDate: persistedPaidDate,
                     categoryId: txCategoryId || undefined,
                     supplier: txSupplier || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
-                  });
+                  } as any);
                 }}
                 disabled={updateTransaction.isPending}
               >
@@ -789,6 +833,5 @@ export default function AdminFinanceiro() {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
   );
 }

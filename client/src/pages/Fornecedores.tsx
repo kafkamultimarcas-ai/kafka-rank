@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "@/components/PaginationControls";
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, User, Receipt, FileText, CheckCircle, Clock, AlertTriangle, Download, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { isValidCPF, isValidCNPJ } from "@shared/validators";
+import { isValidCPF, isValidCNPJ, isValidEmail, isValidBrazilianPhone } from "@shared/validators";
+import { maskPhone } from "@/lib/masks";
 
 // ===== CPF/CNPJ MASK & VALIDATION HELPERS =====
 function maskCPF(value: string): string {
@@ -33,6 +34,12 @@ function maskCNPJ(value: string): string {
 
 function maskCpfCnpj(value: string, type: "fisica" | "juridica"): string {
   return type === "juridica" ? maskCNPJ(value) : maskCPF(value);
+}
+
+function maskCEP(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
 function validateCpfCnpj(value: string, type: "fisica" | "juridica"): { valid: boolean; message: string } {
@@ -98,6 +105,16 @@ const EMPTY_FORM = {
   notes: "",
 };
 
+// Validação dos campos de contato/endereço (aplicada no submit de criar/editar).
+function validateContactFields(form: typeof EMPTY_FORM): string | null {
+  if (form.email && !isValidEmail(form.email)) return "E-mail inválido";
+  if (form.phone && !isValidBrazilianPhone(form.phone)) return "Telefone inválido";
+  if (form.mobile && !isValidBrazilianPhone(form.mobile)) return "Celular inválido";
+  if (form.cep && form.cep.replace(/\D/g, "").length !== 8) return "CEP inválido (8 dígitos)";
+  if (form.birthDate && Number.isNaN(new Date(form.birthDate).getTime())) return "Data de nascimento inválida";
+  return null;
+}
+
 export function FornecedoresContent() {
   return <FornecedoresInner />;
 }
@@ -110,13 +127,13 @@ export default function Fornecedores() {
   );
 }
 
-function FornecedoresInner() {
+export function FornecedoresInner() {
   // Filters & pagination
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const [pageSize, setPageSize] = useState(20);
 
   // Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -209,6 +226,8 @@ function FornecedoresInner() {
       const validation = validateCpfCnpj(form.cpfCnpj, form.personType);
       if (!validation.valid) { toast.error(validation.message); return; }
     }
+    const contactError = validateContactFields(form);
+    if (contactError) { toast.error(contactError); return; }
     createMut.mutate({
       personType: form.personType,
       name: form.name.trim(),
@@ -241,6 +260,8 @@ function FornecedoresInner() {
       const validation = validateCpfCnpj(form.cpfCnpj, form.personType);
       if (!validation.valid) { toast.error(validation.message); return; }
     }
+    const contactError = validateContactFields(form);
+    if (contactError) { toast.error(contactError); return; }
     updateMut.mutate({
       id: selectedSupplier.id,
       personType: form.personType,
@@ -367,13 +388,13 @@ function FornecedoresInner() {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <PaginationControls page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} showPageSize={false} />
+      {total > 0 && (
+        <PaginationControls page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
       )}
 
       {/* CREATE MODAL */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Cadastrar Fornecedor</DialogTitle></DialogHeader>
           <SupplierForm form={form} setForm={setForm} onCepLookup={lookupCep} />
           <DialogFooter>
@@ -387,7 +408,7 @@ function FornecedoresInner() {
 
       {/* EDIT MODAL */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Editar Fornecedor</DialogTitle></DialogHeader>
           <SupplierForm form={form} setForm={setForm} onCepLookup={lookupCep} />
           <DialogFooter>
@@ -401,7 +422,7 @@ function FornecedoresInner() {
 
       {/* DETAILS MODAL with Tabs */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Detalhes do Fornecedor</DialogTitle></DialogHeader>
           {selectedSupplier && (
             <Tabs defaultValue="dados" className="w-full">
@@ -589,7 +610,7 @@ function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM;
           <div className="flex gap-2">
             <div className="flex-1">
               <Label>CEP</Label>
-              <Input value={form.cep} onChange={e => upd("cep", e.target.value)} placeholder="00000-000" onBlur={onCepLookup} />
+              <Input value={form.cep} onChange={e => upd("cep", maskCEP(e.target.value))} placeholder="00000-000" maxLength={9} inputMode="numeric" onBlur={onCepLookup} />
             </div>
             <Button type="button" variant="outline" size="icon" className="mt-6" onClick={onCepLookup}><Search className="w-4 h-4" /></Button>
           </div>
@@ -628,15 +649,24 @@ function SupplierForm({ form, setForm, onCepLookup }: { form: typeof EMPTY_FORM;
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <Label>E-mail</Label>
-            <Input type="email" value={form.email} onChange={e => upd("email", e.target.value)} />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={e => upd("email", e.target.value)}
+              placeholder="email@exemplo.com"
+              className={form.email.trim() && !isValidEmail(form.email) ? "border-red-500/50 focus-visible:ring-red-500/30" : ""}
+            />
+            {form.email.trim() && !isValidEmail(form.email) && (
+              <p className="text-xs mt-1 text-red-500">E-mail inválido</p>
+            )}
           </div>
           <div>
             <Label>Telefone</Label>
-            <Input value={form.phone} onChange={e => upd("phone", e.target.value)} placeholder="(00) 0000-0000" />
+            <Input value={form.phone} onChange={e => upd("phone", maskPhone(e.target.value))} placeholder="(00) 0000-0000" maxLength={15} inputMode="numeric" />
           </div>
           <div>
             <Label>Celular</Label>
-            <Input value={form.mobile} onChange={e => upd("mobile", e.target.value)} placeholder="(00) 00000-0000" />
+            <Input value={form.mobile} onChange={e => upd("mobile", maskPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} inputMode="numeric" />
           </div>
         </div>
       </div>

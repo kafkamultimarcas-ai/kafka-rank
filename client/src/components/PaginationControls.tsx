@@ -22,7 +22,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 interface PaginationControlsProps {
   page: number;
@@ -54,6 +54,11 @@ export function PaginationControls({
   className = "",
 }: PaginationControlsProps) {
   if (totalPages <= 0) return null;
+
+  // Garante que o tamanho de página atual esteja entre as opções selecionáveis.
+  const mergedPageSizeOptions = pageSizeOptions.includes(pageSize)
+    ? pageSizeOptions
+    : [...pageSizeOptions, pageSize].sort((a, b) => a - b);
 
   // Gera os números de página visíveis (max 5 botões)
   const getVisiblePages = (): (number | "ellipsis")[] => {
@@ -102,11 +107,13 @@ export function PaginationControls({
                 onPageChange(1); // Reset to page 1 when changing size
               }}
             >
-              <SelectTrigger className="w-[70px] h-8">
-                <SelectValue />
+              {/* Renderiza o valor direto (em vez de SelectValue) para garantir que
+                  o tamanho selecionado apareça sempre, mesmo antes de abrir o menu. */}
+              <SelectTrigger size="sm" className="w-[76px]" aria-label="Itens por página">
+                <span>{pageSize}</span>
               </SelectTrigger>
               <SelectContent>
-                {pageSizeOptions.map((size) => (
+                {mergedPageSizeOptions.map((size) => (
                   <SelectItem key={size} value={size.toString()}>
                     {size}
                   </SelectItem>

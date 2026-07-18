@@ -306,10 +306,10 @@ export default function Estoque() {
             <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="gap-1.5 -ml-2">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <img src={logoUrl} alt="" className="h-7 w-7 rounded-lg" />
+            <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain" />
             <div>
-              <span className="font-heading font-bold text-sm text-foreground">ESTOQUE</span>
-              <span className="text-xs text-muted-foreground ml-2">{vehicles?.length || 0} veículos</span>
+              <span className="font-heading font-bold text-sm text-foreground">{brandName}</span>
+              <p className="text-xs text-muted-foreground">Estoque · {vehicles?.length || 0} veículos</p>
             </div>
           </div>
         </div>

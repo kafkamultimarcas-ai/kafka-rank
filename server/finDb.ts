@@ -77,6 +77,7 @@ export async function createFinTransaction(data: {
   amount: string;
   dueDate: number;
   status?: "pending" | "paid" | "overdue" | "cancelled";
+  paidDate?: number;
   categoryId?: number;
   supplier?: string;
   barcode?: string;
@@ -90,6 +91,7 @@ export async function createFinTransaction(data: {
   needsApproval?: boolean;
   approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
   createdByName?: string;
+  sellerId?: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -113,6 +115,7 @@ export async function updateFinTransaction(id: number, data: Partial<{
   approvalStatus: "none" | "pending_approval" | "approved" | "rejected";
   approvedBy: string;
   approvedAt: number;
+  sellerId: number | null;
 }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -22,6 +22,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { useBranding } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
 import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -89,6 +90,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const tenantSlug = getCurrentTenantSlug();
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -118,8 +120,10 @@ export default function DashboardLayout({
   const isManager = managerQuery.data && managerQuery.data.role === "manager";
   // Seller-gerente logged in via seller login
   const isSellerGerente = sellerQuery.data && sellerQuery.data.sellerRole === 'gerente';
+  const isSellerFinanceiro = sellerQuery.data?.department === "financeiro";
+  const canAccessFinanceiroAdmin = isSellerFinanceiro && /\/admin\/financeiro(?:\/)?$/i.test(currentPath);
 
-  if (!isOwner && !isManager && !isSellerGerente) {
+  if (!isOwner && !isManager && !isSellerGerente && !canAccessFinanceiroAdmin) {
     if (tenantSlug) {
       return <TenantLoginRedirect tenantSlug={tenantSlug} />;
     }
@@ -136,7 +140,9 @@ export default function DashboardLayout({
     ? (user?.email || "") 
     : isManager 
       ? "Gerente" 
-      : "Gerente";
+      : isSellerFinanceiro
+        ? "Financeiro"
+        : "Gerente";
   const showOwnerItems = !!isOwner;
 
   return (
@@ -150,6 +156,7 @@ export default function DashboardLayout({
         showOwnerItems={showOwnerItems}
         isManager={!!isManager || !!isSellerGerente}
         isSellerGerente={!!isSellerGerente}
+        isSellerFinanceiro={!!isSellerFinanceiro}
         tenantSlug={tenantSlug}
         trialEndsAt={
           managerQuery.data?.trialEndsAt ??
@@ -219,6 +226,7 @@ type DashboardLayoutContentProps = {
   showOwnerItems: boolean;
   isManager: boolean;
   isSellerGerente?: boolean;
+  isSellerFinanceiro?: boolean;
   tenantSlug: string | null;
   trialEndsAt: number | null;
   subscriptionSuspended: boolean;
@@ -232,11 +240,13 @@ function DashboardLayoutContent({
   showOwnerItems,
   isManager,
   isSellerGerente,
+  isSellerFinanceiro,
   tenantSlug,
   trialEndsAt,
   subscriptionSuspended,
 }: DashboardLayoutContentProps) {
   const { logout: oauthLogout } = useAuth();
+  const { logoUrl, name: brandName } = useBranding();
   const managerLogout = trpc.managers.logout.useMutation();
   const sellerLogout = trpc.sellers.logout.useMutation();
   const utils = trpc.useUtils();
@@ -246,7 +256,10 @@ function DashboardLayoutContent({
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const allItems = showOwnerItems ? [...menuItems, ...ownerOnlyItems] : menuItems;
-  const activeMenuItem = allItems.find(item => buildTenantPath(tenantSlug, item.path) === location);
+  const visibleItems = isSellerFinanceiro
+    ? allItems.filter(item => item.path === "/admin/financeiro")
+    : allItems;
+  const activeMenuItem = visibleItems.find(item => buildTenantPath(tenantSlug, item.path) === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -276,7 +289,7 @@ function DashboardLayoutContent({
   }, [isResizing, setSidebarWidth]);
 
   const handleLogout = async () => {
-    if (isSellerGerente) {
+    if (isSellerGerente || isSellerFinanceiro) {
       await sellerLogout.mutateAsync();
       await utils.sellers.me.invalidate();
       toast.success("Logout realizado!");
@@ -309,9 +322,13 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <Flag className="h-5 w-5 text-primary shrink-0" />
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={brandName} className="h-6 w-6 rounded object-contain shrink-0" />
+                  ) : (
+                    <Flag className="h-5 w-5 text-primary shrink-0" />
+                  )}
                   <span className="font-heading font-bold text-sm tracking-tight truncate text-foreground">
-                    KAFKA RANK
+                    {brandName}
                   </span>
                 </div>
               )}
@@ -322,7 +339,7 @@ function DashboardLayoutContent({
             <SidebarMenu className="px-2 py-1">
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => setLocation(tenantSlug ? buildTenantPath(tenantSlug, "/admin") : "/")}
+                  onClick={() => setLocation(buildTenantPath(tenantSlug, isSellerFinanceiro ? "/financeiro" : "/admin"))}
                   tooltip="Tela Inicial"
                   className="h-10 transition-all font-normal"
                 >
@@ -331,7 +348,7 @@ function DashboardLayoutContent({
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <div className="my-2 border-t border-border" />
-              {allItems.map(item => {
+              {visibleItems.map(item => {
                 const itemPath = buildTenantPath(tenantSlug, item.path);
                 const isActive = location === itemPath;
                 return (
