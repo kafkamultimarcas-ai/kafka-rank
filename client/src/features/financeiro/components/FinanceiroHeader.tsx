@@ -1,9 +1,11 @@
 import { ArrowLeft, LogOut } from "lucide-react";
+import NotificationCenter from "@/components/NotificationCenter";
 
 interface FinanceiroHeaderProps {
   brandName: string;
   logoUrl?: string | null;
   sellerLabel?: string | null;
+  sellerId?: number;
   onBack: () => void;
   onLogout: () => void;
 }
@@ -12,6 +14,7 @@ export function FinanceiroHeader({
   brandName,
   logoUrl,
   sellerLabel,
+  sellerId,
   onBack,
   onLogout,
 }: FinanceiroHeaderProps) {
@@ -34,12 +37,15 @@ export function FinanceiroHeader({
             </p>
           </div>
         </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-400 hover:bg-red-500/10"
-        >
-          <LogOut className="h-3.5 w-3.5" /> Sair
-        </button>
+        <div className="flex items-center gap-2">
+          {sellerId && <NotificationCenter sellerId={sellerId} />}
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-400 hover:bg-red-500/10"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Sair
+          </button>
+        </div>
       </div>
     </header>
   );

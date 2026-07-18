@@ -5,11 +5,11 @@ import { CONTAS_STATUS_OPTIONS, CONTAS_TYPE_OPTIONS, MONTH_NAMES } from "@/featu
 import { currencyInputToNumberString, isPositiveNumberString } from "@/features/financeiro/utils/form";
 import type { FinCategory, FinTransaction, ParseAudioResult, Seller, SellerSession } from "@/features/financeiro/types";
 
-export type ContasFilter = "all" | "pending" | "paid" | "overdue" | "approval";
+export type ContasFilter = "all" | "pending" | "paid" | "overdue" | "due_today" | "approval";
 export type ContasTypeFilter = "all" | "payable" | "receivable";
 export type ContaFormType = "payable" | "receivable" | "paid";
 
-export function useContasState() {
+export function useContasState(initialContaId?: number | null) {
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
   const [filterYear, setFilterYear] = useState(now.getFullYear());
@@ -21,7 +21,7 @@ export function useContasState() {
   const [pageSize, setPageSize] = useState(10);
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<FinTransaction | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(initialContaId ?? null);
 
   const [txType, setTxType] = useState<ContaFormType>("payable");
   const [txDescription, setTxDescription] = useState("");
@@ -169,6 +169,17 @@ export function useContasState() {
           (transaction.status === "pending" || transaction.status === "overdue") &&
           transaction.dueDate < nowTs
       );
+    } else if (filter === "due_today") {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      list = list.filter(
+        (transaction) =>
+          transaction.status === "pending" &&
+          transaction.dueDate >= todayStart.getTime() &&
+          transaction.dueDate <= todayEnd.getTime()
+      );
     } else if (filter === "approval") {
       list = list.filter((transaction) => transaction.approvalStatus === "pending_approval");
     }
@@ -202,6 +213,16 @@ export function useContasState() {
         (transaction.status === "pending" || transaction.status === "overdue") &&
         transaction.dueDate < nowTs
     );
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const dueToday = allTransactions.filter(
+      (transaction) =>
+        transaction.status === "pending" &&
+        transaction.dueDate >= todayStart.getTime() &&
+        transaction.dueDate <= todayEnd.getTime()
+    );
     const needApproval = allTransactions.filter(
       (transaction) => transaction.approvalStatus === "pending_approval"
     );
@@ -222,6 +243,7 @@ export function useContasState() {
       pending: pending.length,
       paid: paid.length,
       overdue: overdue.length,
+      dueToday: dueToday.length,
       needApproval: needApproval.length,
       totalPayable,
       totalReceivable,
@@ -235,6 +257,10 @@ export function useContasState() {
       const subset = allTransactions.filter((transaction) => transaction.type === type);
       const nowTs = Date.now();
       const paidSubset = subset.filter((transaction) => transaction.status === "paid");
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
 
       return {
         total: subset.length,
@@ -243,6 +269,12 @@ export function useContasState() {
           (transaction) =>
             (transaction.status === "pending" || transaction.status === "overdue") &&
             transaction.dueDate < nowTs
+        ).length,
+        dueToday: subset.filter(
+          (transaction) =>
+            transaction.status === "pending" &&
+            transaction.dueDate >= todayStart.getTime() &&
+            transaction.dueDate <= todayEnd.getTime()
         ).length,
         paid: paidSubset.length,
         approval: subset.filter((transaction) => transaction.approvalStatus === "pending_approval").length,
@@ -387,7 +419,9 @@ export function useContasState() {
             ? stats.paid
             : option.key === "overdue"
               ? stats.overdue
-              : stats.needApproval,
+              : option.key === "due_today"
+                ? stats.dueToday
+                : stats.needApproval,
   }));
 
   const typeOptions = CONTAS_TYPE_OPTIONS;

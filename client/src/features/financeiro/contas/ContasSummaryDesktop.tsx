@@ -6,8 +6,8 @@ import type { ContasFilter, ContasTypeFilter } from "@/features/financeiro/conta
 interface ContasSummaryDesktopProps {
   panelType: "receivable" | "payable";
   typedStats: {
-    payable: { total: number; pending: number; overdue: number; paid: number; approval: number };
-    receivable: { total: number; pending: number; overdue: number; paid: number; approval: number };
+    payable: { total: number; pending: number; overdue: number; dueToday: number; paid: number; approval: number };
+    receivable: { total: number; pending: number; overdue: number; dueToday: number; paid: number; approval: number };
   };
   stats: {
     totalPayable: number;
@@ -75,9 +75,11 @@ export function ContasSummaryDesktop({
                 ? panelStats.pending
                 : option.key === "overdue"
                   ? panelStats.overdue
-                  : option.key === "paid"
-                    ? panelStats.paid
-                    : panelStats.approval;
+                  : option.key === "due_today"
+                    ? panelStats.dueToday ?? 0
+                    : option.key === "paid"
+                      ? panelStats.paid
+                      : panelStats.approval;
           const active = typeFilter === panelType && filter === option.key;
 
           return (
