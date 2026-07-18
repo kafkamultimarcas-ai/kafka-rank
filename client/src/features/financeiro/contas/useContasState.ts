@@ -9,7 +9,7 @@ export type ContasFilter = "all" | "pending" | "paid" | "overdue" | "approval";
 export type ContasTypeFilter = "all" | "payable" | "receivable";
 export type ContaFormType = "payable" | "receivable" | "paid";
 
-export function useContasState() {
+export function useContasState(initialContaId?: number | null) {
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1);
   const [filterYear, setFilterYear] = useState(now.getFullYear());
@@ -20,7 +20,7 @@ export function useContasState() {
   const [pageSize, setPageSize] = useState(10);
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<FinTransaction | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(initialContaId ?? null);
 
   const [txType, setTxType] = useState<ContaFormType>("payable");
   const [txDescription, setTxDescription] = useState("");

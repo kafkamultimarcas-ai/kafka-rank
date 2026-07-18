@@ -21,6 +21,7 @@ import { notifyOwner } from "./_core/notification";
 import { adminAuthRouter, crmLeadsRouter, crmPipelineRouter, crmInventoryRouter, crmIntegrationsRouter, crmCampaignsRouter, crmMarketingRouter, crmVoiceRouter, crmChatRouter, crmPerformanceRouter, crmAiRouter, aiMetricsRouter } from "./routers/crmRouter";
 import { crmTemplatesRouter, crmFollowUpRouter, crmDistributionRouter, crmTimeAlertsRouter, crmPermissionsRouter, crmFipeRouter, crmSellerStatsRouter } from "./routers/crmEnhanced";
 import { finCategoriesRouter, finTransactionsRouter, fuelRouter } from "./routers/finRouter";
+import { getFinancialAlerts } from "./finDb";
 import { pvChamadosRouter, pvGastosRouter, pvOficinasRouter, pvOrcamentosRouter } from "./routers/pvRouter";
 import { mktStrategiesRouter, mktTasksRouter } from "./routers/mktRouter";
 import { fichaRouter } from "./routers/fichaRouter";
@@ -185,6 +186,10 @@ export const appRouter = router({
       );
       ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
       console.log(`[AUTH] Seller #${seller.id} (${seller.username}) logged in successfully`);
+      // Generate bill notifications for financeiro users on login
+      if (seller.department === 'financeiro') {
+        generateBillNotifications(seller.id).catch(err => console.error('[NOTIF] Error generating bill notifications:', err));
+      }
       return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
     }),
 
@@ -3832,3 +3837,75 @@ Adapte o formato conforme o assunto, mas sempre inclua:
   }),
 });
 export type AppRouter = typeof appRouter;
+
+// ===== BILL NOTIFICATION GENERATOR =====
+async function generateBillNotifications(sellerId: number) {
+  try {
+    const alerts = await getFinancialAlerts();
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    // Check if we already generated notifications today for this seller
+    const existingNotifs = await db.listNotifications(sellerId);
+    const todayBillNotifs = existingNotifs.filter((n: any) => {
+      if (!n.type?.startsWith('bill_')) return false;
+      const created = new Date(n.createdAt);
+      const createdStr = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}-${String(created.getDate()).padStart(2, '0')}`;
+      return createdStr === todayStr;
+    });
+
+    // If already generated today, skip
+    if (todayBillNotifs.length > 0) {
+      console.log(`[NOTIF] Bill notifications already generated today for seller #${sellerId}, skipping`);
+      return;
+    }
+
+    const tenantPath = await buildCurrentTenantPath('/financeiro');
+
+    // Generate notifications for overdue bills
+    for (const bill of alerts.overdue.slice(0, 10)) {
+      const dueDate = new Date(Number(bill.dueDate));
+      const dueDateFormatted = `${String(dueDate.getDate()).padStart(2, '0')}/${String(dueDate.getMonth() + 1).padStart(2, '0')}`;
+      await db.createNotification({
+        sellerId,
+        targetType: 'seller',
+        type: 'bill_overdue',
+        title: `Conta vencida: ${bill.description || 'Sem descrição'}`,
+        message: `Venceu em ${dueDateFormatted} - R$ ${Number(bill.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${bill.supplier ? ` (${bill.supplier})` : ''}`,
+        actionUrl: `${tenantPath}?tab=contas&contaId=${bill.id}`,
+      });
+    }
+
+    // Generate notifications for bills due today
+    for (const bill of alerts.dueToday) {
+      await db.createNotification({
+        sellerId,
+        targetType: 'seller',
+        type: 'bill_due_today',
+        title: `Conta vence HOJE: ${bill.description || 'Sem descrição'}`,
+        message: `R$ ${Number(bill.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}${bill.supplier ? ` (${bill.supplier})` : ''}`,
+        actionUrl: `${tenantPath}?tab=contas&contaId=${bill.id}`,
+      });
+    }
+
+    // Generate a summary notification for bills due tomorrow
+    if (alerts.dueTomorrow.length > 0) {
+      const totalTomorrow = alerts.dueTomorrow.reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0);
+      await db.createNotification({
+        sellerId,
+        targetType: 'seller',
+        type: 'bill_due_tomorrow',
+        title: `${alerts.dueTomorrow.length} conta(s) vencem amanhã`,
+        message: `Total: R$ ${totalTomorrow.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        actionUrl: `${tenantPath}?tab=contas`,
+      });
+    }
+
+    const totalNotifs = Math.min(alerts.overdue.length, 10) + alerts.dueToday.length + (alerts.dueTomorrow.length > 0 ? 1 : 0);
+    if (totalNotifs > 0) {
+      console.log(`[NOTIF] Generated ${totalNotifs} bill notifications for seller #${sellerId}`);
+    }
+  } catch (err) {
+    console.error('[NOTIF] generateBillNotifications error:', err);
+  }
+}

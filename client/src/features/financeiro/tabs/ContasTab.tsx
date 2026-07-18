@@ -8,8 +8,12 @@ import { ContasSummaryDesktop } from "@/features/financeiro/contas/ContasSummary
 import { useContasState } from "@/features/financeiro/contas/useContasState";
 import { formatCurrency } from "@/features/financeiro/utils/formatters";
 
-export function ContasTab() {
-  const state = useContasState();
+interface ContasTabProps {
+  initialContaId?: number | null;
+}
+
+export function ContasTab({ initialContaId }: ContasTabProps = {}) {
+  const state = useContasState(initialContaId);
 
   const formProps = {
     categories: state.categories,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { trpc } from "@/lib/trpc";
@@ -20,7 +20,25 @@ export default function Financeiro() {
   const { logoUrl, name: brandName } = useBranding();
   const [, navigate] = useLocation();
   const [mainTab, setMainTab] = useState<MainTab>("dashboard");
+  const [initialContaId, setInitialContaId] = useState<number | null>(null);
   const { data: sellerSession } = trpc.sellers.me.useQuery();
+
+  // Deep-link support: read ?tab=contas&contaId=123 from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const contaId = params.get("contaId");
+    if (tab && ["dashboard", "contas", "admin-financeiro", "pos-venda", "gasolina", "relatorios", "fornecedor"].includes(tab)) {
+      setMainTab(tab as MainTab);
+    }
+    if (contaId) {
+      setInitialContaId(Number(contaId));
+    }
+    // Clean URL params after reading
+    if (tab || contaId) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const logoutMutation = trpc.sellers.logout.useMutation({
     onSuccess: () => {
@@ -44,6 +62,7 @@ export default function Financeiro() {
         brandName={brandName}
         logoUrl={logoUrl}
         sellerLabel={sellerSession ? sellerSession.nickname || sellerSession.name : null}
+        sellerId={sellerSession?.id}
         onBack={() => navigate(buildTenantPath(getCurrentTenantSlug(), "/"))}
         onLogout={() => logoutMutation.mutate()}
       />
@@ -56,7 +75,7 @@ export default function Financeiro() {
       />
 
       {mainTab === "dashboard" && <DashboardTab />}
-      {mainTab === "contas" && <ContasTab />}
+      {mainTab === "contas" && <ContasTab initialContaId={initialContaId} />}
       {mainTab === "admin-financeiro" && (
         <div className="container mx-auto max-w-6xl px-4 py-4">
           <AdminFinanceiroInner />

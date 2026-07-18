@@ -88,7 +88,12 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
       markReadMutation.mutate({ id: notif.id });
     }
     if (notif.actionUrl) {
-      setLocation(notif.actionUrl);
+      // Use window.location for URLs with query params (deep-links)
+      if (notif.actionUrl.includes('?')) {
+        window.location.href = notif.actionUrl;
+      } else {
+        setLocation(notif.actionUrl);
+      }
       setIsOpen(false);
     }
   };
@@ -113,6 +118,12 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
         return "👋";
       case "rescue":
         return "🚨";
+      case "bill_overdue":
+        return "🔴";
+      case "bill_due_today":
+        return "💰";
+      case "bill_due_tomorrow":
+        return "📅";
       default:
         return "🔔";
     }
@@ -123,6 +134,9 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
     if (type.includes("approved")) return "border-l-green-500";
     if (type === "overtake") return "border-l-red-500";
     if (type.includes("expiring") || type === "rescue") return "border-l-orange-500";
+    if (type === "bill_overdue") return "border-l-red-600";
+    if (type === "bill_due_today") return "border-l-amber-500";
+    if (type === "bill_due_tomorrow") return "border-l-blue-400";
     return "border-l-blue-500";
   };
 

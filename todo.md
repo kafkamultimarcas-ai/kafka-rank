@@ -2489,3 +2489,12 @@
 - [x] Verificado: CrmAdminDashboard já tem ≡ menu com sidebar + links para Painel Admin/Gerente
 - [x] Verificado: CrmCommandCenter já tem ArrowLeft para voltar à Minha Área
 - [x] Verificado: todas as páginas de vendedor (MinhaArea, Estoque, Financeiro, etc.) já têm back button
+
+## Notificações de Contas a Pagar (Jul 18)
+- [x] Adicionar NotificationCenter no header do Financeiro (FinanceiroHeader.tsx)
+- [x] Implementar deep-link para conta específica (?tab=contas&contaId=X)
+- [x] Criar lógica backend para gerar notificações ao logar com perfil financeiro (generateBillNotifications)
+- [x] Adicionar tipos bill_overdue, bill_due_today, bill_due_tomorrow com ícones e cores
+- [x] Ao clicar na notificação, navegar direto para a conta em questão (window.location.href)
+- [x] Dedup: não gera notificações se já gerou hoje
+- [x] 0 erros TypeScript (server + client)
