@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Key, Shield, ShieldCheck, Eye, Edit3 } from "lucide-react";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { PaginationControls } from "@/components/PaginationControls";
 import { toast } from "sonner";
 import { maskPhone } from "@/lib/masks";
 import { isValidBrazilianPhone, isValidEmail } from "@shared/validators";
@@ -38,10 +39,13 @@ export default function AdminSellers() {
   const [editingSeller, setEditingSeller] = useState<any>(null);
   const [form, setForm] = useState({ name: "", nickname: "", phone: "", email: "", department: "vendas" });
   const [filterDept, setFilterDept] = useState<string>("todos");
+  const [filterActive, setFilterActive] = useState<"ativos" | "inativos">("ativos");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
-  const [passwordForm, setPasswordForm] = useState({ username: "", password: "" });
+  const [passwordForm, setPasswordForm] = useState({ email: "", password: "" });
   const [toggleConfirm, setToggleConfirm] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
   // Permissões de gerente
   const [permsDialog, setPermsDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
@@ -58,21 +62,47 @@ export default function AdminSellers() {
     { enabled: !!permsDialog.seller?.id && permsDialog.open && permsDialog.seller?.sellerRole === 'gerente' }
   );
 
-  const filteredSellers = useMemo(() => {
+  // Filtra primeiro por status (Ativos/Inativos), depois por departamento,
+  // ordenando por cadastro mais recente (id desc como proxy de ordem de cadastro).
+  const activeSellers = useMemo(() => {
     if (!sellers) return [];
-    if (filterDept === "todos") return sellers;
-    return sellers.filter(s => (s.department || "vendas") === filterDept);
-  }, [sellers, filterDept]);
+    return sellers.filter(s => (filterActive === "ativos" ? s.active : !s.active));
+  }, [sellers, filterActive]);
+
+  const filteredSellers = useMemo(() => {
+    const base = filterDept === "todos"
+      ? activeSellers
+      : activeSellers.filter(s => (s.department || "vendas") === filterDept);
+    // Ordem de cadastro decrescente (mais novos primeiro)
+    return [...base].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+  }, [activeSellers, filterDept]);
 
   const deptCounts = useMemo(() => {
-    if (!sellers) return {};
-    const counts: Record<string, number> = { todos: sellers.length };
-    sellers.forEach(s => {
+    const counts: Record<string, number> = { todos: activeSellers.length };
+    activeSellers.forEach(s => {
       const dept = s.department || "vendas";
       counts[dept] = (counts[dept] || 0) + 1;
     });
     return counts;
+  }, [activeSellers]);
+
+  const statusCounts = useMemo(() => {
+    if (!sellers) return { ativos: 0, inativos: 0 };
+    return {
+      ativos: sellers.filter(s => s.active).length,
+      inativos: sellers.filter(s => !s.active).length,
+    };
   }, [sellers]);
+
+  // Paginação (mesmo padrão da tela de Contas)
+  const totalPages = Math.max(1, Math.ceil(filteredSellers.length / pageSize));
+  const pagedSellers = useMemo(
+    () => filteredSellers.slice((page - 1) * pageSize, page * pageSize),
+    [filteredSellers, page, pageSize]
+  );
+
+  // Reset para a página 1 quando os filtros mudam
+  useEffect(() => { setPage(1); }, [filterDept, filterActive, pageSize]);
 
   const createSeller = trpc.sellers.create.useMutation({
     onSuccess: (data) => {
@@ -116,7 +146,7 @@ export default function AdminSellers() {
   });
 
   const setPasswordMutation = trpc.sellers.setPassword.useMutation({
-    onSuccess: () => { setPasswordDialog({ open: false, seller: null }); setPasswordForm({ username: "", password: "" }); toast.success("Login definido com sucesso!"); },
+    onSuccess: () => { setPasswordDialog({ open: false, seller: null }); setPasswordForm({ email: "", password: "" }); utils.sellers.list.invalidate(); toast.success("Login definido com sucesso!"); },
     onError: (err) => toast.error(err.message || "Erro ao definir login."),
   });
 
@@ -283,6 +313,26 @@ export default function AdminSellers() {
             </Dialog>
           </div>
 
+          {/* Filter by status (Ativos/Inativos) — padrão Ativos */}
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setFilterActive("ativos")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filterActive === "ativos" ? "bg-primary text-primary-foreground" : "bg-accent/50 text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              Ativos ({statusCounts.ativos})
+            </button>
+            <button
+              onClick={() => setFilterActive("inativos")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filterActive === "inativos" ? "bg-primary text-primary-foreground" : "bg-accent/50 text-muted-foreground hover:bg-accent"
+              }`}
+            >
+              Inativos ({statusCounts.inativos})
+            </button>
+          </div>
+
           {/* Filter by department */}
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <button
@@ -313,7 +363,7 @@ export default function AdminSellers() {
             </div>
           ) : filteredSellers.length > 0 ? (
             <div className="space-y-3">
-              {filteredSellers.map(seller => {
+              {pagedSellers.map(seller => {
                 const dept = getDeptInfo(seller.department);
                 const isGerente = seller.sellerRole === 'gerente';
                 return (
@@ -450,7 +500,7 @@ export default function AdminSellers() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => { setPasswordDialog({ open: true, seller }); setPasswordForm({ username: (seller as any).username || "", password: "" }); }}
+                            onClick={() => { setPasswordDialog({ open: true, seller }); setPasswordForm({ email: (seller as any).email || "", password: "" }); }}
                           >
                             <Key className={`h-4 w-4 ${(seller as any).username ? 'text-blue-400' : 'text-muted-foreground'}`} />
                           </Button>
@@ -492,11 +542,24 @@ export default function AdminSellers() {
           ) : (
             <div className="racing-card p-12 text-center">
               <p className="text-muted-foreground">
-                {filterDept !== "todos"
-                  ? `Nenhum colaborador no setor "${getDeptInfo(filterDept).label}". Adicione um novo ou mude o filtro.`
-                  : 'Nenhum colaborador cadastrado. Clique em "Novo" para começar.'}
+                {filterActive === "inativos"
+                  ? "Nenhum colaborador inativo."
+                  : filterDept !== "todos"
+                    ? `Nenhum colaborador ativo no setor "${getDeptInfo(filterDept).label}". Adicione um novo ou mude o filtro.`
+                    : 'Nenhum colaborador cadastrado. Clique em "Novo" para começar.'}
               </p>
             </div>
+          )}
+
+          {filteredSellers.length > 0 && (
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              total={filteredSellers.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           )}
 
           {/* Toggle Active Confirmation Dialog */}
@@ -528,7 +591,7 @@ export default function AdminSellers() {
           </AlertDialog>
 
           {/* Dialog para definir senha */}
-          <Dialog open={passwordDialog.open} onOpenChange={(open) => { setPasswordDialog({ open, seller: open ? passwordDialog.seller : null }); if (!open) setPasswordForm({ username: "", password: "" }); }}>
+          <Dialog open={passwordDialog.open} onOpenChange={(open) => { setPasswordDialog({ open, seller: open ? passwordDialog.seller : null }); if (!open) setPasswordForm({ email: "", password: "" }); }}>
             <DialogContent className="bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="font-heading text-foreground flex items-center gap-2">
@@ -536,18 +599,18 @@ export default function AdminSellers() {
                   Login do Vendedor: {passwordDialog.seller?.name}
                 </DialogTitle>
               </DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); if (!passwordForm.username.trim() || !passwordForm.password.trim()) { toast.error("Preencha usuário e senha"); return; } setPasswordMutation.mutate({ id: passwordDialog.seller!.id, username: passwordForm.username.trim(), password: passwordForm.password.trim() }); }} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); const email = passwordForm.email.trim().toLowerCase(); if (!email || !passwordForm.password.trim()) { toast.error("Preencha e-mail e senha"); return; } if (!isValidEmail(email)) { toast.error("E-mail inválido"); return; } if (passwordForm.password.trim().length < 4) { toast.error("Senha deve ter no mínimo 4 caracteres"); return; } setPasswordMutation.mutate({ id: passwordDialog.seller!.id, email, password: passwordForm.password.trim() }); }} className="space-y-4">
                 <div>
-                  <Label className="text-foreground">Nome de usuário *</Label>
-                  <Input value={passwordForm.username} onChange={e => setPasswordForm({ ...passwordForm, username: e.target.value })} placeholder="Ex: joao.silva" className="bg-input border-border text-foreground" />
-                  <p className="text-xs text-muted-foreground mt-1">Mínimo 3 caracteres. Será usado para login.</p>
+                  <Label className="text-foreground">E-mail *</Label>
+                  <Input type="email" value={passwordForm.email} onChange={e => setPasswordForm({ ...passwordForm, email: e.target.value })} placeholder="voce@email.com" className="bg-input border-border text-foreground" autoComplete="email" />
+                  <p className="text-xs text-muted-foreground mt-1">O colaborador fará login com este e-mail.</p>
                 </div>
                 <div>
                   <Label className="text-foreground">Senha *</Label>
-                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} placeholder="Mínimo 4 caracteres" className="bg-input border-border text-foreground" />
+                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} placeholder="Mínimo 4 caracteres" className="bg-input border-border text-foreground" autoComplete="new-password" />
                 </div>
                 {(passwordDialog.seller as any)?.username && (
-                  <p className="text-xs text-blue-400">Este vendedor já possui login: <strong>{(passwordDialog.seller as any).username}</strong>. Definir nova senha irá substituir a anterior.</p>
+                  <p className="text-xs text-blue-400">Este colaborador já possui login. Definir nova senha irá substituir a anterior.</p>
                 )}
                 <Button type="submit" className="w-full racing-gradient text-white" disabled={setPasswordMutation.isPending}>
                   {setPasswordMutation.isPending ? "Salvando..." : "Definir Login"}

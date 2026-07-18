@@ -923,6 +923,7 @@ export const finTransactions = mysqlTable("fin_transactions", {
   recurrence: mysqlEnum("recurrence", ["none", "monthly", "weekly", "yearly"]).default("none"),
   installmentNumber: int("installmentNumber"), // parcela atual
   installmentTotal: int("installmentTotal"), // total de parcelas
+  sellerId: int("sellerId"), // colaborador vinculado quando a conta é um Vale/adiantamento (null = conta normal)
   needsApproval: boolean("needsApproval").default(false), // conta que precisa de autorização de pagamento
   approvalStatus: mysqlEnum("approvalStatus", ["none", "pending_approval", "approved", "rejected"]).default("none"), // status da autorização
   approvedBy: varchar("approvedBy", { length: 255 }), // quem autorizou
@@ -1839,6 +1840,7 @@ export const sellerAdvances = mysqlTable("seller_advances", {
   month: int("month").notNull(), // 1-12
   year: int("year").notNull(),
   createdBy: int("createdBy"), // admin/gerente que registrou
+  finTransactionId: int("finTransactionId"), // conta a pagar de origem no Financeiro (null = vale avulso)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   tenantId: int("tenantId").notNull().default(1),
 }, (table) => ({

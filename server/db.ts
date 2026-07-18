@@ -212,6 +212,17 @@ export async function getSellerByEmail(email: string) {
   return result[0];
 }
 
+// Internal use only - includes passwordHash/inviteToken for the first-access flow
+export async function getSellerByInviteToken(inviteToken: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(sellers).where(and(
+    eq(sellers.tenantId, getCurrentTenantId()),
+    eq(sellers.inviteToken, inviteToken)
+  )).limit(1);
+  return result[0];
+}
+
 export async function updateSellerLastAccess(id: number) {
   const db = await getDb();
   if (!db) return;
@@ -3645,6 +3656,32 @@ export async function deleteSellerAdvance(id: number) {
   const db = await getDb();
   if (!db) return;
   await db.delete(sellerAdvances).where(eq(sellerAdvances.id, id));
+}
+
+// Vale vinculado a uma conta do Financeiro (integração Vale do Colaborador)
+export async function getAdvanceByFinTransaction(finTransactionId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(sellerAdvances)
+    .where(and(eq(sellerAdvances.tenantId, getCurrentTenantId()), eq(sellerAdvances.finTransactionId, finTransactionId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+// Atualizar vale vinculado a uma conta do Financeiro
+export async function updateAdvanceByFinTransaction(finTransactionId: number, data: Partial<{ amount: number; description: string; date: number; month: number; year: number; sellerId: number }>) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(sellerAdvances).set(data)
+    .where(and(eq(sellerAdvances.tenantId, getCurrentTenantId()), eq(sellerAdvances.finTransactionId, finTransactionId)));
+}
+
+// Remover vale vinculado ao excluir a conta de origem
+export async function deleteAdvanceByFinTransaction(finTransactionId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(sellerAdvances)
+    .where(and(eq(sellerAdvances.tenantId, getCurrentTenantId()), eq(sellerAdvances.finTransactionId, finTransactionId)));
 }
 
 // Buscar vendas aprovadas do mês para um vendedor

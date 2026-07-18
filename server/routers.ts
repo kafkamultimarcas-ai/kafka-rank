@@ -85,7 +85,8 @@ export const appRouter = router({
       let loginUrl: string | null = null;
       const tenant = await getTenantById(ctx.tenantId);
       if (tenant) {
-        loginUrl = `${getRequestOrigin(ctx.req)}/login?invite=${inviteToken}`;
+        // Link precisa do slug do tenant para o login por email resolver a loja correta.
+        loginUrl = `${getRequestOrigin(ctx.req)}/t/${tenant.slug}/login?invite=${inviteToken}`;
         await sendUserWelcomeEmail(input.email, tenant.name, "vendedor", loginUrl, ctx.tenantId);
       }
 
@@ -276,20 +277,81 @@ export const appRouter = router({
       return { success: true, sellerId: seller.id, name: seller.name, nickname: seller.nickname, sellerRole: seller.sellerRole || 'vendedor', department: seller.department || 'vendas' };
     }),
 
-    // Admin define/reseta senha de vendedor
+    // Admin define/reseta login do vendedor. Login agora \u00e9 por EMAIL:
+    // salvamos email + passwordHash (e username = email para compatibilidade
+    // com o login legado por username e o indicador de "j\u00e1 tem login").
     setPassword: adminProcedure.input(z.object({
       id: z.number(),
-      username: z.string().min(3),
+      email: z.string().email("E-mail inv\u00e1lido"),
       password: z.string().min(4),
     })).mutation(async ({ input }) => {
-      // Verificar se username j\u00e1 existe em outro vendedor
-      const existing = await db.getSellerByUsername(input.username);
+      const email = input.email.trim().toLowerCase();
+      // E-mail deve ser \u00fanico (login por email resolve o vendedor por esse campo).
+      const existing = await db.getSellerByEmail(email);
       if (existing && existing.id !== input.id) {
-        throw new Error("Este nome de usu\u00e1rio j\u00e1 est\u00e1 em uso por outro vendedor");
+        throw new Error("Este e-mail j\u00e1 est\u00e1 em uso por outro colaborador");
       }
       const passwordHash = await bcrypt.hash(input.password, 10);
-      await db.updateSeller(input.id, { username: input.username, passwordHash });
+      await db.updateSeller(input.id, { email, username: email, passwordHash });
       return { success: true };
+    }),
+
+    // Primeiro acesso por EMAIL: dados resolvidos pelo token do convite.
+    getInvite: publicProcedure.input(z.object({
+      inviteToken: z.string().min(1),
+    })).query(async ({ input }) => {
+      const seller = await db.getSellerByInviteToken(input.inviteToken);
+      if (!seller || !seller.active) return null;
+      // Se j\u00e1 tem login definido, o convite n\u00e3o \u00e9 mais v\u00e1lido.
+      if (seller.passwordHash) return null;
+      return {
+        sellerId: seller.id,
+        name: seller.name,
+        email: seller.email,
+        department: seller.department || "vendas",
+      };
+    }),
+
+    // Vendedor define a pr\u00f3pria senha via link de convite (login por email).
+    firstAccessByEmail: publicProcedure.input(z.object({
+      inviteToken: z.string().min(1, "C\u00f3digo de convite obrigat\u00f3rio"),
+      email: z.string().email("E-mail inv\u00e1lido"),
+      password: z.string().min(4),
+    })).mutation(async ({ input, ctx }) => {
+      const seller = await db.getSellerByInviteToken(input.inviteToken);
+      if (!seller || !seller.active) {
+        throw new Error("Convite inv\u00e1lido ou expirado. Pe\u00e7a o link novamente pro seu gerente/admin.");
+      }
+      if (seller.passwordHash) {
+        throw new Error("Este colaborador j\u00e1 possui login. Use a tela de login por e-mail.");
+      }
+      const email = input.email.trim().toLowerCase();
+      const existing = await db.getSellerByEmail(email);
+      if (existing && existing.id !== seller.id) {
+        throw new Error("Este e-mail j\u00e1 est\u00e1 em uso por outro colaborador");
+      }
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      await db.updateSeller(seller.id, { email, username: email, passwordHash, inviteToken: null });
+      await db.updateSellerLastAccess(seller.id);
+      // Auto-login
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+      const token = jwt.sign(
+        { sellerId: seller.id, username: email, tenantId: (seller as any).tenantId ?? ctx.tenantId, tenantSlug: ctx.tenantSlug },
+        ENV.cookieSecret,
+        { expiresIn: "30d" }
+      );
+      ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      const department = seller.department || "vendas";
+      const sellerRole = seller.sellerRole || "vendedor";
+      return {
+        success: true,
+        sellerId: seller.id,
+        name: seller.name,
+        nickname: seller.nickname,
+        sellerRole,
+        department,
+      };
     }),
     // === RESET ALL PASSWORDS (ADMIN) ===
     resetAllPasswords: adminProcedure.mutation(async () => {
@@ -3695,12 +3757,12 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       const month = input.month || (now.getMonth() + 1);
       const year = input.year || now.getFullYear();
       
-      // Buscar todos os vendedores ativos do dept vendas
+      // Vendedores do dept vendas + qualquer colaborador que tenha vale/bônus no mês
+      // (ex.: um Vale lançado pelo Financeiro para um colaborador de outro setor).
       const allSellers = await db.listSellers(true);
-      const salesSellers = allSellers.filter((s: any) => s.department === 'vendas');
       const rules = await db.getCommissionRules();
-      
-      const overview = await Promise.all(salesSellers.map(async (seller: any) => {
+
+      const fullOverview = await Promise.all(allSellers.map(async (seller: any) => {
         const monthSales = await db.getApprovedSalesForMonth(seller.id, month, year);
         const salesCount = monthSales.length;
         const commission = db.calculateCommission(salesCount, rules);
@@ -3717,6 +3779,7 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           sellerId: seller.id,
           name: seller.nickname || seller.name,
           photoUrl: seller.photoUrl,
+          department: seller.department || 'vendas',
           salesCount,
           helpAllowance: commission.helpAllowance,
           totalCommission: commission.totalCommission,
@@ -3728,7 +3791,12 @@ Adapte o formato conforme o assunto, mas sempre inclua:
           advances: advances.map((a: any) => ({ id: a.id, amount: a.amount, description: a.description, date: a.date })),
         };
       }));
-      
+
+      // Mostra vendedores do setor de vendas + colaboradores com movimento financeiro no mês.
+      const overview = fullOverview.filter((o) =>
+        o.department === 'vendas' || o.totalAdvances > 0 || o.totalBonuses > 0 || o.salesCount > 0
+      );
+
       return {
         month,
         year,

@@ -31,6 +31,22 @@ type UnifiedLoginResult = {
   subscriptionSuspended: boolean;
 };
 
+const DEPARTMENT_LABELS: Record<string, string> = {
+  vendas: "Vendedor",
+  pre_vendas: "Pré-Vendas / SDR",
+  fei: "F&I",
+  consignacao: "Consignação",
+  despachante: "Despachante",
+  pos_venda: "Pós-Venda",
+  financeiro: "Financeiro",
+  marketing: "Marketing",
+};
+
+function buildSellerRoleLabel(department?: string, sellerRole?: string): string {
+  if (sellerRole === "gerente") return "Gerente";
+  return DEPARTMENT_LABELS[department || "vendas"] || "Vendedor";
+}
+
 function buildSellerRedirect(department: string, sellerRole: string, sellerId: number): string {
   if (department === "pos_venda") return "/pos-venda";
   if (department === "financeiro") return "/financeiro";
@@ -66,9 +82,7 @@ export const tenantAuthRouter = router({
             ? "Administrador"
             : identity.userType === "manager"
               ? "Gerente"
-              : identity.sellerRole === "gerente"
-                ? "Gerente"
-                : "Vendedor",
+              : buildSellerRoleLabel(identity.department, identity.sellerRole),
       };
     }
 

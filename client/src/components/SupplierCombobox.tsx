@@ -1,22 +1,18 @@
 import { useState } from "react";
+import { toast } from "sonner";
+import { Check, ChevronsUpDown, Building2, Plus } from "lucide-react";
+import { maskCpfCnpj, maskPhone } from "@/lib/masks";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
+import { isValidBrazilianPhone, isValidCpfCnpj, isValidEmail } from "@shared/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown, Building2, Plus } from "lucide-react";
-import { toast } from "sonner";
+import type { Supplier } from "@/features/financeiro/types";
 
 type SupplierComboboxProps = {
   value: string;
@@ -42,25 +38,22 @@ export function SupplierCombobox({
   const [newEmail, setNewEmail] = useState("");
 
   const utils = trpc.useUtils();
+  const { data, isLoading } = trpc.suppliers.list.useQuery({ page: 1, pageSize: 100 });
 
-  // Fetch all suppliers for the combobox
-  const { data, isLoading } = trpc.suppliers.list.useQuery({
-    page: 1,
-    pageSize: 200,
-  });
-
-  const createMut = trpc.suppliers.create.useMutation({
-    onSuccess: (created: any) => {
+  const createMutation = trpc.suppliers.create.useMutation({
+    onSuccess: () => {
       toast.success("Fornecedor cadastrado com sucesso!");
       utils.suppliers.list.invalidate();
-      onChange(created.name || newName);
+      onChange(newName.trim());
       setQuickAddOpen(false);
       resetQuickAddForm();
     },
-    onError: (err: any) => {
-      toast.error(err.message || "Erro ao cadastrar fornecedor.");
+    onError: (error) => {
+      toast.error(error.message || "Erro ao cadastrar fornecedor.");
     },
   });
+
+  const suppliers: Supplier[] = data?.items || [];
 
   function resetQuickAddForm() {
     setNewName("");
@@ -75,19 +68,30 @@ export function SupplierCombobox({
       toast.error("Nome é obrigatório.");
       return;
     }
-    createMut.mutate({
+    if (newCpfCnpj && !isValidCpfCnpj(newCpfCnpj)) {
+      toast.error(newPersonType === "juridica" ? "CNPJ inválido." : "CPF inválido.");
+      return;
+    }
+    if (newPhone && !isValidBrazilianPhone(newPhone)) {
+      toast.error("Telefone inválido.");
+      return;
+    }
+    if (newEmail && !isValidEmail(newEmail)) {
+      toast.error("E-mail inválido.");
+      return;
+    }
+
+    createMutation.mutate({
       name: newName.trim(),
       personType: newPersonType,
       cpfCnpj: newCpfCnpj.replace(/\D/g, "") || undefined,
-      phone: newPhone || undefined,
-      email: newEmail || undefined,
-    } as any);
+      phone: newPhone.replace(/\D/g, "") || undefined,
+      email: newEmail.trim() || undefined,
+    });
   }
 
-  const suppliers = data?.items || [];
-
   return (
-    <div className="flex gap-1.5 items-center">
+    <div className="flex w-full items-center gap-1.5">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -96,7 +100,7 @@ export function SupplierCombobox({
             role="combobox"
             aria-expanded={open}
             disabled={isLoading}
-            className={cn("w-full justify-between font-normal", className)}
+            className={cn("min-w-0 flex-1 justify-between font-normal", className)}
           >
             {value ? (
               <span className="flex items-center gap-2 truncate">
@@ -109,16 +113,12 @@ export function SupplierCombobox({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="z-[200] w-[var(--radix-popover-trigger-width)] p-0"
-        >
+        <PopoverContent align="start" className="z-[200] w-[var(--radix-popover-trigger-width)] p-0">
           <Command>
             <CommandInput placeholder="Buscar fornecedor..." />
             <CommandList>
               <CommandEmpty>Nenhum fornecedor encontrado.</CommandEmpty>
               <CommandGroup>
-                {/* Option to clear */}
                 <CommandItem
                   value="__clear__"
                   onSelect={() => {
@@ -127,22 +127,22 @@ export function SupplierCombobox({
                   }}
                 >
                   <Check className={cn("h-4 w-4", !value ? "opacity-100" : "opacity-0")} />
-                  <span className="text-muted-foreground italic">Nenhum (limpar)</span>
+                  <span className="italic text-muted-foreground">Nenhum (limpar)</span>
                 </CommandItem>
-                {suppliers.map((s: any) => (
+                {suppliers.map((supplier) => (
                   <CommandItem
-                    key={s.id}
-                    value={s.name}
+                    key={supplier.id}
+                    value={supplier.name}
                     onSelect={() => {
-                      onChange(s.name);
+                      onChange(supplier.name);
                       setOpen(false);
                     }}
                   >
-                    <Check className={cn("h-4 w-4", value === s.name ? "opacity-100" : "opacity-0")} />
-                    {s.name}
-                    {s.cpfCnpj && (
+                    <Check className={cn("h-4 w-4", value === supplier.name ? "opacity-100" : "opacity-0")} />
+                    {supplier.name}
+                    {supplier.cpfCnpj && (
                       <span className="ml-auto text-xs text-muted-foreground">
-                        {s.personType === "juridica" ? "PJ" : "PF"}
+                        {supplier.personType === "juridica" ? "PJ" : "PF"}
                       </span>
                     )}
                   </CommandItem>
@@ -159,7 +159,7 @@ export function SupplierCombobox({
             type="button"
             variant="outline"
             size="icon"
-            className="shrink-0 h-9 w-9"
+            className="h-9 w-9 shrink-0"
             title="Cadastro rápido de fornecedor"
             onClick={() => setQuickAddOpen(true)}
           >
@@ -177,7 +177,7 @@ export function SupplierCombobox({
               <div className="space-y-4 py-2">
                 <div>
                   <Label>Tipo de Pessoa *</Label>
-                  <Select value={newPersonType} onValueChange={(v: any) => setNewPersonType(v)}>
+                  <Select value={newPersonType} onValueChange={(value) => setNewPersonType(value as "fisica" | "juridica")}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="juridica">Pessoa Jurídica</SelectItem>
@@ -187,20 +187,24 @@ export function SupplierCombobox({
                 </div>
                 <div>
                   <Label>Nome / Razão Social *</Label>
-                  <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome do fornecedor" />
+                  <Input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Nome do fornecedor" />
                 </div>
                 <div>
                   <Label>{newPersonType === "juridica" ? "CNPJ" : "CPF"}</Label>
-                  <Input value={newCpfCnpj} onChange={e => setNewCpfCnpj(e.target.value)} placeholder={newPersonType === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"} />
+                  <Input
+                    value={newCpfCnpj}
+                    onChange={(event) => setNewCpfCnpj(maskCpfCnpj(event.target.value))}
+                    placeholder={newPersonType === "juridica" ? "00.000.000/0000-00" : "000.000.000-00"}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Telefone</Label>
-                    <Input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="(00) 00000-0000" />
+                    <Input value={newPhone} onChange={(event) => setNewPhone(maskPhone(event.target.value))} placeholder="(00) 00000-0000" />
                   </div>
                   <div>
                     <Label>Email</Label>
-                    <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="email@empresa.com" />
+                    <Input value={newEmail} onChange={(event) => setNewEmail(event.target.value)} placeholder="email@empresa.com" />
                   </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
@@ -209,8 +213,8 @@ export function SupplierCombobox({
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setQuickAddOpen(false)}>Cancelar</Button>
-                <Button onClick={handleQuickAdd} disabled={createMut.isPending}>
-                  {createMut.isPending ? "Salvando..." : "Cadastrar"}
+                <Button onClick={handleQuickAdd} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? "Salvando..." : "Cadastrar"}
                 </Button>
               </DialogFooter>
             </DialogContent>

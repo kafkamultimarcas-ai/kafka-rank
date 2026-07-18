@@ -9,9 +9,18 @@ import {
   getOverdueTransactions, getUpcomingDueTransactions, getFinancialAlerts,
   listFuelRecords, createFuelRecord, updateFuelRecord, deleteFuelRecord, getFuelDashboard,
 } from "../finDb";
+import {
+  createSellerAdvance, deleteAdvanceByFinTransaction, updateAdvanceByFinTransaction,
+} from "../db";
+import { getCurrentTenantId } from "../tenantDb";
 import { invokeLLM } from "../_core/llm";
 import { storagePut } from "../storage";
 import { notifyOwner } from "../_core/notification";
+
+// Converte um valor em reais (string/number) para centavos inteiros.
+function reaisToCents(amount: string | number): number {
+  return Math.round((Number(amount) || 0) * 100);
+}
 
 // ===== CATEGORIES ROUTER =====
 export const finCategoriesRouter = router({
@@ -71,6 +80,7 @@ export const finTransactionsRouter = router({
     amount: z.string(),
     dueDate: z.number(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
+    paidDate: z.number().nullable().optional(),
     categoryId: z.number().nullable().optional(),
     supplier: z.string().optional(),
     barcode: z.string().optional(),
@@ -82,14 +92,36 @@ export const finTransactionsRouter = router({
     installmentTotal: z.number().optional(),
     needsApproval: z.boolean().optional(),
     createdByName: z.string().optional(),
+    // Vale/adiantamento: quando informado, a conta é vinculada a um colaborador
+    // e reflete automaticamente no Financeiro dos Vendedores.
+    sellerId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
     const approvalStatus = input.needsApproval ? "pending_approval" as const : "none" as const;
     const id = await createFinTransaction({
       ...input,
       categoryId: input.categoryId ?? undefined,
+      paidDate: input.paidDate ?? undefined,
       createdBy: ctx.user?.id,
       approvalStatus,
     });
+
+    // Integração Vale do Colaborador: espelha a conta como vale do vendedor.
+    if (input.sellerId) {
+      const valeDate = input.dueDate;
+      const d = new Date(valeDate);
+      await createSellerAdvance({
+        sellerId: input.sellerId,
+        amount: reaisToCents(input.amount),
+        description: input.description,
+        date: valeDate,
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        createdBy: ctx.user?.id,
+        finTransactionId: id,
+        tenantId: getCurrentTenantId(),
+      });
+    }
+
     // Send notification to owner when approval is needed
     if (input.needsApproval) {
       const amt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(input.amount) || 0);
@@ -107,6 +139,7 @@ export const finTransactionsRouter = router({
     amount: z.string().optional(),
     dueDate: z.number().optional(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
+    paidDate: z.number().nullable().optional(),
     categoryId: z.number().nullable().optional(),
     supplier: z.string().optional(),
     barcode: z.string().optional(),
@@ -115,11 +148,26 @@ export const finTransactionsRouter = router({
     receiptKey: z.string().optional(),
   })).mutation(async ({ input }) => {
     const { id, ...data } = input;
-    await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined });
+    await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined, paidDate: data.paidDate ?? undefined });
+    // Mantém o vale do colaborador sincronizado com a conta (valor/descrição/data).
+    if (data.amount !== undefined || data.description !== undefined || data.dueDate !== undefined) {
+      const sync: { amount?: number; description?: string; date?: number; month?: number; year?: number } = {};
+      if (data.amount !== undefined) sync.amount = reaisToCents(data.amount);
+      if (data.description !== undefined) sync.description = data.description;
+      if (data.dueDate !== undefined) {
+        const d = new Date(data.dueDate);
+        sync.date = data.dueDate;
+        sync.month = d.getMonth() + 1;
+        sync.year = d.getFullYear();
+      }
+      await updateAdvanceByFinTransaction(id, sync);
+    }
     return { success: true };
   }),
-  
+
   delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+    // Remove o vale vinculado (se houver) antes de excluir a conta de origem.
+    await deleteAdvanceByFinTransaction(input.id);
     await deleteFinTransaction(input.id);
     return { success: true };
   }),
