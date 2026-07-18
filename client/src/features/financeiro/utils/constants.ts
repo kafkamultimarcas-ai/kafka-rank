@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Wrench,
   Clock,
+  CalendarClock,
   AlertTriangle,
   CheckCircle,
   Shield,
@@ -61,6 +62,7 @@ export const FINANCEIRO_STATIC_TAB_CLASSES: Record<MainTab, string> = {
 export const CONTAS_STATUS_OPTIONS = [
   { key: "all", label: "Todas", color: "gray" },
   { key: "overdue", label: "Vencidas", color: "red" },
+  { key: "due_today", label: "Vence Hoje", color: "amber" },
   { key: "pending", label: "Pendentes", color: "amber" },
   { key: "paid", label: "Pagas", color: "emerald" },
   { key: "approval", label: "Autorizar", color: "purple" },
@@ -75,6 +77,7 @@ export const CONTAS_TYPE_OPTIONS = [
 export const CONTAS_DESKTOP_PANEL_OPTIONS = [
   { key: "all", label: "Todas", icon: Receipt },
   { key: "overdue", label: "Vencidas", icon: Clock },
+  { key: "due_today", label: "Vence Hoje", icon: CalendarClock },
   { key: "pending", label: "Pendentes", icon: AlertTriangle },
   { key: "paid", label: "Pagas", icon: CheckCircle },
   { key: "approval", label: "Autorizar", icon: Shield },

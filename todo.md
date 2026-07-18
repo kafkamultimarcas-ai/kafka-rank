@@ -2498,3 +2498,11 @@
 - [x] Ao clicar na notificação, navegar direto para a conta em questão (window.location.href)
 - [x] Dedup: não gera notificações se já gerou hoje
 - [x] 0 erros TypeScript (server + client)
+
+## Melhorias Notificações + Filtro Contas (Jul 18)
+- [x] Botão "Limpar tudo" no menu de notificações (marca todas como lidas + esconde da lista)
+- [x] Visual colorido: contas atrasadas em vermelho (borda + fundo), contas de hoje em amarelo
+- [x] Filtro rápido "Vence Hoje" na aba de contas (mobile chips + desktop panel)
+- [x] Contagem de contas vencendo hoje no filtro
+- [x] typedStats atualizado com dueToday por tipo (payable/receivable)
+- [x] 0 erros TypeScript

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
-import { Bell, BellRing, X, Check, CheckCheck, ExternalLink } from "lucide-react";
+import { Bell, BellRing, X, Check, CheckCheck, ExternalLink, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 
@@ -119,9 +119,9 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
       case "rescue":
         return "🚨";
       case "bill_overdue":
-        return "🔴";
+        return "🚫";
       case "bill_due_today":
-        return "💰";
+        return "⚠️";
       case "bill_due_tomorrow":
         return "📅";
       default:
@@ -130,14 +130,39 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
   };
 
   const getNotifColor = (type: string) => {
+    if (type === "bill_overdue") return "border-l-red-500";
+    if (type === "bill_due_today") return "border-l-yellow-500";
+    if (type === "bill_due_tomorrow") return "border-l-blue-400";
     if (type.includes("pending")) return "border-l-yellow-500";
     if (type.includes("approved")) return "border-l-green-500";
     if (type === "overtake") return "border-l-red-500";
     if (type.includes("expiring") || type === "rescue") return "border-l-orange-500";
-    if (type === "bill_overdue") return "border-l-red-600";
-    if (type === "bill_due_today") return "border-l-amber-500";
-    if (type === "bill_due_tomorrow") return "border-l-blue-400";
     return "border-l-blue-500";
+  };
+
+  // Background color for bill notifications
+  const getNotifBgColor = (type: string, read: boolean) => {
+    if (!read) {
+      if (type === "bill_overdue") return "bg-red-950/40";
+      if (type === "bill_due_today") return "bg-yellow-950/40";
+      if (type === "bill_due_tomorrow") return "bg-blue-950/30";
+      return "bg-gray-800/30";
+    }
+    if (type === "bill_overdue") return "bg-red-950/15";
+    if (type === "bill_due_today") return "bg-yellow-950/15";
+    return "";
+  };
+
+  // Title color for bill notifications
+  const getNotifTitleColor = (type: string, read: boolean) => {
+    if (!read) {
+      if (type === "bill_overdue") return "text-red-300";
+      if (type === "bill_due_today") return "text-yellow-300";
+      return "text-white";
+    }
+    if (type === "bill_overdue") return "text-red-400/70";
+    if (type === "bill_due_today") return "text-yellow-400/70";
+    return "text-gray-400";
   };
 
   const timeAgo = (date: Date) => {
@@ -197,13 +222,14 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
                   )}
                 </h3>
                 <div className="flex items-center gap-1">
-                  {unreadCount > 0 && (
+                  {notifications && notifications.length > 0 && (
                     <button
                       onClick={handleMarkAllRead}
-                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700"
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+                      title="Marcar todas como lidas e limpar"
                     >
-                      <CheckCheck className="w-3 h-3" />
-                      Ler tudo
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      Limpar tudo
                     </button>
                   )}
                   <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-gray-700 rounded">
@@ -224,15 +250,13 @@ export default function NotificationCenter({ sellerId, isAdmin }: NotificationCe
                     <button
                       key={notif.id}
                       onClick={() => handleNotificationClick(notif)}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800/50 transition-colors border-l-4 ${getNotifColor(notif.type)} ${
-                        !notif.read ? "bg-gray-800/30" : ""
-                      }`}
+                      className={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800/50 transition-colors border-l-4 ${getNotifColor(notif.type)} ${getNotifBgColor(notif.type, !!notif.read)}`}
                     >
                       <div className="flex items-start gap-3">
                         <span className="text-lg flex-shrink-0 mt-0.5">{getNotifIcon(notif.type)}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className={`text-sm font-semibold truncate ${!notif.read ? "text-white" : "text-gray-400"}`}>
+                            <p className={`text-sm font-semibold truncate ${getNotifTitleColor(notif.type, !!notif.read)}`}>
                               {notif.title}
                             </p>
                             {!notif.read && (
