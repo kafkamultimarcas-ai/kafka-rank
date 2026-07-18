@@ -30,6 +30,8 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
     setTxDueDate: state.setTxDueDate,
     txSupplier: state.txSupplier,
     setTxSupplier: state.setTxSupplier,
+    txVehicle: state.txVehicle,
+    setTxVehicle: state.setTxVehicle,
     txNotes: state.txNotes,
     setTxNotes: state.setTxNotes,
     txCategoryId: state.txCategoryId,
@@ -38,6 +40,8 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
     setTxNeedsApproval: state.setTxNeedsApproval,
     txRecurrence: state.txRecurrence,
     setTxRecurrence: state.setTxRecurrence,
+    txRecurrenceMonths: state.txRecurrenceMonths,
+    setTxRecurrenceMonths: state.setTxRecurrenceMonths,
     txIsVale: state.txIsVale,
     setTxIsVale: state.setTxIsVale,
     txSellerId: state.txSellerId,
@@ -79,6 +83,8 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
           onTypeFilterChange={state.setTypeFilter}
           searchQuery={state.searchQuery}
           onSearchChange={state.setSearchQuery}
+          filterVehicle={state.filterVehicle}
+          onVehicleFilterChange={state.setFilterVehicle}
         />
 
         <div className="space-y-2">
@@ -168,6 +174,8 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
               onTypeFilterChange={state.setTypeFilter}
               searchQuery={state.searchQuery}
               onSearchChange={state.setSearchQuery}
+              filterVehicle={state.filterVehicle}
+              onVehicleFilterChange={state.setFilterVehicle}
               showSearchOnly
             />
           </div>

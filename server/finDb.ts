@@ -80,6 +80,7 @@ export async function createFinTransaction(data: {
   paidDate?: number;
   categoryId?: number;
   supplier?: string;
+  vehicle?: string;
   barcode?: string;
   notes?: string;
   receiptUrl?: string;
@@ -107,6 +108,7 @@ export async function updateFinTransaction(id: number, data: Partial<{
   status: "pending" | "paid" | "overdue" | "cancelled";
   categoryId: number;
   supplier: string;
+  vehicle: string;
   barcode: string;
   notes: string;
   receiptUrl: string;

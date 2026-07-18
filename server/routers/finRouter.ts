@@ -83,11 +83,14 @@ export const finTransactionsRouter = router({
     paidDate: z.number().nullable().optional(),
     categoryId: z.number().nullable().optional(),
     supplier: z.string().optional(),
+    vehicle: z.string().optional(),
     barcode: z.string().optional(),
     notes: z.string().optional(),
     receiptUrl: z.string().optional(),
     receiptKey: z.string().optional(),
     recurrence: z.enum(["none", "monthly", "weekly", "yearly"]).optional(),
+    // Quando a recorrência é "monthly", gera esta quantidade de contas (uma por mês).
+    recurrenceMonths: z.number().int().min(1).max(60).optional(),
     installmentNumber: z.number().optional(),
     installmentTotal: z.number().optional(),
     needsApproval: z.boolean().optional(),
@@ -96,30 +99,52 @@ export const finTransactionsRouter = router({
     // e reflete automaticamente no Financeiro dos Vendedores.
     sellerId: z.number().optional(),
   })).mutation(async ({ input, ctx }) => {
+    const { recurrenceMonths, ...txInput } = input;
     const approvalStatus = input.needsApproval ? "pending_approval" as const : "none" as const;
-    const id = await createFinTransaction({
-      ...input,
-      categoryId: input.categoryId ?? undefined,
-      paidDate: input.paidDate ?? undefined,
-      createdBy: ctx.user?.id,
-      approvalStatus,
-    });
 
-    // Integração Vale do Colaborador: espelha a conta como vale do vendedor.
-    if (input.sellerId) {
-      const valeDate = input.dueDate;
-      const d = new Date(valeDate);
-      await createSellerAdvance({
-        sellerId: input.sellerId,
-        amount: reaisToCents(input.amount),
-        description: input.description,
-        date: valeDate,
-        month: d.getMonth() + 1,
-        year: d.getFullYear(),
+    // Recorrência mensal: gera N contas (uma por mês), mantendo o dia de vencimento
+    // (com clamp para meses mais curtos). Demais recorrências geram 1 conta.
+    const months = input.recurrence === "monthly" ? Math.max(1, Math.min(recurrenceMonths ?? 1, 60)) : 1;
+    const base = new Date(input.dueDate);
+    const addMonths = (n: number) => {
+      const d = new Date(base.getFullYear(), base.getMonth() + n, 1, base.getHours(), base.getMinutes(), base.getSeconds());
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(base.getDate(), lastDay));
+      return d.getTime();
+    };
+
+    const ids: number[] = [];
+    for (let i = 0; i < months; i++) {
+      const dueDate = months > 1 ? addMonths(i) : input.dueDate;
+      const description = months > 1 ? `${input.description} (${i + 1}/${months})` : input.description;
+      const id = await createFinTransaction({
+        ...txInput,
+        description,
+        dueDate,
+        categoryId: input.categoryId ?? undefined,
+        paidDate: input.paidDate ?? undefined,
+        installmentNumber: months > 1 ? i + 1 : input.installmentNumber,
+        installmentTotal: months > 1 ? months : input.installmentTotal,
         createdBy: ctx.user?.id,
-        finTransactionId: id,
-        tenantId: getCurrentTenantId(),
+        approvalStatus,
       });
+      ids.push(id);
+
+      // Integração Vale do Colaborador: espelha cada conta gerada como vale do vendedor.
+      if (input.sellerId) {
+        const d = new Date(dueDate);
+        await createSellerAdvance({
+          sellerId: input.sellerId,
+          amount: reaisToCents(input.amount),
+          description,
+          date: dueDate,
+          month: d.getMonth() + 1,
+          year: d.getFullYear(),
+          createdBy: ctx.user?.id,
+          finTransactionId: id,
+          tenantId: getCurrentTenantId(),
+        });
+      }
     }
 
     // Send notification to owner when approval is needed
@@ -130,7 +155,7 @@ export const finTransactionsRouter = router({
         content: `${input.createdByName || "Financeiro"} lan\u00e7ou uma conta que precisa de autoriza\u00e7\u00e3o:\n\n${input.description} - ${amt}\n${input.supplier ? "Fornecedor: " + input.supplier : ""}\nVencimento: ${new Date(input.dueDate).toLocaleDateString("pt-BR")}`,
       }).catch(() => {});
     }
-    return { id };
+    return { id: ids[0], ids };
   }),
   
   update: publicProcedure.input(z.object({
@@ -142,6 +167,7 @@ export const finTransactionsRouter = router({
     paidDate: z.number().nullable().optional(),
     categoryId: z.number().nullable().optional(),
     supplier: z.string().optional(),
+    vehicle: z.string().optional(),
     barcode: z.string().optional(),
     notes: z.string().optional(),
     receiptUrl: z.string().optional(),
@@ -150,6 +176,7 @@ export const finTransactionsRouter = router({
     const { id, ...data } = input;
     await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined, paidDate: data.paidDate ?? undefined });
     // Mantém o vale do colaborador sincronizado com a conta (valor/descrição/data).
+    // Efeito colateral: não deve impedir a atualização da conta caso falhe.
     if (data.amount !== undefined || data.description !== undefined || data.dueDate !== undefined) {
       const sync: { amount?: number; description?: string; date?: number; month?: number; year?: number } = {};
       if (data.amount !== undefined) sync.amount = reaisToCents(data.amount);
@@ -160,14 +187,24 @@ export const finTransactionsRouter = router({
         sync.month = d.getMonth() + 1;
         sync.year = d.getFullYear();
       }
-      await updateAdvanceByFinTransaction(id, sync);
+      try {
+        await updateAdvanceByFinTransaction(id, sync);
+      } catch (err) {
+        console.warn("[finTransactions.update] falha ao sincronizar vale vinculado (ignorado):", err);
+      }
     }
     return { success: true };
   }),
 
   delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     // Remove o vale vinculado (se houver) antes de excluir a conta de origem.
-    await deleteAdvanceByFinTransaction(input.id);
+    // A limpeza do vale é um efeito colateral e não deve impedir a exclusão da
+    // conta caso falhe (ex.: coluna finTransactionId ausente antes da migração).
+    try {
+      await deleteAdvanceByFinTransaction(input.id);
+    } catch (err) {
+      console.warn("[finTransactions.delete] falha ao remover vale vinculado (ignorado):", err);
+    }
     await deleteFinTransaction(input.id);
     return { success: true };
   }),

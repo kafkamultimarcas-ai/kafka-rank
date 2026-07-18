@@ -1,6 +1,7 @@
 import {
   Banknote,
   Calendar,
+  Car,
   CheckCircle,
   ChevronDown,
   ChevronUp,
@@ -78,6 +79,7 @@ export function ContaCard({
               <span className="rounded bg-gray-800 px-1.5 py-0.5">{categoryName}</span>
               <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(transaction.dueDate)}</span>
               {transaction.supplier && <span className="text-gray-400">{transaction.supplier}</span>}
+              {(transaction as any).vehicle && <span className="flex items-center gap-1 text-sky-300"><Car className="h-3 w-3" /> {(transaction as any).vehicle}</span>}
               {isOverdue && <span className="font-bold text-red-400">VENCIDA</span>}
               {isPaid && (
                 <span className="flex items-center gap-0.5 font-bold text-emerald-400">
