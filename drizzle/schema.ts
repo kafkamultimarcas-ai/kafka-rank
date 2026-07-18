@@ -916,6 +916,7 @@ export const finTransactions = mysqlTable("fin_transactions", {
   status: mysqlEnum("status", ["pending", "paid", "overdue", "cancelled"]).default("pending").notNull(),
   categoryId: int("categoryId"),
   supplier: varchar("supplier", { length: 255 }), // fornecedor ou cliente
+  vehicle: varchar("vehicle", { length: 255 }), // veículo do estoque vinculado (rótulo: marca modelo ano - placa)
   barcode: varchar("barcode", { length: 100 }), // código de barras do boleto
   notes: text("notes"),
   receiptUrl: text("receiptUrl"), // URL do comprovante no S3

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { PaginationControls } from "@/components/PaginationControls";
 import { SupplierCombobox } from "@/components/SupplierCombobox";
+import { VehicleCombobox } from "@/components/VehicleCombobox";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +91,7 @@ export function AdminFinanceiroInner() {
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [filterVehicle, setFilterVehicle] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -114,9 +116,11 @@ export function AdminFinanceiroInner() {
   const [txType, setTxType] = useState<"payable" | "receivable" | "paid">("payable");
   const [txCategoryId, setTxCategoryId] = useState<number | null>(null);
   const [txSupplier, setTxSupplier] = useState("");
+  const [txVehicle, setTxVehicle] = useState("");
   const [txBarcode, setTxBarcode] = useState("");
   const [txNotes, setTxNotes] = useState("");
   const [txRecurrence, setTxRecurrence] = useState<"none" | "monthly" | "weekly" | "yearly">("none");
+  const [txRecurrenceMonths, setTxRecurrenceMonths] = useState(2);
 
   // Month range
   const startOfMonth = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getTime(), [selectedMonth]);
@@ -220,14 +224,18 @@ export function AdminFinanceiroInner() {
     if (statusFilter === "pending_approval") {
       list = list.filter((t: any) => (t as any).approvalStatus === "pending_approval");
     }
+    if (filterVehicle) {
+      list = list.filter((t: any) => t.vehicle === filterVehicle);
+    }
     if (!searchText.trim()) return list;
     const q = searchText.toLowerCase();
     return list.filter((t: any) =>
       t.description?.toLowerCase().includes(q) ||
       t.supplier?.toLowerCase().includes(q) ||
+      t.vehicle?.toLowerCase().includes(q) ||
       t.notes?.toLowerCase().includes(q)
     );
-  }, [transactions, searchText, statusFilter]);
+  }, [transactions, searchText, statusFilter, filterVehicle]);
 
   function resetCategoryForm() {
     setCatName("");
@@ -243,9 +251,11 @@ export function AdminFinanceiroInner() {
     setTxType("payable");
     setTxCategoryId(null);
     setTxSupplier("");
+    setTxVehicle("");
     setTxBarcode("");
     setTxNotes("");
     setTxRecurrence("none");
+    setTxRecurrenceMonths(2);
   }
 
   function openEditTransaction(tx: any) {
@@ -256,6 +266,7 @@ export function AdminFinanceiroInner() {
     setTxType(tx.type);
     setTxCategoryId(tx.categoryId);
     setTxSupplier(tx.supplier || "");
+    setTxVehicle(tx.vehicle || "");
     setTxBarcode(tx.barcode || "");
     setTxNotes(tx.notes || "");
     setTxRecurrence(tx.recurrence || "none");
@@ -287,7 +298,7 @@ export function AdminFinanceiroInner() {
   );
   useEffect(() => {
     setPage(1);
-  }, [searchText, statusFilter, typeFilter, activeCategoryId, activeTab, selectedMonth, pageSize]);
+  }, [searchText, statusFilter, typeFilter, filterVehicle, activeCategoryId, activeTab, selectedMonth, pageSize]);
 
   return (
       <div className="space-y-6">
@@ -422,6 +433,9 @@ export function AdminFinanceiroInner() {
               <SelectItem value="receivable">A Receber</SelectItem>
             </SelectContent>
           </Select>
+          <div className="w-full sm:w-[240px]">
+            <VehicleCombobox value={filterVehicle} onChange={setFilterVehicle} placeholder="Todos os veículos" />
+          </div>
         </div>
 
         {/* Transactions List */}
@@ -616,20 +630,40 @@ export function AdminFinanceiroInner() {
                 <SupplierCombobox value={txSupplier} onChange={setTxSupplier} />
               </div>
               <div>
+                <Label>Veículo</Label>
+                <VehicleCombobox value={txVehicle} onChange={setTxVehicle} />
+              </div>
+              <div>
                 <Label>Código de Barras</Label>
                 <Input placeholder="Código do boleto (opcional)" value={txBarcode} onChange={(e) => setTxBarcode(e.target.value)} />
               </div>
-              <div>
-                <Label>Recorrência</Label>
-                <Select value={txRecurrence} onValueChange={(v: any) => setTxRecurrence(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem recorrência</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Recorrência</Label>
+                  <Select value={txRecurrence} onValueChange={(v: any) => setTxRecurrence(v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem recorrência</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="yearly">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {txRecurrence === "monthly" && (
+                  <div>
+                    <Label>Qtd. de meses *</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={txRecurrenceMonths}
+                      onChange={(e) => setTxRecurrenceMonths(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                      inputMode="numeric"
+                    />
+                    <p className="mt-1 text-[10px] text-muted-foreground">Gera 1 conta por mês.</p>
+                  </div>
+                )}
               </div>
               <div>
                 <Label>Observações</Label>
@@ -654,9 +688,11 @@ export function AdminFinanceiroInner() {
                     paidDate: persistedPaidDate,
                     categoryId: txCategoryId,
                     supplier: txSupplier || undefined,
+                    vehicle: txVehicle || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
                     recurrence: txRecurrence,
+                    recurrenceMonths: txRecurrence === "monthly" ? Math.max(1, Number(txRecurrenceMonths) || 1) : undefined,
                   } as any);
                 }}
                 disabled={createTransaction.isPending}
@@ -723,6 +759,10 @@ export function AdminFinanceiroInner() {
                 <SupplierCombobox value={txSupplier} onChange={setTxSupplier} />
               </div>
               <div>
+                <Label>Veículo</Label>
+                <VehicleCombobox value={txVehicle} onChange={setTxVehicle} />
+              </div>
+              <div>
                 <Label>Código de Barras</Label>
                 <Input value={txBarcode} onChange={(e) => setTxBarcode(e.target.value)} />
               </div>
@@ -748,6 +788,7 @@ export function AdminFinanceiroInner() {
                     paidDate: persistedPaidDate,
                     categoryId: txCategoryId || undefined,
                     supplier: txSupplier || undefined,
+                    vehicle: txVehicle || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
                   } as any);
@@ -789,6 +830,7 @@ export function AdminFinanceiroInner() {
                     {tx.paidDate && <div className="flex justify-between"><span className="text-muted-foreground">Data Pagamento</span><span>{formatDate(tx.paidDate)}</span></div>}
                     {cat && <div className="flex justify-between"><span className="text-muted-foreground">Categoria</span><span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color || undefined }} />{cat.name}</span></div>}
                     {tx.supplier && <div className="flex justify-between"><span className="text-muted-foreground">Fornecedor</span><span>{tx.supplier}</span></div>}
+                    {tx.vehicle && <div className="flex justify-between"><span className="text-muted-foreground">Veículo</span><span>{tx.vehicle}</span></div>}
                     {tx.barcode && <div className="flex justify-between"><span className="text-muted-foreground">Código Barras</span><span className="text-xs font-mono truncate max-w-[200px]">{tx.barcode}</span></div>}
                     {tx.recurrence && tx.recurrence !== "none" && <div className="flex justify-between"><span className="text-muted-foreground">Recorrência</span><span className="capitalize">{tx.recurrence === "monthly" ? "Mensal" : tx.recurrence === "weekly" ? "Semanal" : "Anual"}</span></div>}
                     {tx.notes && <div><span className="text-muted-foreground">Observa\u00e7\u00f5es:</span><p className="mt-1 text-xs bg-muted/30 p-2 rounded">{tx.notes}</p></div>}

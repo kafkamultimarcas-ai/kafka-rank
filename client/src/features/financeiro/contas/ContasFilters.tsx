@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import { VehicleCombobox } from "@/components/VehicleCombobox";
 import type { ContasFilter, ContasTypeFilter } from "@/features/financeiro/contas/useContasState";
 
 const STATUS_ACTIVE_CLASS: Record<string, string> = {
@@ -18,6 +19,8 @@ interface ContasFiltersProps {
   onTypeFilterChange: (filter: ContasTypeFilter) => void;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  filterVehicle: string;
+  onVehicleFilterChange: (value: string) => void;
   showSearchOnly?: boolean;
 }
 
@@ -30,6 +33,8 @@ export function ContasFilters({
   onTypeFilterChange,
   searchQuery,
   onSearchChange,
+  filterVehicle,
+  onVehicleFilterChange,
   showSearchOnly = false,
 }: ContasFiltersProps) {
   return (
@@ -77,8 +82,17 @@ export function ContasFilters({
           type="text"
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por descrição, fornecedor..."
+          placeholder="Buscar por descrição, fornecedor, veículo..."
           className="w-full rounded-xl border border-gray-800 bg-gray-900 py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-gray-600 focus:border-emerald-500 focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-[10px] font-bold uppercase text-gray-500">Filtrar por veículo</label>
+        <VehicleCombobox
+          value={filterVehicle}
+          onChange={onVehicleFilterChange}
+          placeholder="Todos os veículos"
         />
       </div>
     </>
