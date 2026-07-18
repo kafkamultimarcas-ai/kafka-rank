@@ -8,7 +8,100 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Copy, Check, ExternalLink, Wifi, WifiOff, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Copy, Check, ExternalLink, Wifi, WifiOff, Eye, EyeOff, RefreshCw, CheckCircle2, XCircle, AlertTriangle, Instagram, Loader2 } from "lucide-react";
+
+function TokenStatusBanner() {
+  const { data: tokenStatus, isLoading, refetch } = trpc.crmIntegrations.getMetaTokenStatus.useQuery(undefined, {
+    refetchInterval: 5 * 60 * 1000, // Re-check every 5 minutes
+    staleTime: 2 * 60 * 1000,
+  });
+
+  if (isLoading) {
+    return (
+      <Card className="border-muted">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Verificando status do token...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!tokenStatus) return null;
+
+  if (tokenStatus.valid) {
+    return (
+      <Card className="border-green-500/30 bg-green-500/5">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                  Token ativo — Instagram conectado
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Conta: <strong>@{tokenStatus.username}</strong> • Tipo: {tokenStatus.tokenType === "instagram" ? "Instagram Business Login" : "Facebook Page Token"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400">
+                <Instagram className="w-3 h-3 mr-1" /> Ativo
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-7 px-2">
+                <RefreshCw className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Token invalid/expired
+  const isExpired = tokenStatus.error?.includes("expired") || tokenStatus.error?.includes("Session has expired") || tokenStatus.errorCode === 190;
+  const isInvalidParse = tokenStatus.error?.includes("Cannot parse");
+
+  return (
+    <Card className="border-red-500/30 bg-red-500/5">
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {isExpired ? (
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            ) : (
+              <XCircle className="w-5 h-5 text-red-500" />
+            )}
+            <div>
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                {isExpired ? "Token expirado — reconecte o Instagram" : isInvalidParse ? "Token inválido — formato incorreto" : "Token com erro — reconecte o Instagram"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {tokenStatus.error}
+              </p>
+              {isExpired && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Tokens do Instagram expiram a cada 60 dias. Refaça o login OAuth para renovar.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="border-red-500/50 text-red-600 dark:text-red-400">
+              <WifiOff className="w-3 h-3 mr-1" /> Desconectado
+            </Badge>
+            <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-7 px-2">
+              <RefreshCw className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminMetaIntegration() {
   const { data: metaConfig, isLoading, refetch } = trpc.crmIntegrations.getMetaConfig.useQuery();
@@ -97,6 +190,9 @@ export default function AdminMetaIntegration() {
           </Badge>
         </div>
 
+        {/* Token Status Indicator */}
+        {metaConfig?.hasPageAccessToken && <TokenStatusBanner />}
+
         {/* Step 1: Webhook URLs */}
         <Card>
           <CardHeader>
@@ -136,7 +232,7 @@ export default function AdminMetaIntegration() {
               <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener" className="text-blue-500 underline">
                 developers.facebook.com/apps
               </a>
-              {" "}→ Seu App → Configurações → Básico
+              {" "}&rarr; Seu App &rarr; Configurações &rarr; Básico
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -238,7 +334,7 @@ export default function AdminMetaIntegration() {
                 <Label>Ativar recebimento de DMs</Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   A mesma URL de webhook do passo 1 já recebe mensagens — no painel da Meta, em{" "}
-                  <strong>Produtos → Webhooks</strong>, marque também os campos <strong>messages</strong> e{" "}
+                  <strong>Produtos &rarr; Webhooks</strong>, marque também os campos <strong>messages</strong> e{" "}
                   <strong>messaging_postbacks</strong> na assinatura da Página, e <strong>messages</strong> na
                   assinatura do Instagram
                 </p>
@@ -291,8 +387,8 @@ export default function AdminMetaIntegration() {
                 </a>
                 {" "}e crie um app (tipo: Negócios)
               </li>
-              <li>Em <strong>Configurações → Básico</strong>, copie o <strong>App ID</strong> e <strong>App Secret</strong> e cole acima</li>
-              <li>Vá em <strong>Produtos → Webhooks</strong> e clique em <strong>Configurar</strong></li>
+              <li>Em <strong>Configurações &rarr; Básico</strong>, copie o <strong>App ID</strong> e <strong>App Secret</strong> e cole acima</li>
+              <li>Vá em <strong>Produtos &rarr; Webhooks</strong> e clique em <strong>Configurar</strong></li>
               <li>Selecione <strong>Page</strong>, clique em <strong>Assinar</strong></li>
               <li>Cole a <strong>URL do Webhook</strong> e o <strong>Token de Verificação</strong> gerados acima</li>
               <li>Marque o campo <strong>leadgen</strong> para receber leads</li>

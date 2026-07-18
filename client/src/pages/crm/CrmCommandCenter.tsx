@@ -211,7 +211,16 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
 
   const sendMsg = trpc.crmChat.sendMessage.useMutation({
     onSuccess: () => { setMessage(""); refetchMessages(); },
-    onError: (e: any) => toast.error("Erro ao enviar: " + e.message),
+    onError: (e: any) => {
+      const msg = e.message || "";
+      if (msg.includes("access token") || msg.includes("OAuth") || msg.includes("token") || msg.includes("Session has expired")) {
+        toast.error("Token do Instagram expirado. Vá em Ajustes > Integração Meta e reconecte a conta.", { duration: 8000 });
+      } else if (msg.includes("24 hour") || msg.includes("outside the allowed window")) {
+        toast.error("Janela de 24h expirada. O cliente precisa enviar nova mensagem primeiro.", { duration: 8000 });
+      } else {
+        toast.error("Erro ao enviar: " + msg);
+      }
+    },
   });
 
   const aiSuggest = trpc.crmAi.suggestReply.useMutation({

@@ -879,7 +879,16 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
       setMessage("");
       refetchMessages();
     },
-    onError: (e: any) => toast.error("Erro ao enviar: " + e.message),
+    onError: (e: any) => {
+      const msg = e.message || "";
+      if (msg.includes("access token") || msg.includes("OAuth") || msg.includes("token") || msg.includes("Session has expired")) {
+        toast.error("Token do Instagram expirado. Vá em Ajustes > Integração Meta e reconecte a conta.", { duration: 8000 });
+      } else if (msg.includes("24 hour") || msg.includes("outside the allowed window")) {
+        toast.error("Janela de 24h expirada. O cliente precisa enviar uma nova mensagem antes de você poder responder.", { duration: 8000 });
+      } else {
+        toast.error("Erro ao enviar: " + msg);
+      }
+    },
   });
 
   const aiSuggest = trpc.crmAi.suggestReply.useMutation({
@@ -919,21 +928,32 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
     onError: (e: any) => toast.error(e.message),
   });
 
+  const handleMetaSendError = (prefix: string) => (e: any) => {
+    const msg = e.message || "";
+    if (msg.includes("access token") || msg.includes("OAuth") || msg.includes("token") || msg.includes("Session has expired")) {
+      toast.error("Token do Instagram expirado. Vá em Ajustes > Integração Meta e reconecte a conta.", { duration: 8000 });
+    } else if (msg.includes("24 hour") || msg.includes("outside the allowed window")) {
+      toast.error("Janela de 24h expirada. O cliente precisa enviar uma nova mensagem antes de você poder responder.", { duration: 8000 });
+    } else {
+      toast.error(prefix + msg);
+    }
+  };
+
   const sendImage = trpc.crmChat.sendImage.useMutation({
     onSuccess: () => { refetchMessages(); toast.success("Imagem enviada!"); },
-    onError: (e: any) => toast.error("Erro ao enviar imagem: " + e.message),
+    onError: handleMetaSendError("Erro ao enviar imagem: "),
   });
   const sendAudio = trpc.crmChat.sendAudio.useMutation({
     onSuccess: () => { refetchMessages(); toast.success("Áudio enviado!"); },
-    onError: (e: any) => toast.error("Erro ao enviar áudio: " + e.message),
+    onError: handleMetaSendError("Erro ao enviar áudio: "),
   });
   const sendVideo = trpc.crmChat.sendVideo.useMutation({
     onSuccess: () => { refetchMessages(); toast.success("Vídeo enviado!"); },
-    onError: (e: any) => toast.error("Erro ao enviar vídeo: " + e.message),
+    onError: handleMetaSendError("Erro ao enviar vídeo: "),
   });
   const sendDoc = trpc.crmChat.sendDocument.useMutation({
     onSuccess: () => { refetchMessages(); toast.success("Documento enviado!"); },
-    onError: (e: any) => toast.error("Erro ao enviar documento: " + e.message),
+    onError: handleMetaSendError("Erro ao enviar documento: "),
   });
   const sendVehicle = trpc.crmChat.sendVehicle.useMutation({
     onSuccess: (data: any) => { refetchMessages(); setShowVehicles(false); toast.success(`Veículo ${data.vehicleName} enviado!`); },

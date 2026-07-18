@@ -47,15 +47,15 @@ function isInstagramToken(token: string): boolean {
 
 /**
  * Build the correct fetch call based on token type.
- * - Instagram tokens: POST to graph.instagram.com/<IG_ID>/messages with Bearer auth
+ * - Instagram tokens: POST to graph.instagram.com/me/messages with Bearer auth
  * - Page tokens: POST to graph.facebook.com/v21.0/me/messages?access_token=...
  */
-async function callSendAPI(token: string, igUserId: string | null, body: object): Promise<Response> {
+async function callSendAPI(token: string, _igUserId: string | null, body: object): Promise<Response> {
   if (isInstagramToken(token)) {
-    // Instagram API with Instagram Login
-    const igId = igUserId || "me";
-    const url = `${GRAPH_IG_BASE}/${igId}/messages`;
-    console.log(`[Meta Send API] Using Instagram API: POST ${url} (igUserId=${igId})`);
+    // Instagram API with Instagram Login — always use /me/messages
+    // The token itself identifies the account, no need for explicit IG user ID
+    const url = `${GRAPH_IG_BASE}/me/messages`;
+    console.log(`[Meta Send API] Using Instagram API: POST ${url}`);
     return fetch(url, {
       method: "POST",
       headers: {
@@ -172,6 +172,48 @@ export async function sendPrivateReply(commentId: string, text: string): Promise
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+}
+
+/** Validate the current token by calling the Meta API. Returns status info. */
+export async function validateToken(): Promise<{
+  valid: boolean;
+  username?: string;
+  accountId?: string;
+  tokenType?: "instagram" | "facebook_page";
+  error?: string;
+  errorCode?: number;
+}> {
+  try {
+    const config = await getMetaConfig();
+    if (!config) return { valid: false, error: "Token não configurado" };
+
+    const isIG = isInstagramToken(config.token);
+    const tokenType = isIG ? "instagram" as const : "facebook_page" as const;
+    const testUrl = isIG
+      ? `https://graph.instagram.com/me?fields=id,username&access_token=${config.token}`
+      : `https://graph.facebook.com/v21.0/me?access_token=${config.token}`;
+
+    const resp = await fetch(testUrl);
+    const data = await resp.json() as any;
+
+    if (data.error) {
+      return {
+        valid: false,
+        tokenType,
+        error: data.error.message,
+        errorCode: data.error.code,
+      };
+    }
+
+    return {
+      valid: true,
+      tokenType,
+      username: data.username || data.name,
+      accountId: data.id,
+    };
+  } catch (err: any) {
+    return { valid: false, error: err.message };
   }
 }
 

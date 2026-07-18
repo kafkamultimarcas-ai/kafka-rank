@@ -2506,3 +2506,13 @@
 - [x] Contagem de contas vencendo hoje no filtro
 - [x] typedStats atualizado com dueToday por tipo (payable/receivable)
 - [x] 0 erros TypeScript
+
+## Fix Instagram DM Outbound - Token Type (Jul 18)
+- [x] Diagnosticado: token IGAAWI (Instagram User Token) sendo enviado para graph.facebook.com (endpoint errado)
+- [x] metaMessagingService reescrito para detectar tipo de token automaticamente
+- [x] Tokens IGAAWI → usa graph.instagram.com/<IG_ID>/messages com Authorization: Bearer
+- [x] Tokens EAA → usa graph.facebook.com/v21.0/me/messages com access_token query param
+- [x] igUserId lido do config do banco (17841407938741730) para construir endpoint correto
+- [x] 0 erros TypeScript
+- [ ] PENDENTE: Verificar se o token IGAAWI tem permissão instagram_business_manage_messages
+- [ ] PENDENTE: Se token expirado, usuário precisa refazer OAuth do Instagram Business Login

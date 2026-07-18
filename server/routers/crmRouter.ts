@@ -696,27 +696,23 @@ export const crmIntegrationsRouter = router({
   }),
 
   testMetaConnection: adminProcedure.mutation(async () => {
-    const integration = await crmDb.getIntegrationByType("facebook");
-    if (!integration?.config) return { success: false, error: "Integração não configurada" };
-    try {
-      const config = JSON.parse(integration.config);
-      if (!config.pageAccessToken) return { success: false, error: "Page Access Token não configurado" };
-      const token = config.pageAccessToken;
-      // Detect if it's an Instagram token (starts with IGAA) or Facebook Page token (starts with EAA)
-      const isInstagramToken = token.startsWith("IGAA");
-      const apiUrl = isInstagramToken
-        ? `https://graph.instagram.com/me?fields=id,username&access_token=${token}`
-        : `https://graph.facebook.com/v21.0/me?access_token=${token}`;
-      const resp = await fetch(apiUrl);
-      const data = await resp.json() as any;
-      if (data.error) return { success: false, error: data.error.message };
-      if (isInstagramToken) {
-        return { success: true, pageName: data.username || "Instagram conectado", pageId: data.id };
-      }
-      return { success: true, pageName: data.name, pageId: data.id };
-    } catch (err: any) {
-      return { success: false, error: err.message };
-    }
+    const result = await metaMessaging.validateToken();
+    if (!result.valid) return { success: false, error: result.error || "Token inválido" };
+    return { success: true, pageName: result.username || "Conectado", pageId: result.accountId };
+  }),
+
+  // Returns token health status for the frontend indicator (non-mutating)
+  getMetaTokenStatus: adminProcedure.query(async () => {
+    const result = await metaMessaging.validateToken();
+    return {
+      configured: true,
+      valid: result.valid,
+      tokenType: result.tokenType || null,
+      username: result.username || null,
+      accountId: result.accountId || null,
+      error: result.error || null,
+      errorCode: result.errorCode || null,
+    };
   }),
   // ===== SYNC LOGS =====
   getSyncLogs: adminProcedure.input(z.object({
