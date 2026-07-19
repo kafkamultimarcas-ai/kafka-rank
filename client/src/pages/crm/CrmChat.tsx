@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { ChannelIcon } from "@/components/ChannelIcon";
 import { useBranding } from "@/contexts/TenantContext";
+import { isValidBrazilianPhone } from "@shared/validators";
+import { usePaginatedConversations } from "@/features/crm/hooks/usePaginatedConversations";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -168,6 +170,21 @@ function formatPhoneDisplay(phone: string | null) {
   return phone;
 }
 
+function hasCallablePhone(phone: string | null | undefined) {
+  return Boolean(phone && isValidBrazilianPhone(phone));
+}
+
+function getInstagramUsername(username: string | null | undefined) {
+  if (!username) return null;
+  const normalized = username.trim().replace(/^@+/, "");
+  return normalized || null;
+}
+
+function getInstagramProfileUrl(username: string | null | undefined) {
+  const normalized = getInstagramUsername(username);
+  return normalized ? `https://instagram.com/${normalized}` : null;
+}
+
 function getLastMsgPreview(lead: any): string {
   if (lead.lastMessageType && lead.lastMessageType !== "text") {
     const typeMap: Record<string, string> = {
@@ -205,7 +222,13 @@ const SOURCE_CFG: Record<string, { label: string; color: string }> = {
 };
 
 // ===== MAIN CRM CHAT COMPONENT =====
-export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?: boolean }) {
+export default function CrmChat({
+  sellerId,
+  mode = "seller",
+}: {
+  sellerId?: number;
+  mode?: "admin" | "seller" | "sdr";
+}) {
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterScore, setFilterScore] = useState<string | null>(null);
@@ -230,7 +253,7 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
       <div className={`w-full md:w-[400px] md:min-w-[380px] border-r border-border/50 flex flex-col bg-card/50 backdrop-blur ${showMobileChat ? "hidden md:flex" : "flex"}`}>
         <LeadList
           sellerId={sellerId}
-          isSdr={isSdr}
+          mode={mode}
           selectedLeadId={selectedLeadId}
           onSelectLead={handleSelectLead}
           searchQuery={searchQuery}
@@ -256,10 +279,10 @@ export default function CrmChat({ sellerId, isSdr }: { sellerId?: number; isSdr?
 
 // ===== LEAD LIST - REDESIGNED =====
 function LeadList({
-  sellerId, isSdr, selectedLeadId, onSelectLead, searchQuery, setSearchQuery, filterScore, setFilterScore, filterSource, setFilterSource
+  sellerId, mode, selectedLeadId, onSelectLead, searchQuery, setSearchQuery, filterScore, setFilterScore, filterSource, setFilterSource
 }: {
   sellerId?: number;
-  isSdr?: boolean;
+  mode: "admin" | "seller" | "sdr";
   selectedLeadId: number | null;
   onSelectLead: (id: number) => void;
   searchQuery: string;
@@ -274,62 +297,37 @@ function LeadList({
   const [printDateFrom, setPrintDateFrom] = useState("");
   const [printDateTo, setPrintDateTo] = useState("");
   const [printMode, setPrintMode] = useState<"all" | "period">("all");
-  const [loadedLeads, setLoadedLeads] = useState<any[]>([]);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [sourceCatalog, setSourceCatalog] = useState<string[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 100;
+  const PAGE_SIZE = 500;
 
-  // Initial load - first page
-  const { data: firstPageData, isLoading: isFirstLoading } = trpc.crmLeads.listAll.useQuery(
-    { archived: false, limit: PAGE_SIZE, offset: 0 },
-    { refetchInterval: 10000 }
-  );
-
-  // Load more pages
-  const { data: moreData } = trpc.crmLeads.listAll.useQuery(
-    { archived: false, limit: PAGE_SIZE, offset: page * PAGE_SIZE },
-    { enabled: page > 0 && hasMore }
-  );
-
-  // Merge first page
-  useEffect(() => {
-    if (firstPageData) {
-      setLoadedLeads(firstPageData);
-      setHasMore(firstPageData.length >= PAGE_SIZE);
-    }
-  }, [firstPageData]);
-
-  // Merge additional pages
-  useEffect(() => {
-    if (moreData && page > 0) {
-      setLoadedLeads(prev => {
-        const existingIds = new Set(prev.map((l: any) => l.id));
-        const newLeads = moreData.filter((l: any) => !existingIds.has(l.id));
-        return [...prev, ...newLeads];
-      });
-      setHasMore(moreData.length >= PAGE_SIZE);
-      setIsLoadingMore(false);
-    }
-  }, [moreData, page]);
+  const {
+    items: allLeads,
+    total,
+    hasMore,
+    isLoadingMore,
+    isInitialLoading: isFirstLoading,
+    loadMore,
+  } = usePaginatedConversations({
+    mode,
+    sellerId: mode === "seller" ? sellerId : undefined,
+    archived: false,
+    query: searchQuery,
+    score: filterScore,
+    source: filterSource,
+    pageSize: PAGE_SIZE,
+    refreshInterval: 10000,
+  });
 
   // Scroll handler for infinite scroll
   const handleScroll = useCallback(() => {
     if (!listRef.current || !hasMore || isLoadingMore) return;
     const { scrollTop, scrollHeight, clientHeight } = listRef.current;
     if (scrollHeight - scrollTop - clientHeight < 300) {
-      setIsLoadingMore(true);
-      setPage(p => p + 1);
+      loadMore();
     }
-  }, [hasMore, isLoadingMore]);
+  }, [hasMore, isLoadingMore, loadMore]);
 
-  const allLeads = loadedLeads;
-
-  const { data: searchResults } = trpc.crmLeads.search.useQuery(
-    { query: searchQuery },
-    { enabled: searchQuery.length >= 2 }
-  );
   const { data: sellers } = trpc.sellers.list.useQuery();
   const { data: alerts } = trpc.crmPerformance.getAlerts.useQuery({ thresholdMinutes: 5 }, { refetchInterval: 30000 });
 
@@ -360,16 +358,38 @@ function LeadList({
 
   const alertLeadIds = useMemo(() => new Set(alerts?.map((a: any) => a.id) || []), [alerts]);
 
-  const availableSources = useMemo(() => {
-    if (!allLeads) return [];
-    return Array.from(new Set(allLeads.map((l: any) => l.source).filter(Boolean)));
+  useEffect(() => {
+    const seenSources = Array.from(new Set((allLeads || []).map((lead: any) => lead.source).filter(Boolean) as string[]));
+    if (!seenSources.length) return;
+
+    setSourceCatalog((current) => {
+      const merged = new Set([...current, ...seenSources]);
+      return Array.from(merged);
+    });
   }, [allLeads]);
+
+  const availableSources = useMemo(() => {
+    const currentSources = Array.from(new Set((allLeads || []).map((lead: any) => lead.source).filter(Boolean) as string[]));
+    const merged = Array.from(new Set([...sourceCatalog, ...currentSources, ...(filterSource ? [filterSource] : [])]));
+
+    return merged.sort((left, right) => {
+      const leftIndex = Object.prototype.hasOwnProperty.call(SOURCE_CFG, left)
+        ? Object.keys(SOURCE_CFG).indexOf(left)
+        : Number.MAX_SAFE_INTEGER;
+      const rightIndex = Object.prototype.hasOwnProperty.call(SOURCE_CFG, right)
+        ? Object.keys(SOURCE_CFG).indexOf(right)
+        : Number.MAX_SAFE_INTEGER;
+
+      if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+      return left.localeCompare(right, "pt-BR");
+    });
+  }, [allLeads, filterSource, sourceCatalog]);
 
   // Unread count per source
   const unreadBySource = useMemo(() => {
     if (!allLeads) return {} as Record<string, number>;
     const map: Record<string, number> = {};
-    const filtered = sellerId && !isSdr ? allLeads.filter((l: any) => l.sellerId === sellerId) : allLeads;
+    const filtered = sellerId && mode === "seller" ? allLeads.filter((l: any) => l.sellerId === sellerId) : allLeads;
     for (const l of filtered) {
       const count = l.unreadCount || 0;
       if (count > 0 && l.source) {
@@ -377,44 +397,25 @@ function LeadList({
       }
     }
     return map;
-  }, [allLeads, sellerId, isSdr]);
+  }, [allLeads, sellerId, mode]);
 
   const totalUnread = useMemo(() => {
     return Object.values(unreadBySource).reduce((sum, c) => sum + c, 0);
   }, [unreadBySource]);
 
-  const leads = useMemo(() => {
-    let base = searchQuery.length >= 2 ? searchResults : allLeads;
-    if (!base) return [];
-    if (sellerId && !isSdr) {
-      base = base.filter((l: any) => l.sellerId === sellerId);
-    }
-    if (filterScore) {
-      base = base.filter((l: any) => l.score === filterScore);
-    }
-    if (filterSource) {
-      base = base.filter((l: any) => l.source === filterSource);
-    }
-    // Sort: ALWAYS by most recent message timestamp DESC (WhatsApp style)
-    // Leads with newest messages go to the top, no exceptions
-    return [...base].sort((a: any, b: any) => {
-      const aTime = a.lastMessageTimestamp || a.updatedAt || a.createdAt || 0;
-      const bTime = b.lastMessageTimestamp || b.updatedAt || b.createdAt || 0;
-      return Number(bTime) - Number(aTime);
-    });
-  }, [allLeads, searchResults, searchQuery, sellerId, isSdr, filterScore, filterSource, alertLeadIds]);
+  const leads = allLeads;
 
   const stats = useMemo(() => {
     if (!allLeads) return { total: 0, hot: 0, warm: 0, cold: 0, unassigned: 0 };
-    const filtered = sellerId && !isSdr ? allLeads.filter((l: any) => l.sellerId === sellerId) : allLeads;
+    const filtered = allLeads;
     return {
-      total: filtered.length,
+      total,
       hot: filtered.filter((l: any) => l.score === "hot").length,
       warm: filtered.filter((l: any) => l.score === "warm").length,
       cold: filtered.filter((l: any) => l.score === "cold").length,
       unassigned: filtered.filter((l: any) => l.sellerId === 0).length,
     };
-  }, [allLeads, sellerId, isSdr]);
+  }, [allLeads, total]);
 
   return (
     <>
@@ -472,15 +473,15 @@ function LeadList({
           </button>
           <button onClick={() => setFilterScore(filterScore === "hot" ? null : "hot")}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1 ${filterScore === "hot" ? "bg-orange-500/15 border-orange-500/40 text-orange-400 shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
-            <Flame className="w-3 h-3" /> {stats.hot}
+            <Flame className="w-3.5 h-3.5" /> {stats.hot}
           </button>
           <button onClick={() => setFilterScore(filterScore === "warm" ? null : "warm")}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1 ${filterScore === "warm" ? "bg-amber-500/15 border-amber-500/40 text-amber-400 shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
-            <Thermometer className="w-3 h-3" /> {stats.warm}
+            <Thermometer className="w-3.5 h-3.5" /> {stats.warm}
           </button>
           <button onClick={() => setFilterScore(filterScore === "cold" ? null : "cold")}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap flex items-center gap-1 ${filterScore === "cold" ? "bg-blue-500/15 border-blue-500/40 text-blue-400 shadow-sm" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
-            <Snowflake className="w-3 h-3" /> {stats.cold}
+            <Snowflake className="w-3.5 h-3.5" /> {stats.cold}
           </button>
           {stats.unassigned > 0 && (
             <div className="px-3 py-1.5 rounded-xl text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 whitespace-nowrap flex items-center gap-1">
@@ -491,11 +492,11 @@ function LeadList({
         </div>
 
         {/* Source/Origin filter chips */}
-        {availableSources.length > 1 && (
+        {availableSources.length > 0 && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             <button onClick={() => setFilterSource(null)}
               className={`px-2.5 py-1 rounded-xl text-[10px] font-medium border transition-all whitespace-nowrap flex items-center gap-1 ${!filterSource ? "bg-primary/15 border-primary/40 text-primary" : "bg-transparent border-border/50 text-muted-foreground hover:bg-accent/30"}`}>
-              Todas origens
+              Todas
               {totalUnread > 0 && (
                 <span className="min-w-[16px] h-4 px-1 rounded-full bg-green-500 text-white text-[9px] font-bold flex items-center justify-center">
                   {totalUnread > 99 ? "99+" : totalUnread}
@@ -599,20 +600,64 @@ function LeadList({
                     </span>
                   </div>
 
-                  {/* Row 2: Phone number - HIGHLIGHTED & CLICKABLE */}
-                  {lead.phone && (
+                  {/* Row 2: Phone/Instagram */}
+                  {(lead.phone || getInstagramUsername(lead.socialUsername)) && (
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Phone className="w-3 h-3 text-green-500/70 shrink-0" />
-                      <a
-                        href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-[12px] font-mono text-green-400/90 tracking-wide hover:text-green-300 hover:underline transition-colors cursor-pointer"
-                        title="Abrir no WhatsApp"
-                      >
-                        {formatPhoneDisplay(lead.phone)}
-                      </a>
+                      {lead.source === "instagram" && getInstagramProfileUrl(lead.socialUsername) ? (
+                        <a
+                          href={getInstagramProfileUrl(lead.socialUsername)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[12px] font-medium text-pink-400/90 hover:text-pink-300 hover:underline transition-colors cursor-pointer"
+                          title="Abrir perfil no Instagram"
+                        >
+                          @{getInstagramUsername(lead.socialUsername)}
+                        </a>
+                      ) : hasCallablePhone(lead.phone) ? (
+                        <>
+                          <Phone className="w-3 h-3 text-green-500/70 shrink-0" />
+                          <a
+                            href={`https://wa.me/${lead.phone.replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[12px] font-mono text-green-400/90 tracking-wide hover:text-green-300 hover:underline transition-colors cursor-pointer"
+                            title="Abrir no WhatsApp"
+                          >
+                            {formatPhoneDisplay(lead.phone)}
+                          </a>
+                        </>
+                      ) : lead.phone ? (
+                        <span className="text-[12px] font-mono text-muted-foreground/80 tracking-wide">
+                          {lead.phone}
+                        </span>
+                      ) : null}
+                      {lead.source === "instagram" && lead.phone && !getInstagramUsername(lead.socialUsername) && !hasCallablePhone(lead.phone) ? (
+                        <span className="text-[10px] text-muted-foreground/60">
+                          ID do Instagram
+                        </span>
+                      ) : null}
+                      {lead.source === "instagram" && lead.phone && hasCallablePhone(lead.phone) && getInstagramUsername(lead.socialUsername) ? (
+                        <span className="text-[10px] text-muted-foreground/50">
+                          {formatPhoneDisplay(lead.phone)}
+                        </span>
+                      ) : null}
+                      {lead.source !== "instagram" && getInstagramUsername(lead.socialUsername) ? (
+                        <a
+                          href={getInstagramProfileUrl(lead.socialUsername)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[12px] font-medium text-pink-400/90 hover:text-pink-300 hover:underline transition-colors cursor-pointer"
+                          title="Abrir perfil no Instagram"
+                        >
+                          @{getInstagramUsername(lead.socialUsername)}
+                        </a>
+                      ) : null}
+                      {lead.source === "instagram" && !getInstagramUsername(lead.socialUsername) && !lead.phone ? (
+                        <span className="text-[12px] text-muted-foreground/80">Instagram</span>
+                      ) : null}
                     </div>
                   )}
 
@@ -621,7 +666,7 @@ function LeadList({
                     <div className="flex items-center gap-1 min-w-0 flex-1">
                       {lead.lastMessageDirection === "outbound" && (
                         <span className="text-[10px] text-blue-400 shrink-0">
-                          {lead.lastMessageSender === "IA Kafka" ? "IA:" : "Voce:"}
+                          {lead.lastMessageSender === "IA Kafka" ? "IA:" : "Você:"}
                         </span>
                       )}
                       <span className={`text-[11px] truncate ${hasUnread ? "text-foreground/70 font-medium" : "text-muted-foreground/60"}`}>
@@ -1147,8 +1192,10 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
               </span>
             </div>
             <div className="flex items-center gap-2 text-[11px]">
-              {lead.phone && (
-                <span className="font-mono text-green-400/80">{formatPhoneDisplay(lead.phone)}</span>
+              {lead.phone && (lead.source !== "instagram" || hasCallablePhone(lead.phone) || !getInstagramUsername(lead.socialUsername)) && (
+                <span className={`font-mono ${hasCallablePhone(lead.phone) ? "text-green-400/80" : "text-muted-foreground/80"}`}>
+                  {hasCallablePhone(lead.phone) ? formatPhoneDisplay(lead.phone) : lead.phone}
+                </span>
               )}
               {lead.socialUsername && lead.source === "instagram" && (
                 <>
@@ -1174,7 +1221,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
           </div>
 
           <div className="flex items-center gap-0.5">
-            {lead.phone && (
+            {lead.phone && hasCallablePhone(lead.phone) && (
               <>
                 <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
                   className="p-2 rounded-xl hover:bg-green-500/10 text-green-400 transition-all" title="Abrir WhatsApp">
@@ -1295,7 +1342,7 @@ function ChatPanel({ leadId, sellerId, onBack }: { leadId: number; sellerId?: nu
                     </div>
                   </button>
                 ))}
-                {filteredVehicles.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum veiculo disponivel</p>}
+                {filteredVehicles.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhum veículo disponível</p>}
               </div>
             </div>
           )}

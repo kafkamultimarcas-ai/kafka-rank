@@ -3,7 +3,7 @@ import { router, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import {
   listFinCategories, createFinCategory, updateFinCategory,
-  listFinTransactions, getFinTransaction, createFinTransaction,
+  listFinTransactions, getFinTransactionsSummary, getFinTransaction, createFinTransaction,
   updateFinTransaction, deleteFinTransaction, markAsPaid,
   getFinDashboard, parseDocumentWithLLM,
   getOverdueTransactions, getUpcomingDueTransactions, getFinancialAlerts,
@@ -58,14 +58,26 @@ export const finTransactionsRouter = router({
   list: publicProcedure.input(z.object({
     type: z.enum(["payable", "receivable"]).optional(),
     status: z.enum(["pending", "paid", "overdue", "cancelled"]).optional(),
+    approvalStatus: z.enum(["none", "pending_approval", "approved", "rejected"]).optional(),
     categoryId: z.number().optional(),
     startDate: z.number().optional(),
     endDate: z.number().optional(),
     search: z.string().optional(),
+    vehicle: z.string().optional(),
+    overdueOnly: z.boolean().optional(),
+    dueTodayOnly: z.boolean().optional(),
     limit: z.number().optional(),
     offset: z.number().optional(),
   }).optional()).query(async ({ input }) => {
     return listFinTransactions(input || {});
+  }),
+
+  // Contadores por status (chips/resumo), respeitando período/tipo — para paginação server-side.
+  summary: publicProcedure.input(z.object({
+    startDate: z.number().optional(),
+    endDate: z.number().optional(),
+  }).optional()).query(async ({ input }) => {
+    return getFinTransactionsSummary(input || {});
   }),
   
   get: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {

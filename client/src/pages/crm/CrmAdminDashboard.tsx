@@ -280,7 +280,7 @@ export default function CrmAdminDashboard() {
           </div>
         </div>
 
-        {activeView === "chat" && <CrmChat isSdr={true} />}
+        {activeView === "chat" && <CrmChat mode="admin" />}
         {activeView === "performance" && <PerformanceDashboard />}
         <div className="p-4">
           {activeView === "dashboard" && <DashboardView onSelectDept={handleDeptClick} />}

@@ -17,6 +17,7 @@ export function useContasState(initialContaId?: number | null) {
   const [typeFilter, setTypeFilter] = useState<ContasTypeFilter>("all");
   const [filterVehicle, setFilterVehicle] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showForm, setShowForm] = useState(false);
@@ -40,13 +41,31 @@ export function useContasState(initialContaId?: number | null) {
   const startDate = useMemo(() => new Date(filterYear, filterMonth - 1, 1).getTime(), [filterMonth, filterYear]);
   const endDate = useMemo(() => new Date(filterYear, filterMonth, 0, 23, 59, 59).getTime(), [filterMonth, filterYear]);
 
+  // Debounce da busca (server-side): evita uma query por tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   const { data: categories } = trpc.finCategories.list.useQuery();
-  const { data: transactionsData, refetch } = trpc.finTransactions.list.useQuery({
+  // Lista paginada no servidor, com todos os filtros aplicados (tipo, status/aprovação, veículo, busca, período).
+  const { data: transactionsData, refetch, isFetching: isTransactionsFetching } = trpc.finTransactions.list.useQuery({
     startDate,
     endDate,
-    limit: 500,
-    offset: 0,
+    ...(typeFilter !== "all" ? { type: typeFilter } : {}),
+    ...(filter === "pending" ? { status: "pending" as const } : {}),
+    ...(filter === "paid" ? { status: "paid" as const } : {}),
+    ...(filter === "overdue" ? { overdueOnly: true } : {}),
+    ...(filter === "due_today" ? { dueTodayOnly: true } : {}),
+    ...(filter === "approval" ? { approvalStatus: "pending_approval" as const } : {}),
+    ...(filterVehicle ? { vehicle: filterVehicle } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    offset: (page - 1) * pageSize,
+    limit: pageSize,
   });
+  // Contadores dos chips (todo o mês) e somas dos cards — via agregados, independentes da página.
+  const { data: summaryData } = trpc.finTransactions.summary.useQuery({ startDate, endDate });
+  const { data: dashboardData } = trpc.finTransactions.dashboard.useQuery({ month: filterMonth, year: filterYear });
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const { data: sellersList } = trpc.sellers.list.useQuery({ activeOnly: true });
 
@@ -147,149 +166,54 @@ export function useContasState(initialContaId?: number | null) {
 
   const allTransactions: FinTransaction[] = transactionsData?.items || [];
 
-  const filteredTransactions = useMemo(() => {
-    let list = allTransactions;
-    const nowTs = Date.now();
+  // A lista já vem filtrada e paginada do servidor; a "página" é o próprio resultado.
+  const totalRecords = transactionsData?.total ?? 0;
+  const totalPages = Math.max(1, transactionsData?.totalPages ?? 1);
+  const filteredTransactions = allTransactions;
+  const paginatedTransactions = allTransactions;
 
-    if (typeFilter !== "all") {
-      list = list.filter((transaction) => transaction.type === typeFilter);
-    }
+  // Contadores/somas do mês inteiro vêm dos agregados do servidor (summary + dashboard),
+  // independentes da página atual.
+  const emptySummary = { total: 0, pending: 0, paid: 0, overdue: 0, dueToday: 0, approval: 0 };
+  const sumAll = summaryData?.all ?? emptySummary;
+  const sumPayable = summaryData?.payable ?? emptySummary;
+  const sumReceivable = summaryData?.receivable ?? emptySummary;
 
-    if (filterVehicle) {
-      list = list.filter((transaction) => (transaction as any).vehicle === filterVehicle);
-    }
+  const stats = {
+    pending: sumAll.pending,
+    paid: sumAll.paid,
+    overdue: sumAll.overdue,
+    dueToday: sumAll.dueToday,
+    needApproval: sumAll.approval,
+    totalPayable: Number(dashboardData?.totalPayable ?? 0),
+    totalReceivable: Number(dashboardData?.totalReceivable ?? 0),
+    totalPaid: Number(dashboardData?.totalPaid ?? 0),
+    totalReceived: Number(dashboardData?.totalReceived ?? 0),
+  };
 
-    if (filter === "pending") {
-      list = list.filter((transaction) => transaction.status === "pending");
-    } else if (filter === "paid") {
-      list = list.filter((transaction) => transaction.status === "paid");
-    } else if (filter === "overdue") {
-      list = list.filter(
-        (transaction) =>
-          (transaction.status === "pending" || transaction.status === "overdue") &&
-          transaction.dueDate < nowTs
-      );
-    } else if (filter === "due_today") {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      list = list.filter(
-        (transaction) =>
-          transaction.status === "pending" &&
-          transaction.dueDate >= todayStart.getTime() &&
-          transaction.dueDate <= todayEnd.getTime()
-      );
-    } else if (filter === "approval") {
-      list = list.filter((transaction) => transaction.approvalStatus === "pending_approval");
-    }
+  const typedStats = {
+    payable: {
+      total: sumPayable.total,
+      pending: sumPayable.pending,
+      overdue: sumPayable.overdue,
+      dueToday: sumPayable.dueToday,
+      paid: sumPayable.paid,
+      approval: sumPayable.approval,
+    },
+    receivable: {
+      total: sumReceivable.total,
+      pending: sumReceivable.pending,
+      overdue: sumReceivable.overdue,
+      dueToday: sumReceivable.dueToday,
+      paid: sumReceivable.paid,
+      approval: sumReceivable.approval,
+    },
+  };
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      list = list.filter((transaction) =>
-        transaction.description?.toLowerCase().includes(query) ||
-        transaction.supplier?.toLowerCase().includes(query) ||
-        (transaction as any).vehicle?.toLowerCase().includes(query) ||
-        transaction.notes?.toLowerCase().includes(query)
-      );
-    }
-
-    return [...list].sort((a, b) => a.dueDate - b.dueDate);
-  }, [allTransactions, filter, searchQuery, typeFilter, filterVehicle]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
-
-  const paginatedTransactions = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredTransactions.slice(start, start + pageSize);
-  }, [filteredTransactions, page, pageSize]);
-
-  const stats = useMemo(() => {
-    const nowTs = Date.now();
-    const pending = allTransactions.filter((transaction) => transaction.status === "pending");
-    const paid = allTransactions.filter((transaction) => transaction.status === "paid");
-    const overdue = allTransactions.filter(
-      (transaction) =>
-        (transaction.status === "pending" || transaction.status === "overdue") &&
-        transaction.dueDate < nowTs
-    );
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-    const dueToday = allTransactions.filter(
-      (transaction) =>
-        transaction.status === "pending" &&
-        transaction.dueDate >= todayStart.getTime() &&
-        transaction.dueDate <= todayEnd.getTime()
-    );
-    const needApproval = allTransactions.filter(
-      (transaction) => transaction.approvalStatus === "pending_approval"
-    );
-    const totalPayable = allTransactions
-      .filter((transaction) => transaction.type === "payable")
-      .reduce((sum: number, transaction) => sum + Number(transaction.amount || 0), 0);
-    const totalReceivable = allTransactions
-      .filter((transaction) => transaction.type === "receivable")
-      .reduce((sum: number, transaction) => sum + Number(transaction.amount || 0), 0);
-    const totalPaid = paid
-      .filter((transaction) => transaction.type === "payable")
-      .reduce((sum: number, transaction) => sum + Number(transaction.amount || 0), 0);
-    const totalReceived = paid
-      .filter((transaction) => transaction.type === "receivable")
-      .reduce((sum: number, transaction) => sum + Number(transaction.amount || 0), 0);
-
-    return {
-      pending: pending.length,
-      paid: paid.length,
-      overdue: overdue.length,
-      dueToday: dueToday.length,
-      needApproval: needApproval.length,
-      totalPayable,
-      totalReceivable,
-      totalPaid,
-      totalReceived,
-    };
-  }, [allTransactions]);
-
-  const typedStats = useMemo(() => {
-    const build = (type: "payable" | "receivable") => {
-      const subset = allTransactions.filter((transaction) => transaction.type === type);
-      const nowTs = Date.now();
-      const paidSubset = subset.filter((transaction) => transaction.status === "paid");
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
-      return {
-        total: subset.length,
-        pending: subset.filter((transaction) => transaction.status === "pending").length,
-        overdue: subset.filter(
-          (transaction) =>
-            (transaction.status === "pending" || transaction.status === "overdue") &&
-            transaction.dueDate < nowTs
-        ).length,
-        dueToday: subset.filter(
-          (transaction) =>
-            transaction.status === "pending" &&
-            transaction.dueDate >= todayStart.getTime() &&
-            transaction.dueDate <= todayEnd.getTime()
-        ).length,
-        paid: paidSubset.length,
-        approval: subset.filter((transaction) => transaction.approvalStatus === "pending_approval").length,
-      };
-    };
-
-    return {
-      payable: build("payable"),
-      receivable: build("receivable"),
-    };
-  }, [allTransactions]);
-
+  // Reset para a página 1 quando filtros/período/busca mudam.
   useEffect(() => {
     setPage(1);
-  }, [filterMonth, filterYear, filter, typeFilter, filterVehicle, searchQuery, pageSize]);
+  }, [filterMonth, filterYear, filter, typeFilter, filterVehicle, debouncedSearch, pageSize]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -412,7 +336,7 @@ export function useContasState(initialContaId?: number | null) {
     ...option,
     count:
       option.key === "all"
-        ? allTransactions.length
+        ? sumAll.total
         : option.key === "pending"
           ? stats.pending
           : option.key === "paid"
@@ -434,7 +358,9 @@ export function useContasState(initialContaId?: number | null) {
     allTransactions,
     filteredTransactions,
     paginatedTransactions,
+    totalRecords,
     totalPages,
+    isTransactionsFetching,
     page,
     setPage,
     pageSize,

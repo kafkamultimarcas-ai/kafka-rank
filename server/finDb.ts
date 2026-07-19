@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, gte, lte, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, lte, lt, or, like } from "drizzle-orm";
 import { finCategories, InsertFinCategory, finTransactions, InsertFinTransaction, fuelRecords, type InsertFuelRecord } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -30,38 +30,119 @@ export async function updateFinCategory(id: number, data: Partial<{ name: string
 
 // ===== TRANSACTIONS =====
 
-export async function listFinTransactions(filters: {
+export type FinTransactionFilters = {
   type?: "payable" | "receivable";
   status?: "pending" | "paid" | "overdue" | "cancelled";
+  approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
   categoryId?: number;
   startDate?: number;
   endDate?: number;
-  limit?: number;
-  offset?: number;
-}) {
-  const db = await getDb();
-  if (!db) return { items: [], total: 0 };
-  
-  const conditions = [];
+  search?: string;
+  vehicle?: string;
+  /** Vencidas: status pendente/vencido com vencimento no passado. */
+  overdueOnly?: boolean;
+  /** Vence hoje: status pendente com vencimento dentro do dia atual. */
+  dueTodayOnly?: boolean;
+};
+
+/** Monta as condições de filtro compartilhadas entre a listagem e o summary (sempre escopadas por tenant). */
+function buildFinTransactionConditions(filters: FinTransactionFilters) {
+  const conditions: any[] = [eq(finTransactions.tenantId, getCurrentTenantId())];
   if (filters.type) conditions.push(eq(finTransactions.type, filters.type));
   if (filters.status) conditions.push(eq(finTransactions.status, filters.status));
+  if (filters.approvalStatus) conditions.push(eq(finTransactions.approvalStatus, filters.approvalStatus));
   if (filters.categoryId) conditions.push(eq(finTransactions.categoryId, filters.categoryId));
   if (filters.startDate) conditions.push(gte(finTransactions.dueDate, filters.startDate));
   if (filters.endDate) conditions.push(lte(finTransactions.dueDate, filters.endDate));
-  
-  const where = conditions.length > 0 ? and(...conditions) : undefined;
-  
+  if (filters.vehicle) conditions.push(eq(finTransactions.vehicle, filters.vehicle));
+
+  if (filters.overdueOnly) {
+    conditions.push(or(eq(finTransactions.status, "pending"), eq(finTransactions.status, "overdue")));
+    conditions.push(lt(finTransactions.dueDate, Date.now()));
+  }
+  if (filters.dueTodayOnly) {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+    conditions.push(eq(finTransactions.status, "pending"));
+    conditions.push(gte(finTransactions.dueDate, start.getTime()));
+    conditions.push(lte(finTransactions.dueDate, end.getTime()));
+  }
+  if (filters.search && filters.search.trim()) {
+    const q = `%${filters.search.trim()}%`;
+    conditions.push(or(
+      like(finTransactions.description, q),
+      like(finTransactions.supplier, q),
+      like(finTransactions.vehicle, q),
+      like(finTransactions.notes, q),
+    ));
+  }
+  return and(...conditions);
+}
+
+export async function listFinTransactions(filters: FinTransactionFilters & { limit?: number; offset?: number }) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0, page: 1, pageSize: 50, totalPages: 1 };
+
+  const where = buildFinTransactionConditions(filters);
+  const pageSize = Math.max(1, filters.limit ?? 50);
+  const offset = Math.max(0, filters.offset ?? 0);
+
   const [items, countResult] = await Promise.all([
     db.select().from(finTransactions)
       .where(where)
       .orderBy(asc(finTransactions.dueDate))
-      .limit(filters.limit || 50)
-      .offset(filters.offset || 0),
-    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(and(eq(finTransactions.tenantId, getCurrentTenantId()), where)),
-
+      .limit(pageSize)
+      .offset(offset),
+    // IMPORTANTE: count usa exatamente o mesmo `where` (com tenant) — antes a query de
+    // items não filtrava por tenant e vazava dados entre lojas.
+    db.select({ count: sql<number>`count(*)` }).from(finTransactions).where(where),
   ]);
-  
-  return { items, total: Number(countResult[0]?.count || 0) };
+
+  const total = Number(countResult[0]?.count || 0);
+  return {
+    items,
+    total,
+    page: Math.floor(offset / pageSize) + 1,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+/**
+ * Contadores por status para os chips/resumo, respeitando os mesmos filtros de período/tipo.
+ * Retorna contagens globais e por tipo (payable/receivable) numa única passada de agregação.
+ */
+export async function getFinTransactionsSummary(filters: { startDate?: number; endDate?: number }) {
+  const db = await getDb();
+  const empty = { total: 0, pending: 0, paid: 0, overdue: 0, dueToday: 0, approval: 0 };
+  if (!db) return { all: empty, payable: empty, receivable: empty };
+
+  const base = buildFinTransactionConditions(filters);
+  const now = Date.now();
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(); dayEnd.setHours(23, 59, 59, 999);
+
+  const rows = await db.select({
+    type: finTransactions.type,
+    status: finTransactions.status,
+    approvalStatus: finTransactions.approvalStatus,
+    dueDate: finTransactions.dueDate,
+  }).from(finTransactions).where(base);
+
+  const mk = () => ({ total: 0, pending: 0, paid: 0, overdue: 0, dueToday: 0, approval: 0 });
+  const acc = { all: mk(), payable: mk(), receivable: mk() };
+  for (const r of rows) {
+    const buckets = [acc.all, r.type === "payable" ? acc.payable : acc.receivable];
+    for (const b of buckets) {
+      b.total++;
+      if (r.status === "pending") b.pending++;
+      if (r.status === "paid") b.paid++;
+      if ((r.status === "pending" || r.status === "overdue") && Number(r.dueDate) < now) b.overdue++;
+      if (r.status === "pending" && Number(r.dueDate) >= dayStart.getTime() && Number(r.dueDate) <= dayEnd.getTime()) b.dueToday++;
+      if (r.approvalStatus === "pending_approval") b.approval++;
+    }
+  }
+  return acc;
 }
 
 export async function getFinTransaction(id: number) {

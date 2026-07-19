@@ -16,6 +16,8 @@ import {
 import { ChannelIcon, ChannelBadge, ChannelIndicator } from "@/components/ChannelIcon";
 import { useBranding } from "@/contexts/TenantContext";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { isValidBrazilianPhone } from "@shared/validators";
+import { usePaginatedConversations } from "@/features/crm/hooks/usePaginatedConversations";
 
 // Detect media type from URL extension as fallback
 function detectMediaTypeFromUrl(url: string): string | null {
@@ -25,6 +27,21 @@ function detectMediaTypeFromUrl(url: string): string | null {
   if (lower.match(/\.(mp4|avi|mov|mkv|3gp)/)) return "video";
   if (lower.match(/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|csv|zip|rar)/)) return "document";
   return null;
+}
+
+function hasCallablePhone(phone: string | null | undefined) {
+  return Boolean(phone && isValidBrazilianPhone(phone));
+}
+
+function getInstagramUsername(username: string | null | undefined) {
+  if (!username) return null;
+  const normalized = username.trim().replace(/^@+/, "");
+  return normalized || null;
+}
+
+function getInstagramProfileUrl(username: string | null | undefined) {
+  const normalized = getInstagramUsername(username);
+  return normalized ? `https://instagram.com/${normalized}` : null;
 }
 
 // Reusable media renderer for chat messages
@@ -451,7 +468,18 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
                 {lead?.source && lead.source !== 'manual' && (
                   <ChannelIcon source={lead.source} size={12} />
                 )}
-                <span>{lead?.phone}</span>
+                {lead?.source === "instagram" && getInstagramProfileUrl(lead?.socialUsername) ? (
+                  <a
+                    href={getInstagramProfileUrl(lead?.socialUsername)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-pink-400 hover:text-pink-300 hover:underline transition-colors"
+                  >
+                    @{getInstagramUsername(lead?.socialUsername)}
+                  </a>
+                ) : (
+                  <span>{lead?.phone}</span>
+                )}
                 <span className="text-muted-foreground/30">•</span>
                 <span className={`px-1 py-0.5 rounded text-[9px] font-medium ${
                   lead?.stage === 'novo' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-primary/10 text-primary'
@@ -465,13 +493,13 @@ function InlineChatPanel({ leadId, sellerId, onClose }: { leadId: number; seller
               </div>
             </div>
             <div className="flex items-center gap-1">
-              {lead?.phone && (
+              {lead?.phone && hasCallablePhone(lead.phone) && (
                 <a href={`https://wa.me/55${lead.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener"
                   className="p-2 rounded-lg hover:bg-green-500/10 text-green-400" title="Abrir WhatsApp">
                   <MessageCircle className="w-4 h-4" />
                 </a>
               )}
-              {lead?.phone && (
+              {lead?.phone && hasCallablePhone(lead.phone) && (
                 <a href={`tel:${lead.phone}`}
                   className="p-2 rounded-lg hover:bg-blue-500/10 text-blue-400" title="Ligar">
                   <Phone className="w-4 h-4" />
@@ -775,6 +803,7 @@ export default function CrmCommandCenter() {
   const [assignmentFilter, setAssignmentFilter] = useState<AssignmentFilter>("all");
   const [leadStatusFilter, setLeadStatusFilter] = useState<LeadStatusFilter>("all");
   const [chatLeadId, setChatLeadId] = useState<number | null>(null);
+  const leadListSentinelRef = useRef<HTMLDivElement>(null);
 
   const { data: sellerSession } = trpc.sellers.me.useQuery();
   const sellerId = sellerSession?.id || 0;
@@ -791,6 +820,27 @@ export default function CrmCommandCenter() {
   );
   const leads = isSDR ? sdrLeads : sellerLeads;
   const refetchLeads = isSDR ? refetchSDR : refetchSellerLeads;
+
+  const {
+    items: paginatedLeadItems,
+    total: paginatedLeadTotal,
+    hasMore: paginatedHasMore,
+    isLoadingMore: paginatedIsLoadingMore,
+    isInitialLoading: isPaginatedLeadListLoading,
+    loadMore: loadMorePaginatedLeads,
+    refetchFirstPage: refetchPaginatedLeads,
+  } = usePaginatedConversations({
+    mode: isSDR ? "sdr" : "seller",
+    sellerId: isSDR ? undefined : sellerId,
+    archived: false,
+    query: activeTab === "leads" ? searchQuery : "",
+    score: activeTab === "leads" ? filterScore : null,
+    source: activeTab === "leads" ? filterSource : null,
+    filterAssignment: isSDR ? assignmentFilter : "all",
+    enabled: sellerId > 0 && activeTab === "leads",
+    pageSize: 500,
+    refreshInterval: 10000,
+  });
 
   // Sellers list for SDR assign dropdown
   const { data: allSellers } = trpc.sellers.list.useQuery({ activeOnly: true }, { enabled: isSDR });
@@ -824,9 +874,24 @@ export default function CrmCommandCenter() {
     { sellerId }, { enabled: sellerId > 0 && !isSDR }
   );
 
+  useEffect(() => {
+    if (activeTab !== "leads") return;
+    const sentinel = leadListSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        loadMorePaginatedLeads();
+      }
+    }, { rootMargin: "400px" });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeTab, loadMorePaginatedLeads, paginatedLeadItems.length]);
+
   // Assign lead mutation for SDR
   const assignLead = trpc.crmLeads.assignToSeller.useMutation({
-    onSuccess: () => { refetchLeads(); toast.success("Lead atribuído com sucesso!"); },
+    onSuccess: () => { refetchLeads(); refetchPaginatedLeads(); toast.success("Lead atribuído com sucesso!"); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -883,11 +948,11 @@ export default function CrmCommandCenter() {
   }, [leads, searchResults, searchQuery, filterScore, filterSource, isSDR, assignmentFilter, leadStatusFilter]);
 
   const moveStage = trpc.crmLeads.moveStage.useMutation({
-    onSuccess: () => { refetchLeads(); toast.success("Etapa atualizada!"); },
+    onSuccess: () => { refetchLeads(); refetchPaginatedLeads(); toast.success("Etapa atualizada!"); },
     onError: (e: any) => toast.error(e.message),
   });
   const addActivity = trpc.crmLeads.addActivity.useMutation({
-    onSuccess: () => { refetchLeads(); },
+    onSuccess: () => { refetchLeads(); refetchPaginatedLeads(); },
   });
   const renderTemplateQuery = trpc.useUtils();
 
@@ -919,6 +984,17 @@ export default function CrmCommandCenter() {
   const handleAssign = useCallback((leadId: number, newSellerId: number) => {
     assignLead.mutate({ leadId, newSellerId, currentSellerId: sellerId });
   }, [assignLead, sellerId]);
+
+  const leadListItems = useMemo(() => {
+    if (!paginatedLeadItems) return [];
+    if (!isSDR && leadStatusFilter === "accepted") {
+      return paginatedLeadItems.filter((lead: any) => lead.acknowledgedAt);
+    }
+    if (!isSDR && leadStatusFilter === "pending") {
+      return paginatedLeadItems.filter((lead: any) => !lead.acknowledgedAt);
+    }
+    return paginatedLeadItems;
+  }, [isSDR, leadStatusFilter, paginatedLeadItems]);
 
   if (!sellerSession) {
     return (
@@ -1117,7 +1193,7 @@ export default function CrmCommandCenter() {
             <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar">
               <button onClick={() => setLeadStatusFilter("all")}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${leadStatusFilter === "all" ? "bg-primary/20 border-primary/40 text-primary" : "bg-accent/50 border-border text-muted-foreground"}`}>
-                <LayoutGrid className="w-3 h-3" /> Todos {(leads || []).length}
+                <LayoutGrid className="w-3 h-3" /> Todos {paginatedLeadTotal}
               </button>
               <button onClick={() => setLeadStatusFilter("accepted")}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${leadStatusFilter === "accepted" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" : "bg-accent/50 border-border text-muted-foreground"}`}>
@@ -1192,8 +1268,9 @@ export default function CrmCommandCenter() {
 
           {/* Lead list */}
           <div className="space-y-2">
-            {filteredLeads.length > 0 ? (
-              filteredLeads.map((lead: any) => (
+            {leadListItems.length > 0 ? (
+              <>
+                {leadListItems.map((lead: any) => (
                 <LeadCard key={lead.id} lead={lead} stages={stages || []} sellerId={sellerId}
                   templates={templates || []}
                   isSDR={isSDR}
@@ -1208,14 +1285,33 @@ export default function CrmCommandCenter() {
                   showTemplates={showTemplates === lead.id}
                   onToggleTemplates={() => setShowTemplates(showTemplates === lead.id ? null : lead.id)}
                 />
-              ))
+                ))}
+                <div ref={leadListSentinelRef} className="h-4" />
+                {paginatedHasMore && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={loadMorePaginatedLeads}
+                      disabled={paginatedIsLoadingMore}
+                    >
+                      {paginatedIsLoadingMore ? "Carregando..." : "Carregar mais 500"}
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center py-12">
                 <User className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">{searchQuery ? "Nenhum lead encontrado" : "Nenhum lead cadastrado"}</p>
-                <Button size="sm" onClick={() => setShowNewLead(true)} variant="outline" className="mt-3">
-                  <Plus className="w-3.5 h-3.5 mr-1" /> Cadastrar Lead
-                </Button>
+                <p className="text-sm text-muted-foreground">
+                  {isPaginatedLeadListLoading ? "Carregando leads..." : searchQuery ? "Nenhum lead encontrado" : "Nenhum lead cadastrado"}
+                </p>
+                {!isPaginatedLeadListLoading && (
+                  <Button size="sm" onClick={() => setShowNewLead(true)} variant="outline" className="mt-3">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Cadastrar Lead
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -1237,7 +1333,7 @@ export default function CrmCommandCenter() {
       {showNewLead && (
         <NewLeadModal sellerId={isSDR ? 0 : sellerId} department={dept}
           onClose={() => setShowNewLead(false)}
-          onCreated={() => { setShowNewLead(false); refetchLeads(); }} />
+          onCreated={() => { setShowNewLead(false); refetchLeads(); refetchPaginatedLeads(); }} />
       )}
 
       {/* Inline Chat Panel */}
@@ -1759,7 +1855,22 @@ function LeadCard({ lead, stages, sellerId, templates, isSDR, vendorSellers, sel
             <div className="flex items-center gap-2 mt-0.5">
               {lead.phone && (
                 <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Phone className="w-2.5 h-2.5" /> {lead.phone}
+                  {lead.source === "instagram" && getInstagramProfileUrl(lead.socialUsername) ? (
+                    <a
+                      href={getInstagramProfileUrl(lead.socialUsername)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-pink-400 hover:text-pink-300 hover:underline transition-colors"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      @{getInstagramUsername(lead.socialUsername)}
+                    </a>
+                  ) : (
+                    <>
+                      {hasCallablePhone(lead.phone) && <Phone className="w-2.5 h-2.5" />}
+                      {lead.phone}
+                    </>
+                  )}
                 </span>
               )}
               <span className="text-[9px] text-muted-foreground/50">

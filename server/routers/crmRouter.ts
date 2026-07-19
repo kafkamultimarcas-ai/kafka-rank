@@ -278,6 +278,21 @@ export const crmLeadsRouter = router({
     return crmDb.listLeadsBySeller(sellerId, opts);
   }),
 
+  listBySellerPaginated: publicProcedure.input(z.object({
+    sellerId: z.number(),
+    department: z.string().optional(),
+    archived: z.boolean().optional(),
+    stage: z.string().optional(),
+    score: z.string().optional(),
+    source: z.string().optional(),
+    query: z.string().optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+  })).query(async ({ input }) => {
+    const { sellerId, ...opts } = input;
+    return crmDb.listConversationSummaries({ sellerId, ...opts });
+  }),
+
   listAll: adminProcedure.input(z.object({
     archived: z.boolean().optional(),
     department: z.string().optional(),
@@ -286,6 +301,30 @@ export const crmLeadsRouter = router({
     offset: z.number().optional(),
   }).optional()).query(async ({ input }) => {
     return crmDb.listAllLeads(input || {});
+  }),
+
+  listAllPaginated: adminProcedure.input(z.object({
+    archived: z.boolean().optional(),
+    department: z.string().optional(),
+    sellerId: z.number().optional(),
+    score: z.string().optional(),
+    source: z.string().optional(),
+    query: z.string().optional(),
+    filterAssignment: z.enum(["all", "unassigned", "assigned"]).optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+  }).optional()).query(async ({ input }) => {
+    return crmDb.listConversationSummaries({
+      archived: input?.archived,
+      department: input?.department,
+      sellerId: input?.sellerId,
+      score: input?.score,
+      source: input?.source,
+      query: input?.query,
+      filterAssignment: input?.filterAssignment,
+      limit: input?.limit,
+      offset: input?.offset,
+    });
   }),
 
   search: publicProcedure.input(z.object({
@@ -443,6 +482,26 @@ export const crmLeadsRouter = router({
     if (!input?.filterAssignment || input.filterAssignment === "all") return allLeads;
     if (input.filterAssignment === "unassigned") return allLeads.filter(l => l.sellerId === 0);
     return allLeads.filter(l => l.sellerId > 0);
+  }),
+
+  listForSDRPaginated: publicProcedure.input(z.object({
+    archived: z.boolean().optional(),
+    filterAssignment: z.enum(["all", "unassigned", "assigned"]).optional(),
+    score: z.string().optional(),
+    source: z.string().optional(),
+    query: z.string().optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+  }).optional()).query(async ({ input }) => {
+    return crmDb.listConversationSummaries({
+      archived: input?.archived ?? false,
+      filterAssignment: input?.filterAssignment,
+      score: input?.score,
+      source: input?.source,
+      query: input?.query,
+      limit: input?.limit,
+      offset: input?.offset,
+    });
   }),
 
   // Vendedor confirma que recebeu o lead (impede transferência automática)
@@ -1332,6 +1391,28 @@ export const crmVoiceRouter = router({
 import { invokeLLM } from "../_core/llm";
 
 export const crmChatRouter = router({
+  listConversations: publicProcedure.input(z.object({
+    sellerId: z.number().optional(),
+    archived: z.boolean().optional(),
+    filterAssignment: z.enum(["all", "unassigned", "assigned"]).optional(),
+    score: z.string().optional(),
+    source: z.string().optional(),
+    query: z.string().optional(),
+    limit: z.number().min(1).max(500).optional(),
+    offset: z.number().min(0).optional(),
+  }).optional()).query(async ({ input }) => {
+    return crmDb.listConversationSummaries({
+      sellerId: input?.sellerId,
+      archived: input?.archived ?? false,
+      filterAssignment: input?.filterAssignment,
+      score: input?.score,
+      source: input?.source,
+      query: input?.query,
+      limit: input?.limit,
+      offset: input?.offset,
+    });
+  }),
+
   // Mark lead as read (reset unread count)
   markAsRead: publicProcedure.input(z.object({
     leadId: z.number(),

@@ -23,6 +23,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 interface PaginationControlsProps {
   page: number;
@@ -31,12 +32,14 @@ interface PaginationControlsProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
-  /** Opções de tamanho de página (default: [10, 20, 50, 100]) */
+  /** Opções de tamanho de página (default: [10, 25, 50]) */
   pageSizeOptions?: number[];
   /** Mostrar seletor de tamanho de página (default: true) */
   showPageSize?: boolean;
   /** Mostrar info "X de Y" (default: true) */
   showInfo?: boolean;
+  /** Estado de carregamento durante troca de página */
+  isLoading?: boolean;
   /** Classe CSS adicional */
   className?: string;
 }
@@ -48,9 +51,10 @@ export function PaginationControls({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 20, 50, 100],
+  pageSizeOptions = [10, 25, 50],
   showPageSize = true,
   showInfo = true,
+  isLoading = false,
   className = "",
 }: PaginationControlsProps) {
   if (totalPages <= 0) return null;
@@ -81,21 +85,31 @@ export function PaginationControls({
 
   const startItem = (page - 1) * pageSize + 1;
   const endItem = Math.min(page * pageSize, total);
+  const handlePageChange = (nextPage: number) => {
+    if (isLoading || nextPage === page) return;
+    onPageChange(nextPage);
+  };
 
   return (
     <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 ${className}`}>
       {/* Info */}
       {showInfo && (
-        <div className="text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {total > 0 ? (
             <span>Mostrando <strong>{startItem}</strong>-<strong>{endItem}</strong> de <strong>{total}</strong></span>
           ) : (
             <span>Nenhum registro</span>
           )}
+          {isLoading && (
+            <span className="inline-flex items-center gap-1.5 text-primary">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Carregando página...
+            </span>
+          )}
         </div>
       )}
 
-      <div className="flex items-center gap-4">
+      <div className={`flex items-center gap-4 transition-opacity ${isLoading ? "opacity-70" : ""}`}>
         {/* Page size selector */}
         {showPageSize && onPageSizeChange && (
           <div className="flex items-center gap-2">
@@ -103,6 +117,7 @@ export function PaginationControls({
             <Select
               value={pageSize.toString()}
               onValueChange={(v) => {
+                if (isLoading) return;
                 onPageSizeChange(Number(v));
                 onPageChange(1); // Reset to page 1 when changing size
               }}
@@ -129,8 +144,8 @@ export function PaginationControls({
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
-                  onClick={() => page > 1 && onPageChange(page - 1)}
-                  className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  onClick={() => page > 1 && handlePageChange(page - 1)}
+                  className={page <= 1 || isLoading ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
 
@@ -143,8 +158,8 @@ export function PaginationControls({
                   <PaginationItem key={p}>
                     <PaginationLink
                       isActive={p === page}
-                      onClick={() => onPageChange(p)}
-                      className="cursor-pointer"
+                      onClick={() => handlePageChange(p)}
+                      className={isLoading ? "pointer-events-none cursor-wait" : "cursor-pointer"}
                     >
                       {p}
                     </PaginationLink>
@@ -154,8 +169,8 @@ export function PaginationControls({
 
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => page < totalPages && onPageChange(page + 1)}
-                  className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  onClick={() => page < totalPages && handlePageChange(page + 1)}
+                  className={page >= totalPages || isLoading ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
             </PaginationContent>

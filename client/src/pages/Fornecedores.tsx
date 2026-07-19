@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaginationControls } from "@/components/PaginationControls";
+import { usePagination } from "@/hooks/usePagination";
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, User, Receipt, FileText, CheckCircle, Clock, AlertTriangle, Download, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { isValidCPF, isValidCNPJ, isValidEmail, isValidBrazilianPhone } from "@shared/validators";
@@ -132,8 +133,10 @@ export function FornecedoresInner() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const { page, pageSize, setPage, setPageSize } = usePagination({
+    initialPageSize: 25,
+    resetDeps: [debouncedSearch, filterType],
+  });
 
   // Modals
   const [showCreate, setShowCreate] = useState(false);
@@ -152,12 +155,18 @@ export function FornecedoresInner() {
   }, [search]);
 
   // Query
-  const { data, isLoading, refetch } = trpc.suppliers.list.useQuery({
+  const { data, isLoading, isFetching, refetch } = trpc.suppliers.list.useQuery({
     search: debouncedSearch || undefined,
     personType: filterType !== "all" ? (filterType as "fisica" | "juridica") : undefined,
     page,
     pageSize,
   });
+
+  // Clamp: se a página atual ficar além do total (ex.: após excluir), volta pra última válida.
+  useEffect(() => {
+    const tp = data?.totalPages ?? 1;
+    if (page > tp) setPage(tp);
+  }, [data?.totalPages, page, setPage]);
 
   // Mutations
   const createMut = trpc.suppliers.create.useMutation({
@@ -389,7 +398,7 @@ export function FornecedoresInner() {
 
       {/* Pagination */}
       {total > 0 && (
-        <PaginationControls page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+        <PaginationControls page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} isLoading={isFetching} />
       )}
 
       {/* CREATE MODAL */}

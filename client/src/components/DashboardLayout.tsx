@@ -10,6 +10,9 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -24,7 +27,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { useBranding } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -33,45 +36,79 @@ import { StoreLoginPicker } from "./StoreLoginPicker";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Visão Geral", path: "/admin" },
-  { icon: CheckCircle, label: "Aprovar Vendas", path: "/admin/aprovacoes" },
-  { icon: Users, label: "Equipe", path: "/admin/vendedores" },
-  { icon: Trophy, label: "Competições", path: "/admin/competicoes" },
-  { icon: Tv, label: "TV / Corrida", path: "/tv" },
-  { icon: ShoppingCart, label: "Vendas", path: "/admin/vendas" },
-  { icon: Banknote, label: "F&I", path: "/admin/fei" },
-  { icon: GraduationCap, label: "Treinamentos", path: "/admin/treinamentos" },
-  { icon: ClipboardList, label: "Planos de Ação", path: "/admin/planos" },
-  { icon: Target, label: "Metas", path: "/admin/metas" },
-  { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
-  { icon: Gift, label: "Carros Bônus", path: "/admin/bonus-veiculos" },
-  { icon: CreditCard, label: "Assinatura", path: "/assinatura" },
-  { icon: Settings, label: "Ajustes", path: "/admin/configuracoes" },
-  { icon: LayoutGrid, label: "CRM Gerente", path: "/crm/admin" },
-  { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
-  { icon: Wrench, label: "Pós-Venda", path: "/admin/pos-venda" },
-  { icon: DollarSign, label: "Gastos Pós-Venda", path: "/admin/pv-financeiro" },
-  { icon: Flag, label: "Marketing", path: "/admin/marketing" },
-  { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
-  { icon: Users, label: "Financeiro Vendedores", path: "/admin/financeiro-vendedores" },
-  { icon: Warehouse, label: "Fornecedores", path: "/admin/fornecedores" },
-  { icon: DollarSign, label: "Caixa da Loja", path: "/financeiro" },
-  { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
-  { icon: Bot, label: "Ajustar IA", path: "/admin/iam" },
-  { icon: FileText, label: "Documentos", path: "/admin/documentos" },
-  { icon: Car, label: "Estoque", path: "/admin/estoque" },
-  { icon: Car, label: "Custo por Veículo", path: "/admin/custo-veiculo" },
-  { icon: CalendarDays, label: "Virada de Mês", path: "/admin/virada-mes" },
-  { icon: Cake, label: "Aniversariantes", path: "/admin/aniversariantes" },
-];
+type MenuItem = { icon: typeof Home; label: string; path: string; ownerOnly?: boolean };
+type MenuGroup = { key: string; label: string; items: MenuItem[] };
 
-// Items only visible to owner (not managers)
-const ownerOnlyItems = [
-  { icon: UserCog, label: "Gerentes", path: "/admin/gerentes" },
+// Menu agrupado por módulo. Cada grupo pode ser recolhido/expandido na sidebar.
+const MENU_GROUPS: MenuGroup[] = [
+  {
+    key: "principal", label: "Principal", items: [
+      { icon: LayoutDashboard, label: "Visão Geral", path: "/admin" },
+      { icon: CheckCircle, label: "Aprovar Vendas", path: "/admin/aprovacoes" },
+      { icon: Tv, label: "TV / Corrida", path: "/tv" },
+    ],
+  },
+  {
+    key: "vendas", label: "Vendas", items: [
+      { icon: ShoppingCart, label: "Vendas", path: "/admin/vendas" },
+      { icon: Banknote, label: "F&I", path: "/admin/fei" },
+      { icon: Target, label: "Metas", path: "/admin/metas" },
+      { icon: Trophy, label: "Competições", path: "/admin/competicoes" },
+      { icon: Gift, label: "Carros Bônus", path: "/admin/bonus-veiculos" },
+    ],
+  },
+  {
+    key: "equipe", label: "Equipe", items: [
+      { icon: Users, label: "Equipe", path: "/admin/vendedores" },
+      { icon: UserCog, label: "Gerentes", path: "/admin/gerentes", ownerOnly: true },
+      { icon: GraduationCap, label: "Treinamentos", path: "/admin/treinamentos" },
+      { icon: ClipboardList, label: "Planos de Ação", path: "/admin/planos" },
+    ],
+  },
+  {
+    key: "crm", label: "CRM & Marketing", items: [
+      { icon: LayoutGrid, label: "CRM Gerente", path: "/crm/admin" },
+      { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
+      { icon: Cake, label: "Aniversariantes", path: "/admin/aniversariantes" },
+      { icon: Flag, label: "Marketing", path: "/admin/marketing" },
+      { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
+    ],
+  },
+  {
+    key: "estoque", label: "Estoque", items: [
+      { icon: Car, label: "Estoque", path: "/admin/estoque" },
+      { icon: Car, label: "Custo por Veículo", path: "/admin/custo-veiculo" },
+      { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
+    ],
+  },
+  {
+    key: "financeiro", label: "Financeiro", items: [
+      { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
+      { icon: DollarSign, label: "Caixa da Loja", path: "/financeiro" },
+      { icon: Users, label: "Financeiro Vendedores", path: "/admin/financeiro-vendedores" },
+      { icon: Warehouse, label: "Fornecedores", path: "/admin/fornecedores" },
+      { icon: CalendarDays, label: "Virada de Mês", path: "/admin/virada-mes" },
+    ],
+  },
+  {
+    key: "posvenda", label: "Pós-Venda", items: [
+      { icon: Wrench, label: "Pós-Venda", path: "/admin/pos-venda" },
+      { icon: DollarSign, label: "Gastos Pós-Venda", path: "/admin/pv-financeiro" },
+    ],
+  },
+  {
+    key: "ferramentas", label: "Ferramentas & Conta", items: [
+      { icon: Bot, label: "Ajustar IA", path: "/admin/iam" },
+      { icon: FileText, label: "Documentos", path: "/admin/documentos" },
+      { icon: Settings, label: "Ajustes", path: "/admin/configuracoes" },
+      { icon: CreditCard, label: "Assinatura", path: "/assinatura" },
+    ],
+  },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
+const SIDEBAR_GROUPS_OPEN_KEY = "sidebar-groups-open";
+const MAX_OPEN_GROUPS = 2;
 const DEFAULT_WIDTH = 260;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
@@ -255,11 +292,71 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const allItems = showOwnerItems ? [...menuItems, ...ownerOnlyItems] : menuItems;
-  const visibleItems = isSellerFinanceiro
-    ? allItems.filter(item => item.path === "/admin/financeiro")
-    : allItems;
-  const activeMenuItem = visibleItems.find(item => buildTenantPath(tenantSlug, item.path) === location);
+  // Grupos visíveis: aplica owner-only e o filtro do login financeiro, escondendo grupos vazios.
+  const visibleGroups = MENU_GROUPS.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (item.ownerOnly && !showOwnerItems) return false;
+      if (isSellerFinanceiro && item.path !== "/admin/financeiro") return false;
+      return true;
+    }),
+  })).filter(group => group.items.length > 0);
+  const activeMenuItem = visibleGroups
+    .flatMap(g => g.items)
+    .find(item => buildTenantPath(tenantSlug, item.path) === location);
+  const activeGroupKey = visibleGroups.find(g =>
+    g.items.some(item => buildTenantPath(tenantSlug, item.path) === location)
+  )?.key;
+
+  // Estado de recolher/expandir dos módulos (persistido).
+  // Primeira carga: apenas "Principal" aberto.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(SIDEBAR_GROUPS_OPEN_KEY);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      return { principal: true };
+    } catch {
+      return { principal: true };
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_GROUPS_OPEN_KEY, JSON.stringify(openGroups));
+    } catch { /* ignore */ }
+  }, [openGroups]);
+  // O grupo com a rota ativa fica sempre aberto; os demais respeitam a preferência.
+  const isGroupOpen = (key: string) => key === activeGroupKey || openGroups[key] === true;
+  const toggleGroup = (key: string) => {
+    setOpenGroups(prev => {
+      const currentlyOpenKeys = visibleGroups
+        .map(group => group.key)
+        .filter(groupKey => groupKey === activeGroupKey || prev[groupKey] === true);
+
+      const nextIsOpening = !currentlyOpenKeys.includes(key);
+      if (!nextIsOpening) {
+        return { ...prev, [key]: false };
+      }
+
+      const nextState = { ...prev, [key]: true };
+      const nextOpenKeys = visibleGroups
+        .map(group => group.key)
+        .filter(groupKey => groupKey === activeGroupKey || nextState[groupKey] === true);
+
+      if (nextOpenKeys.length <= MAX_OPEN_GROUPS) {
+        return nextState;
+      }
+
+      const keyToClose = nextOpenKeys.find(groupKey => groupKey !== key && groupKey !== activeGroupKey);
+      if (!keyToClose) {
+        return nextState;
+      }
+
+      return { ...nextState, [keyToClose]: false };
+    });
+  };
+
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -347,25 +444,49 @@ function DashboardLayoutContent({
                   <span>Tela Inicial</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <div className="my-2 border-t border-border" />
-              {visibleItems.map(item => {
-                const itemPath = buildTenantPath(tenantSlug, item.path);
-                const isActive = location === itemPath;
-                return (
-                  <SidebarMenuItem key={itemPath}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(itemPath)}
-                      tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
-                    >
-                      <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
             </SidebarMenu>
+            <div className="mx-2 my-1 border-t border-border group-data-[collapsible=icon]:hidden" />
+
+            {visibleGroups.map(group => {
+              const open = isGroupOpen(group.key);
+              return (
+                <SidebarGroup key={group.key} className="px-0 py-0.5">
+                  <SidebarGroupLabel asChild>
+                    <button
+                      onClick={() => toggleGroup(group.key)}
+                      className="flex w-full cursor-pointer items-center justify-between px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+                      aria-expanded={open}
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "" : "-rotate-90"}`} />
+                    </button>
+                  </SidebarGroupLabel>
+                  {(open || isCollapsed) && (
+                    <SidebarGroupContent>
+                      <SidebarMenu className="px-2">
+                        {group.items.map(item => {
+                          const itemPath = buildTenantPath(tenantSlug, item.path);
+                          const isActive = location === itemPath;
+                          return (
+                            <SidebarMenuItem key={itemPath}>
+                              <SidebarMenuButton
+                                isActive={isActive}
+                                onClick={() => setLocation(itemPath)}
+                                tooltip={item.label}
+                                className="h-10 transition-all font-normal"
+                              >
+                                <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
+                                <span>{item.label}</span>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          );
+                        })}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  )}
+                </SidebarGroup>
+              );
+            })}
           </SidebarContent>
 
           <SidebarFooter className="p-3">

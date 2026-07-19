@@ -414,19 +414,25 @@ function PaymentSuccessScreen({ planName, receiptUrl, onDismiss }: { planName: s
   // Confetti effect on mount
   useEffect(() => {
     let mounted = true;
-    import("canvas-confetti").then((mod) => {
-      if (!mounted) return;
-      const confetti = mod.default;
-      // First burst
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-      // Second burst after 300ms
-      setTimeout(() => {
-        if (mounted) confetti({ particleCount: 50, spread: 100, origin: { y: 0.5, x: 0.3 } });
-      }, 300);
-      setTimeout(() => {
-        if (mounted) confetti({ particleCount: 50, spread: 100, origin: { y: 0.5, x: 0.7 } });
-      }, 600);
-    });
+    const confettiModule = "canvas-confetti";
+
+    import(/* @vite-ignore */ confettiModule)
+      .then((mod) => {
+        if (!mounted) return;
+        const confetti = mod.default;
+        // First burst
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        // Second burst after 300ms
+        setTimeout(() => {
+          if (mounted) confetti({ particleCount: 50, spread: 100, origin: { y: 0.5, x: 0.3 } });
+        }, 300);
+        setTimeout(() => {
+          if (mounted) confetti({ particleCount: 50, spread: 100, origin: { y: 0.5, x: 0.7 } });
+        }, 600);
+      })
+      .catch(() => {
+        // Optional visual effect only; the screen should work without the dependency.
+      });
     return () => { mounted = false; };
   }, []);
 
