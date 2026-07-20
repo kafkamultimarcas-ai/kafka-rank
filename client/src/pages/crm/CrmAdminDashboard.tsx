@@ -25,6 +25,11 @@ import AssinaturaContent from "@/components/billing/AssinaturaContent";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { useBranding } from "@/contexts/TenantContext";
 import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SyncLogSection } from "@/features/integrations/SyncLogSection";
+import { MetaIntegrationConfig } from "@/features/integrations/MetaIntegrationConfig";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -1904,8 +1909,13 @@ function SettingsView() {
 }
 
 // ===== ABA 1: USUÁRIOS ADMINISTRADORES =====
-function SettingsUsersTab() {
-  const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
+export function SettingsUsersTab() {
+  const { data: admins, refetch, isLoading } = trpc.adminAuth.list.useQuery();
+  const pagination = usePagination({ initialPageSize: 10, total: admins?.length ?? 0 });
+  const pagedAdmins = useMemo(
+    () => (admins ?? []).slice(pagination.offset, pagination.offset + pagination.limit),
+    [admins, pagination.offset, pagination.limit],
+  );
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     name: "", username: "", password: "", email: "", phone: "", role: "admin",
@@ -2015,8 +2025,23 @@ function SettingsUsersTab() {
       )}
 
       {/* Admin List */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-xl border border-border bg-card">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="space-y-2">
-        {admins?.map((a: any) => {
+        {pagedAdmins.map((a: any) => {
           let perms: Record<string, boolean> = {};
           try { perms = JSON.parse(a.permissions || "{}"); } catch {}
           const activePerms = Object.entries(perms).filter(([, v]) => v).map(([k]) => PERM_LABELS[k] || k);
@@ -2131,12 +2156,24 @@ function SettingsUsersTab() {
             );
           })}
         </div>
-      </div>
+      )}
+
+      {!isLoading && (admins?.length ?? 0) > 0 && (
+        <PaginationControls
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={admins?.length ?? 0}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+        />
+      )}
+    </div>
   );
 }
 
 // ===== ABA 2: DADOS DA LOJA =====
-function SettingsStoreTab() {
+export function SettingsStoreTab() {
   return (
     <div className="space-y-4">
       <div>
@@ -2149,7 +2186,7 @@ function SettingsStoreTab() {
 }
 
 // ===== ABA 3: INTEGRAÇÕES =====
-function SettingsIntegrationsTab() {
+export function SettingsIntegrationsTab() {
   const [, navigate] = useLocation();
   return (
     <div className="space-y-4">
@@ -2179,14 +2216,14 @@ function SettingsIntegrationsTab() {
         </div>
       </div>
 
-      {/* Meta Ads */}
-      <MetaIntegrationPanel />
+      {/* Meta (Facebook + Instagram) — configuração completa embutida */}
+      <MetaIntegrationConfig />
     </div>
   );
 }
 
 // ===== ABA 4: SEGURANÇA E SENHA =====
-function SettingsSecurityTab() {
+export function SettingsSecurityTab() {
   const [myNewPassword, setMyNewPassword] = useState("");
   const [myConfirmPassword, setMyConfirmPassword] = useState("");
 
@@ -2337,104 +2374,6 @@ function TokenIntegrationRow({ type, name, description, endpointLabel, endpointP
             </Button>
           </div>
           <SyncLogSection integrationType={type === 'sig' ? 'sig' : type === 'email_parser' ? 'olx' : type} mutationKey={type === 'sig' ? 'syncSig' : 'syncOlx'} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ===== META ADS (FACEBOOK/INSTAGRAM LEAD ADS) — CONFIG AVANÇADA =====
-function MetaIntegrationPanel() {
-  const utils = trpc.useUtils();
-  const { data: config, refetch } = trpc.crmIntegrations.getMetaConfig.useQuery();
-  const saveConfig = trpc.crmIntegrations.saveMetaConfig.useMutation({
-    onSuccess: () => { toast.success("Configuração do Meta Ads salva!"); refetch(); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-  const testConnection = trpc.crmIntegrations.testMetaConnection.useMutation({
-    onSuccess: (data: any) => { if (data.success) toast.success("Conexão com Meta Ads validada!"); else toast.error(data.error || "Falha na conexão"); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-
-  const [expanded, setExpanded] = useState(false);
-  const [form, setForm] = useState({ appId: "", appSecret: "", pageAccessToken: "", verifyToken: "", pageId: "" });
-  const [initialized, setInitialized] = useState(false);
-
-  if (config && !initialized) {
-    setForm({ appId: config.appId || "", appSecret: "", pageAccessToken: "", verifyToken: config.verifyToken || "", pageId: config.pageId || "" });
-    setInitialized(true);
-  }
-
-  const isActive = !!(config?.hasAppSecret && config?.hasPageAccessToken);
-
-  return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? "bg-blue-500/20" : "bg-amber-500/20"}`}>
-            <Facebook className={`w-5 h-5 ${isActive ? "text-blue-400" : "text-amber-400"}`} />
-          </div>
-          <div className="text-left">
-            <h3 className="text-sm font-bold text-foreground">Meta Ads (Facebook/Instagram Lead Ads)</h3>
-            <p className="text-[10px] text-muted-foreground">Receba leads direto dos anúncios, sem precisar de Zapier/Make</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-[10px] px-2 py-0.5 rounded ${isActive ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
-            {isActive ? "Configurado" : "Pendente"}
-          </span>
-          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
-        </div>
-      </button>
-      {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <p className="text-[11px] text-blue-300 leading-relaxed">
-              Crie um App em <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a>, conecte sua página e copie as credenciais abaixo. Veja o passo a passo completo na documentação de integrações.
-            </p>
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">App ID</label>
-            <Input value={form.appId} onChange={e => setForm({ ...form, appId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 1234567890" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">App Secret</label>
-            <Input value={form.appSecret} type="password" onChange={e => setForm({ ...form, appSecret: e.target.value })}
-              placeholder={config?.hasAppSecret ? "***já configurado*** (deixe vazio para manter)" : "Cole o App Secret aqui"} className="h-9 text-sm font-mono" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Page Access Token</label>
-            <Input value={form.pageAccessToken} type="password" onChange={e => setForm({ ...form, pageAccessToken: e.target.value })}
-              placeholder={config?.hasPageAccessToken ? "***já configurado*** (deixe vazio para manter)" : "Cole o Page Access Token aqui"} className="h-9 text-sm font-mono" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Page ID</label>
-            <Input value={form.pageId} onChange={e => setForm({ ...form, pageId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 987654321" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Verify Token (você escolhe, usado na verificação do webhook)</label>
-            <Input value={form.verifyToken} onChange={e => setForm({ ...form, verifyToken: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: kafka-verify-123" />
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" className="flex-1" onClick={() => {
-              const updates: any = {};
-              if (form.appId) updates.appId = form.appId;
-              if (form.appSecret) updates.appSecret = form.appSecret;
-              if (form.pageAccessToken) updates.pageAccessToken = form.pageAccessToken;
-              if (form.verifyToken) updates.verifyToken = form.verifyToken;
-              if (form.pageId) updates.pageId = form.pageId;
-              if (Object.keys(updates).length === 0) { toast.error("Preencha pelo menos um campo"); return; }
-              saveConfig.mutate(updates);
-            }} disabled={saveConfig.isPending}>
-              <Save className="w-3.5 h-3.5 mr-1" />
-              {saveConfig.isPending ? "Salvando..." : "Salvar Credenciais"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => testConnection.mutate()} disabled={testConnection.isPending || !isActive}>
-              <Zap className="w-3.5 h-3.5 mr-1" />
-              {testConnection.isPending ? "Testando..." : "Testar Conexão"}
-            </Button>
-          </div>
-          <SyncLogSection integrationType="meta" mutationKey="syncMeta" />
         </div>
       )}
     </div>
@@ -2608,33 +2547,6 @@ function WhatsAppZapiPanel() {
           </div>
         )}
       </div>
-  );
-}
-// ===== GENERIC SYNC LOG SECTION (reusable) =====
-function SyncLogSection({ integrationType, mutationKey }: { integrationType: string; mutationKey: "syncWhatsapp" | "syncSig" | "syncOlx" | "syncMeta" }) {
-  const { data: logs, refetch } = trpc.crmIntegrations.getSyncLogs.useQuery({ integrationType });
-  const sync = (trpc.crmIntegrations as any)[mutationKey].useMutation({
-    onSuccess: () => { toast.success("Verifica\u00e7\u00e3o conclu\u00edda!"); refetch(); },
-    onError: (e: any) => { toast.error("Erro: " + e.message); refetch(); },
-  });
-  const lastLog = logs?.[0];
-  return (
-    <div className="pt-2 border-t border-border/50 space-y-2">
-      <Button size="sm" variant="outline" className="text-xs" onClick={() => sync.mutate()} disabled={sync.isPending}>
-        <RefreshCw className={`w-3.5 h-3.5 mr-1 ${sync.isPending ? 'animate-spin' : ''}`} />
-        {sync.isPending ? 'Verificando...' : 'Sincronizar Agora'}
-      </Button>
-      {lastLog && (
-        <div className="text-[11px] text-muted-foreground">
-          <span className={lastLog.status === 'success' ? 'text-green-400' : 'text-red-400'}>
-            {lastLog.status === 'success' ? '\u2713 \u00daltima verifica\u00e7\u00e3o' : '\u2717 Falha'}
-          </span>
-          {' '}em {new Date(lastLog.createdAt).toLocaleString("pt-BR")}
-          {lastLog.summary ? ` \u2014 ${lastLog.summary}` : ''}
-          {lastLog.status === 'error' && lastLog.errorMessage ? ` \u2014 ${lastLog.errorMessage}` : ''}
-        </div>
-      )}
-    </div>
   );
 }
 // ===== ESTOQUE (URL de sincronização) PANEL =====

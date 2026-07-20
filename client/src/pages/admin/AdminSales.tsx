@@ -7,9 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, ShoppingCart, TrendingUp, Trash2, Clock, CheckCircle2, XCircle, Pencil, Search } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
+import MonthFilter from "@/components/MonthFilter";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 
 function formatCurrency(val: string): string {
   const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
@@ -26,7 +29,6 @@ function CurrencyInput({ value, onChange, placeholder }: { value: string; onChan
 }
 
 export default function AdminSales() {
-  const { data: salesList } = trpc.sales.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const { data: competitions } = trpc.competitions.list.useQuery({ status: "active" });
   const utils = trpc.useUtils();
@@ -47,34 +49,30 @@ export default function AdminSales() {
   const [filterSellerId, setFilterSellerId] = useState<string>("todos");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
 
-  const filteredSales = useMemo(() => {
-    if (!salesList) return [];
-    let result = showAll ? salesList : filterByMonth(salesList, filterMonth, filterYear, 'createdAt' as any);
-    // Filtro por status
-    if (statusFilter !== "todos") result = result.filter((s: any) => (s.status || 'approved') === statusFilter);
-    // Filtro por vendedor
-    if (filterSellerId !== "todos") {
-      result = result.filter((s: any) => String(s.sellerId) === filterSellerId);
-    }
-    // Busca por texto
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      result = result.filter((s: any) => {
-        const seller = sellers?.find((sel: any) => sel.id === s.sellerId);
-        return (
-          seller?.name?.toLowerCase().includes(q) ||
-          seller?.nickname?.toLowerCase().includes(q) ||
-          s.vehicleModel?.toLowerCase().includes(q) ||
-          s.description?.toLowerCase().includes(q)
-        );
-      });
-    }
-    return result;
-  }, [salesList, filterMonth, filterYear, showAll, filterSellerId, searchTerm, sellers]);
+  const pagination = usePagination({
+    initialPageSize: 20,
+    resetDeps: [filterMonth, filterYear, showAll, statusFilter, filterSellerId, searchTerm],
+  });
+  const salesQuery = trpc.sales.listPaged.useQuery({
+    month: filterMonth,
+    year: filterYear,
+    showAll,
+    status: statusFilter,
+    sellerId: filterSellerId !== "todos" ? Number(filterSellerId) : undefined,
+    search: searchTerm || undefined,
+    offset: pagination.offset,
+    limit: pagination.pageSize,
+  });
+  const sales = salesQuery.data?.items ?? [];
+  const total = salesQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
+  const counts = salesQuery.data?.counts ?? { total: 0, approved: 0, pending: 0, rejected: 0 };
+  const isLoading = salesQuery.isLoading;
+  const isFetching = salesQuery.isFetching;
 
   const createSale = trpc.sales.create.useMutation({
     onSuccess: () => {
-      utils.sales.list.invalidate();
+      utils.sales.invalidate();
       utils.sellers.list.invalidate();
       utils.participants.list.invalidate();
       utils.competitions.ranking.invalidate();
@@ -87,7 +85,7 @@ export default function AdminSales() {
 
   const editSale = trpc.sales.edit.useMutation({
     onSuccess: () => {
-      utils.sales.list.invalidate();
+      utils.sales.invalidate();
       utils.sellers.list.invalidate();
       utils.participants.list.invalidate();
       utils.competitions.ranking.invalidate();
@@ -101,7 +99,7 @@ export default function AdminSales() {
 
   const deleteSale = trpc.sales.delete.useMutation({
     onSuccess: () => {
-      utils.sales.list.invalidate();
+      utils.sales.invalidate();
       utils.sellers.list.invalidate();
       utils.participants.list.invalidate();
       utils.competitions.ranking.invalidate();
@@ -315,11 +313,10 @@ export default function AdminSales() {
 
         {/* Stats - Clicáveis */}
         {(() => {
-          const baseList = showAll ? (salesList || []) : filterByMonth(salesList || [], filterMonth, filterYear, 'createdAt' as any);
-          const totalCount = baseList.length;
-          const approvedCount = baseList.filter((s: any) => (s.status || 'approved') === 'approved').length;
-          const pendingCount = baseList.filter((s: any) => s.status === 'pending').length;
-          const rejectedCount = baseList.filter((s: any) => s.status === 'rejected').length;
+          const totalCount = counts.total;
+          const approvedCount = counts.approved;
+          const pendingCount = counts.pending;
+          const rejectedCount = counts.rejected;
           return (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button onClick={() => setStatusFilter('todos')} className={`racing-card p-4 text-center transition-all cursor-pointer ${statusFilter === 'todos' ? 'ring-2 ring-foreground/50' : 'hover:ring-1 hover:ring-foreground/30'}`}>
@@ -377,9 +374,12 @@ export default function AdminSales() {
         </div>
 
         {/* Sales List */}
-        {filteredSales.length > 0 ? (
+        {isLoading ? (
+          <ListSkeleton rows={6} />
+        ) : sales.length > 0 ? (
+          <>
           <div className="space-y-2">
-            {filteredSales.map(sale => {
+            {sales.map(sale => {
               const seller = sellers?.find(s => s.id === sale.sellerId);
               return (
                 <div key={sale.id} className={`racing-card p-4 flex items-center gap-4 ${statusBg(sale.status || 'approved')}`}>
@@ -452,6 +452,17 @@ export default function AdminSales() {
               );
             })}
           </div>
+          <PaginationControls
+            page={pagination.page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pagination.pageSize}
+            isLoading={isFetching}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            className="border-t border-border pt-5"
+          />
+          </>
         ) : (
           <div className="racing-card p-12 text-center">
             <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Key, Shield, ShieldCheck, Eye, Edit3 } from "lucide-react";
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import { PaginationControls } from "@/components/PaginationControls";
+import { usePagination } from "@/hooks/usePagination";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import { toast } from "sonner";
 import { maskPhone } from "@/lib/masks";
 import { isValidBrazilianPhone, isValidEmail } from "@shared/validators";
@@ -31,7 +33,6 @@ function getDeptInfo(dept: string | null | undefined) {
 }
 
 export default function AdminSellers() {
-  const { data: sellers, isLoading } = trpc.sellers.list.useQuery({});
   const { data: availableModules } = trpc.sellers.permissionModules.useQuery();
   const { data: managerModules } = trpc.managerPerms.modules.useQuery();
   const utils = trpc.useUtils();
@@ -40,8 +41,6 @@ export default function AdminSellers() {
   const [form, setForm] = useState({ name: "", nickname: "", phone: "", email: "", department: "vendas" });
   const [filterDept, setFilterDept] = useState<string>("todos");
   const [filterActive, setFilterActive] = useState<"ativos" | "inativos">("ativos");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
@@ -62,51 +61,28 @@ export default function AdminSellers() {
     { enabled: !!permsDialog.seller?.id && permsDialog.open && permsDialog.seller?.sellerRole === 'gerente' }
   );
 
-  // Filtra primeiro por status (Ativos/Inativos), depois por departamento,
-  // ordenando por cadastro mais recente (id desc como proxy de ordem de cadastro).
-  const activeSellers = useMemo(() => {
-    if (!sellers) return [];
-    return sellers.filter(s => (filterActive === "ativos" ? s.active : !s.active));
-  }, [sellers, filterActive]);
-
-  const filteredSellers = useMemo(() => {
-    const base = filterDept === "todos"
-      ? activeSellers
-      : activeSellers.filter(s => (s.department || "vendas") === filterDept);
-    // Ordem de cadastro decrescente (mais novos primeiro)
-    return [...base].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
-  }, [activeSellers, filterDept]);
-
-  const deptCounts = useMemo(() => {
-    const counts: Record<string, number> = { todos: activeSellers.length };
-    activeSellers.forEach(s => {
-      const dept = s.department || "vendas";
-      counts[dept] = (counts[dept] || 0) + 1;
-    });
-    return counts;
-  }, [activeSellers]);
-
-  const statusCounts = useMemo(() => {
-    if (!sellers) return { ativos: 0, inativos: 0 };
-    return {
-      ativos: sellers.filter(s => s.active).length,
-      inativos: sellers.filter(s => !s.active).length,
-    };
-  }, [sellers]);
-
-  // Paginação (mesmo padrão da tela de Contas)
-  const totalPages = Math.max(1, Math.ceil(filteredSellers.length / pageSize));
-  const pagedSellers = useMemo(
-    () => filteredSellers.slice((page - 1) * pageSize, page * pageSize),
-    [filteredSellers, page, pageSize]
-  );
-
-  // Reset para a página 1 quando os filtros mudam
-  useEffect(() => { setPage(1); }, [filterDept, filterActive, pageSize]);
+  // Paginação server-side (mesmo padrão das demais telas)
+  const pagination = usePagination({
+    initialPageSize: 20,
+    resetDeps: [filterDept, filterActive],
+  });
+  const sellersQuery = trpc.sellers.listPaged.useQuery({
+    active: filterActive,
+    dept: filterDept,
+    offset: pagination.offset,
+    limit: pagination.pageSize,
+  });
+  const pagedSellers = sellersQuery.data?.items ?? [];
+  const total = sellersQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
+  const deptCounts = sellersQuery.data?.deptCounts ?? { todos: 0 };
+  const statusCounts = sellersQuery.data?.statusCounts ?? { ativos: 0, inativos: 0 };
+  const isLoading = sellersQuery.isLoading;
+  const isFetching = sellersQuery.isFetching;
 
   const createSeller = trpc.sellers.create.useMutation({
     onSuccess: (data) => {
-      utils.sellers.list.invalidate();
+      utils.sellers.invalidate();
       const wasDialogOpenName = form.name;
       setDialogOpen(false);
       resetForm();
@@ -118,23 +94,23 @@ export default function AdminSellers() {
   });
 
   const updateSeller = trpc.sellers.update.useMutation({
-    onSuccess: () => { utils.sellers.list.invalidate(); setDialogOpen(false); resetForm(); toast.success("Colaborador atualizado!"); },
+    onSuccess: () => { utils.sellers.invalidate(); setDialogOpen(false); resetForm(); toast.success("Colaborador atualizado!"); },
     onError: () => toast.error("Erro ao atualizar colaborador."),
   });
 
   const deleteSeller = trpc.sellers.delete.useMutation({
-    onSuccess: () => { utils.sellers.list.invalidate(); toast.success("Colaborador removido!"); },
+    onSuccess: () => { utils.sellers.invalidate(); toast.success("Colaborador removido!"); },
     onError: () => toast.error("Erro ao remover colaborador."),
   });
 
   const uploadPhoto = trpc.sellers.uploadPhoto.useMutation({
-    onSuccess: () => { utils.sellers.list.invalidate(); setUploadingId(null); toast.success("Foto atualizada!"); },
+    onSuccess: () => { utils.sellers.invalidate(); setUploadingId(null); toast.success("Foto atualizada!"); },
     onError: () => { setUploadingId(null); toast.error("Erro ao enviar foto."); },
   });
 
   const toggleActive = trpc.sellers.update.useMutation({
     onSuccess: (_, variables) => {
-      utils.sellers.list.invalidate();
+      utils.sellers.invalidate();
       const action = variables.active ? "ativado" : "desativado";
       toast.success(`Colaborador ${action} com sucesso!`);
       setToggleConfirm({ open: false, seller: null });
@@ -146,12 +122,12 @@ export default function AdminSellers() {
   });
 
   const setPasswordMutation = trpc.sellers.setPassword.useMutation({
-    onSuccess: () => { setPasswordDialog({ open: false, seller: null }); setPasswordForm({ email: "", password: "" }); utils.sellers.list.invalidate(); toast.success("Login definido com sucesso!"); },
+    onSuccess: () => { setPasswordDialog({ open: false, seller: null }); setPasswordForm({ email: "", password: "" }); utils.sellers.invalidate(); toast.success("Login definido com sucesso!"); },
     onError: (err) => toast.error(err.message || "Erro ao definir login."),
   });
 
   const setRoleMutation = trpc.sellers.update.useMutation({
-    onSuccess: () => { utils.sellers.list.invalidate(); toast.success("Papel atualizado!"); },
+    onSuccess: () => { utils.sellers.invalidate(); toast.success("Papel atualizado!"); },
     onError: () => toast.error("Erro ao alterar papel."),
   });
 
@@ -358,10 +334,8 @@ export default function AdminSellers() {
 
           {/* Sellers List */}
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => <div key={i} className="racing-card p-4 h-20 animate-pulse" />)}
-            </div>
-          ) : filteredSellers.length > 0 ? (
+            <ListSkeleton rows={6} />
+          ) : total > 0 ? (
             <div className="space-y-3">
               {pagedSellers.map(seller => {
                 const dept = getDeptInfo(seller.department);
@@ -551,14 +525,15 @@ export default function AdminSellers() {
             </div>
           )}
 
-          {filteredSellers.length > 0 && (
+          {total > 0 && (
             <PaginationControls
-              page={page}
+              page={pagination.page}
               totalPages={totalPages}
-              total={filteredSellers.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
+              total={total}
+              pageSize={pagination.pageSize}
+              isLoading={isFetching}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
             />
           )}
 

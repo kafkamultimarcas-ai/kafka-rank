@@ -1,170 +1,53 @@
-# Feature Plan: Upload de Fotos e Vídeos no Estoque com S3
+# Estoque Upload de Mídia S3 Feature Plan
 
-## CAPABILITY
+Data de atualização: 2026-07-19
 
-Hoje o cadastro de veículos no estoque aceita mídia apenas por URL, com os campos `photoUrl`, `photos[]` e `videoUrl`. A capacidade desejada é evoluir o módulo de estoque para permitir upload real de arquivos de imagem e vídeo no momento do cadastro e da edição do veículo, usando bucket S3 da Amazon como armazenamento padrão, sem quebrar o modo atual por link.
+## Objetivo
 
-O resultado esperado é:
-
-- upload de fotos e vídeos como fluxo principal
-- manutenção do fluxo atual por URL externa
-- compatibilidade com integrações que continuarão fornecendo links
-- persistência multi-tenant segura
-- base arquitetural pronta para escalar com reorder, capa principal, remoção e auditoria
-
-## CONTEXTO ATUAL ENCONTRADO
-
-### Frontend
-
-- O cadastro/admin de estoque passa pelo formulário em [client/src/components/inventory/InventoryVehicleForm.tsx](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/client/src/components/inventory/InventoryVehicleForm.tsx).
-- O formulário hoje trabalha com:
-  - `photoUrl`
-  - `videoUrl`
-  - `photosText` para galeria via lista de URLs
-- A experiência atual é orientada a link manual, sem fluxo nativo de upload.
-
-### Shared contract
-
-- O schema compartilhado do estoque está em [shared/inventory.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/shared/inventory.ts).
-- Hoje o contrato forte é URL-based:
-  - `photoUrl: optionalUrl`
-  - `photos: string[]`
-  - `videoUrl: optionalUrl`
-- Isso confirma que todo o domínio atual assume mídia já resolvida como URL pública.
-
-### Backend
-
-- O router principal do estoque está em [server/routers/inventoryRouter.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/server/routers/inventoryRouter.ts).
-- O persist atual faz:
-  - `photoUrl` como capa principal
-  - `photos` como lista serializada
-  - `videoUrl` como URL opcional
-- Não existe hoje mutation específica de upload de mídia do estoque.
-
-### Armazenamento
-
-- Já existe uma abstração de storage em [server/storage.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/server/storage.ts).
-- O projeto já utiliza `storagePut(...)` em outros módulos.
-- Essa camada hoje já resolve:
-  - prefixo por tenant
-  - upload de binário
-  - geração de URL final
-- Arquiteturalmente, isso é importante porque evita acoplamento direto do estoque ao provider.
-
-### Referências internas já existentes
-
-O sistema já tem padrões prontos de upload em outros domínios, por exemplo:
-
-- financeiro
-- ficha
-- pós-venda
-- custos de veículo
-- CRM/mídias
-
-Isso reduz risco de implementação, porque o produto já possui:
-
-- contrato cliente → backend com arquivo serializado
-- validação backend
-- persistência em storage
-- gravação da URL final no domínio de negócio
-
-## OBJETIVO DE ARQUITETURA
-
-Permitir que o estoque suporte dois modos de mídia de forma nativa:
-
-### Modo 1: Upload
-
-Fluxo padrão da UI.
-
-- usuário seleciona imagem ou vídeo
-- backend envia para storage/S3
-- sistema grava URL resolvida e metadados
-
-### Modo 2: Link externo
-
-Fluxo de compatibilidade e integração.
-
-- usuário ou integração informa URL como hoje
-- sistema valida e persiste
-- não há upload do binário
-
-### Regra central
-
-O domínio de estoque não deve “escolher um ou outro”. Ele deve suportar ambos, com o upload como padrão de UX e link externo como modo compatível.
-
-## DECISÃO SÊNIOR RECOMENDADA
-
-### Recomendação principal
-
-Implementar uma camada de mídia estruturada para estoque, mas preservar os campos atuais como contrato de compatibilidade.
-
-Em vez de tentar sobreviver apenas com `photoUrl`, `photos[]` e `videoUrl`, o ideal é introduzir um modelo de mídia mais rico, mantendo sincronização backward-compatible com os campos legados.
-
-### Por que não ficar só nos campos atuais
-
-Os campos atuais não representam bem:
-
-- tipo da mídia
-- origem da mídia
-- ordem consistente
-- foto principal
-- metadados do arquivo
-- chave de storage
-- exclusão/limpeza futura
-- coexistência entre upload e link
-
-### Por que não quebrar o modelo atual agora
-
-Hoje outros consumidores já leem:
+Evoluir o módulo de estoque para suportar upload real de imagens e vídeos de veículo, mantendo compatibilidade total com o modelo atual por link:
 
 - `photoUrl`
 - `photos`
 - `videoUrl`
 
-Então a evolução correta é:
+O padrão de uso passa a ser upload de arquivo. O modo por link continua suportado para operação manual e integrações existentes.
 
-1. adicionar um modelo estruturado
-2. continuar populando os campos legados
-3. migrar consumidores gradualmente quando fizer sentido
+## Status Atual
 
-## PROPOSTA DE MODELAGEM
+Esta feature já está parcialmente implementada no código local.
 
-## Opção A: Evolução mínima
+### Já entregue
 
-Continuar armazenando só:
+- Tabela estruturada `inventory_vehicle_media`
+- Sincronização com os campos legados do veículo
+- Upload via backend para storage
+- Leitura de mídia por veículo
+- Exclusão lógica da mídia
+- Definição de capa principal
+- Reordenação de mídia no backend
+- Rate limit específico para upload de mídia do estoque
+- Form de estoque com upload local e upload imediato em edição
+- Extração de metadados no frontend
+  - largura
+  - altura
+  - duração
+- Exclusão física do objeto no bucket quando houver credenciais S3 configuradas
+- Testes automatizados cobrindo helper de mídia, router e isolamento de storage
 
-- `photoUrl`
-- `photos`
-- `videoUrl`
+### Em uso híbrido
 
-E apenas trocar a origem dessas URLs:
+Hoje o fluxo já suporta dois mundos ao mesmo tempo:
 
-- antes: coladas manualmente
-- depois: geradas por upload para S3
+- mídia enviada por upload
+- mídia cadastrada por URL externa
 
-### Vantagens
+## Arquitetura Recomendada
 
-- menor custo inicial
-- sem nova tabela
-- menor esforço de rollout
+### Modelo de dados
 
-### Desvantagens
+Tabela dedicada: `inventory_vehicle_media`
 
-- fraco para vídeos múltiplos
-- difícil manter ordenação rica
-- sem metadados de arquivo
-- sem rastreabilidade de origem
-- limpeza de storage mais frágil
-
-## Opção B: Modelo estruturado de mídia
-
-Criar tabela dedicada, por exemplo `inventory_vehicle_media`, e manter sincronização com os campos atuais da tabela de veículo.
-
-### Recomendação
-
-Esta é a opção recomendada para lançamento sólido.
-
-### Estrutura sugerida
+Campos:
 
 - `id`
 - `tenantId`
@@ -198,527 +81,275 @@ Esta é a opção recomendada para lançamento sólido.
 - `updatedAt`
 - `deletedAt`
 
-### Campos legados que devem continuar existindo
+### Campos legados preservados
 
-Na tabela principal do veículo:
+Na tabela principal do veículo, seguem válidos:
 
 - `photoUrl`
 - `photos`
 - `videoUrl`
 
-### Regra de sincronização recomendada
+### Regra de sincronização
 
-- `photoUrl` = URL da imagem primária
+- `photoUrl` = imagem principal ativa
 - `photos` = array ordenado das imagens ativas
-- `videoUrl` = URL do vídeo principal ou primeiro vídeo ativo
+- `videoUrl` = primeiro vídeo ativo
 
-Isso garante compatibilidade com:
+Isso mantém compatibilidade com:
 
 - estoque público
-- CRM
 - integrações
+- CRM
 - telas legadas
 
-## ESTRATÉGIA DE STORAGE
+## Estratégia de Storage
 
-## Recomendação arquitetural
+### Caminho de chave
 
-Não acoplar o módulo de estoque diretamente ao AWS SDK como primeira camada de uso.
-
-O caminho mais sênior aqui é:
-
-- manter `server/storage.ts` como abstração
-- fazer o provider final apontar para o bucket S3 da Amazon
-- deixar o estoque depender do contrato de storage, e não do provedor
-
-### Benefícios
-
-- reaproveita padrão já existente do projeto
-- reduz duplicação
-- facilita troca futura de provider
-- centraliza tenant prefix, naming, ACL/presign e observabilidade
-
-### Se a equipe quiser AWS nativo no app
-
-Criar uma interface de provider, por exemplo:
-
-- `StorageProvider.put`
-- `StorageProvider.delete`
-- `StorageProvider.getPublicUrl`
-- `StorageProvider.getSignedUploadUrl`
-
-Com implementações:
-
-- provider atual do projeto
-- provider S3
-
-Mesmo nesse cenário, o estoque ainda deve consumir a abstração.
-
-## ESTRATÉGIA DE CHAVES NO BUCKET
-
-Padrão recomendado:
+Padrão adotado:
 
 - `t/<tenantId>/inventory/<vehicleId>/images/<uuid>.<ext>`
 - `t/<tenantId>/inventory/<vehicleId>/videos/<uuid>.<ext>`
 
-### Regras importantes
+### Abstração usada
 
-- nunca confiar no nome original do arquivo como key final
-- normalizar extensão a partir do mime validado
-- manter tenant isolado por prefixo
-- não misturar mídias de estoque com outros domínios no mesmo path
+O módulo continua consumindo `server/storage.ts`, e não depende diretamente de S3 em todas as operações.
 
-## FLUXO FUNCIONAL PROPOSTO
+Hoje a estratégia está assim:
 
-## 1. Cadastro do veículo
+- upload: via storage proxy atual do projeto
+- delete físico: via AWS SDK quando as envs S3 estão configuradas
 
-Ao criar ou editar um veículo, a seção de mídia deve permitir:
+Isso permite rollout gradual sem quebrar o padrão já usado no restante do sistema.
 
-- upload múltiplo de imagens
-- upload de vídeo
-- informar links manualmente
-- definir foto principal
-- reordenar galeria
-- remover item antes de salvar
+## Configuração Operacional
 
-## 2. UX recomendada
+### Variáveis já necessárias para upload
 
-Na aba de mídia:
+- `BUILT_IN_FORGE_API_URL`
+- `BUILT_IN_FORGE_API_KEY`
 
-- bloco principal `Adicionar mídia`
-- subtabs ou toggle:
-  - `Upload de arquivos`
-  - `Usar link externo`
+### Variáveis necessárias para exclusão física no bucket
 
-### Upload de arquivos
+- `AWS_REGION`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_S3_BUCKET`
 
-- drag and drop
-- seleção múltipla para imagens
-- seleção simples ou controlada para vídeo
-- preview imediato
-- barra de progresso
-- estado de erro por item
-- ação para definir capa
+### Variáveis opcionais
 
-### Link externo
+- `AWS_S3_ENDPOINT`
+- `AWS_S3_FORCE_PATH_STYLE=true`
 
-- manter campos compatíveis com o modelo atual
-- `Foto principal (URL)`
-- `Galeria (URLs)`
-- `Vídeo (URL)`
+### Comportamento sem credenciais S3
 
-### Regra de UX
+Se as envs S3 não estiverem configuradas:
 
-O modo por upload deve aparecer como padrão.
-O modo por link deve existir como opção avançada/compatível.
+- o upload continua funcionando
+- a mídia é removida do banco
+- a referência legacy é recalculada
+- a exclusão física do objeto é marcada como `skipped`
 
-## CONTRATO DE BACKEND RECOMENDADO
+Isso evita quebrar a operação, mas deve ser tratado como gap de infraestrutura até produção.
 
-## Procedimentos sugeridos
+## Fluxos Suportados
 
-- `inventory.uploadMedia`
-- `inventory.deleteMedia`
-- `inventory.reorderMedia`
-- `inventory.setPrimaryMedia`
-- `inventory.listMedia`
+### 1. Cadastro com upload
 
-E manter:
+1. usuário seleciona imagens e vídeos
+2. frontend extrai metadados
+3. veículo é salvo
+4. arquivos pendentes são enviados
+5. backend persiste `inventory_vehicle_media`
+6. backend sincroniza `photoUrl/photos/videoUrl`
 
-- `inventory.createDetailed`
-- `inventory.updateDetailed`
+### 2. Edição com upload imediato
 
-### Responsabilidade de cada um
+1. usuário abre veículo existente
+2. adiciona mídia
+3. frontend sobe arquivo imediatamente
+4. backend persiste item de mídia
+5. backend recalcula campos legados
 
-#### `inventory.uploadMedia`
+### 3. Cadastro ou edição por link
 
-- recebe arquivo e contexto do veículo
-- valida mime, extensão e tamanho
-- envia para storage
-- persiste item em `inventory_vehicle_media`
-- recalcula compatibilidade em `photoUrl/photos/videoUrl`
+1. operador informa URLs
+2. backend converte isso em mídia estruturada `external_url`
+3. backend mantém consistência com os campos legados
 
-#### `inventory.deleteMedia`
+### 4. Remoção de mídia enviada
 
-- marca mídia como removida
-- opcionalmente agenda exclusão física do bucket
-- recalcula capa/listas legadas
+1. mídia é marcada como `deleted`
+2. backend tenta exclusão física no bucket quando aplicável
+3. backend recalcula capa e listas legadas
+4. auditoria registra o resultado
 
-#### `inventory.reorderMedia`
+### 5. Reordenação
 
-- recebe ordenação final
-- reaplica `sortOrder`
-- recalcula `photos`
+1. frontend permite reordenar visualmente
+2. backend persiste `sortOrder`
+3. backend recalcula `photos`
 
-#### `inventory.setPrimaryMedia`
+## UX Atual e Recomendada
 
-- define capa principal entre imagens
-- recalcula `photoUrl`
+### Já presente localmente
 
-## CONTRATO DE FRONTEND RECOMENDADO
+- upload de arquivos na aba de mídia
+- preview de imagem e vídeo
+- cards de mídia enviada
+- cards de fila local no create
+- capa principal por botão
+- metadados básicos exibidos
+- reordenação local/backend preparada
 
-## Componentização sugerida
+### Padrão recomendado para lançamento
 
-- `InventoryVehicleMediaTab`
-- `InventoryMediaUploader`
-- `InventoryMediaDropzone`
-- `InventoryMediaPreviewGrid`
-- `InventoryMediaLinkFields`
-- `InventoryMediaVideoCard`
+- upload como fluxo primário
+- links como modo compatível
+- feedback de tamanho e tipo por item
+- indicação clara de capa
+- indicação visual de ordem
 
-## Estado sugerido
+## Limites Atuais
 
-Separar claramente:
+### Implementados
 
-- `uploadedMediaDraft[]`
-- `externalMediaDraft[]`
-- `removedMediaIds[]`
-- `primaryMediaId`
-
-### Regra de composição antes do submit
-
-O frontend não deve montar a verdade final apenas em `photoUrl/photos/videoUrl`.
-Ele deve trabalhar com um draft rico e o backend consolida.
-
-## COMPATIBILIDADE COM O MODELO ATUAL
-
-## Invariante obrigatória
-
-Enquanto existirem consumidores legados, o backend deve continuar garantindo:
-
-- `photoUrl` sempre coerente
-- `photos` sempre coerente
-- `videoUrl` sempre coerente
-
-### Compatibilidade com integração por link
-
-Integrações de estoque que continuarem mandando links devem seguir válidas.
-
-Exemplos:
-
-- integração externa envia galeria por URL
-- scraper/sync preenche `photoUrl/photos`
-- operador manual cola uma URL de vídeo hospedada externamente
-
-Tudo isso deve seguir funcionando sem obrigar upload.
-
-## REGRAS DE NEGÓCIO RECOMENDADAS
-
-### Imagens
-
-- múltiplas imagens permitidas
-- exatamente uma imagem primária quando houver imagens
-- ordem explícita
-- limite máximo por veículo
-
-### Vídeos
-
-- suportar pelo menos um vídeo principal no V1
-- permitir evolução para múltiplos vídeos no modelo estruturado
-
-### Modo misto
-
-Permitir coexistência entre:
-
-- imagens por upload
-- imagens por link
-- vídeo por upload
-- vídeo por link
-
-### Fonte/origem
-
-Registrar a origem da mídia:
-
-- upload manual
-- link manual
-- integração
-
-Isso ajuda em auditoria, suporte e futuras rotinas de sync.
-
-## VALIDAÇÕES E SEGURANÇA
-
-## Backend
-
-- validar mime real permitido
-- validar extensão coerente com mime
-- limitar tamanho por arquivo
-- limitar quantidade por veículo
-- rejeitar payloads enormes
-- rejeitar URLs inválidas no modo link
-- isolar mídia por tenant
-- impedir acesso cruzado de tenant
-
-## Frontend
-
-- bloquear extensões não suportadas antes do submit
-- exibir feedback imediato
-- impedir enviar vídeo acima do limite
-- mostrar estado de upload e falha por item
-
-## Regras sugeridas de tamanho
-
-Exemplo inicial seguro:
-
-- imagem: até 8 MB por arquivo
-- vídeo: até 80 MB no V1 server-mediated
+- imagem: até `8 MB`
+- vídeo: até `9 MB`
 
 ### Observação importante
 
-Se o backend atual estiver trabalhando com payload base64 e limite de body relativamente baixo, vídeo grande via base64 vai escalar mal.
+Como o upload atual ainda passa por base64 e backend:
 
-Por isso a recomendação senior é:
+- é bom para imagens pequenas e médias
+- é aceitável para vídeos curtos
+- não é o desenho ideal para vídeos maiores
 
-- V1: upload server-mediated apenas se o limite for controlado
-- V2: presigned upload ou multipart direto para S3 para vídeos maiores
+## Melhorias Prioritárias Recomendadas
 
-## ESTRATÉGIA DE UPLOAD
+### P0
 
-## Alternativa 1: Upload via backend
+- validar visualmente drag and drop desktop/mobile
+- corrigir todos os textos remanescentes com acentuação quebrada no form do estoque
+- adicionar feedback explícito quando `storageDeleteSkipped = true`
+- adicionar teste de integração cobrindo `deleteMedia` com `storageDelete`
 
-Fluxo:
+### P1
 
-1. frontend lê arquivo
-2. envia para mutation
-3. backend faz upload ao storage/S3
-4. backend retorna item persistido
+- adicionar reorder também para mídia por link estruturada
+- permitir “definir capa” na fila local do create sem depender de ordem manual
+- adicionar limite configurável de quantidade de imagens por veículo
+- impedir múltiplos vídeos quando a regra de negócio exigir apenas um
 
-### Vantagens
+### P2
 
-- consistente com o padrão já usado no projeto
-- menor complexidade inicial
-- mais simples para imagens pequenas e médias
+- extração de thumbnail de vídeo
+- compressão ou resize opcional de imagem
+- rotina de cleanup para mídia órfã
+- telemetria de falhas por upload, delete e reorder
 
-### Desvantagens
+### P3
 
-- base64 aumenta payload
-- vídeos grandes pressionam memória e tempo de request
-- escala pior
+- presigned upload direto para S3
+- multipart upload para vídeos grandes
+- fila assíncrona para processamento de mídia
 
-## Alternativa 2: Presigned URL / direct-to-S3
+## Próximos Passos de Arquitetura
 
-Fluxo:
+### Recomendação de lançamento
 
-1. frontend pede autorização de upload
-2. backend gera presigned
-3. frontend sobe direto ao S3
-4. backend recebe confirmação/finalização
-5. backend persiste item de mídia
+Lançar com o modelo híbrido atual, desde que os itens abaixo sejam fechados:
 
-### Vantagens
+1. ambiente S3 de produção configurado
+2. validação visual da aba de mídia no estoque
+3. revisão final de strings e acentuação
+4. teste manual de:
+   - create com imagem
+   - create com vídeo
+   - edit com upload imediato
+   - delete com exclusão física
+   - reorder persistido
+   - fluxo por link
 
-- melhor para vídeo
-- menos carga no app server
-- maior escalabilidade
+### Recomendação de segunda fase
 
-### Desvantagens
+Migrar vídeos grandes para upload direto ao bucket com presigned URL:
 
-- fluxo mais complexo
-- exige controle mais cuidadoso de finalização e limpeza de uploads órfãos
+- menos memória no backend
+- menos latência
+- menos risco de timeout
+- melhor escalabilidade
 
-## Recomendação prática
+## Riscos e Mitigações
 
-### Fase 1
-
-- imagens por upload via backend
-- vídeo por link ou upload controlado com limite pequeno
-
-### Fase 2
-
-- presigned/direct upload para vídeo
-- opcionalmente também para imagens
-
-## IMPACTOS EM OUTROS MÓDULOS
-
-## Estoque público
-
-Não deve quebrar.
-
-Como continuará consumindo URLs, ele permanece compatível se `photoUrl/photos/videoUrl` continuarem sendo mantidos.
-
-## CRM
-
-Hoje já existem fluxos que usam URLs de imagem do estoque para envio de mídia ao lead.
-Logo:
-
-- não remover campos legados
-- garantir URLs acessíveis
-- garantir que capa e galeria continuem consistentes
-
-## Integrações
-
-Integrações que trazem link devem continuar funcionais sem mudança obrigatória.
-
-## Limpeza de mídia
-
-Ao excluir mídia ou veículo, o sistema deve ter estratégia para:
-
-- remover referência do banco
-- recalcular compatibilidade
-- opcionalmente apagar objeto no bucket
-- evitar órfãos
-
-## MIGRAÇÃO RECOMENDADA
-
-## Etapa 1
-
-Adicionar tabela estruturada de mídia.
-
-## Etapa 2
-
-Backfill opcional dos veículos existentes:
-
-- `photoUrl` vira item primário de imagem
-- `photos[]` viram itens ordenados
-- `videoUrl` vira item de vídeo
-
-## Etapa 3
-
-Passar a UI a consumir a tabela de mídia.
-
-## Etapa 4
-
-Manter sincronização reversa para os campos legados.
-
-## FASES DE IMPLEMENTAÇÃO
-
-## Fase 1: Fundacional
-
-- definir contrato de mídia do estoque
-- criar migration de `inventory_vehicle_media`
-- criar camada service/repository de mídia
-- reaproveitar `storage.ts`
-
-## Fase 2: Backend funcional
-
-- `uploadMedia`
-- `deleteMedia`
-- `setPrimaryMedia`
-- `reorderMedia`
-- consolidação automática em `photoUrl/photos/videoUrl`
-
-## Fase 3: Frontend admin
-
-- aba de mídia com upload
-- modo link preservado
-- preview
-- reorder
-- capa principal
-- progresso e erros
-
-## Fase 4: Hardening
-
-- limites
-- observabilidade
-- cleanup
-- testes
-
-## Fase 5: Escala
-
-- presigned upload para vídeos
-- processamento assíncrono
-- extração de metadados
-- compressão/thumbnail opcional
-
-## TESTES RECOMENDADOS
-
-## Unitários
-
-- normalização de mídia
-- cálculo de capa
-- serialização compatível para `photoUrl/photos/videoUrl`
-
-## Integração
-
-- upload image
-- upload video
-- link externo
-- modo misto
-- reorder
-- delete
-- proteção multi-tenant
-
-## E2E
-
-- cadastrar veículo com upload de imagens
-- cadastrar veículo com link externo
-- editar veículo e trocar capa
-- remover mídia
-- validar persistência final no card/lista do estoque
-
-## RISCOS E MITIGAÇÕES
-
-### Risco 1: payload grande demais
+### Payload de vídeo grande
 
 Mitigação:
 
-- limitar tamanho
-- começar com imagens
-- adotar direct-to-S3 para vídeos grandes
+- manter limite baixo no V1
+- planejar presigned upload no V2
 
-### Risco 2: quebrar integrações por link
-
-Mitigação:
-
-- manter modo link oficialmente suportado
-- preservar contrato legado
-
-### Risco 3: inconsistência entre tabela nova e campos antigos
+### Inconsistência entre tabela nova e legado
 
 Mitigação:
 
-- centralizar consolidação em service único
-- nunca deixar frontend escrever diretamente os campos legados sem passar pela regra de consolidação
+- nunca atualizar `photoUrl/photos/videoUrl` fora da rotina de consolidação central
 
-### Risco 4: arquivos órfãos no bucket
-
-Mitigação:
-
-- soft delete no banco
-- rotina de cleanup
-- logs por storage key
-
-### Risco 5: UX confusa com dois modos
+### Objeto órfão no bucket
 
 Mitigação:
 
-- upload como padrão
-- link como modo secundário
-- linguagem simples: `Enviar arquivo` e `Usar link`
+- delete físico no fluxo normal
+- futura rotina de varredura por `storageKey`
 
-## NON-GOALS
+### Falta de credenciais S3 em produção
 
-- não reescrever agora todo consumo legado de mídia do estoque
-- não obrigar integrações a usar upload
-- não depender de processamento de vídeo avançado no V1
-- não transformar essa feature em DAM completo de mídia
+Mitigação:
 
-## OPEN QUESTIONS
+- checklist de infra antes do deploy
+- alerta em operação quando delete for `skipped`
 
-- O V1 precisa suportar múltiplos vídeos ou apenas um?
-- O bucket será privado com URL assinada ou público com URL direta?
-- O storage atual do projeto já será apontado para S3 ou haverá provider novo?
-- A exclusão do veículo deve apagar fisicamente as mídias no mesmo ato ou apenas agendar cleanup?
-- Há necessidade de thumbnails e compressão já no V1?
-- Existe limite comercial esperado de quantidade de fotos por veículo?
+## Checklist Operacional
 
-## HANDOFF
+Antes do deploy:
 
-Status recomendado: `ready for implementation`.
+- rodar migration `0080_inventory_vehicle_media.sql`
+- validar `BUILT_IN_FORGE_API_URL`
+- validar `BUILT_IN_FORGE_API_KEY`
+- validar `AWS_REGION`
+- validar `AWS_ACCESS_KEY_ID`
+- validar `AWS_SECRET_ACCESS_KEY`
+- validar `AWS_S3_BUCKET`
+- validar permissão de delete no bucket
+- testar upload e delete em tenant real de homologação
 
-### Recomendação sênior final
+Depois do deploy:
 
-Para entrega robusta sem retrabalho, o melhor caminho é:
+- monitorar criação de mídia por tenant
+- monitorar falhas de upload
+- monitorar deletes com `storageDeleteSkipped`
+- revisar crescimento do bucket
 
-1. criar uma tabela estruturada de mídia do estoque
-2. manter `photoUrl/photos/videoUrl` como camada de compatibilidade
-3. usar upload como experiência padrão
-4. manter link externo como modo suportado
-5. reaproveitar a abstração de storage já existente e conectá-la ao S3
-6. deixar direct-to-S3 para vídeos grandes como evolução natural de segunda fase
+## Arquivos Principais da Feature
 
-### Resultado arquitetural dessa abordagem
+- [drizzle/0080_inventory_vehicle_media.sql](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/drizzle/0080_inventory_vehicle_media.sql)
+- [drizzle/schema.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/drizzle/schema.ts)
+- [shared/inventory.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/shared/inventory.ts)
+- [server/inventoryMedia.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/server/inventoryMedia.ts)
+- [server/storage.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/server/storage.ts)
+- [server/routers/inventoryRouter.ts](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/server/routers/inventoryRouter.ts)
+- [client/src/components/inventory/InventoryVehicleForm.tsx](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/client/src/components/inventory/InventoryVehicleForm.tsx)
+- [client/src/pages/admin/AdminInventoryCreate.tsx](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/client/src/pages/admin/AdminInventoryCreate.tsx)
+- [client/src/pages/admin/AdminInventoryEdit.tsx](C:/Users/pfsou/Projetos/Brothers-Labs/kafka/kafka-rank/client/src/pages/admin/AdminInventoryEdit.tsx)
 
-- não quebra o legado
-- suporta integração por link
-- habilita upload real com S3
-- melhora governança de mídia
-- prepara o estoque para escala e lançamento com padrão sênior
+## Conclusão
+
+O desenho escolhido continua sendo o mais sólido para lançamento:
+
+1. mídia estruturada própria
+2. compatibilidade com legado
+3. upload como padrão
+4. link como compatibilidade
+5. caminho aberto para escalar com presigned upload depois
+
+Hoje a base já ficou pronta para operação real com bem menos retrabalho futuro.

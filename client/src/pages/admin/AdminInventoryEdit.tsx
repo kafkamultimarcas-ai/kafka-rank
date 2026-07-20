@@ -1,11 +1,12 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import InventoryVehicleForm from "@/components/inventory/InventoryVehicleForm";
+import InventoryVehicleForm, { type InventoryVehicleFormSubmitPayload } from "@/components/inventory/InventoryVehicleForm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
+import { type InventoryUpdateDetailedInput } from "@shared/inventory";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation, useParams } from "wouter";
@@ -26,6 +27,7 @@ export default function AdminInventoryEdit() {
     { inventoryId: vehicleId },
     { enabled: historyOpen && Number.isFinite(vehicleId) && vehicleId > 0 }
   );
+  const auditEntries = historyQuery.data ?? [];
 
   const updateMutation = trpc.inventory.updateDetailed.useMutation({
     onSuccess: () => {
@@ -69,7 +71,7 @@ export default function AdminInventoryEdit() {
             initialVehicle={vehicleQuery.data}
             isSubmitting={updateMutation.isPending}
             onCancel={() => setLocation(buildTenantPath(tenantSlug, "/admin/estoque"))}
-            onSubmit={(payload) => updateMutation.mutate(payload)}
+            onSubmit={({ data }: InventoryVehicleFormSubmitPayload) => updateMutation.mutate(data as InventoryUpdateDetailedInput)}
             onShowHistory={() => setHistoryOpen(true)}
           />
 
@@ -83,10 +85,10 @@ export default function AdminInventoryEdit() {
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   </div>
-                ) : !historyQuery.data?.length ? (
+                ) : auditEntries.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum evento de auditoria encontrado.</p>
                 ) : (
-                  historyQuery.data.map((entry: any) => (
+                  auditEntries.map((entry) => (
                     <div key={entry.id} className="rounded-2xl border border-border/60 bg-card/80 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>

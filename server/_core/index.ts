@@ -171,6 +171,7 @@ async function startServer() {
   app.use("/api/trpc/saleDocuments.uploadCnh", uploadLimiter);
   app.use("/api/trpc/saleDocuments.uploadComprovante", uploadLimiter);
   app.use("/api/trpc/sellers.uploadPhoto", uploadLimiter);
+  app.use("/api/trpc/inventory.uploadMedia", uploadLimiter);
 
   // Configure body parser with size limit for file uploads (reduzido de 50mb para 16mb)
   // Preserve raw body for webhook signature verification (Meta/Facebook/Instagram)

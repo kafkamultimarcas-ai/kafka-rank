@@ -71,7 +71,6 @@ const MENU_GROUPS: MenuGroup[] = [
       { icon: CalendarClock, label: "Agendamentos", path: "/admin/agendamentos" },
       { icon: Cake, label: "Aniversariantes", path: "/admin/aniversariantes" },
       { icon: Flag, label: "Marketing", path: "/admin/marketing" },
-      { icon: LayoutGrid, label: "Meta Ads", path: "/admin/meta-integration" },
     ],
   },
   {

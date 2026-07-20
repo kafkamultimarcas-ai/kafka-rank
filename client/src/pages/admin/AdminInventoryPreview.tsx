@@ -4,10 +4,10 @@ import { trpc } from "@/lib/trpc";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { ArrowLeft, Car, Loader2 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
+import { formatBRL } from "@shared/inventory";
 
 function formatPrice(value: number | null | undefined) {
-  if (!value) return "Consulte";
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
+  return formatBRL(value, "Consulte");
 }
 
 function parsePhotos(value: unknown): string[] {

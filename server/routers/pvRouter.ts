@@ -204,11 +204,25 @@ export const pvGastosRouter = router({
     return db.getPvGastosResumo();
   }),
 
-  // Todos os gastos com info do chamado (tela financeira)
+  // Todos os gastos com info do chamado (tela financeira) — paginado server-side
   listAll: adminProcedure.input(z.object({
     statusAprovacao: z.string().optional(),
+    month: z.number().int().min(0).max(11).optional(),
+    year: z.number().int().optional(),
+    showAll: z.boolean().default(false),
+    offset: z.number().int().min(0).default(0),
+    limit: z.number().int().min(1).max(100).default(20),
   }).optional()).query(async ({ input }) => {
-    return db.listAllPvGastosWithChamado(input?.statusAprovacao);
+    const all = await db.listAllPvGastosWithChamado(input?.statusAprovacao);
+    const inMonth = (createdAt: any) => {
+      if (input?.showAll || input?.month == null || input?.year == null) return true;
+      const d = new Date(createdAt);
+      return d.getMonth() === input.month && d.getFullYear() === input.year;
+    };
+    const filtered = all.filter((g: any) => inMonth(g.createdAt));
+    const offset = input?.offset ?? 0;
+    const limit = input?.limit ?? 20;
+    return { items: filtered.slice(offset, offset + limit), total: filtered.length };
   }),
 });
 

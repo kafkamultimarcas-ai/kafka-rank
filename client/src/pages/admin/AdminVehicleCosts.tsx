@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Search, Plus, Camera, Car, Trash2, Edit, DollarSign, Eye, Loader2, X, ChevronLeft, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useParams, useLocation } from "wouter";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import VehicleDetail from "./VehicleDetail";
 import FipeConsulta from "./FipeConsulta";
 
@@ -485,7 +488,13 @@ export default function AdminVehicleCosts() {
   const [showFipeDialog, setShowFipeDialog] = useState(false);
 
   const utils = trpc.useUtils();
-  const { data: vehicles, isLoading } = trpc.vehicleCosts.list.useQuery({ search, status: statusFilter });
+  const pagination = usePagination({ initialPageSize: 12, total: undefined, resetDeps: [search, statusFilter] });
+  const { data, isLoading, isFetching } = trpc.vehicleCosts.list.useQuery({
+    search, status: statusFilter, offset: pagination.offset, limit: pagination.pageSize,
+  });
+  const vehicles = data?.items;
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
 
   const handleRefresh = () => {
     utils.vehicleCosts.list.invalidate();
@@ -500,10 +509,11 @@ export default function AdminVehicleCosts() {
     );
   }
 
-  const totalInStock = vehicles?.filter(v => v.status === "in_stock").length || 0;
-  const totalSold = vehicles?.filter(v => v.status === "sold").length || 0;
-  const totalInvested = vehicles?.reduce((acc, v) => acc + (v.totalCost || 0), 0) || 0;
-  const totalProfit = vehicles?.filter(v => v.profit !== null).reduce((acc, v) => acc + (v.profit || 0), 0) || 0;
+  const stats = data?.stats;
+  const totalInStock = stats?.inStock ?? 0;
+  const totalSold = stats?.sold ?? 0;
+  const totalInvested = stats?.totalInvested ?? 0;
+  const totalProfit = stats?.totalProfit ?? 0;
 
   return (
     <DashboardLayout>
@@ -581,19 +591,30 @@ export default function AdminVehicleCosts() {
 
         {/* Lista de Veículos */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
+          <ListSkeleton grid rows={6} />
         ) : vehicles && vehicles.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {vehicles.map((v) => (
-              <VehicleCard
-                key={v.id}
-                vehicle={v}
-                onClick={() => setLocation(`/admin/custo-veiculo/${v.id}`)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {vehicles.map((v) => (
+                <VehicleCard
+                  key={v.id}
+                  vehicle={v}
+                  onClick={() => setLocation(`/admin/custo-veiculo/${v.id}`)}
+                />
+              ))}
+            </div>
+            <PaginationControls
+              page={pagination.page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pagination.pageSize}
+              isLoading={isFetching}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              pageSizeOptions={[12, 24, 48]}
+              className="border-t border-border pt-5"
+            />
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Car className="w-16 h-16 mb-4 opacity-30" />

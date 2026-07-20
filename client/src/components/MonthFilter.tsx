@@ -1,6 +1,5 @@
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
-
-const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+import { MONTH_NAMES } from "@/lib/months";
 
 interface MonthFilterProps {
   month: number; // 0-11

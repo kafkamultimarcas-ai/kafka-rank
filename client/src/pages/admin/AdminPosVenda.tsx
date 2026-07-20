@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
 
 function formatCurrencyPV(val: string): string {
   const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
@@ -87,6 +89,16 @@ export default function AdminPosVenda() {
       c.ticketNumber?.toLowerCase().includes(s)
     );
   }, [chamados, searchTerm]);
+
+  const pagination = usePagination({
+    initialPageSize: 10,
+    total: filtered.length,
+    resetDeps: [statusFilter, searchTerm, filterMonth, filterYear, showAllMonths],
+  });
+  const pagedChamados = useMemo(
+    () => filtered.slice(pagination.offset, pagination.offset + pagination.limit),
+    [filtered, pagination.offset, pagination.limit],
+  );
 
   const alertas = alertasQuery.data || { vencendo: [], vencidos: [] };
   const totalAlertas = alertas.vencendo.length + alertas.vencidos.length;
@@ -188,7 +200,7 @@ export default function AdminPosVenda() {
               <p>Nenhum chamado encontrado</p>
             </div>
           )}
-          {filtered.map((chamado: any) => {
+          {pagedChamados.map((chamado: any) => {
             const cfg = STATUS_CONFIG[chamado.status] || STATUS_CONFIG.aberto;
             const StatusIcon = cfg.icon;
             const isOverdue = chamado.prazoEntrega && chamado.prazoEntrega < Date.now() && !["entregue", "cancelado"].includes(chamado.status);
@@ -241,6 +253,18 @@ export default function AdminPosVenda() {
               </Card>
             );
           })}
+
+          {filtered.length > 0 && (
+            <PaginationControls
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={filtered.length}
+              pageSize={pagination.pageSize}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              className="border-t border-border pt-5"
+            />
+          )}
         </div>
 
         {/* Modal: Novo Chamado */}

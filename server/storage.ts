@@ -1,45 +1,38 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
-
-import { ENV } from './_core/env';
-import { getCurrentTenantId } from './tenantDb';
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { ENV } from "./_core/env";
+import { getCurrentTenantId } from "./tenantDb";
 
 type StorageConfig = { baseUrl: string; apiKey: string };
+type S3DeleteConfig = { bucket: string; client: S3Client };
 
 function getStorageConfig(): StorageConfig {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
 
   if (!baseUrl || !apiKey) {
-    throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
+    throw new Error("Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY");
   }
 
   return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
 }
 
-function buildUploadUrl(baseUrl: string, relKey: string): URL {
-  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
-  url.searchParams.set("path", normalizeKey(relKey));
-  return url;
-}
+function getS3DeleteConfig(): S3DeleteConfig | null {
+  if (!ENV.awsRegion || !ENV.awsAccessKeyId || !ENV.awsSecretAccessKey || !ENV.awsS3Bucket) {
+    return null;
+  }
 
-async function buildDownloadUrl(
-  baseUrl: string,
-  relKey: string,
-  apiKey: string
-): Promise<string> {
-  const downloadApiUrl = new URL(
-    "v1/storage/downloadUrl",
-    ensureTrailingSlash(baseUrl)
-  );
-  downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
-  const response = await fetch(downloadApiUrl, {
-    method: "GET",
-    headers: buildAuthHeaders(apiKey),
-  });
-  return (await response.json()).url;
+  return {
+    bucket: ENV.awsS3Bucket,
+    client: new S3Client({
+      region: ENV.awsRegion,
+      endpoint: ENV.awsS3Endpoint || undefined,
+      forcePathStyle: ENV.awsS3ForcePathStyle,
+      credentials: {
+        accessKeyId: ENV.awsAccessKeyId,
+        secretAccessKey: ENV.awsSecretAccessKey,
+      },
+    }),
+  };
 }
 
 function ensureTrailingSlash(value: string): string {
@@ -50,15 +43,31 @@ function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
 
+function buildUploadUrl(baseUrl: string, relKey: string): URL {
+  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
+  url.searchParams.set("path", normalizeKey(relKey));
+  return url;
+}
+
+async function buildDownloadUrl(baseUrl: string, relKey: string, apiKey: string): Promise<string> {
+  const downloadApiUrl = new URL("v1/storage/downloadUrl", ensureTrailingSlash(baseUrl));
+  downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
+  const response = await fetch(downloadApiUrl, {
+    method: "GET",
+    headers: buildAuthHeaders(apiKey),
+  });
+  return (await response.json()).url;
+}
+
 function toFormData(
   data: Buffer | Uint8Array | string,
   contentType: string,
-  fileName: string
+  fileName: string,
 ): FormData {
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
+  const binaryData = typeof data === "string" ? data : new Uint8Array(data);
+  const blob = typeof data === "string"
+    ? new Blob([data], { type: contentType })
+    : new Blob([binaryData], { type: contentType });
   const form = new FormData();
   form.append("file", blob, fileName || "file");
   return form;
@@ -68,21 +77,18 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
-/**
- * Prefixa a chave de upload com o tenant atual (`t/<tenantId>/...`). Sem isso, chaves
- * construídas a partir de IDs sequenciais (sellerId, vehicleId) são previsíveis o
- * suficiente para que alguém monte a chave de um arquivo de outra loja — documentos
- * sensíveis (CNH, comprovante de residência) incluídos. Só afeta uploads novos; arquivos
- * já existentes continuam acessíveis pela URL já salva no banco.
- */
 function withTenantPrefix(relKey: string): string {
   return `t/${getCurrentTenantId()}/${normalizeKey(relKey)}`;
+}
+
+export function isStorageDeleteConfigured() {
+  return getS3DeleteConfig() !== null;
 }
 
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream"
+  contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
   const { baseUrl, apiKey } = getStorageConfig();
   const key = withTenantPrefix(relKey);
@@ -96,19 +102,34 @@ export async function storagePut(
 
   if (!response.ok) {
     const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+    throw new Error(`Storage upload failed (${response.status} ${response.statusText}): ${message}`);
   }
+
   const url = (await response.json()).url;
   return { key, url };
 }
 
-export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
+export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
   return {
     key,
     url: await buildDownloadUrl(baseUrl, key, apiKey),
   };
+}
+
+export async function storageDelete(relKey: string): Promise<{ key: string; deleted: boolean }> {
+  const config = getS3DeleteConfig();
+  const key = normalizeKey(relKey);
+
+  if (!config) {
+    throw new Error("Storage delete requires AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_S3_BUCKET.");
+  }
+
+  await config.client.send(new DeleteObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+  }));
+
+  return { key, deleted: true };
 }

@@ -1363,6 +1363,36 @@ export const inventoryVehicles = mysqlTable("inventory_vehicles", {
 export type InventoryVehicle = typeof inventoryVehicles.$inferSelect;
 export type InsertInventoryVehicle = typeof inventoryVehicles.$inferInsert;
 
+export const inventoryVehicleMedia = mysqlTable("inventory_vehicle_media", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  inventoryVehicleId: int("inventoryVehicleId").notNull(),
+  mediaType: mysqlEnum("mediaType", ["image", "video"]).notNull(),
+  sourceMode: mysqlEnum("sourceMode", ["upload", "external_url", "integration"]).notNull(),
+  storageProvider: mysqlEnum("storageProvider", ["s3", "external"]).notNull(),
+  url: text("url").notNull(),
+  storageKey: varchar("storageKey", { length: 500 }),
+  fileName: varchar("fileName", { length: 255 }),
+  mimeType: varchar("mimeType", { length: 120 }),
+  fileSizeBytes: bigint("fileSizeBytes", { mode: "number" }),
+  width: int("width"),
+  height: int("height"),
+  durationSeconds: int("durationSeconds"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  isPrimary: boolean("isPrimary").default(false).notNull(),
+  status: mysqlEnum("status", ["active", "deleted", "processing"]).default("active").notNull(),
+  createdBySellerId: int("createdBySellerId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  deletedAt: bigint("deletedAt", { mode: "number" }),
+}, (table) => ({
+  tenantIdx: index("idx_inventory_vehicle_media_tenant").on(table.tenantId),
+  vehicleIdx: index("idx_inventory_vehicle_media_vehicle").on(table.inventoryVehicleId),
+  vehicleStatusIdx: index("idx_inventory_vehicle_media_vehicle_status").on(table.inventoryVehicleId, table.status),
+}));
+export type InventoryVehicleMedia = typeof inventoryVehicleMedia.$inferSelect;
+export type InsertInventoryVehicleMedia = typeof inventoryVehicleMedia.$inferInsert;
+
 export const inventoryAuditLogs = mysqlTable("inventory_audit_logs", {
   id: int("id").autoincrement().primaryKey(),
   inventoryId: int("inventoryId").notNull(),

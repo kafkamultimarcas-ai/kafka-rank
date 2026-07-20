@@ -21,23 +21,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
-import { inventorySourceTypes, inventorySortFields } from "@shared/inventory";
-import { ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { formatBRL, inventorySourceTypes, inventorySortFields } from "@shared/inventory";
+import { ChevronLeft, ChevronRight, Eye, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 function formatPrice(value: number | null | undefined) {
-  if (!value) return "Consulte";
-  return value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-  });
+  return formatBRL(value, "Consulte");
 }
 
 function formatKm(value: number | null | undefined) {
@@ -334,34 +336,34 @@ export default function AdminInventory() {
                       <td className="px-4 py-4 align-top text-foreground">{vehicle.modelYear || vehicle.year || "-"}</td>
                       <td className="px-4 py-4 align-top text-foreground">{formatDate(vehicle.entryDate)}</td>
                       <td className="px-4 py-4 align-top">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => setLocation(buildTenantPath(tenantSlug, `/admin/estoque/${vehicle.id}/editar`))}
-                          >
-                            <Pencil className="h-4 w-4" />
-                            Editar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => setDetailsId(vehicle.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            Detalhes
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(vehicle.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Excluir
-                          </Button>
+                        <div className="flex justify-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Ações do veículo">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                onClick={() => setLocation(buildTenantPath(tenantSlug, `/admin/estoque/${vehicle.id}/editar`))}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDetailsId(vehicle.id)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setDeleteId(vehicle.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>
