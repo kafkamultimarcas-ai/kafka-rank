@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { useBranding } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown, Building2 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -92,6 +92,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     key: "posvenda", label: "Pós-Venda", items: [
       { icon: Wrench, label: "Pós-Venda", path: "/admin/pos-venda" },
+      { icon: Building2, label: "Oficinas", path: "/admin/oficinas" },
       { icon: DollarSign, label: "Gastos Pós-Venda", path: "/admin/pv-financeiro" },
     ],
   },

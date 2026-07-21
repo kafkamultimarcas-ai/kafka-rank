@@ -26,6 +26,7 @@ const AdminAgendamentos = lazy(() => import("./pages/admin/AdminAgendamentos"));
 const AdminGerentes = lazy(() => import("./pages/admin/AdminGerentes"));
 const AdminFei = lazy(() => import("./pages/admin/AdminFei"));
 const AdminPosVenda = lazy(() => import("./pages/admin/AdminPosVenda"));
+const AdminOficinas = lazy(() => import("./pages/admin/AdminOficinas"));
 const AdminPvFinanceiro = lazy(() => import("./pages/admin/AdminPvFinanceiro"));
 const AdminMarketing = lazy(() => import("./pages/admin/AdminMarketing"));
 const AdminFinanceiro = lazy(() => import("./pages/admin/AdminFinanceiro"));
@@ -143,6 +144,8 @@ function Router() {
         <Route path="/t/:slug/admin/fei" component={AdminFei} />
         <Route path="/admin/pos-venda" component={AdminPosVenda} />
         <Route path="/t/:slug/admin/pos-venda" component={AdminPosVenda} />
+        <Route path="/admin/oficinas" component={AdminOficinas} />
+        <Route path="/t/:slug/admin/oficinas" component={AdminOficinas} />
         <Route path="/admin/pv-financeiro" component={AdminPvFinanceiro} />
         <Route path="/t/:slug/admin/pv-financeiro" component={AdminPvFinanceiro} />
         <Route path="/admin/marketing" component={AdminMarketing} />

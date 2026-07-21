@@ -2538,3 +2538,7 @@
 
 ## Campo Status no Pós-Venda (Jul 21, 2026)
 - [x] Adicionar combobox Status no formulário de edição do chamado (Aberto, Agendado, Em Serviço, Finalizado, Entregue, Cancelado)
+- [x] CRUD completo de Oficinas Credenciadas (AdminOficinas)
+- [x] Menu lateral: Oficinas abaixo de Pós-Venda
+- [x] Listagem com busca, paginação, ações (editar, excluir, ver, ativar/desativar)
+- [x] Modais de criação, edição, detalhes e confirmação de exclusão
