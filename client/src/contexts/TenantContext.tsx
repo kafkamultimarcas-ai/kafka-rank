@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { getTenantSlugFromPath } from "@/lib/tenant";
+import { applyTenantBranding } from "@/lib/branding";
 import React, { createContext, useContext, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 
@@ -37,28 +38,12 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const root = document.documentElement;
-    // Sobrescreve os tokens de tema (definidos em index.css) com a cor da loja, quando
-    // configurada. --primary/--secondary alimentam todas as classes utilitárias
-    // (bg-primary, text-primary etc via @theme inline), então isso já propaga para o
-    // app inteiro sem precisar tocar em cada componente.
-    if (data?.primaryColor) {
-      root.style.setProperty("--primary", data.primaryColor);
-      root.style.setProperty("--ring", data.primaryColor);
-      root.style.setProperty("--sidebar-primary", data.primaryColor);
-      root.style.setProperty("--sidebar-ring", data.primaryColor);
-    } else {
-      root.style.removeProperty("--primary");
-      root.style.removeProperty("--ring");
-      root.style.removeProperty("--sidebar-primary");
-      root.style.removeProperty("--sidebar-ring");
-    }
-
-    if (data?.secondaryColor) {
-      root.style.setProperty("--secondary", data.secondaryColor);
-    } else {
-      root.style.removeProperty("--secondary");
-    }
+    // Primária: botões/accents. Secundária: tint das superfícies (menu/cards/fundo).
+    // Ver lib/branding.ts — propaga via tokens de tema, sem tocar em cada componente.
+    applyTenantBranding(document.documentElement, {
+      primaryColor: data?.primaryColor,
+      secondaryColor: data?.secondaryColor,
+    });
 
     if (data?.name) {
       document.title = data.name;

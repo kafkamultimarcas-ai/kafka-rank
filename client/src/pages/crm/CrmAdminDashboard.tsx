@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,21 @@ import AssinaturaContent from "@/components/billing/AssinaturaContent";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { useBranding } from "@/contexts/TenantContext";
 import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
+import { applyTenantBranding } from "@/lib/branding";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SyncLogSection } from "@/features/integrations/SyncLogSection";
+import { MetaIntegrationConfig } from "@/features/integrations/MetaIntegrationConfig";
+import { maskPhone } from "@/lib/masks";
+import {
+  normalizeEmailInput,
+  normalizeUfInput,
+  validateHexColor,
+  validateOptionalEmail,
+  validateOptionalPhone,
+  validateUf,
+} from "@/lib/formFieldValidation";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -280,7 +295,7 @@ export default function CrmAdminDashboard() {
           </div>
         </div>
 
-        {activeView === "chat" && <CrmChat isSdr={true} />}
+        {activeView === "chat" && <CrmChat mode="admin" />}
         {activeView === "performance" && <PerformanceDashboard />}
         <div className="p-4">
           {activeView === "dashboard" && <DashboardView onSelectDept={handleDeptClick} />}
@@ -1904,8 +1919,13 @@ function SettingsView() {
 }
 
 // ===== ABA 1: USUÁRIOS ADMINISTRADORES =====
-function SettingsUsersTab() {
-  const { data: admins, refetch } = trpc.adminAuth.list.useQuery();
+export function SettingsUsersTab() {
+  const { data: admins, refetch, isLoading } = trpc.adminAuth.list.useQuery();
+  const pagination = usePagination({ initialPageSize: 10, total: admins?.length ?? 0 });
+  const pagedAdmins = useMemo(
+    () => (admins ?? []).slice(pagination.offset, pagination.offset + pagination.limit),
+    [admins, pagination.offset, pagination.limit],
+  );
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     name: "", username: "", password: "", email: "", phone: "", role: "admin",
@@ -2015,8 +2035,23 @@ function SettingsUsersTab() {
       )}
 
       {/* Admin List */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-xl border border-border bg-card">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <Skeleton className="h-5 w-14 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="space-y-2">
-        {admins?.map((a: any) => {
+        {pagedAdmins.map((a: any) => {
           let perms: Record<string, boolean> = {};
           try { perms = JSON.parse(a.permissions || "{}"); } catch {}
           const activePerms = Object.entries(perms).filter(([, v]) => v).map(([k]) => PERM_LABELS[k] || k);
@@ -2131,12 +2166,24 @@ function SettingsUsersTab() {
             );
           })}
         </div>
-      </div>
+      )}
+
+      {!isLoading && (admins?.length ?? 0) > 0 && (
+        <PaginationControls
+          page={pagination.page}
+          totalPages={pagination.totalPages}
+          total={admins?.length ?? 0}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+        />
+      )}
+    </div>
   );
 }
 
 // ===== ABA 2: DADOS DA LOJA =====
-function SettingsStoreTab() {
+export function SettingsStoreTab() {
   return (
     <div className="space-y-4">
       <div>
@@ -2149,7 +2196,7 @@ function SettingsStoreTab() {
 }
 
 // ===== ABA 3: INTEGRAÇÕES =====
-function SettingsIntegrationsTab() {
+export function SettingsIntegrationsTab() {
   const [, navigate] = useLocation();
   return (
     <div className="space-y-4">
@@ -2179,14 +2226,14 @@ function SettingsIntegrationsTab() {
         </div>
       </div>
 
-      {/* Meta Ads */}
-      <MetaIntegrationPanel />
+      {/* Meta (Facebook + Instagram) — configuração completa embutida */}
+      <MetaIntegrationConfig />
     </div>
   );
 }
 
 // ===== ABA 4: SEGURANÇA E SENHA =====
-function SettingsSecurityTab() {
+export function SettingsSecurityTab() {
   const [myNewPassword, setMyNewPassword] = useState("");
   const [myConfirmPassword, setMyConfirmPassword] = useState("");
 
@@ -2337,104 +2384,6 @@ function TokenIntegrationRow({ type, name, description, endpointLabel, endpointP
             </Button>
           </div>
           <SyncLogSection integrationType={type === 'sig' ? 'sig' : type === 'email_parser' ? 'olx' : type} mutationKey={type === 'sig' ? 'syncSig' : 'syncOlx'} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ===== META ADS (FACEBOOK/INSTAGRAM LEAD ADS) — CONFIG AVANÇADA =====
-function MetaIntegrationPanel() {
-  const utils = trpc.useUtils();
-  const { data: config, refetch } = trpc.crmIntegrations.getMetaConfig.useQuery();
-  const saveConfig = trpc.crmIntegrations.saveMetaConfig.useMutation({
-    onSuccess: () => { toast.success("Configuração do Meta Ads salva!"); refetch(); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-  const testConnection = trpc.crmIntegrations.testMetaConnection.useMutation({
-    onSuccess: (data: any) => { if (data.success) toast.success("Conexão com Meta Ads validada!"); else toast.error(data.error || "Falha na conexão"); },
-    onError: (e: any) => toast.error("Erro: " + e.message),
-  });
-
-  const [expanded, setExpanded] = useState(false);
-  const [form, setForm] = useState({ appId: "", appSecret: "", pageAccessToken: "", verifyToken: "", pageId: "" });
-  const [initialized, setInitialized] = useState(false);
-
-  if (config && !initialized) {
-    setForm({ appId: config.appId || "", appSecret: "", pageAccessToken: "", verifyToken: config.verifyToken || "", pageId: config.pageId || "" });
-    setInitialized(true);
-  }
-
-  const isActive = !!(config?.hasAppSecret && config?.hasPageAccessToken);
-
-  return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between p-4 hover:bg-accent/30 transition-colors">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? "bg-blue-500/20" : "bg-amber-500/20"}`}>
-            <Facebook className={`w-5 h-5 ${isActive ? "text-blue-400" : "text-amber-400"}`} />
-          </div>
-          <div className="text-left">
-            <h3 className="text-sm font-bold text-foreground">Meta Ads (Facebook/Instagram Lead Ads)</h3>
-            <p className="text-[10px] text-muted-foreground">Receba leads direto dos anúncios, sem precisar de Zapier/Make</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-[10px] px-2 py-0.5 rounded ${isActive ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"}`}>
-            {isActive ? "Configurado" : "Pendente"}
-          </span>
-          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
-        </div>
-      </button>
-      {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <p className="text-[11px] text-blue-300 leading-relaxed">
-              Crie um App em <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a>, conecte sua página e copie as credenciais abaixo. Veja o passo a passo completo na documentação de integrações.
-            </p>
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">App ID</label>
-            <Input value={form.appId} onChange={e => setForm({ ...form, appId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 1234567890" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">App Secret</label>
-            <Input value={form.appSecret} type="password" onChange={e => setForm({ ...form, appSecret: e.target.value })}
-              placeholder={config?.hasAppSecret ? "***já configurado*** (deixe vazio para manter)" : "Cole o App Secret aqui"} className="h-9 text-sm font-mono" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Page Access Token</label>
-            <Input value={form.pageAccessToken} type="password" onChange={e => setForm({ ...form, pageAccessToken: e.target.value })}
-              placeholder={config?.hasPageAccessToken ? "***já configurado*** (deixe vazio para manter)" : "Cole o Page Access Token aqui"} className="h-9 text-sm font-mono" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Page ID</label>
-            <Input value={form.pageId} onChange={e => setForm({ ...form, pageId: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: 987654321" />
-          </div>
-          <div>
-            <label className="text-[10px] text-muted-foreground mb-1 block">Verify Token (você escolhe, usado na verificação do webhook)</label>
-            <Input value={form.verifyToken} onChange={e => setForm({ ...form, verifyToken: e.target.value })} className="h-9 text-sm font-mono" placeholder="Ex: kafka-verify-123" />
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" className="flex-1" onClick={() => {
-              const updates: any = {};
-              if (form.appId) updates.appId = form.appId;
-              if (form.appSecret) updates.appSecret = form.appSecret;
-              if (form.pageAccessToken) updates.pageAccessToken = form.pageAccessToken;
-              if (form.verifyToken) updates.verifyToken = form.verifyToken;
-              if (form.pageId) updates.pageId = form.pageId;
-              if (Object.keys(updates).length === 0) { toast.error("Preencha pelo menos um campo"); return; }
-              saveConfig.mutate(updates);
-            }} disabled={saveConfig.isPending}>
-              <Save className="w-3.5 h-3.5 mr-1" />
-              {saveConfig.isPending ? "Salvando..." : "Salvar Credenciais"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => testConnection.mutate()} disabled={testConnection.isPending || !isActive}>
-              <Zap className="w-3.5 h-3.5 mr-1" />
-              {testConnection.isPending ? "Testando..." : "Testar Conexão"}
-            </Button>
-          </div>
-          <SyncLogSection integrationType="meta" mutationKey="syncMeta" />
         </div>
       )}
     </div>
@@ -2610,33 +2559,6 @@ function WhatsAppZapiPanel() {
       </div>
   );
 }
-// ===== GENERIC SYNC LOG SECTION (reusable) =====
-function SyncLogSection({ integrationType, mutationKey }: { integrationType: string; mutationKey: "syncWhatsapp" | "syncSig" | "syncOlx" | "syncMeta" }) {
-  const { data: logs, refetch } = trpc.crmIntegrations.getSyncLogs.useQuery({ integrationType });
-  const sync = (trpc.crmIntegrations as any)[mutationKey].useMutation({
-    onSuccess: () => { toast.success("Verifica\u00e7\u00e3o conclu\u00edda!"); refetch(); },
-    onError: (e: any) => { toast.error("Erro: " + e.message); refetch(); },
-  });
-  const lastLog = logs?.[0];
-  return (
-    <div className="pt-2 border-t border-border/50 space-y-2">
-      <Button size="sm" variant="outline" className="text-xs" onClick={() => sync.mutate()} disabled={sync.isPending}>
-        <RefreshCw className={`w-3.5 h-3.5 mr-1 ${sync.isPending ? 'animate-spin' : ''}`} />
-        {sync.isPending ? 'Verificando...' : 'Sincronizar Agora'}
-      </Button>
-      {lastLog && (
-        <div className="text-[11px] text-muted-foreground">
-          <span className={lastLog.status === 'success' ? 'text-green-400' : 'text-red-400'}>
-            {lastLog.status === 'success' ? '\u2713 \u00daltima verifica\u00e7\u00e3o' : '\u2717 Falha'}
-          </span>
-          {' '}em {new Date(lastLog.createdAt).toLocaleString("pt-BR")}
-          {lastLog.summary ? ` \u2014 ${lastLog.summary}` : ''}
-          {lastLog.status === 'error' && lastLog.errorMessage ? ` \u2014 ${lastLog.errorMessage}` : ''}
-        </div>
-      )}
-    </div>
-  );
-}
 // ===== ESTOQUE (URL de sincronização) PANEL =====
 function InventoryIntegrationPanel() {
   const { data: settings, refetch } = trpc.crmPerformance.getTenantSettings.useQuery();
@@ -2755,22 +2677,162 @@ function StoreDataPanel() {
   };
 
   const [showStore, setShowStore] = useState(false);
-  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '' });
-  const [initialized, setInitialized] = useState(false);
+  const [storeForm, setStoreForm] = useState({ name: "", phone: "", email: "", city: "", state: "", address: "", primaryColor: "", secondaryColor: "" });
+  const [errors, setErrors] = useState<Partial<Record<"phone" | "email" | "state" | "primaryColor" | "secondaryColor", string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<"phone" | "email" | "state" | "primaryColor" | "secondaryColor", boolean>>>({});
 
-  if (settings && !initialized) {
+  // ===== Preview ao vivo do branding (cores da loja) =====
+  const savedBrandingRef = useRef<{ primaryColor: string | null; secondaryColor: string | null }>({ primaryColor: null, secondaryColor: null });
+  useEffect(() => {
+    savedBrandingRef.current = {
+      primaryColor: settings?.primaryColor ?? null,
+      secondaryColor: settings?.secondaryColor ?? null,
+    };
+  }, [settings?.primaryColor, settings?.secondaryColor]);
+
+  // Aplica o preview enquanto o painel está aberto (sem revert por tecla → sem flicker).
+  useEffect(() => {
+    if (showStore) {
+      applyTenantBranding(document.documentElement, {
+        primaryColor: storeForm.primaryColor || null,
+        secondaryColor: storeForm.secondaryColor || null,
+      });
+    }
+  }, [showStore, storeForm.primaryColor, storeForm.secondaryColor]);
+
+  // Restaura o branding salvo ao fechar o painel ou desmontar (descarta preview não salvo).
+  useEffect(() => {
+    if (!showStore) applyTenantBranding(document.documentElement, savedBrandingRef.current);
+    return () => { applyTenantBranding(document.documentElement, savedBrandingRef.current); };
+  }, [showStore]);
+
+  useEffect(() => {
+    if (!settings) return;
+
     setStoreForm({
-      name: settings.name || '',
-      phone: settings.phone || '',
-      email: settings.email || '',
-      city: settings.city || '',
-      state: settings.state || '',
-      address: settings.address || '',
-      primaryColor: settings.primaryColor || '#DC2626',
-      secondaryColor: settings.secondaryColor || '#1F2937',
+      name: settings.name || "",
+      phone: settings.phone || "",
+      email: settings.email || "",
+      city: settings.city || "",
+      state: settings.state || "",
+      address: settings.address || "",
+      primaryColor: settings.primaryColor || "#DC2626",
+      secondaryColor: settings.secondaryColor || "#1F2937",
     });
-    setInitialized(true);
-  }
+    setErrors({});
+    setTouched({});
+  }, [settings]);
+
+  const setStoreField = useCallback((field: keyof typeof storeForm, value: string) => {
+    setStoreForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }, []);
+
+  const runStoreFieldValidation = useCallback((field: "phone" | "email" | "state" | "primaryColor" | "secondaryColor", value: string) => {
+    let nextError: string | null = null;
+
+    switch (field) {
+      case "phone":
+        nextError = validateOptionalPhone(value);
+        break;
+      case "email":
+        nextError = validateOptionalEmail(value);
+        break;
+      case "state":
+        nextError = validateUf(value);
+        break;
+      case "primaryColor":
+      case "secondaryColor":
+        nextError = validateHexColor(value);
+        break;
+    }
+
+    setErrors((current) => {
+      if (!nextError) {
+        const { [field]: _removed, ...rest } = current;
+        return rest;
+      }
+
+      return {
+        ...current,
+        [field]: nextError,
+      };
+    });
+
+    return nextError;
+  }, []);
+
+  const handleStoreBlur = useCallback((field: "phone" | "email" | "state" | "primaryColor" | "secondaryColor") => {
+    setTouched((current) => ({ ...current, [field]: true }));
+
+    if (field === "email") {
+      const normalized = normalizeEmailInput(storeForm.email);
+      if (normalized !== storeForm.email) {
+        setStoreField("email", normalized);
+      }
+      return runStoreFieldValidation(field, normalized);
+    }
+
+    if (field === "state") {
+      const normalized = normalizeUfInput(storeForm.state);
+      if (normalized !== storeForm.state) {
+        setStoreField("state", normalized);
+      }
+      return runStoreFieldValidation(field, normalized);
+    }
+
+    return runStoreFieldValidation(field, storeForm[field]);
+  }, [runStoreFieldValidation, setStoreField, storeForm]);
+
+  const validateStoreForm = useCallback(() => {
+    const normalizedEmail = normalizeEmailInput(storeForm.email);
+    const normalizedState = normalizeUfInput(storeForm.state);
+
+    const phoneError = runStoreFieldValidation("phone", storeForm.phone);
+    const emailError = runStoreFieldValidation("email", normalizedEmail);
+    const stateError = runStoreFieldValidation("state", normalizedState);
+    const primaryColorError = runStoreFieldValidation("primaryColor", storeForm.primaryColor);
+    const secondaryColorError = runStoreFieldValidation("secondaryColor", storeForm.secondaryColor);
+
+    setTouched({
+      phone: true,
+      email: true,
+      state: true,
+      primaryColor: true,
+      secondaryColor: true,
+    });
+
+    return !phoneError && !emailError && !stateError && !primaryColorError && !secondaryColorError;
+  }, [runStoreFieldValidation, storeForm]);
+
+  const handleSaveStore = useCallback(() => {
+    const normalizedEmail = normalizeEmailInput(storeForm.email);
+    const normalizedState = normalizeUfInput(storeForm.state);
+
+    setStoreForm((current) => ({
+      ...current,
+      email: normalizedEmail,
+      state: normalizedState,
+    }));
+
+    if (!validateStoreForm()) {
+      toast.error("Revise os campos destacados antes de salvar.");
+      return;
+    }
+
+    updateSettings.mutate({
+      name: storeForm.name.trim(),
+      phone: storeForm.phone.trim(),
+      email: normalizedEmail,
+      city: storeForm.city.trim(),
+      state: normalizedState,
+      address: storeForm.address.trim(),
+      primaryColor: storeForm.primaryColor.trim(),
+      secondaryColor: storeForm.secondaryColor.trim(),
+    });
+  }, [storeForm, updateSettings, validateStoreForm]);
 
   // Store Data Configuration
   return (
@@ -2812,23 +2874,52 @@ function StoreDataPanel() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Nome da Loja</label>
-                <Input value={storeForm.name} onChange={e => setStoreForm({ ...storeForm, name: e.target.value })} className="h-9 text-sm" />
+                <Input value={storeForm.name} onChange={e => setStoreField("name", e.target.value)} className="h-9 text-sm" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Telefone</label>
-                <Input value={storeForm.phone} onChange={e => setStoreForm({ ...storeForm, phone: e.target.value })} className="h-9 text-sm" placeholder="(11) 99999-9999" />
+                <Input
+                  value={storeForm.phone}
+                  onChange={e => setStoreField("phone", maskPhone(e.target.value))}
+                  onBlur={() => handleStoreBlur("phone")}
+                  className="h-9 text-sm"
+                  placeholder="(11) 99999-9999"
+                  inputMode="tel"
+                  maxLength={15}
+                  aria-invalid={!!(touched.phone && errors.phone)}
+                />
+                {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-destructive">{errors.phone}</p>}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Email</label>
-                <Input value={storeForm.email} onChange={e => setStoreForm({ ...storeForm, email: e.target.value })} className="h-9 text-sm" type="email" />
+                <Input
+                  value={storeForm.email}
+                  onChange={e => setStoreField("email", e.target.value)}
+                  onBlur={() => handleStoreBlur("email")}
+                  className="h-9 text-sm"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  aria-invalid={!!(touched.email && errors.email)}
+                />
+                {touched.email && errors.email && <p className="mt-1 text-[10px] text-destructive">{errors.email}</p>}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Cidade</label>
-                <Input value={storeForm.city} onChange={e => setStoreForm({ ...storeForm, city: e.target.value })} className="h-9 text-sm" />
+                <Input value={storeForm.city} onChange={e => setStoreField("city", e.target.value)} className="h-9 text-sm" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Estado (UF)</label>
-                <Input value={storeForm.state} onChange={e => setStoreForm({ ...storeForm, state: e.target.value })} className="h-9 text-sm" maxLength={2} placeholder="SP" />
+                <Input
+                  value={storeForm.state}
+                  onChange={e => setStoreField("state", normalizeUfInput(e.target.value))}
+                  onBlur={() => handleStoreBlur("state")}
+                  className="h-9 text-sm uppercase"
+                  maxLength={2}
+                  placeholder="SP"
+                  aria-invalid={!!(touched.state && errors.state)}
+                />
+                {touched.state && errors.state && <p className="mt-1 text-[10px] text-destructive">{errors.state}</p>}
               </div>
             </div>
             <div>
@@ -2839,25 +2930,33 @@ function StoreDataPanel() {
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Cor Principal</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={storeForm.primaryColor} onChange={e => setStoreForm({ ...storeForm, primaryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-border" />
-                  <Input value={storeForm.primaryColor} onChange={e => setStoreForm({ ...storeForm, primaryColor: e.target.value })} className="h-9 text-sm font-mono flex-1" />
+                  <input type="color" value={storeForm.primaryColor} onChange={e => setStoreField("primaryColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <Input
+                    value={storeForm.primaryColor}
+                    onChange={e => setStoreField("primaryColor", e.target.value)}
+                    onBlur={() => handleStoreBlur("primaryColor")}
+                    className="h-9 text-sm font-mono flex-1"
+                    aria-invalid={!!(touched.primaryColor && errors.primaryColor)}
+                  />
                 </div>
+                {touched.primaryColor && errors.primaryColor && <p className="mt-1 text-[10px] text-destructive">{errors.primaryColor}</p>}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Cor Secundária</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={storeForm.secondaryColor} onChange={e => setStoreForm({ ...storeForm, secondaryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-border" />
-                  <Input value={storeForm.secondaryColor} onChange={e => setStoreForm({ ...storeForm, secondaryColor: e.target.value })} className="h-9 text-sm font-mono flex-1" />
+                  <input type="color" value={storeForm.secondaryColor} onChange={e => setStoreField("secondaryColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <Input
+                    value={storeForm.secondaryColor}
+                    onChange={e => setStoreField("secondaryColor", e.target.value)}
+                    onBlur={() => handleStoreBlur("secondaryColor")}
+                    className="h-9 text-sm font-mono flex-1"
+                    aria-invalid={!!(touched.secondaryColor && errors.secondaryColor)}
+                  />
                 </div>
+                {touched.secondaryColor && errors.secondaryColor && <p className="mt-1 text-[10px] text-destructive">{errors.secondaryColor}</p>}
               </div>
             </div>
-            <Button size="sm" className="w-full" onClick={() => {
-              const updates: any = {};
-              for (const [k, v] of Object.entries(storeForm)) {
-                if (v) updates[k] = v;
-              }
-              updateSettings.mutate(updates);
-            }} disabled={updateSettings.isPending}>
+            <Button size="sm" className="w-full" onClick={handleSaveStore} disabled={updateSettings.isPending}>
               <Save className="w-3.5 h-3.5 mr-1" />
               {updateSettings.isPending ? 'Salvando...' : 'Salvar Dados da Loja'}
             </Button>

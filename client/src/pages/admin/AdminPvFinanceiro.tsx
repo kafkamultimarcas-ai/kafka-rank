@@ -1,10 +1,13 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
+import MonthFilter from "@/components/MonthFilter";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import {
   DollarSign, CheckCircle2, Clock, XCircle, CreditCard,
   Car, User, FileText, ExternalLink
@@ -28,19 +31,30 @@ export default function AdminPvFinanceiro() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [showAllMonths, setShowAllMonths] = useState(false);
+  const pagination = usePagination({
+    initialPageSize: 20,
+    resetDeps: [filter, filterMonth, filterYear, showAllMonths],
+  });
   const resumoQuery = trpc.pvGastos.resumo.useQuery();
-  const gastosQuery = trpc.pvGastos.listAll.useQuery({ statusAprovacao: filter !== "todos" ? filter : undefined });
+  const gastosQuery = trpc.pvGastos.listAll.useQuery({
+    statusAprovacao: filter !== "todos" ? filter : undefined,
+    month: filterMonth,
+    year: filterYear,
+    showAll: showAllMonths,
+    offset: pagination.offset,
+    limit: pagination.pageSize,
+  });
   const statusMutation = trpc.pvGastos.updateStatus.useMutation({
     onSuccess: () => { toast.success("Status atualizado!"); gastosQuery.refetch(); resumoQuery.refetch(); },
     onError: (err) => toast.error(err.message),
   });
 
   const resumo = resumoQuery.data || { pendente: 0, autorizado: 0, recusado: 0, pago: 0 };
-  const allGastos = gastosQuery.data || [];
-  const gastos = useMemo(() => {
-    if (showAllMonths) return allGastos;
-    return filterByMonth(allGastos, filterMonth, filterYear, 'createdAt' as any);
-  }, [allGastos, filterMonth, filterYear, showAllMonths]);
+  const gastos = gastosQuery.data?.items ?? [];
+  const total = gastosQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
+  const isLoading = gastosQuery.isLoading;
+  const isFetching = gastosQuery.isFetching;
   const totalGeral = resumo.pendente + resumo.autorizado + resumo.pago;
 
   return (
@@ -104,13 +118,14 @@ export default function AdminPvFinanceiro() {
 
         {/* Lista de gastos */}
         <div className="space-y-3">
-          {gastos.length === 0 && (
+          {isLoading && <ListSkeleton rows={6} />}
+          {!isLoading && gastos.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <DollarSign className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p>Nenhum gasto encontrado</p>
             </div>
           )}
-          {gastos.map((g: any) => {
+          {!isLoading && gastos.map((g: any) => {
             const st = STATUS_GASTO[g.statusAprovacao] || STATUS_GASTO.pendente;
             const StIcon = st.icon;
             return (
@@ -165,6 +180,19 @@ export default function AdminPvFinanceiro() {
               </Card>
             );
           })}
+
+          {!isLoading && total > 0 && (
+            <PaginationControls
+              page={pagination.page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pagination.pageSize}
+              isLoading={isFetching}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              className="border-t border-border pt-5"
+            />
+          )}
         </div>
       </div>
     </DashboardLayout>

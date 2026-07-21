@@ -2,6 +2,10 @@ import { z } from "zod";
 
 export const inventoryStatuses = ["available", "reserved", "sold"] as const;
 export const inventorySourceTypes = ["sync", "manual", "integration"] as const;
+export const inventoryMediaTypes = ["image", "video"] as const;
+export const inventoryMediaSourceModes = ["upload", "external_url", "integration"] as const;
+export const inventoryMediaStorageProviders = ["s3", "external"] as const;
+export const inventoryMediaStatuses = ["active", "deleted", "processing"] as const;
 export const inventorySortFields = [
   "createdAt",
   "entryDate",
@@ -36,8 +40,16 @@ const optionalInt = z
   });
 
 const optionalBool = z.boolean().optional().default(false);
-
-const stringArray = z.array(z.string().trim().min(1).max(255)).max(100).default([]);
+// Listas de texto (opcionais, destaques, tags): tolerantes a dados vindos de
+// integração/scraper, que podem trazer descrições longas e muitos itens.
+const stringArray = z.array(z.string().trim().min(1).max(500)).max(200).default([]);
+// Galeria de fotos: são URLs, que em CDNs externas podem ser bem longas.
+const urlListSchema = z.array(z.string().trim().min(1).max(2048)).max(200).default([]);
+// base64 infla ~33%: 40MB de vídeo ≈ 53M chars. Teto de 56M com folga.
+const inventoryMediaBase64Schema = z.string().max(56 * 1024 * 1024, "Arquivo muito grande.");
+const inventoryMediaFilenameSchema = z.string().trim().min(1).max(255);
+const mediaDimensionSchema = z.number().int().min(1).max(20000).optional();
+const mediaDurationSchema = z.number().min(0).max(60 * 60 * 12).optional();
 
 export const inventoryAdminListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -76,7 +88,9 @@ export const inventoryDetailedBaseSchema = z.object({
   manufactureYear: optionalInt,
   modelYear: optionalInt,
   km: optionalInt,
-  price: z.number().int().min(1, "Preço é obrigatório"),
+  // Preço 0 é aceito para salvar rascunho / editar dados integrados; a
+  // exigência de preço > 0 fica no checklist de publicação.
+  price: z.number().int().min(0),
   offerPrice: optionalInt,
   fipePrice: optionalInt,
   purchasePrice: optionalInt,
@@ -86,7 +100,7 @@ export const inventoryDetailedBaseSchema = z.object({
   otherCosts: optionalInt,
   minimumSalePrice: optionalInt,
   photoUrl: optionalUrl,
-  photos: stringArray,
+  photos: urlListSchema,
   optionals: stringArray,
   highlightItems: stringArray,
   internalTags: stringArray,
@@ -113,6 +127,34 @@ export const inventorySoftDeleteInputSchema = z.object({
   reason: z.string().trim().min(3, "Informe o motivo da exclusão").max(500),
 });
 
+export const inventoryUploadMediaInputSchema = z.object({
+  vehicleId: z.number().int().positive(),
+  fileName: inventoryMediaFilenameSchema,
+  base64: inventoryMediaBase64Schema,
+  mimeType: z.string().trim().min(1).max(120),
+  width: mediaDimensionSchema,
+  height: mediaDimensionSchema,
+  durationSeconds: mediaDurationSchema,
+});
+
+export const inventoryDeleteMediaInputSchema = z.object({
+  mediaId: z.number().int().positive(),
+});
+
+export const inventorySetPrimaryMediaInputSchema = z.object({
+  vehicleId: z.number().int().positive(),
+  mediaId: z.number().int().positive(),
+});
+
+export const inventoryReorderMediaInputSchema = z.object({
+  vehicleId: z.number().int().positive(),
+  orderedIds: z.array(z.number().int().positive()).min(1).max(200),
+});
+
+export const inventoryListMediaInputSchema = z.object({
+  vehicleId: z.number().int().positive(),
+});
+
 export const inventoryDuplicateValidationInputSchema = z.object({
   id: z.number().int().positive().optional(),
   plate: trimmedOptionalString,
@@ -124,6 +166,24 @@ export type InventoryAdminListInput = z.infer<typeof inventoryAdminListInputSche
 export type InventoryCreateDetailedInput = z.infer<typeof inventoryCreateDetailedInputSchema>;
 export type InventoryUpdateDetailedInput = z.infer<typeof inventoryUpdateDetailedInputSchema>;
 export type InventorySoftDeleteInput = z.infer<typeof inventorySoftDeleteInputSchema>;
+export type InventoryUploadMediaInput = z.infer<typeof inventoryUploadMediaInputSchema>;
+
+/**
+ * Formatação monetária única do app (BRL, sem centavos). Aceita número ou
+ * string de dígitos. Use `fallback` para o texto quando não houver valor
+ * (ex: "Consulte" no público, "—" em telas internas).
+ */
+export function formatBRL(value: number | string | null | undefined, fallback = "—"): string {
+  const numeric = typeof value === "string" ? Number(value.replace(/[^\d.-]/g, "")) : Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric === 0) return fallback;
+  return numeric.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0 });
+}
+
+/** Normaliza um valor de exibição, retornando "—" quando vazio. */
+export function summaryValue(value?: string | null): string {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : "—";
+}
 
 export function splitLinesToList(value: string): string[] {
   return value

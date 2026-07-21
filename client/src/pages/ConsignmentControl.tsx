@@ -4,6 +4,9 @@ import { useState, useMemo } from "react";
 import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Phone, DollarSign, FileText, ShieldCheck, Tag } from "lucide-react";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import { Button } from "@/components/ui/button";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
@@ -36,11 +39,11 @@ export default function ConsignmentControl() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // Dados
-  const { data: yardVehicles, refetch: refetchYard } = trpc.consignment.yard.useQuery();
-  const { data: completed7Days, refetch: refetchCompleted } = trpc.consignment.completed7Days.useQuery(
+  const { data: yardVehicles, isLoading: loadingYard, refetch: refetchYard } = trpc.consignment.yard.useQuery();
+  const { data: completed7Days, isLoading: loadingCompleted, refetch: refetchCompleted } = trpc.consignment.completed7Days.useQuery(
     { month: filterMonth + 1, year: filterYear }
   );
-  const { data: exitedVehicles, refetch: refetchExited } = trpc.consignment.exited.useQuery(
+  const { data: exitedVehicles, isLoading: loadingExited, refetch: refetchExited } = trpc.consignment.exited.useQuery(
     { month: filterMonth + 1, year: filterYear }
   );
 
@@ -57,6 +60,15 @@ export default function ConsignmentControl() {
     );
   };
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: false });
+
+  // Paginação da aba ativa (client-side: as 3 listas já são carregadas para os
+  // contadores das abas, então server-side não reduziria carga aqui).
+  const pagination = usePagination({ initialPageSize: 20, resetDeps: [activeTab, searchTerm, filterMonth, filterYear] });
+  const activeIsLoading = activeTab === "patio" ? loadingYard : activeTab === "completed" ? loadingCompleted : loadingExited;
+  const activeRaw = activeTab === "patio" ? yardVehicles : activeTab === "completed" ? completed7Days : exitedVehicles;
+  const activeFilteredTotal = filterVehicles(activeRaw).length;
+  const activeTotalPages = Math.max(1, Math.ceil(activeFilteredTotal / pagination.pageSize));
+  const pagedFilter = (list: any[] | undefined) => filterVehicles(list).slice(pagination.offset, pagination.offset + pagination.limit);
 
   // Edit state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -303,8 +315,10 @@ export default function ConsignmentControl() {
           />
         </div>
 
+        {activeIsLoading && <ListSkeleton rows={6} />}
+
         {/* VEÍCULOS NO PÁTIO */}
-        {activeTab === "patio" && (
+        {activeTab === "patio" && !activeIsLoading && (
           <>
             <div className="flex items-center gap-2 mb-2">
               <Car className="w-4 h-4 text-blue-400" />
@@ -319,7 +333,7 @@ export default function ConsignmentControl() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filterVehicles(yardVehicles).map((v: any) => {
+                {pagedFilter(yardVehicles).map((v: any) => {
                   const days = getDaysInYard(v.entryDate);
                   const isNear7 = days >= 5 && days < 7;
                   const isOver7 = days >= 7;
@@ -424,7 +438,7 @@ export default function ConsignmentControl() {
         )}
 
         {/* COMPLETARAM 7 DIAS */}
-        {activeTab === "completed" && (
+        {activeTab === "completed" && !activeIsLoading && (
           <>
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -447,7 +461,7 @@ export default function ConsignmentControl() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filterVehicles(completed7Days).map((v: any) => {
+                {pagedFilter(completed7Days).map((v: any) => {
                   const days = getDaysInYard(v.entryDate, v.exitDate);
                   const isExpanded = expandedId === v.id;
                   return (
@@ -492,7 +506,7 @@ export default function ConsignmentControl() {
         )}
 
         {/* HISTÓRICO (SAÍRAM) */}
-        {activeTab === "history" && (
+        {activeTab === "history" && !activeIsLoading && (
           <>
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-muted-foreground" />
@@ -506,7 +520,7 @@ export default function ConsignmentControl() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filterVehicles(exitedVehicles).map((v: any) => {
+                {pagedFilter(exitedVehicles).map((v: any) => {
                   const days = getDaysInYard(v.entryDate, v.exitDate);
                   const isExpanded = expandedId === v.id;
                   return (
@@ -551,6 +565,18 @@ export default function ConsignmentControl() {
               </div>
             )}
           </>
+        )}
+
+        {!activeIsLoading && activeFilteredTotal > 0 && (
+          <PaginationControls
+            page={pagination.page}
+            totalPages={activeTotalPages}
+            total={activeFilteredTotal}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            className="border-t border-border pt-5"
+          />
         )}
       </div>
 

@@ -139,6 +139,36 @@ export const fichaRouter = router({
     return listFichasFinanciamento(input);
   }),
 
+  // Listagem paginada server-side (Mesa de Crédito) — filtro status/busca + ordenação
+  listPaged: publicProcedure.input(z.object({
+    status: z.string().optional(),
+    search: z.string().optional(),
+    offset: z.number().int().min(0).default(0),
+    limit: z.number().int().min(1).max(100).default(20),
+  })).query(async ({ input, ctx }) => {
+    const privacySellerId = await getFichaPrivacySellerId(ctx);
+    const all = await listFichasFinanciamento(privacySellerId ? { sellerId: privacySellerId } : {});
+    let list = all;
+    if (input.status && input.status !== "todos") list = list.filter((f: any) => f.status === input.status);
+    const q = input.search?.toLowerCase().trim();
+    if (q) {
+      list = list.filter((f: any) =>
+        f.nomeCompleto?.toLowerCase().includes(q) ||
+        f.cpf?.includes(q) ||
+        f.placa?.toLowerCase().includes(q) ||
+        f.veiculo?.toLowerCase().includes(q)
+      );
+    }
+    // Na fila primeiro, depois em análise, parciais, aprovadas, recusadas; mais antigo primeiro
+    const order: Record<string, number> = { na_fila: 0, em_analise: 1, parcial: 2, aprovado: 3, recusado: 4 };
+    list = [...list].sort((a: any, b: any) => {
+      const diff = (order[a.status] ?? 5) - (order[b.status] ?? 5);
+      if (diff !== 0) return diff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+    return { items: list.slice(input.offset, input.offset + input.limit), total: list.length };
+  }),
+
   // Detalhe da ficha com bancos
   getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
     const ficha = await getFichaById(input.id);

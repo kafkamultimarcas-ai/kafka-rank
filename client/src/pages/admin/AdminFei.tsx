@@ -18,9 +18,12 @@ import {
   User,
   Calendar,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
+import MonthFilter from "@/components/MonthFilter";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 
 function formatDate(ts: number | string | Date | null | undefined) {
   if (!ts) return "—";
@@ -62,7 +65,6 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AdminFei() {
-  const { data: allFei, isLoading } = trpc.fei.list.useQuery({});
   const { data: sellers } = trpc.sellers.list.useQuery({});
   const utils = trpc.useUtils();
 
@@ -94,22 +96,22 @@ export default function AdminFei() {
   );
 
   const approveFei = trpc.fei.approve.useMutation({
-    onSuccess: () => { utils.fei.list.invalidate(); utils.sellers.list.invalidate(); toast.success("F&I aprovado!"); },
+    onSuccess: () => { utils.fei.invalidate(); utils.sellers.list.invalidate(); toast.success("F&I aprovado!"); },
     onError: () => toast.error("Erro ao aprovar."),
   });
 
   const rejectFei = trpc.fei.reject.useMutation({
-    onSuccess: () => { utils.fei.list.invalidate(); utils.sellers.list.invalidate(); toast.success("F&I rejeitado."); },
+    onSuccess: () => { utils.fei.invalidate(); utils.sellers.list.invalidate(); toast.success("F&I rejeitado."); },
     onError: () => toast.error("Erro ao rejeitar."),
   });
 
   const deleteFei = trpc.fei.delete.useMutation({
-    onSuccess: () => { utils.fei.list.invalidate(); utils.sellers.list.invalidate(); toast.success("Registro removido!"); },
+    onSuccess: () => { utils.fei.invalidate(); utils.sellers.list.invalidate(); toast.success("Registro removido!"); },
     onError: () => toast.error("Erro ao remover."),
   });
 
   const updateFei = trpc.fei.update.useMutation({
-    onSuccess: () => { utils.fei.list.invalidate(); toast.success("Registro atualizado!"); setEditDialog(false); setEditReason(""); },
+    onSuccess: () => { utils.fei.invalidate(); toast.success("Registro atualizado!"); setEditDialog(false); setEditReason(""); },
     onError: (err) => toast.error(err.message || "Erro ao atualizar."),
   });
 
@@ -132,28 +134,29 @@ export default function AdminFei() {
 
   const getSeller = (id: number) => sellers?.find(s => s.id === id);
 
-  // Filtros por mês
-  const allRecords = allFei || [];
-  const records = useMemo(() => {
-    if (showAllMonths) return allRecords;
-    return filterByMonth(allRecords, filterMonth, filterYear, 'createdAt' as any);
-  }, [allRecords, filterMonth, filterYear, showAllMonths]);
-  const approvedCount = records.filter((r: any) => r.status === "approved").length;
-  const pendingCount = records.filter((r: any) => r.status === "pending").length;
-  const rejectedCount = records.filter((r: any) => r.status === "rejected").length;
-
-  const filteredRecords = useMemo(() => {
-    let list = records;
-    if (statusFilter !== "todos") list = list.filter((r: any) => r.status === statusFilter);
-    if (sellerFilter !== "todos") list = list.filter((r: any) => String(r.sellerId) === sellerFilter);
-    return list;
-  }, [records, statusFilter, sellerFilter]);
-
-  // Sellers que têm registros F&I
-  const feiSellers = useMemo(() => {
-    const ids = new Set(records.map((r: any) => r.sellerId));
-    return (sellers || []).filter(s => ids.has(s.id));
-  }, [records, sellers]);
+  const pagination = usePagination({
+    initialPageSize: 20,
+    resetDeps: [filterMonth, filterYear, showAllMonths, statusFilter, sellerFilter],
+  });
+  const feiQuery = trpc.fei.listPaged.useQuery({
+    month: filterMonth,
+    year: filterYear,
+    showAll: showAllMonths,
+    status: statusFilter,
+    sellerId: sellerFilter !== "todos" ? Number(sellerFilter) : undefined,
+    offset: pagination.offset,
+    limit: pagination.pageSize,
+  });
+  const filteredRecords = feiQuery.data?.items ?? [];
+  const total = feiQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
+  const counts = feiQuery.data?.counts ?? { total: 0, approved: 0, pending: 0, rejected: 0, totalApproved: 0, totalPending: 0 };
+  const isLoading = feiQuery.isLoading;
+  const isFetching = feiQuery.isFetching;
+  const approvedCount = counts.approved;
+  const pendingCount = counts.pending;
+  const rejectedCount = counts.rejected;
+  const feiSellers = (sellers || []).filter(s => (feiQuery.data?.sellerIds ?? []).includes(s.id));
 
   function openEdit(record: any) {
     setEditingRecord(record);
@@ -180,9 +183,9 @@ export default function AdminFei() {
     }
   }
 
-  // Valor total financiado por status
-  const totalApproved = records.filter((r: any) => r.status === "approved").reduce((sum: number, r: any) => sum + (r.financedValue || 0), 0);
-  const totalPending = records.filter((r: any) => r.status === "pending").reduce((sum: number, r: any) => sum + (r.financedValue || 0), 0);
+  // Valor total financiado por status (vem do servidor)
+  const totalApproved = counts.totalApproved;
+  const totalPending = counts.totalPending;
 
   return (
     <DashboardLayout>
@@ -198,7 +201,7 @@ export default function AdminFei() {
         {/* Stats - Clicáveis */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button onClick={() => setStatusFilter("todos")} className={`racing-card p-4 text-center transition-all cursor-pointer ${statusFilter === 'todos' ? 'ring-2 ring-foreground/50' : 'hover:ring-1 hover:ring-foreground/30'}`}>
-            <p className="text-2xl font-black text-foreground">{records.length}</p>
+            <p className="text-2xl font-black text-foreground">{counts.total}</p>
             <p className="text-xs text-muted-foreground">Total</p>
           </button>
           <button onClick={() => setStatusFilter("approved")} className={`racing-card p-4 text-center border-l-4 border-l-emerald-500 transition-all cursor-pointer ${statusFilter === 'approved' ? 'ring-2 ring-emerald-400' : 'hover:ring-1 hover:ring-emerald-400/50'}`}>
@@ -231,7 +234,7 @@ export default function AdminFei() {
         <div className="flex flex-wrap gap-3 items-center">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {[
-              { key: "todos" as const, label: "Todas", count: records.length },
+              { key: "todos" as const, label: "Todas", count: counts.total },
               { key: "approved" as const, label: "Aprovadas", count: approvedCount },
               { key: "pending" as const, label: "Pendentes", count: pendingCount },
               { key: "rejected" as const, label: "Rejeitadas", count: rejectedCount },
@@ -270,10 +273,9 @@ export default function AdminFei() {
 
         {/* Lista */}
         {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => <div key={i} className="racing-card p-4 h-24 animate-pulse" />)}
-          </div>
+          <ListSkeleton rows={6} />
         ) : filteredRecords.length > 0 ? (
+          <>
           <div className="space-y-3">
             {filteredRecords.map((record: any) => {
               const seller = getSeller(record.sellerId);
@@ -461,6 +463,17 @@ export default function AdminFei() {
               );
             })}
           </div>
+          <PaginationControls
+            page={pagination.page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pagination.pageSize}
+            isLoading={isFetching}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            className="border-t border-border pt-5"
+          />
+          </>
         ) : (
           <div className="racing-card p-12 text-center">
             <Filter className="w-8 h-8 text-muted-foreground mx-auto mb-2" />

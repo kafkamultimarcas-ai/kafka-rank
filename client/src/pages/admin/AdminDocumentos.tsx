@@ -8,6 +8,9 @@ import {
   CheckCircle2, ArrowRight, Filter, Search, Download, Loader2,
   Trash2, MessageSquare, X, ArrowLeft
 } from "lucide-react";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
   aguardando_docs: { label: "Aguardando Docs", color: "text-red-400", bg: "bg-red-500/20", icon: FileWarning },
@@ -31,7 +34,14 @@ export default function AdminDocumentos() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: docs, refetch } = trpc.saleDocuments.listAll.useQuery({});
+  const pagination = usePagination({ initialPageSize: 20, resetDeps: [filter, search] });
+  const listQuery = trpc.saleDocuments.listAll.useQuery({
+    offset: pagination.offset,
+    limit: pagination.pageSize,
+    search: search || undefined,
+    dispatchStatus: filter,
+  });
+  const refetch = listQuery.refetch;
   const markInTransfer = trpc.saleDocuments.markInTransfer.useMutation({
     onSuccess: () => { toast.success("Marcado como em transferência!"); refetch(); },
     onError: (e) => toast.error(e.message),
@@ -81,24 +91,12 @@ export default function AdminDocumentos() {
     setDeletingId(id);
   };
 
-  const allDocs = docs || [];
-  // Filter by dispatchStatus (client-side) since backend filter uses docStatus
-  const statusFiltered = filter !== "todos" ? allDocs.filter((d: any) => d.dispatchStatus === filter) : allDocs;
-  const filteredDocs = search
-    ? statusFiltered.filter((d: any) =>
-        (d.clienteNome || "").toLowerCase().includes(search.toLowerCase()) ||
-        (d.vehicleModel || "").toLowerCase().includes(search.toLowerCase()) ||
-        (d.vehiclePlate || "").toLowerCase().includes(search.toLowerCase())
-      )
-    : statusFiltered;
-
-  const counts = {
-    total: allDocs.length,
-    aguardando: allDocs.filter((d: any) => d.dispatchStatus === "aguardando_docs").length,
-    recebidos: allDocs.filter((d: any) => d.dispatchStatus === "docs_enviados").length,
-    emTransferencia: allDocs.filter((d: any) => d.dispatchStatus === "em_transferencia").length,
-    transferidos: allDocs.filter((d: any) => d.dispatchStatus === "transferido").length,
-  };
+  const docs = listQuery.data?.items ?? [];
+  const total = listQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
+  const counts = listQuery.data?.counts ?? { total: 0, aguardando: 0, recebidos: 0, emTransferencia: 0, transferidos: 0 };
+  const isLoading = listQuery.isLoading;
+  const isFetching = listQuery.isFetching;
 
   return (
     <DashboardLayout>
@@ -239,8 +237,11 @@ export default function AdminDocumentos() {
 
         {/* Documents List */}
         <div className="space-y-3">
-          {filteredDocs.length > 0 ? (
-            filteredDocs.map((doc: any) => {
+          {isLoading ? (
+            <ListSkeleton rows={6} />
+          ) : docs.length > 0 ? (
+            <>
+            {docs.map((doc: any) => {
               const statusInfo = STATUS_CONFIG[doc.dispatchStatus] || STATUS_CONFIG.aguardando_docs;
               const StatusIcon = statusInfo.icon;
               return (
@@ -379,7 +380,18 @@ export default function AdminDocumentos() {
                   )}
                 </div>
               );
-            })
+            })}
+            <PaginationControls
+              page={pagination.page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pagination.pageSize}
+              isLoading={isFetching}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              className="border-t border-border pt-5"
+            />
+            </>
           ) : (
             <div className="bg-card border border-border rounded-xl p-12 text-center">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />

@@ -46,6 +46,47 @@ import jwt from "jsonwebtoken";
 import { ENV } from "./_core/env";
 import { getPrivacySellerId } from "./authHelpers";
 
+function extractAssistantTextContent(content: unknown): string {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    const text = content
+      .map((part) => {
+        if (part && typeof part === "object" && "type" in part && part.type === "text" && "text" in part && typeof part.text === "string") {
+          return part.text;
+        }
+        return "";
+      })
+      .join("\n")
+      .trim();
+
+    if (text) return text;
+  }
+
+  throw new Error("Resposta da IA veio sem conteúdo textual.");
+}
+
+function extractStructuredLlmPayload<T extends Record<string, unknown>>(response: Awaited<ReturnType<typeof invokeLLM>>): T {
+  const firstChoice = response.choices?.[0];
+  if (!firstChoice?.message) {
+    throw new Error("Resposta da IA veio sem choices válidas.");
+  }
+
+  const rawText = extractAssistantTextContent(firstChoice.message.content);
+
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as T;
+    }
+    throw new Error(`Resposta da IA não veio em JSON válido: ${rawText.slice(0, 240)}`);
+  }
+}
+
 export const appRouter = router({
   system: systemRouter,
   fichas: fichaRouter,
@@ -69,6 +110,28 @@ export const appRouter = router({
   sellers: router({
     list: publicProcedure.input(z.object({ activeOnly: z.boolean().optional() }).optional()).query(async ({ input }) => {
       return db.listSellers(input?.activeOnly ?? false);
+    }),
+    // Listagem paginada server-side (admin) — filtros ativos/depto + contadores
+    listPaged: adminProcedure.input(z.object({
+      active: z.enum(["ativos", "inativos"]).default("ativos"),
+      dept: z.string().default("todos"),
+      offset: z.number().int().min(0).default(0),
+      limit: z.number().int().min(1).max(100).default(20),
+    })).query(async ({ input }) => {
+      const all = await db.listSellers(false);
+      const statusCounts = {
+        ativos: all.filter((s: any) => s.active).length,
+        inativos: all.filter((s: any) => !s.active).length,
+      };
+      const scoped = all.filter((s: any) => (input.active === "ativos" ? s.active : !s.active));
+      const deptCounts: Record<string, number> = { todos: scoped.length };
+      for (const s of scoped) {
+        const dept = (s as any).department || "vendas";
+        deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+      }
+      let filtered = input.dept === "todos" ? scoped : scoped.filter((s: any) => ((s as any).department || "vendas") === input.dept);
+      filtered = [...filtered].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
+      return { items: filtered.slice(input.offset, input.offset + input.limit), total: filtered.length, deptCounts, statusCounts };
     }),
     getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return db.getSellerById(input.id);
@@ -805,6 +868,45 @@ export const appRouter = router({
       if (privacySellerId) return db.listSales(input?.competitionId, privacySellerId);
       return db.listSales(input?.competitionId, input?.sellerId);
     }),
+    // Listagem paginada server-side (admin) — com filtros e contadores
+    listPaged: adminProcedure.input(z.object({
+      month: z.number().int().min(0).max(11).optional(),
+      year: z.number().int().optional(),
+      showAll: z.boolean().default(false),
+      status: z.string().optional(),
+      sellerId: z.number().optional(),
+      search: z.string().optional(),
+      offset: z.number().int().min(0).default(0),
+      limit: z.number().int().min(1).max(100).default(20),
+    })).query(async ({ input }) => {
+      const all = await db.listSales();
+      const sellers = await db.listSellers(false);
+      const nameById = new Map<number, string>(sellers.map((s: any) => [s.id, `${s.name || ""} ${s.nickname || ""}`.toLowerCase()]));
+      const inMonth = (createdAt: any) => {
+        if (input.showAll || input.month == null || input.year == null) return true;
+        const d = new Date(createdAt);
+        return d.getMonth() === input.month && d.getFullYear() === input.year;
+      };
+      const base = all.filter((s: any) => inMonth(s.createdAt));
+      const counts = {
+        total: base.length,
+        approved: base.filter((s: any) => (s.status || "approved") === "approved").length,
+        pending: base.filter((s: any) => s.status === "pending").length,
+        rejected: base.filter((s: any) => s.status === "rejected").length,
+      };
+      let filtered = base;
+      if (input.status && input.status !== "todos") filtered = filtered.filter((s: any) => (s.status || "approved") === input.status);
+      if (input.sellerId) filtered = filtered.filter((s: any) => s.sellerId === input.sellerId);
+      const q = input.search?.toLowerCase().trim();
+      if (q) {
+        filtered = filtered.filter((s: any) =>
+          (nameById.get(s.sellerId) || "").includes(q) ||
+          (s.vehicleModel || "").toLowerCase().includes(q) ||
+          (s.description || "").toLowerCase().includes(q)
+        );
+      }
+      return { items: filtered.slice(input.offset, input.offset + input.limit), total: filtered.length, counts };
+    }),
     // Admin cria vendas já aprovadas
     create: adminProcedure.input(z.object({
       sellerId: z.number(),
@@ -1292,7 +1394,7 @@ export const appRouter = router({
           },
         },
       });
-      const parsed = JSON.parse(response.choices[0].message.content as string);
+      const parsed = extractStructuredLlmPayload<{ title: string; content: string }>(response);
       const id = await db.createActionPlan({ sellerId: input.sellerId, title: parsed.title, content: parsed.content });
       // Notificar vendedor sobre plano gerado por IA
       await db.createNotification({
@@ -1345,7 +1447,13 @@ export const appRouter = router({
           },
         },
       });
-      const parsed = JSON.parse(response.choices[0].message.content as string);
+      const parsed = extractStructuredLlmPayload<{ quote: string; author: string }>(response);
+      if (!parsed.quote?.trim()) {
+        throw new Error("A IA retornou a frase vazia.");
+      }
+      if (!parsed.author?.trim()) {
+        throw new Error("A IA retornou o autor vazio.");
+      }
       const id = await db.createQuote({ quote: parsed.quote, author: parsed.author });
       return { id, ...parsed };
     }),
@@ -1442,6 +1550,38 @@ export const appRouter = router({
       const privacySellerId = await getPrivacySellerId(ctx);
       if (privacySellerId) return db.listFeiRecords(input?.competitionId, privacySellerId);
       return db.listFeiRecords(input?.competitionId, input?.sellerId);
+    }),
+    // Listagem paginada server-side (admin) — filtros, contadores e totais
+    listPaged: adminProcedure.input(z.object({
+      month: z.number().int().min(0).max(11).optional(),
+      year: z.number().int().optional(),
+      showAll: z.boolean().default(false),
+      status: z.string().optional(),
+      sellerId: z.number().optional(),
+      offset: z.number().int().min(0).default(0),
+      limit: z.number().int().min(1).max(100).default(20),
+    })).query(async ({ input }) => {
+      const all = await db.listFeiRecords();
+      const inMonth = (createdAt: any) => {
+        if (input.showAll || input.month == null || input.year == null) return true;
+        const d = new Date(createdAt);
+        return d.getMonth() === input.month && d.getFullYear() === input.year;
+      };
+      const base = all.filter((r: any) => inMonth(r.createdAt));
+      const sumBy = (st: string) => base.filter((r: any) => r.status === st).reduce((s: number, r: any) => s + (r.financedValue || 0), 0);
+      const counts = {
+        total: base.length,
+        approved: base.filter((r: any) => r.status === "approved").length,
+        pending: base.filter((r: any) => r.status === "pending").length,
+        rejected: base.filter((r: any) => r.status === "rejected").length,
+        totalApproved: sumBy("approved"),
+        totalPending: sumBy("pending"),
+      };
+      const sellerIds = Array.from(new Set(base.map((r: any) => r.sellerId as number)));
+      let filtered = base;
+      if (input.status && input.status !== "todos") filtered = filtered.filter((r: any) => r.status === input.status);
+      if (input.sellerId) filtered = filtered.filter((r: any) => r.sellerId === input.sellerId);
+      return { items: filtered.slice(input.offset, input.offset + input.limit), total: filtered.length, counts, sellerIds };
     }),
     register: publicProcedure.input(z.object({
       sellerId: z.number(),
@@ -2946,6 +3086,121 @@ export const appRouter = router({
   mktStrategies: mktStrategiesRouter,
   mktTasks: mktTasksRouter,
 
+  // ===== DASHBOARD (Painel Administrativo — resumo agregado do mês) =====
+  dashboard: router({
+    summary: adminProcedure
+      .input(z.object({ month: z.number().int().min(0).max(11), year: z.number().int() }))
+      .query(async ({ input }) => {
+        const { month, year } = input;
+        const prevMonth = month === 0 ? 11 : month - 1;
+        const prevYear = month === 0 ? year - 1 : year;
+        const inMonth = (createdAt: any, m: number, y: number) => {
+          if (!createdAt) return false;
+          const d = new Date(createdAt);
+          return d.getMonth() === m && d.getFullYear() === y;
+        };
+        const pct = (cur: number, prev: number) =>
+          prev === 0 ? (cur > 0 ? 100 : 0) : Math.round(((cur - prev) / prev) * 100);
+
+        const [allSales, allFei, allSellers, allPv] = await Promise.all([
+          db.listSales(),
+          db.listFeiRecords(),
+          db.listSellers(false),
+          db.listPvChamados({}),
+        ]);
+
+        const salesMonth = allSales.filter((s: any) => inMonth(s.createdAt, month, year));
+        const salesPrev = allSales.filter((s: any) => inMonth(s.createdAt, prevMonth, prevYear));
+        const feiMonth = allFei.filter((f: any) => inMonth(f.createdAt, month, year));
+        const pvMonth = allPv.filter((c: any) => inMonth(c.createdAt, month, year));
+
+        const revenueOf = (rows: any[]) =>
+          rows.filter((s) => s.status === "approved").reduce((sum, s) => sum + (Number(s.value) || 0), 0);
+        const currentRevenue = revenueOf(salesMonth);
+        const previousRevenue = revenueOf(salesPrev);
+        const salesApproved = salesMonth.filter((s: any) => s.status === "approved").length;
+        const salesApprovedPrev = salesPrev.filter((s: any) => s.status === "approved").length;
+
+        const activeSellers = allSellers.filter((s: any) => s.active);
+        const vendedores = activeSellers.filter((s: any) => !s.department || s.department === "vendas");
+        const nameById = new Map<number, string>(allSellers.map((s: any) => [s.id, s.nickname || s.name]));
+        const sellerNameOf = (id: number) => nameById.get(id) || `#${id}`;
+
+        // KPIs por vendedor no mês (vendas aprovadas, fichas F&I, pontos)
+        const salesBySeller: Record<number, number> = {};
+        const pointsBySeller: Record<number, number> = {};
+        salesMonth.filter((s: any) => s.status === "approved").forEach((s: any) => {
+          salesBySeller[s.sellerId] = (salesBySeller[s.sellerId] || 0) + 1;
+          pointsBySeller[s.sellerId] = (pointsBySeller[s.sellerId] || 0) + (Number(s.points) || 0);
+        });
+        const feiBySeller: Record<number, number> = {};
+        feiMonth.forEach((f: any) => { feiBySeller[f.sellerId] = (feiBySeller[f.sellerId] || 0) + 1; });
+
+        const topEquipe = vendedores.map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          nickname: v.nickname ?? null,
+          photoUrl: v.photoUrl ?? null,
+          vendas: salesBySeller[v.id] || 0,
+          fei: feiBySeller[v.id] || 0,
+          pontos: pointsBySeller[v.id] || 0,
+        }));
+
+        return {
+          month,
+          year,
+          vendas: {
+            approved: salesApproved,
+            pending: salesMonth.filter((s: any) => s.status === "pending").length,
+            total: salesMonth.length,
+            revenue: currentRevenue,
+            items: salesMonth.map((s: any) => ({
+              id: s.id, customerName: s.customerName, vehicleModel: s.vehicleModel,
+              sellerId: s.sellerId, sellerName: sellerNameOf(s.sellerId),
+              value: Number(s.value) || 0, status: s.status, createdAt: s.createdAt,
+            })),
+          },
+          fei: {
+            approved: feiMonth.filter((f: any) => f.status === "approved").length,
+            pending: feiMonth.filter((f: any) => f.status === "pending").length,
+            total: feiMonth.length,
+            // financedValue está em centavos no banco — normaliza para reais
+            financedTotal: Math.round(
+              feiMonth.filter((f: any) => f.status === "approved").reduce((sum: number, f: any) => sum + (Number(f.financedValue) || 0), 0) / 100
+            ),
+            items: feiMonth.map((f: any) => ({
+              id: f.id, customerName: f.customerName, bankName: f.bankName, vehiclePlate: f.vehiclePlate,
+              financedValue: Math.round((Number(f.financedValue) || 0) / 100),
+              sellerId: f.sellerId, sellerName: sellerNameOf(f.sellerId), status: f.status, createdAt: f.createdAt,
+            })),
+          },
+          posvenda: {
+            total: pvMonth.length,
+            abertos: pvMonth.filter((c: any) => c.status === "aberto").length,
+            emServico: pvMonth.filter((c: any) => c.status === "em_servico").length,
+            finalizados: pvMonth.filter((c: any) => c.status === "finalizado" || c.status === "entregue").length,
+            items: pvMonth.map((c: any) => ({
+              id: c.id, ticketNumber: c.ticketNumber, clienteNome: c.clienteNome,
+              carroModelo: c.carroModelo, carroPlaca: c.carroPlaca, status: c.status, createdAt: c.createdAt,
+            })),
+          },
+          equipe: {
+            vendedoresAtivos: vendedores.length,
+            totalAtivos: activeSellers.length,
+            sellers: activeSellers.map((s: any) => ({
+              id: s.id, name: s.name, nickname: s.nickname ?? null,
+              department: s.department ?? null, active: s.active, photoUrl: s.photoUrl ?? null,
+            })),
+          },
+          topEquipe,
+          trend: {
+            revenue: { current: currentRevenue, previous: previousRevenue, pct: pct(currentRevenue, previousRevenue) },
+            vendas: { current: salesApproved, previous: salesApprovedPrev, pct: pct(salesApproved, salesApprovedPrev) },
+          },
+        };
+      }),
+  }),
+
   // ===== IAM CONFIG (Admin) =====
   iamConfig: router({
     get: publicProcedure.query(async () => {
@@ -3232,9 +3487,36 @@ Adapte o formato conforme o assunto, mas sempre inclua:
       return { success: true, docStatus: result.docStatus };
     }),
     // Admin/Despachante: listar todos os documentos
-    listAll: adminProcedure.input(z.object({ filterStatus: z.string().optional() }).optional()).query(async ({ input }) => {
-      return db.listAllSaleDocuments(input?.filterStatus);
-    }),
+    listAll: adminProcedure
+      .input(z.object({
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(100).default(20),
+        search: z.string().optional(),
+        dispatchStatus: z.string().optional(),
+      }).optional())
+      .query(async ({ input }) => {
+        const all = await db.listAllSaleDocuments();
+        const counts = {
+          total: all.length,
+          aguardando: all.filter((d: any) => d.dispatchStatus === "aguardando_docs").length,
+          recebidos: all.filter((d: any) => d.dispatchStatus === "docs_enviados").length,
+          emTransferencia: all.filter((d: any) => d.dispatchStatus === "em_transferencia").length,
+          transferidos: all.filter((d: any) => d.dispatchStatus === "transferido").length,
+        };
+        const status = input?.dispatchStatus;
+        let filtered = status && status !== "todos" ? all.filter((d: any) => d.dispatchStatus === status) : all;
+        const search = input?.search?.toLowerCase().trim();
+        if (search) {
+          filtered = filtered.filter((d: any) =>
+            (d.clienteNome || "").toLowerCase().includes(search) ||
+            (d.vehicleModel || "").toLowerCase().includes(search) ||
+            (d.vehiclePlate || "").toLowerCase().includes(search)
+          );
+        }
+        const offset = input?.offset ?? 0;
+        const limit = input?.limit ?? 20;
+        return { items: filtered.slice(offset, offset + limit), total: filtered.length, counts };
+      }),
     // Despachante: marcar como em transfer\u00eancia
     markInTransfer: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
       await db.markSaleDocInTransfer(input.id);

@@ -172,6 +172,22 @@ async function startServer() {
   app.use("/api/trpc/saleDocuments.uploadComprovante", uploadLimiter);
   app.use("/api/trpc/sellers.uploadPhoto", uploadLimiter);
 
+  // Estoque: galerias têm muitas fotos; limite bem maior para não travar o upload
+  // em lote (uma galeria de 30-40 fotos estouraria o limite de 20/min).
+  const inventoryUploadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 150,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Muitos uploads de mídia. Tente novamente em 1 minuto." },
+  });
+  app.use("/api/trpc/inventory.uploadMedia", inventoryUploadLimiter);
+
+  // Body parser maior SÓ para o upload de mídia do estoque (vídeos via base64),
+  // preservando o limite global de 16mb (hardening) para todos os outros endpoints.
+  // Roda antes do parser global; o body-parser global pula o que já foi parseado.
+  app.use("/api/trpc/inventory.uploadMedia", express.json({ limit: "60mb" }));
+
   // Configure body parser with size limit for file uploads (reduzido de 50mb para 16mb)
   // Preserve raw body for webhook signature verification (Meta/Facebook/Instagram)
   app.use(express.json({

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { PaginationControls } from "@/components/PaginationControls";
+import { usePagination } from "@/hooks/usePagination";
 import { SupplierCombobox } from "@/components/SupplierCombobox";
 import { VehicleCombobox } from "@/components/VehicleCombobox";
 import { trpc } from "@/lib/trpc";
@@ -76,6 +77,36 @@ function getStatusInfo(status: string, dueDate: number) {
   return { label: "Pendente", color: "bg-blue-500/20 text-blue-400", icon: Clock };
 }
 
+function AdminTransactionsSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: count }).map((_, index) => (
+        <Card key={index} className="bg-card/40">
+          <CardContent className="p-4">
+            <div className="flex animate-pulse items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-lg bg-muted/40" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-52 rounded bg-muted/40" />
+                  <div className="flex flex-wrap gap-2">
+                    <div className="h-3 w-24 rounded bg-muted/30" />
+                    <div className="h-3 w-20 rounded bg-muted/30" />
+                    <div className="h-3 w-28 rounded bg-muted/30" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-6 w-24 rounded bg-muted/40" />
+                <div className="ml-auto h-4 w-20 rounded bg-muted/30" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminFinanceiro() {
   return (
     <DashboardLayout>
@@ -92,8 +123,11 @@ export function AdminFinanceiroInner() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [filterVehicle, setFilterVehicle] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const { page, pageSize, setPage, setPageSize } = usePagination({
+    initialPageSize: 25,
+    resetDeps: [debouncedSearch, statusFilter, typeFilter, filterVehicle, activeCategoryId, activeTab, selectedMonth],
+  });
 
   // Dialogs
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -126,15 +160,28 @@ export function AdminFinanceiroInner() {
   const startOfMonth = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getTime(), [selectedMonth]);
   const endOfMonth = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0, 23, 59, 59, 999).getTime(), [selectedMonth]);
 
+  // Debounce da busca (evita uma query por tecla no server-side).
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchText.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchText]);
+
   // Queries
   const categoriesQuery = trpc.finCategories.list.useQuery(undefined);
   const transactionsQuery = trpc.finTransactions.list.useQuery({
     startDate: startOfMonth,
     endDate: endOfMonth,
     ...(activeCategoryId && activeTab === "category" ? { categoryId: activeCategoryId } : {}),
-    ...(statusFilter !== "all" ? { status: statusFilter as any } : {}),
     ...(typeFilter !== "all" ? { type: typeFilter as any } : {}),
-    limit: 200,
+    ...(statusFilter === "pending_approval"
+      ? { approvalStatus: "pending_approval" as const }
+      : statusFilter !== "all"
+        ? { status: statusFilter as any }
+        : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(filterVehicle ? { vehicle: filterVehicle } : {}),
+    offset: (page - 1) * pageSize,
+    limit: pageSize,
   });
   const dashboardQuery = trpc.finTransactions.dashboard.useQuery({
     month: selectedMonth.getMonth() + 1,
@@ -213,29 +260,18 @@ export function AdminFinanceiroInner() {
   });
 
   const categories = categoriesQuery.data || [];
+  // Lista já filtrada e paginada pelo servidor (tipo, status/aprovação, categoria, busca, veículo, período).
   const transactions = transactionsQuery.data?.items || [];
+  const totalRecords = transactionsQuery.data?.total ?? 0;
+  const totalPages = transactionsQuery.data?.totalPages ?? 1;
   const dashboard = dashboardQuery.data;
   const overdueCount = overdueQuery.data?.length || 0;
+  const showTransactionsSkeleton = transactionsQuery.isFetching && (transactions.length > 0 || !transactionsQuery.data);
 
-  // Filter by search
-  const filteredTransactions = useMemo(() => {
-    let list = transactions;
-    // Client-side filter for pending_approval since backend only filters by status field
-    if (statusFilter === "pending_approval") {
-      list = list.filter((t: any) => (t as any).approvalStatus === "pending_approval");
-    }
-    if (filterVehicle) {
-      list = list.filter((t: any) => t.vehicle === filterVehicle);
-    }
-    if (!searchText.trim()) return list;
-    const q = searchText.toLowerCase();
-    return list.filter((t: any) =>
-      t.description?.toLowerCase().includes(q) ||
-      t.supplier?.toLowerCase().includes(q) ||
-      t.vehicle?.toLowerCase().includes(q) ||
-      t.notes?.toLowerCase().includes(q)
-    );
-  }, [transactions, searchText, statusFilter, filterVehicle]);
+  // Clamp: se a página atual ficar além do total (ex.: após excluir), volta pra última válida.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page, setPage]);
 
   function resetCategoryForm() {
     setCatName("");
@@ -289,16 +325,6 @@ export function AdminFinanceiroInner() {
   }
 
   const monthLabel = selectedMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-
-  // Paginação da lista de transações (mesmo padrão da tela de Contas).
-  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / pageSize));
-  const paginatedTransactions = useMemo(
-    () => filteredTransactions.slice((page - 1) * pageSize, page * pageSize),
-    [filteredTransactions, page, pageSize]
-  );
-  useEffect(() => {
-    setPage(1);
-  }, [searchText, statusFilter, typeFilter, filterVehicle, activeCategoryId, activeTab, selectedMonth, pageSize]);
 
   return (
       <div className="space-y-6">
@@ -440,7 +466,9 @@ export function AdminFinanceiroInner() {
 
         {/* Transactions List */}
         <div className="space-y-2">
-          {filteredTransactions.length === 0 ? (
+          {showTransactionsSkeleton ? (
+            <AdminTransactionsSkeleton count={pageSize} />
+          ) : transactions.length === 0 ? (
             <Card className="bg-card/30">
               <CardContent className="p-8 text-center">
                 <Receipt className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
@@ -449,7 +477,7 @@ export function AdminFinanceiroInner() {
               </CardContent>
             </Card>
           ) : (
-            paginatedTransactions.map((tx: any) => {
+            transactions.map((tx: any) => {
               const statusInfo = getStatusInfo(tx.status, tx.dueDate);
               const StatusIcon = statusInfo.icon;
               const cat = categories.find((c: any) => c.id === tx.categoryId);
@@ -503,14 +531,15 @@ export function AdminFinanceiroInner() {
           )}
         </div>
 
-        {filteredTransactions.length > 0 && (
+        {totalRecords > 0 && (
           <PaginationControls
             page={page}
             totalPages={totalPages}
-            total={filteredTransactions.length}
+            total={totalRecords}
             pageSize={pageSize}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
+            isLoading={transactionsQuery.isFetching}
           />
         )}
 

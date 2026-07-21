@@ -2,15 +2,29 @@ import { publicProcedure, adminProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getDb } from "../db";
-import { inventoryVehicles, inventorySyncLogs, inventoryAuditLogs, tenants } from "../../drizzle/schema";
+import { inventoryVehicles, inventoryVehicleMedia, inventorySyncLogs, inventoryAuditLogs, tenants } from "../../drizzle/schema";
 import { eq, desc, asc, and, like, or, sql, isNull, isNotNull, ne } from "drizzle-orm";
 import { syncInventory } from "../inventory-scraper";
 import { getCurrentTenantId } from "../tenantDb";
+import { isStorageDeleteConfigured, storageDelete, storagePut } from "../storage";
+import {
+  buildExternalInventoryMediaRows,
+  buildInventoryMediaStorageKey,
+  buildLegacyInventoryMediaFields,
+  inferInventoryMediaTypeFromMime,
+  isAllowedInventoryMediaMime,
+  sanitizeInventoryFileName,
+} from "../inventoryMedia";
 import {
   inventoryAdminListInputSchema,
   inventoryCreateDetailedInputSchema,
+  inventoryDeleteMediaInputSchema,
   inventoryDuplicateValidationInputSchema,
+  inventoryListMediaInputSchema,
+  inventoryReorderMediaInputSchema,
+  inventorySetPrimaryMediaInputSchema,
   inventorySoftDeleteInputSchema,
+  inventoryUploadMediaInputSchema,
   inventoryUpdateDetailedInputSchema,
 } from "@shared/inventory";
 
@@ -19,6 +33,9 @@ type InventoryMutationCtxUser = {
   name?: string | null;
   email?: string | null;
 };
+
+const MAX_INVENTORY_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_INVENTORY_VIDEO_BYTES = 40 * 1024 * 1024;
 
 function serializeList(values?: string[] | null) {
   if (!values || values.length === 0) return null;
@@ -93,6 +110,13 @@ function mapAdminVehicle(vehicle: any) {
     optionalsList: parseList(vehicle.optionals),
     highlightItemsList: parseList(vehicle.highlightItems),
     internalTagsList: parseList(vehicle.internalTags),
+  };
+}
+
+function mapInventoryMediaItem(item: any) {
+  return {
+    ...item,
+    fileSizeBytes: item.fileSizeBytes == null ? null : Number(item.fileSizeBytes),
   };
 }
 
@@ -312,6 +336,91 @@ function changedFields(before: Record<string, unknown>, after: Record<string, un
   return fields;
 }
 
+async function listVehicleMediaRows(vehicleId: number, includeDeleted = false) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [
+    eq(inventoryVehicleMedia.inventoryVehicleId, vehicleId),
+    eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+  ];
+  if (!includeDeleted) conditions.push(eq(inventoryVehicleMedia.status, "active"));
+  return db
+    .select()
+    .from(inventoryVehicleMedia)
+    .where(and(...conditions))
+    .orderBy(asc(inventoryVehicleMedia.sortOrder), asc(inventoryVehicleMedia.id));
+}
+
+async function normalizePrimaryImageSelection(vehicleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const mediaRows = await listVehicleMediaRows(vehicleId);
+  const imageRows = mediaRows.filter((row) => row.mediaType === "image");
+  if (imageRows.length === 0) return mediaRows;
+  const primaryImage = imageRows.find((row) => row.isPrimary) || imageRows[0];
+  await Promise.all(imageRows.map((row) =>
+    db.update(inventoryVehicleMedia)
+      .set({ isPrimary: row.id === primaryImage.id })
+      .where(and(
+        eq(inventoryVehicleMedia.id, row.id),
+        eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+      ))
+  ));
+  return mediaRows.map((row) => row.mediaType === "image" ? { ...row, isPrimary: row.id === primaryImage.id } : row);
+}
+
+async function syncLegacyVehicleMediaFields(vehicleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const mediaRows = await normalizePrimaryImageSelection(vehicleId);
+  const legacyFields = buildLegacyInventoryMediaFields(mediaRows);
+  await db.update(inventoryVehicles)
+    .set(legacyFields)
+    .where(and(
+      eq(inventoryVehicles.id, vehicleId),
+      eq(inventoryVehicles.tenantId, getCurrentTenantId()),
+    ));
+  return mediaRows;
+}
+
+async function replaceExternalVehicleMedia(params: {
+  vehicleId: number;
+  photoUrl?: string | null;
+  photos?: string[] | null;
+  videoUrl?: string | null;
+  actorId?: number | null;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(inventoryVehicleMedia)
+    .set({
+      status: "deleted",
+      deletedAt: Date.now(),
+      isPrimary: false,
+    })
+    .where(and(
+      eq(inventoryVehicleMedia.inventoryVehicleId, params.vehicleId),
+      eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+      eq(inventoryVehicleMedia.sourceMode, "external_url"),
+      eq(inventoryVehicleMedia.status, "active"),
+    ));
+
+  const rows = buildExternalInventoryMediaRows({
+    tenantId: getCurrentTenantId(),
+    vehicleId: params.vehicleId,
+    actorId: params.actorId,
+    photoUrl: params.photoUrl,
+    photos: params.photos,
+    videoUrl: params.videoUrl,
+  });
+
+  if (rows.length > 0) {
+    await db.insert(inventoryVehicleMedia).values(rows);
+  }
+
+  await syncLegacyVehicleMediaFields(params.vehicleId);
+}
+
 export const inventoryRouter = router({
   list: publicProcedure
     .input(
@@ -438,7 +547,21 @@ export const inventoryRouter = router({
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
       const vehicle = await getVehicleById(input.id, true);
-      return vehicle ? mapAdminVehicle(vehicle) : null;
+      if (!vehicle) return null;
+      const mediaItems = await listVehicleMediaRows(input.id, true);
+      return {
+        ...mapAdminVehicle(vehicle),
+        mediaItems: mediaItems.map(mapInventoryMediaItem),
+      };
+    }),
+
+  listMedia: adminProcedure
+    .input(inventoryListMediaInputSchema)
+    .query(async ({ input }) => {
+      const vehicle = await getVehicleById(input.vehicleId, true);
+      if (!vehicle) throw new Error("Veículo não encontrado");
+      const rows = await listVehicleMediaRows(input.vehicleId, true);
+      return rows.map(mapInventoryMediaItem);
     }),
 
   brands: publicProcedure.query(async () => {
@@ -545,6 +668,213 @@ export const inventoryRouter = router({
       }));
     }),
 
+  uploadMedia: adminProcedure
+    .input(inventoryUploadMediaInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const vehicle = await getVehicleById(input.vehicleId, true);
+      if (!vehicle || vehicle.deletedAt) throw new Error("Veículo não encontrado");
+
+      const mimeType = input.mimeType.toLowerCase().split(";")[0].trim();
+      if (!isAllowedInventoryMediaMime(mimeType)) {
+        throw new Error("Tipo de arquivo não suportado para o estoque.");
+      }
+
+      const mediaType = inferInventoryMediaTypeFromMime(mimeType);
+      if (!mediaType) throw new Error("Não foi possível identificar o tipo da mídia.");
+
+      const buffer = Buffer.from(input.base64, "base64");
+      const maxBytes = mediaType === "video" ? MAX_INVENTORY_VIDEO_BYTES : MAX_INVENTORY_IMAGE_BYTES;
+      if (buffer.byteLength > maxBytes) {
+        throw new Error(mediaType === "video"
+          ? "Vídeo muito grande para o upload atual. Envie um vídeo menor."
+          : "Imagem muito grande. Reduza o arquivo antes de enviar.");
+      }
+
+      const activeMedia = await listVehicleMediaRows(input.vehicleId);
+      const sortOrder = activeMedia.length > 0
+        ? Math.max(...activeMedia.map((item) => Number(item.sortOrder || 0))) + 1
+        : 0;
+
+      const storageKey = buildInventoryMediaStorageKey({
+        tenantId: getCurrentTenantId(),
+        vehicleId: input.vehicleId,
+        mediaType,
+        fileName: sanitizeInventoryFileName(input.fileName),
+        mimeType,
+      });
+
+      const uploadResult = await storagePut(storageKey, buffer, mimeType);
+      const isPrimary = mediaType === "image"
+        ? !activeMedia.some((item) => item.mediaType === "image" && item.isPrimary)
+        : !activeMedia.some((item) => item.mediaType === "video" && item.isPrimary);
+
+      const insertResult = await db.insert(inventoryVehicleMedia).values({
+        tenantId: getCurrentTenantId(),
+        inventoryVehicleId: input.vehicleId,
+        mediaType,
+        sourceMode: "upload",
+        storageProvider: "s3",
+        url: uploadResult.url,
+        storageKey: uploadResult.key,
+        fileName: sanitizeInventoryFileName(input.fileName),
+        mimeType,
+        fileSizeBytes: buffer.byteLength,
+        width: input.width ?? null,
+        height: input.height ?? null,
+        durationSeconds: input.durationSeconds ?? null,
+        sortOrder,
+        isPrimary,
+        status: "active",
+        createdBySellerId: ctx.user?.id ?? null,
+      });
+
+      await syncLegacyVehicleMediaFields(input.vehicleId);
+      const mediaId = Number(insertResult[0].insertId);
+      const rows = await listVehicleMediaRows(input.vehicleId, true);
+      const created = rows.find((item) => item.id === mediaId);
+
+      await createAuditLog({
+        inventoryId: input.vehicleId,
+        action: "updated",
+        actor: ctx.user,
+        summary: `Mídia enviada para o veículo: ${input.fileName}`,
+        changedFields: ["photoUrl", "photos", "videoUrl"],
+        metadata: { mediaType, sourceMode: "upload", mediaId },
+      });
+
+      return created ? mapInventoryMediaItem(created) : { id: mediaId, url: uploadResult.url };
+    }),
+
+  deleteMedia: adminProcedure
+    .input(inventoryDeleteMediaInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const rows = await db.select().from(inventoryVehicleMedia)
+        .where(and(
+          eq(inventoryVehicleMedia.id, input.mediaId),
+          eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+          eq(inventoryVehicleMedia.status, "active"),
+        ))
+        .limit(1);
+      const media = rows[0];
+      if (!media) throw new Error("Mídia não encontrada");
+
+      await db.update(inventoryVehicleMedia)
+        .set({
+          status: "deleted",
+          deletedAt: Date.now(),
+          isPrimary: false,
+        })
+        .where(and(
+          eq(inventoryVehicleMedia.id, input.mediaId),
+          eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+        ));
+
+      let storageDeleted = false;
+      let storageDeleteSkipped = false;
+      if (media.storageProvider === "s3" && media.storageKey) {
+        if (isStorageDeleteConfigured()) {
+          try {
+            await storageDelete(media.storageKey);
+            storageDeleted = true;
+          } catch (err) {
+            // Best-effort: o registro já foi marcado como removido no banco; uma falha
+            // no bucket não deve derrubar a operação (evita erro na UI + estado inconsistente).
+            console.error(`[inventory deleteMedia] Falha ao remover objeto do bucket (${media.storageKey}):`, err);
+            storageDeleteSkipped = true;
+          }
+        } else {
+          storageDeleteSkipped = true;
+        }
+      }
+
+      await syncLegacyVehicleMediaFields(media.inventoryVehicleId);
+      await createAuditLog({
+        inventoryId: media.inventoryVehicleId,
+        action: "updated",
+        actor: ctx.user,
+        summary: "Mídia removida do veículo",
+        changedFields: ["photoUrl", "photos", "videoUrl"],
+        metadata: { mediaId: input.mediaId, mediaType: media.mediaType, storageDeleted, storageDeleteSkipped },
+      });
+
+      return { success: true, storageDeleted, storageDeleteSkipped };
+    }),
+
+  setPrimaryMedia: adminProcedure
+    .input(inventorySetPrimaryMediaInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const rows = await listVehicleMediaRows(input.vehicleId);
+      const selected = rows.find((row) => row.id === input.mediaId);
+      if (!selected) throw new Error("Mídia não encontrada");
+      if (selected.mediaType !== "image") throw new Error("Apenas imagens podem ser definidas como principal.");
+
+      const imageRows = rows.filter((row) => row.mediaType === "image");
+      await Promise.all(imageRows.map((row) =>
+        db.update(inventoryVehicleMedia)
+          .set({ isPrimary: row.id === input.mediaId })
+          .where(and(
+            eq(inventoryVehicleMedia.id, row.id),
+            eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+          ))
+      ));
+
+      await syncLegacyVehicleMediaFields(input.vehicleId);
+      await createAuditLog({
+        inventoryId: input.vehicleId,
+        action: "updated",
+        actor: ctx.user,
+        summary: "Foto principal do veículo atualizada",
+        changedFields: ["photoUrl", "photos"],
+        metadata: { mediaId: input.mediaId },
+      });
+
+      return { success: true };
+    }),
+
+  reorderMedia: adminProcedure
+    .input(inventoryReorderMediaInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      const rows = await listVehicleMediaRows(input.vehicleId);
+      if (rows.length === 0) return { success: true };
+
+      const rowMap = new Map(rows.map((row) => [row.id, row]));
+      for (const id of input.orderedIds) {
+        if (!rowMap.has(id)) throw new Error("Ordenação contém mídia inválida.");
+      }
+
+      const untouched = rows.filter((row) => !input.orderedIds.includes(row.id));
+      const nextOrder = [...input.orderedIds, ...untouched.map((row) => row.id)];
+
+      await Promise.all(nextOrder.map((id, index) =>
+        db.update(inventoryVehicleMedia)
+          .set({ sortOrder: index })
+          .where(and(
+            eq(inventoryVehicleMedia.id, id),
+            eq(inventoryVehicleMedia.tenantId, getCurrentTenantId()),
+          ))
+      ));
+
+      await syncLegacyVehicleMediaFields(input.vehicleId);
+      await createAuditLog({
+        inventoryId: input.vehicleId,
+        action: "updated",
+        actor: ctx.user,
+        summary: "Ordem da mídia do veículo atualizada",
+        changedFields: ["photos"],
+        metadata: { orderedIds: nextOrder },
+      });
+
+      return { success: true };
+    }),
+
   sync: adminProcedure.mutation(async () => {
     const db = await getDb();
     if (!db) throw new Error("DB not available");
@@ -577,6 +907,13 @@ export const inventoryRouter = router({
       ensurePublishable(insertPayload);
       const result = await db.insert(inventoryVehicles).values(insertPayload);
       const id = Number(result[0].insertId);
+      await replaceExternalVehicleMedia({
+        vehicleId: id,
+        photoUrl: input.photoUrl,
+        photos: input.photos,
+        videoUrl: input.videoUrl,
+        actorId: ctx.user?.id ?? null,
+      });
       await createAuditLog({
         inventoryId: id,
         action: "created",
@@ -600,13 +937,27 @@ export const inventoryRouter = router({
         throw new Error("Já existe outro veículo com placa, chassi ou renavam informados.");
       }
       const payload = toInventoryUpdate(input);
-      ensurePublishable(payload);
+      // Só exige checklist completo quando o veículo está sendo publicado agora
+      // (transição de rascunho -> publicado). Editar um veículo já publicado —
+      // típico de dados integrados/sincronizados — não é bloqueado.
+      if (payload.isPublished && !current.isPublished) ensurePublishable(payload);
       const fieldDiffs = changedFields(current, payload as Record<string, unknown>);
       const [result] = await db
         .update(inventoryVehicles)
         .set(payload)
-        .where(and(eq(inventoryVehicles.id, input.id), eq(inventoryVehicles.tenantId, getCurrentTenantId()), isNull(inventoryVehicles.deletedAt)));
+        .where(and(
+          eq(inventoryVehicles.id, input.id),
+          eq(inventoryVehicles.tenantId, getCurrentTenantId()),
+          isNull(inventoryVehicles.deletedAt),
+        ));
       if ((result as any)?.affectedRows === 0) throw new Error("Veículo não encontrado");
+      await replaceExternalVehicleMedia({
+        vehicleId: input.id,
+        photoUrl: input.photoUrl,
+        photos: input.photos,
+        videoUrl: input.videoUrl,
+        actorId: ctx.user?.id ?? null,
+      });
       await createAuditLog({
         inventoryId: input.id,
         action: fieldDiffs.includes("status") ? "status_changed" : "updated",

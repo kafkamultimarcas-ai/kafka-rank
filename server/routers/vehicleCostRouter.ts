@@ -23,11 +23,13 @@ export const vehicleCostRouter = router({
     .input(z.object({
       search: z.string().optional(),
       status: z.string().optional(),
+      offset: z.number().int().min(0).default(0),
+      limit: z.number().int().min(1).max(100).default(12),
     }).optional())
     .query(async ({ input }) => {
-      const vehicles = await db.listVehicleCosts(input);
-      // Para cada veículo, buscar total de gastos
-      const result = await Promise.all(vehicles.map(async (v) => {
+      const all = await db.listVehicleCosts({ search: input?.search, status: input?.status });
+      // Enriquece com o total de gastos/lucro por veículo
+      const enriched = await Promise.all(all.map(async (v) => {
         const summary = await db.getVehicleCostSummary(v.id);
         const purchasePrice = parseFloat(String(v.purchasePrice || '0'));
         const salePrice = parseFloat(String(v.salePrice || '0'));
@@ -43,7 +45,19 @@ export const vehicleCostRouter = router({
           margin: salePrice > 0 ? margin : null,
         };
       }));
-      return result;
+
+      // Contadores agregados sobre o conjunto filtrado completo
+      const stats = {
+        total: enriched.length,
+        inStock: enriched.filter((v) => v.status === "in_stock").length,
+        sold: enriched.filter((v) => v.status === "sold").length,
+        totalInvested: enriched.reduce((acc, v) => acc + (v.totalCost || 0), 0),
+        totalProfit: enriched.filter((v) => v.profit !== null).reduce((acc, v) => acc + (v.profit || 0), 0),
+      };
+
+      const offset = input?.offset ?? 0;
+      const limit = input?.limit ?? 12;
+      return { items: enriched.slice(offset, offset + limit), total: enriched.length, stats };
     }),
 
   getById: managerOrAdminProcedure

@@ -3,6 +3,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -51,7 +54,7 @@ export default function AdminAgendamentos() {
     return () => clearInterval(interval);
   }, []);
 
-  const { data: allRecords, refetch } = trpc.sdr.list.useQuery({});
+  const { data: allRecords, isLoading, refetch } = trpc.sdr.list.useQuery({});
   const { data: sellersList } = trpc.sellers.list.useQuery({ activeOnly: false });
   const deleteMut = trpc.sdr.delete.useMutation({ onSuccess: () => { refetch(); toast.success("Agendamento excluído"); } });
   const updateMut = trpc.sdr.update.useMutation({ onSuccess: () => { refetch(); setEditingId(null); toast.success("Agendamento atualizado"); } });
@@ -145,6 +148,12 @@ export default function AdminAgendamentos() {
     if (tab === "pendentes") return pendingAttendance;
     return records;
   }, [tab, records, rescueRecords, pendingAttendance]);
+
+  // Paginação da aba ativa (client-side: as abas têm contadores que exigem as listas completas)
+  const pagination = usePagination({ initialPageSize: 20, resetDeps: [tab, search, sellerFilter, filterMonth] });
+  const displayTotal = displayRecords.length;
+  const displayTotalPages = Math.max(1, Math.ceil(displayTotal / pagination.pageSize));
+  const pagedRecords = displayRecords.slice(pagination.offset, pagination.offset + pagination.limit);
 
   // Play alert sound when there are rescue leads
   useEffect(() => {
@@ -428,7 +437,9 @@ function formatDateShort(ts: number | string | Date | null) {
         )}
 
         {/* Records list */}
-        {displayRecords.length === 0 ? (
+        {isLoading ? (
+          <ListSkeleton rows={6} />
+        ) : displayRecords.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-12 text-center text-muted-foreground">
               <CalendarClock className="h-12 w-12 mx-auto mb-3 opacity-30" />
@@ -436,8 +447,9 @@ function formatDateShort(ts: number | string | Date | null) {
             </CardContent>
           </Card>
         ) : (
+          <>
           <div className="space-y-3">
-            {displayRecords.map(record => {
+            {pagedRecords.map(record => {
               const isEditing = editingId === record.id;
               const statusCfg = STATUS_LABELS[record.status] || STATUS_LABELS.pending;
               const attCfg = ATTENDANCE_LABELS[record.attendanceStatus || "pending"] || ATTENDANCE_LABELS.pending;
@@ -691,6 +703,16 @@ function formatDateShort(ts: number | string | Date | null) {
               );
             })}
           </div>
+          <PaginationControls
+            page={pagination.page}
+            totalPages={displayTotalPages}
+            total={displayTotal}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+            className="border-t border-border pt-5 mt-3"
+          />
+          </>
         )}
       </div>
     </DashboardLayout>

@@ -134,15 +134,129 @@ export async function getLeadById(id: number) {
   return rows[0] || null;
 }
 
-export async function listLeadsBySeller(sellerId: number, opts?: { department?: string; archived?: boolean; stage?: string; score?: string }) {
+export type ConversationListFilters = {
+  archived?: boolean;
+  department?: string;
+  sellerId?: number;
+  stage?: string;
+  score?: string;
+  source?: string;
+  query?: string;
+  filterAssignment?: "all" | "unassigned" | "assigned";
+  limit?: number;
+  offset?: number;
+};
+
+const conversationLeadSelect = {
+  id: crmLeads.id,
+  sellerId: crmLeads.sellerId,
+  department: crmLeads.department,
+  name: crmLeads.name,
+  phone: crmLeads.phone,
+  email: crmLeads.email,
+  vehicleInterest: crmLeads.vehicleInterest,
+  vehiclePlate: crmLeads.vehiclePlate,
+  source: crmLeads.source,
+  stage: crmLeads.stage,
+  score: crmLeads.score,
+  cpf: crmLeads.cpf,
+  birthday: crmLeads.birthday,
+  notes: crmLeads.notes,
+  nextContactDate: crmLeads.nextContactDate,
+  lastContactDate: crmLeads.lastContactDate,
+  archived: crmLeads.archived,
+  convertedToSale: crmLeads.convertedToSale,
+  saleValue: crmLeads.saleValue,
+  acknowledgedAt: crmLeads.acknowledgedAt,
+  lastAutoTransferAt: crmLeads.lastAutoTransferAt,
+  aiHandled: crmLeads.aiHandled,
+  aiDataCollected: crmLeads.aiDataCollected,
+  aiCreditAppId: crmLeads.aiCreditAppId,
+  aiAppointmentId: crmLeads.aiAppointmentId,
+  createdAt: crmLeads.createdAt,
+  updatedAt: crmLeads.updatedAt,
+  tenantId: crmLeads.tenantId,
+  lastMessageAt: crmLeads.lastMessageAt,
+  lastCampaignId: crmLeads.lastCampaignId,
+  isCampaignResponse: crmLeads.isCampaignResponse,
+  profilePicUrl: crmLeads.profilePicUrl,
+  socialUsername: crmLeads.socialUsername,
+  lastMessageContent: crmLeads.lastMessageContent,
+  lastMessageDirection: crmLeads.lastMessageDirection,
+  lastMessageTimestamp: crmLeads.lastMessageAt,
+  lastMessageType: crmLeads.lastMessageType,
+  lastMessageSender: crmLeads.lastMessageSender,
+  unreadCount: crmLeads.unreadCount,
+};
+
+function buildConversationWhere(filters?: ConversationListFilters) {
+  const conditions: any[] = [eq(crmLeads.tenantId, getCurrentTenantId())];
+
+  if (filters?.archived !== undefined) conditions.push(eq(crmLeads.archived, filters.archived));
+  if (filters?.department) conditions.push(eq(crmLeads.department, filters.department));
+  if (filters?.sellerId !== undefined) {
+    conditions.push(eq(crmLeads.sellerId, filters.sellerId));
+  } else if (filters?.filterAssignment === "unassigned") {
+    conditions.push(eq(crmLeads.sellerId, 0));
+  } else if (filters?.filterAssignment === "assigned") {
+    conditions.push(gt(crmLeads.sellerId, 0));
+  }
+  if (filters?.stage) conditions.push(eq(crmLeads.stage, filters.stage));
+  if (filters?.score) conditions.push(eq(crmLeads.score, filters.score as "hot" | "warm" | "cold"));
+  if (filters?.source) conditions.push(eq(crmLeads.source, filters.source));
+
+  if (filters?.query) {
+    const searchPattern = `%${filters.query}%`;
+    conditions.push(or(
+      like(crmLeads.name, searchPattern),
+      like(crmLeads.phone, searchPattern),
+      like(crmLeads.email, searchPattern),
+      like(crmLeads.vehicleInterest, searchPattern),
+      like(crmLeads.vehiclePlate, searchPattern),
+      like(crmLeads.socialUsername, searchPattern),
+    ));
+  }
+
+  return and(...conditions);
+}
+
+export async function listConversationSummaries(filters?: ConversationListFilters) {
   const db = await getDb();
-  if (!db) return [];
-  const conditions = [eq(crmLeads.sellerId, sellerId)];
-  if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
-  if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
-  if (opts?.stage) conditions.push(eq(crmLeads.stage, opts.stage));
-  if (opts?.score) conditions.push(eq(crmLeads.score, opts.score as "hot" | "warm" | "cold"));
-  return db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions))).orderBy(desc(crmLeads.updatedAt));
+  if (!db) {
+    return { items: [], total: 0, hasMore: false, nextOffset: null };
+  }
+
+  const queryLimit = filters?.limit ?? 100;
+  const queryOffset = filters?.offset ?? 0;
+  const where = buildConversationWhere(filters);
+
+  const [items, totalRows] = await Promise.all([
+    db.select(conversationLeadSelect)
+      .from(crmLeads)
+      .where(where)
+      .orderBy(desc(crmLeads.lastMessageAt), desc(crmLeads.updatedAt))
+      .limit(queryLimit)
+      .offset(queryOffset),
+    db.select({ count: sql<number>`COUNT(*)` })
+      .from(crmLeads)
+      .where(where)
+      .limit(1),
+  ]);
+
+  const total = Number(totalRows[0]?.count || 0);
+  const nextOffset = queryOffset + items.length;
+
+  return {
+    items,
+    total,
+    hasMore: nextOffset < total,
+    nextOffset: nextOffset < total ? nextOffset : null,
+  };
+}
+
+export async function listLeadsBySeller(sellerId: number, opts?: { department?: string; archived?: boolean; stage?: string; score?: string }) {
+  const result = await listConversationSummaries({ sellerId, ...opts, limit: 100000, offset: 0 });
+  return result.items;
 }
 export async function listLeadsByDepartment(department: string, opts?: { archived?: boolean; stage?: string }) {
   const db = await getDb();
@@ -154,62 +268,8 @@ export async function listLeadsByDepartment(department: string, opts?: { archive
 }
 
 export async function listAllLeads(opts?: { archived?: boolean; department?: string; sellerId?: number; limit?: number; offset?: number }) {
-  const db = await getDb();
-  if (!db) return [];
-  const conditions: any[] = [];
-  if (opts?.archived !== undefined) conditions.push(eq(crmLeads.archived, opts.archived));
-  if (opts?.department) conditions.push(eq(crmLeads.department, opts.department));
-  if (opts?.sellerId !== undefined) conditions.push(eq(crmLeads.sellerId, opts.sellerId));
-  const where = conditions.length > 0 ? and(...conditions) : undefined;
-  const tid = getCurrentTenantId();
-  const queryLimit = opts?.limit || 100;
-  const queryOffset = opts?.offset || 0;
-  // Optimized: use lastMessageAt column for ordering (indexed), limit subqueries to paginated results only
-  const leads = await db.select({
-    id: crmLeads.id,
-    sellerId: crmLeads.sellerId,
-    department: crmLeads.department,
-    name: crmLeads.name,
-    phone: crmLeads.phone,
-    email: crmLeads.email,
-    vehicleInterest: crmLeads.vehicleInterest,
-    vehiclePlate: crmLeads.vehiclePlate,
-    source: crmLeads.source,
-    stage: crmLeads.stage,
-    score: crmLeads.score,
-    cpf: crmLeads.cpf,
-    birthday: crmLeads.birthday,
-    notes: crmLeads.notes,
-    nextContactDate: crmLeads.nextContactDate,
-    lastContactDate: crmLeads.lastContactDate,
-    archived: crmLeads.archived,
-    convertedToSale: crmLeads.convertedToSale,
-    saleValue: crmLeads.saleValue,
-    acknowledgedAt: crmLeads.acknowledgedAt,
-    lastAutoTransferAt: crmLeads.lastAutoTransferAt,
-    aiHandled: crmLeads.aiHandled,
-    aiDataCollected: crmLeads.aiDataCollected,
-    aiCreditAppId: crmLeads.aiCreditAppId,
-    aiAppointmentId: crmLeads.aiAppointmentId,
-    createdAt: crmLeads.createdAt,
-    updatedAt: crmLeads.updatedAt,
-    tenantId: crmLeads.tenantId,
-    lastMessageAt: crmLeads.lastMessageAt,
-    lastCampaignId: crmLeads.lastCampaignId,
-    isCampaignResponse: crmLeads.isCampaignResponse,
-    profilePicUrl: crmLeads.profilePicUrl,
-    socialUsername: crmLeads.socialUsername,
-    lastMessageContent: crmLeads.lastMessageContent,
-    lastMessageDirection: crmLeads.lastMessageDirection,
-    lastMessageTimestamp: crmLeads.lastMessageAt,
-    lastMessageType: crmLeads.lastMessageType,
-    lastMessageSender: crmLeads.lastMessageSender,
-    unreadCount: crmLeads.unreadCount,
-  }).from(crmLeads).where(and(eq(crmLeads.tenantId, tid), where)).orderBy(
-    desc(crmLeads.lastMessageAt),
-    desc(crmLeads.updatedAt)
-  ).limit(queryLimit).offset(queryOffset);
-  return leads;
+  const result = await listConversationSummaries(opts);
+  return result.items;
 }
 
 export async function updateLead(id: number, data: Partial<InsertCrmLead>) {
@@ -581,27 +641,17 @@ export async function getUnrespondedLeads(thresholdMinutes: number, sellerId?: n
   const conditions: any[] = [
     eq(crmLeads.archived, false),
     gt(crmLeads.sellerId, 0), // only assigned leads
+    eq(crmLeads.lastMessageDirection, "inbound"),
+    lte(crmLeads.lastMessageAt, cutoff),
   ];
   if (sellerId !== undefined) {
     conditions.push(eq(crmLeads.sellerId, sellerId));
   }
-  const leads = await db.select().from(crmLeads).where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions)));
-  // Filter: leads where the LAST message is inbound and older than threshold
-  // This means the client sent a message and nobody responded yet
-  const result = [];
-  for (const lead of leads) {
-    // Get the last message for this lead
-    const lastMsg = await db.select().from(crmMessages)
-      .where(eq(crmMessages.leadId, lead.id))
-      .orderBy(desc(crmMessages.timestamp)).limit(1);
-    if (lastMsg.length === 0) continue; // no messages at all, skip
-    const last = lastMsg[0];
-    // If last message is inbound (from client) and older than threshold → unresponded
-    if (last.direction === "inbound" && last.timestamp && last.timestamp < cutoff) {
-      result.push(lead);
-    }
-  }
-  return result;
+  return db
+    .select()
+    .from(crmLeads)
+    .where(and(eq(crmLeads.tenantId, getCurrentTenantId()), and(...conditions)))
+    .orderBy(desc(crmLeads.lastMessageAt));
 }
 
 /** Get average response time for a seller (in minutes) */

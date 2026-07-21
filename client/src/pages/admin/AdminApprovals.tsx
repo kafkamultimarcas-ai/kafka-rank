@@ -8,6 +8,8 @@ import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, W
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +89,9 @@ export default function AdminApprovals() {
     comparecimento: pendingAttendance?.length || 0,
   };
   const totalPending = counts.vendas + counts.fei + counts.consignacao + counts.despachante + counts.sdr + counts.comparecimento;
+
+  // Paginação da aba ativa (client-side: as listas já são carregadas para os badges de contagem)
+  const pagination = usePagination({ initialPageSize: 20, resetDeps: [tab] });
 
   const tabs: { value: Tab; label: string; icon: typeof Car; color: string }[] = [
     { value: "vendas", label: "Vendas", icon: Car, color: "text-red-400" },
@@ -571,6 +576,9 @@ export default function AdminApprovals() {
 
   const renderCurrentTab = () => {
     const items = getCurrentItems();
+    const totalItems = items.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
+    const pagedItems = items.slice(pagination.offset, pagination.offset + pagination.limit);
     if (items.length === 0) {
       return (
         <Card className="border-border bg-card">
@@ -609,12 +617,22 @@ export default function AdminApprovals() {
             )}
           </Button>
         </div>
-        {tab === "vendas" && items.map(renderSaleCard)}
-        {tab === "fei" && items.map(renderFeiCard)}
-        {tab === "consignacao" && items.map(renderConsignmentCard)}
-        {tab === "despachante" && items.map(renderDispatchCard)}
-        {tab === "sdr" && items.map(renderSdrCard)}
-        {tab === "comparecimento" && items.map(renderAttendanceCard)}
+        {tab === "vendas" && pagedItems.map(renderSaleCard)}
+        {tab === "fei" && pagedItems.map(renderFeiCard)}
+        {tab === "consignacao" && pagedItems.map(renderConsignmentCard)}
+        {tab === "despachante" && pagedItems.map(renderDispatchCard)}
+        {tab === "sdr" && pagedItems.map(renderSdrCard)}
+        {tab === "comparecimento" && pagedItems.map(renderAttendanceCard)}
+
+        <PaginationControls
+          page={pagination.page}
+          totalPages={totalPages}
+          total={totalItems}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+          className="border-t border-border pt-5"
+        />
       </div>
     );
   };

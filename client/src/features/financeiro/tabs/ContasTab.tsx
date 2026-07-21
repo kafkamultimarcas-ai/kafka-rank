@@ -183,7 +183,7 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
 
         <ContaList
           transactions={state.paginatedTransactions}
-          filteredTotal={state.filteredTransactions.length}
+          filteredTotal={state.totalRecords}
           emptyMessage={state.emptyMessage}
           expandedId={state.expandedId}
           onToggleExpand={(id) => state.setExpandedId(state.expandedId === id ? null : id)}
@@ -207,6 +207,7 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
           page={state.page}
           totalPages={state.totalPages}
           pageSize={state.pageSize}
+          isLoadingPage={state.isTransactionsFetching}
           onPageChange={state.setPage}
           onPageSizeChange={state.setPageSize}
         />
