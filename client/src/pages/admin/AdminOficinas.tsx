@@ -10,6 +10,7 @@ import { PaginationControls } from "@/components/PaginationControls";
 import { usePagination } from "@/hooks/usePagination";
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, Building2, Phone, MapPin, FileText, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { maskPhone } from "@/lib/masks";
 
 type Oficina = {
   id: number;
@@ -116,6 +117,7 @@ function OficinasContent() {
 
     function handleCreate() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 10) { toast.error("Telefone inválido (mínimo 10 dígitos)"); return; }
     createMut.mutate({
       name: form.name.trim(),
       phone: form.phone || undefined,
@@ -127,6 +129,7 @@ function OficinasContent() {
   function handleUpdate() {
     if (!selectedOficina) return;
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (form.phone && form.phone.replace(/\D/g, "").length < 10) { toast.error("Telefone inválido (mínimo 10 dígitos)"); return; }
     updateMut.mutate({
       id: selectedOficina.id,
       name: form.name.trim(),
@@ -368,8 +371,12 @@ function OficinaForm({ form, setForm }: { form: typeof EMPTY_FORM; setForm: (f: 
         <Input
           placeholder="(47) 99999-9999"
           value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })}
+          maxLength={15}
         />
+        {form.phone && form.phone.replace(/\D/g, "").length < 10 && (
+          <p className="text-xs text-red-400 mt-1">Telefone deve ter pelo menos 10 dígitos</p>
+        )}
       </div>
       <div>
         <label className="text-sm font-medium">CEP</label>

@@ -14,6 +14,7 @@ function formatCurrencyPV(val: string): string {
   return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 import { toast } from "sonner";
+import { maskPhone } from "@/lib/masks";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import {
   Dialog,
@@ -1131,7 +1132,7 @@ function OficinaCombobox({ oficinas, selectedId, onSelect }: { oficinas: any[]; 
             </div>
             <div>
               <label className="text-sm font-medium">Telefone</label>
-              <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="(00) 00000-0000" />
+              <Input value={newPhone} onChange={(e) => setNewPhone(maskPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} />
             </div>
             <Button
               onClick={() => createMutation.mutate({ name: newName, phone: newPhone || undefined })}
