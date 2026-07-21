@@ -2639,3 +2639,8 @@
 - [x] Tela Consignadores: adicionar atalho para visualizar os veículos de cada consignador
 - [x] Botão "Registrar Consignação" deve ir direto para a aba de consignação (não vendas)
 - [x] Layout MinhaArea: ações rápidas lado a lado em cima, histórico full-width embaixo, responsivo
+
+## Permissão Dar Saída - Consignador
+
+- [x] Permitir que perfil Consignador (department=consignacao) possa dar saída em veículos (updateExit)
+- [x] Adicionar sellerDepartment ao AuthActor context para verificação de permissão

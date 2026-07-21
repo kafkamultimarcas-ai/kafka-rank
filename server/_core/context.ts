@@ -17,6 +17,7 @@ import { withTenantAsync } from "../tenantDb";
 export type AuthActor = User & {
   actorType: "oauth" | "manager" | "seller" | "crm_admin";
   sellerRole?: "vendedor" | "gerente";
+  sellerDepartment?: string;
 };
 
 export type TrpcContext = {
@@ -135,6 +136,7 @@ export async function createContext(
             updatedAt: seller.updatedAt,
             lastSignedIn: new Date(),
             sellerRole: (seller.sellerRole as "vendedor" | "gerente") || "vendedor",
+            sellerDepartment: seller.department || "vendas",
           } as AuthActor;
         }
       }

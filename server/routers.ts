@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, adminProcedure, managerOrAdminProcedure, router } from "./_core/trpc";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 
@@ -1951,11 +1952,18 @@ export const appRouter = router({
       const updated = await db.updateConsignmentRecord(id, data);
       return { success: true, record: updated };
     }),
-    // Registrar saída do carro do pátio
-    updateExit: managerOrAdminProcedure.input(z.object({
+    // Registrar saída do carro do pátio (admin, gerente, ou setor consignação)
+    updateExit: protectedProcedure.input(z.object({
       id: z.number(),
       exitDate: z.number(),
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'admin';
+      const isCrmAdmin = ctx.user.actorType === 'crm_admin';
+      const isGerente = ctx.user.sellerRole === 'gerente';
+      const isConsignacao = ctx.user.sellerDepartment === 'consignacao';
+      if (!isAdmin && !isCrmAdmin && !isGerente && !isConsignacao) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso restrito a administradores, gerentes e setor de consignação' });
+      }
       const result = await db.updateConsignmentExitDate(input.id, input.exitDate);
       return { success: true, isValid: result.isValid };
     }),
