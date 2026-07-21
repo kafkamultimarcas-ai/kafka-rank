@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, User, Phone, Mail, MapPin, FileText, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, User, Phone, Mail, MapPin, FileText, ToggleLeft, ToggleRight, Car } from "lucide-react";
 import { toast } from "sonner";
 import { maskPhone } from "@/lib/masks";
 import { isValidCPF } from "@shared/validators";
+
 
 // CPF Mask helper
 function maskCPF(value: string): string {
@@ -59,9 +60,11 @@ function AdminConsignadoresInner() {
   const [editOpen, setEditOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [vehiclesOpen, setVehiclesOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [selectedConsignor, setSelectedConsignor] = useState<Consignor | null>(null);
   const [cpfError, setCpfError] = useState("");
+
 
   // Debounce search
   useEffect(() => {
@@ -71,6 +74,16 @@ function AdminConsignadoresInner() {
 
   const utils = trpc.useUtils();
   const { data: consignors = [], isLoading } = trpc.consignors.list.useQuery({ activeOnly: !showInactive });
+  const { data: vehicleCounts = [] } = trpc.consignors.vehicleCounts.useQuery();
+  const { data: consignorVehicles = [], isLoading: vehiclesLoading } = trpc.consignors.vehiclesByConsignor.useQuery(
+    { consignorId: selectedConsignor?.id || 0 },
+    { enabled: vehiclesOpen && !!selectedConsignor }
+  );
+
+  function getVehicleCount(consignorId: number): number {
+    const found = vehicleCounts.find((vc: any) => vc.consignorId === consignorId);
+    return found ? found.count : 0;
+  }
 
   const createMut = trpc.consignors.create.useMutation({
     onSuccess: () => { toast.success("Consignador cadastrado!"); utils.consignors.list.invalidate(); setCreateOpen(false); resetForm(); },
@@ -219,6 +232,7 @@ function AdminConsignadoresInner() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">CPF</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Telefone</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
+                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Veículos</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                 <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ações</th>
               </tr>
@@ -230,6 +244,16 @@ function AdminConsignadoresInner() {
                   <td className="px-4 py-3 text-muted-foreground">{c.cpf ? maskCPF(c.cpf) : "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.phone ? maskPhone(c.phone) : "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.email || "—"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => { setSelectedConsignor(c); setVehiclesOpen(true); }}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-xs font-medium transition-colors"
+                      title="Ver veículos deste consignador"
+                    >
+                      <Car className="w-3.5 h-3.5" />
+                      {getVehicleCount(c.id)}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                       {c.active ? "Ativo" : "Inativo"}
@@ -430,6 +454,55 @@ function AdminConsignadoresInner() {
             {selectedConsignor && (
               <Button onClick={() => { setDetailsOpen(false); openEdit(selectedConsignor); }}>Editar</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vehicles Dialog */}
+      <Dialog open={vehiclesOpen} onOpenChange={setVehiclesOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Car className="w-5 h-5 text-blue-400" />
+              Veículos de {selectedConsignor?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {vehiclesLoading ? (
+            <div className="text-center py-8 text-muted-foreground">Carregando veículos...</div>
+          ) : consignorVehicles.length === 0 ? (
+            <div className="text-center py-8">
+              <Car className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhum veículo vinculado</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {consignorVehicles.map((v: any) => (
+                <div key={v.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                  <div>
+                    <p className="font-medium text-foreground text-sm">{v.vehicleModel}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-yellow-400 font-mono">{v.vehiclePlate}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Entrada: {v.entryDate ? new Date(v.entryDate).toLocaleDateString('pt-BR') : '—'}
+                      </span>
+                      {v.exitDate && (
+                        <span className="text-xs text-emerald-400">
+                          Saída: {new Date(v.exitDate).toLocaleDateString('pt-BR')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                    v.exitDate ? 'bg-gray-500/20 text-gray-400' : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {v.exitDate ? 'Devolvido' : 'No Pátio'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVehiclesOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

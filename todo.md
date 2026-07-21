@@ -2632,3 +2632,10 @@
 - [x] Aplicar MoneyInput em ConsignmentControl.tsx (costValue)
 - [x] AdminFei.tsx - sem campos de input monetário editáveis (somente display)
 - [x] RankingFeirao.tsx - sem campos monetários (campo type=number é edição numérica, não moeda)
+
+## Melhorias Consignação e MinhaArea
+
+- [x] Tela Consignadores: adicionar coluna com quantidade de veículos vinculados a cada pessoa
+- [x] Tela Consignadores: adicionar atalho para visualizar os veículos de cada consignador
+- [x] Botão "Registrar Consignação" deve ir direto para a aba de consignação (não vendas)
+- [x] Layout MinhaArea: ações rápidas lado a lado em cima, histórico full-width embaixo, responsivo

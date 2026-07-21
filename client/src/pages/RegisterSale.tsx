@@ -126,7 +126,13 @@ function VehicleSelector({ value, onChange }: { value: string; onChange: (model:
 
 export default function RegisterSale() {
   const tenantSlug = getCurrentTenantSlug();
-  const [category, setCategory] = useState<Category>("vendas");
+  const initialCategory = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get('tab') as Category | null;
+    if (cat && ['vendas', 'fei', 'consignacao', 'despachante', 'pre_vendas'].includes(cat)) return cat;
+    return 'vendas' as Category;
+  }, []);
+  const [category, setCategory] = useState<Category>(initialCategory);
   const [sellerId, setSellerId] = useState<string>("");
   const [competitionId, setCompetitionId] = useState<string>("");
   const [submitted, setSubmitted] = useState(false);

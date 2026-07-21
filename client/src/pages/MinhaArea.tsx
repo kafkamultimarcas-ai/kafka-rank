@@ -1362,6 +1362,7 @@ export default function MinhaArea() {
         {/* Ações Rápidas */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Ações Rápidas</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
           {/* Financeiro - Ações específicas do setor */}
           {dept === 'financeiro' && (
@@ -1489,7 +1490,7 @@ export default function MinhaArea() {
           {/* Registrar - botão específico por setor (não mostrar para financeiro) */}
           {dept !== 'financeiro' && (
           <button
-            onClick={() => navigate(buildTenantPath(tenantSlug, "/registrar-venda"))}
+            onClick={() => navigate(buildTenantPath(tenantSlug, `/registrar-venda?tab=${dept === 'vendas' ? 'vendas' : dept === 'fei' ? 'fei' : dept === 'consignacao' ? 'consignacao' : dept === 'despachante' ? 'despachante' : 'pre_vendas'}`))}
             className={`w-full bg-gradient-to-r ${deptInfo.gradient} rounded-xl p-4 flex items-center gap-4 hover:opacity-80 transition-all`}
           >
             <div className={`w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center`}>
@@ -1688,6 +1689,7 @@ export default function MinhaArea() {
             </div>
           </button>
           )}
+          </div>
         </div>
 
         {/* Histórico de registros aprovados (para setores que NÃO são F&I, pois F&I já tem painel completo acima) */}
