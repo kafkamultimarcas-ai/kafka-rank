@@ -675,6 +675,20 @@ function EditChamadoForm({ chamado, oficinas, sellers, editData, setEditData, on
           <Input placeholder="Nome da oficina" onChange={(e) => setEditData((d: any) => ({ ...d, oficinaNome: e.target.value }))} />
         </div>
       </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Status</label>
+        <Select defaultValue={chamado.status} onValueChange={(v) => setEditData((d: any) => ({ ...d, status: v }))}>
+          <SelectTrigger><SelectValue placeholder="Selecionar status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="aberto">Aberto</SelectItem>
+            <SelectItem value="agendado">Agendado</SelectItem>
+            <SelectItem value="em_servico">Em Serviço</SelectItem>
+            <SelectItem value="finalizado">Finalizado</SelectItem>
+            <SelectItem value="entregue">Entregue</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-muted-foreground">Data Entrada Agendada</label>

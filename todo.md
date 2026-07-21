@@ -2535,3 +2535,6 @@
 - [x] Atualizar finRouter (create/update) para aceitar paymentMethod
 - [x] Adicionar combobox "Forma de Pagamento" ao lado de Recorrência no ContaForm
 - [x] Exibir forma de pagamento no ContaCard/ContaList
+
+## Campo Status no Pós-Venda (Jul 21, 2026)
+- [x] Adicionar combobox Status no formulário de edição do chamado (Aberto, Agendado, Em Serviço, Finalizado, Entregue, Cancelado)
