@@ -415,15 +415,15 @@ export default function RegisterSale() {
           break;
         case "consignacao":
           if (!consignPlate || consignPlate.length < 6) { toast.error("Informe a placa do veículo!"); return; }
-          if (!consignModel || !ownerName) { toast.error("Informe o modelo e o nome do dono!"); return; }
-          if (ownerPhone && !isValidBrazilianPhone(ownerPhone)) { toast.error("Telefone do proprietário inválido!"); return; }
+          if (!consignModel) { toast.error("Informe o modelo do veículo!"); return; }
+          if (!consignorId) { toast.error("Selecione ou cadastre o consignador!"); return; }
           if (checkPlateMutation.data?.blocked) { toast.error(checkPlateMutation.data.message); return; }
           result = await registerConsignment.mutateAsync({
             sellerId: sid, competitionId: cid,
             vehiclePlate: consignPlate,
             vehicleModel: consignModel,
             consignorId: consignorId || undefined,
-            ownerName,
+            ownerName: ownerName || "Consignador",
             ownerPhone: ownerPhone || undefined,
             entryDate: Date.now(),
             hasAuction,
@@ -924,7 +924,7 @@ export default function RegisterSale() {
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold flex items-center gap-2">
                     <User className="w-4 h-4 text-blue-400" />
-                    Consignador (Pessoa)
+                    Consignador (Pessoa) *
                   </Label>
                   <ConsignorCombobox
                     value={consignorId}
@@ -933,17 +933,7 @@ export default function RegisterSale() {
                       if (name) setOwnerName(name);
                     }}
                   />
-                  <p className="text-xs text-gray-500">Selecione ou cadastre o consignador. O nome será preenchido automaticamente.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 font-semibold">Nome do proprietário *</Label>
-                  <Input value={ownerName} onChange={e => setOwnerName(e.target.value)}
-                    placeholder="Nome do dono do veículo" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 font-semibold">Telefone do proprietário</Label>
-                  <Input value={ownerPhone} onChange={e => setOwnerPhone(maskPhone(e.target.value))}
-                    placeholder="(11) 99999-9999" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                  <p className="text-xs text-gray-500">Selecione ou cadastre o consignador (obrigatório).</p>
                 </div>
 
                 {/* Leilão */}

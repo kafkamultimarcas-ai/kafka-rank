@@ -54,6 +54,7 @@ const EsqueciSenha = lazy(() => import("./pages/EsqueciSenha"));
 const RedefinirSenha = lazy(() => import("./pages/RedefinirSenha"));
 const MinhaArea = lazy(() => import("./pages/MinhaArea"));
 const ConsignmentControl = lazy(() => import("./pages/ConsignmentControl"));
+const AdminConsignadores = lazy(() => import("./pages/admin/AdminConsignadores"));
 const PosVenda = lazy(() => import("./pages/PosVenda"));
 const IAVendedor = lazy(() => import("./pages/IAVendedor"));
 const SimuladorFinanciamento = lazy(() => import("./pages/SimuladorFinanciamento"));
@@ -154,6 +155,8 @@ function Router() {
         <Route path="/t/:slug/admin/financeiro" component={AdminFinanceiro} />
         <Route path="/admin/fornecedores" component={Fornecedores} />
         <Route path="/t/:slug/admin/fornecedores" component={Fornecedores} />
+        <Route path="/admin/consignadores" component={AdminConsignadores} />
+        <Route path="/t/:slug/admin/consignadores" component={AdminConsignadores} />
         <Route path="/admin/meta-integration" component={AdminMetaIntegration} />
         <Route path="/t/:slug/admin/meta-integration" component={AdminMetaIntegration} />
         <Route path="/admin/iam" component={AdminIAM} />

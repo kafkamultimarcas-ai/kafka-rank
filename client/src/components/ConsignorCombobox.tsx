@@ -4,7 +4,7 @@ import { Check, ChevronsUpDown, User, Plus } from "lucide-react";
 import { maskCpfCnpj, maskPhone } from "@/lib/masks";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
-import { isValidBrazilianPhone, isValidEmail } from "@shared/validators";
+import { isValidBrazilianPhone, isValidCpfCnpj, isValidEmail } from "@shared/validators";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +64,10 @@ export function ConsignorCombobox({
   function handleQuickAdd() {
     if (!newName.trim()) {
       toast.error("Nome é obrigatório.");
+      return;
+    }
+    if (newCpf && !isValidCpfCnpj(newCpf)) {
+      toast.error("CPF inválido.");
       return;
     }
     if (newPhone && !isValidBrazilianPhone(newPhone)) {

@@ -77,6 +77,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { icon: Car, label: "Estoque", path: "/admin/estoque" },
       { icon: Car, label: "Custo por Veículo", path: "/admin/custo-veiculo" },
       { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
+      { icon: Users, label: "Consignadores", path: "/admin/consignadores" },
     ],
   },
   {

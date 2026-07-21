@@ -2597,3 +2597,12 @@
 - [x] Adicionar Combobox de seleção de consignador na tela de Registrar Consignação
 - [x] Adicionar botão "+" ao lado do Combobox para cadastro rápido via modal
 - [x] Criar modal de cadastro rápido de consignador
+
+## Melhorias Perfil Consignação - Lote 2
+
+- [x] Remover campos "Nome do proprietário" e "Telefone do proprietário" da tela de registrar consignação (manter só Combobox consignador)
+- [x] Adicionar máscara de formatação em todos os campos de valor (R$) na tela de consignação
+- [x] Adicionar máscara e validação real de CPF no modal de cadastro rápido de consignador
+- [x] Edição completa no perfil do vendedor: permitir alterar todos os campos (modelo, placa, leilão, status, quitação, custo, obs, consignador) exceto data de entrada
+- [x] Adicionar botão "Dar Saída" ao lado de Editar/Excluir no histórico de consignações do vendedor
+- [x] Criar tela AdminConsignadores no menu principal para gerenciar consignadores (listar, editar, inativar, excluir)

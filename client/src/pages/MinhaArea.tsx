@@ -28,6 +28,11 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
 import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { maskPhone } from "@/lib/masks";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import IAMGreeting from "@/components/IAMGreeting";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
@@ -337,9 +342,20 @@ export default function MinhaArea() {
     onError: (e: any) => toast.error(e.message),
   });
   const updateConsignmentMut = trpc.consignment.update.useMutation({
-    onSuccess: () => { toast.success("Consignação atualizada!"); utils.consignment.list.invalidate(); },
+    onSuccess: () => { toast.success("Consignação atualizada!"); utils.consignment.list.invalidate(); setEditConsignOpen(false); },
     onError: (e: any) => toast.error(e.message),
   });
+  const updateExitMut = trpc.consignment.updateExit.useMutation({
+    onSuccess: () => { toast.success("Saída registrada!"); utils.consignment.list.invalidate(); setExitDialogOpen(false); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  // Edit consignment dialog state
+  const [editConsignOpen, setEditConsignOpen] = useState(false);
+  const [editConsignRecord, setEditConsignRecord] = useState<any>(null);
+  // Exit dialog state
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const [exitRecordId, setExitRecordId] = useState<number | null>(null);
+  const [exitDate, setExitDate] = useState("");
 
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
@@ -1766,17 +1782,29 @@ export default function MinhaArea() {
                     <div className="flex items-center gap-3 mt-2 pt-1 border-t border-gray-800/50">
                       <button
                         onClick={() => {
-                          const novaPlaca = prompt(`Editar placa:\n\nAtual: ${r.vehiclePlate || 'N/I'}\n\nDigite a nova placa (ou vazio para manter):`);
-                          const novoModelo = prompt(`Editar modelo:\n\nAtual: ${r.vehicleModel}\n\nDigite o novo modelo (ou vazio para manter):`);
-                          const data: any = { id: r.id };
-                          if (novaPlaca && novaPlaca.trim()) data.vehiclePlate = novaPlaca.trim().toUpperCase();
-                          if (novoModelo && novoModelo.trim()) data.vehicleModel = novoModelo.trim();
-                          if (data.vehiclePlate || data.vehicleModel) updateConsignmentMut.mutate(data);
+                          setEditConsignRecord({
+                            ...r,
+                            costValueDisplay: r.costValue ? r.costValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
+                            payoffValueDisplay: r.payoffValue ? r.payoffValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '',
+                          });
+                          setEditConsignOpen(true);
                         }}
                         className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs"
                       >
                         <Edit3 className="w-3.5 h-3.5" /> Editar
                       </button>
+                      {!r.exitDate && (
+                        <button
+                          onClick={() => {
+                            setExitRecordId(r.id);
+                            setExitDate(new Date().toISOString().split('T')[0]);
+                            setExitDialogOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-amber-400 hover:text-amber-300 text-xs"
+                        >
+                          <LogOut className="w-3.5 h-3.5" /> Dar Saída
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           if (window.confirm(`Excluir consignação "${r.vehicleModel} - ${r.vehiclePlate}"?`)) {
@@ -2264,6 +2292,141 @@ export default function MinhaArea() {
       {/* IAM - Super Agente IA */}
       {seller && <IAMFloatingButton sellerId={sellerId} />}
       {seller && <IAMGreeting sellerName={seller.nickname || seller.name} sellerId={sellerId} />}
+
+      {/* Dialog Editar Consignação */}
+      <Dialog open={editConsignOpen} onOpenChange={setEditConsignOpen}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">Editar Consignação</DialogTitle>
+            <DialogDescription className="text-gray-400">Altere os dados da consignação (exceto data de entrada).</DialogDescription>
+          </DialogHeader>
+          {editConsignRecord && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Placa</Label>
+                  <Input value={editConsignRecord.vehiclePlate || ''} onChange={e => setEditConsignRecord({...editConsignRecord, vehiclePlate: e.target.value.toUpperCase()})} className="bg-gray-800 border-gray-700 text-white" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Modelo</Label>
+                  <Input value={editConsignRecord.vehicleModel || ''} onChange={e => setEditConsignRecord({...editConsignRecord, vehicleModel: e.target.value})} className="bg-gray-800 border-gray-700 text-white" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Data de Entrada</Label>
+                  <Input type="date" value={editConsignRecord.entryDate ? new Date(editConsignRecord.entryDate).toISOString().split('T')[0] : ''} disabled className="bg-gray-800 border-gray-700 text-white opacity-60 cursor-not-allowed" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Leilão?</Label>
+                  <select value={editConsignRecord.hasAuction ? 'sim' : 'nao'} onChange={e => setEditConsignRecord({...editConsignRecord, hasAuction: e.target.value === 'sim'})} className="w-full h-9 rounded-md border border-gray-700 bg-gray-800 text-white text-sm px-3">
+                    <option value="nao">Sem Leilão</option>
+                    <option value="sim">Com Leilão</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Status</Label>
+                  <select value={editConsignRecord.vehicleStatus || 'quitado'} onChange={e => setEditConsignRecord({...editConsignRecord, vehicleStatus: e.target.value})} className="w-full h-9 rounded-md border border-gray-700 bg-gray-800 text-white text-sm px-3">
+                    <option value="quitado">Quitado</option>
+                    <option value="financiado">Financiado</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Valor Custo (R$)</Label>
+                  <Input
+                    value={editConsignRecord.costValueDisplay || ''}
+                    onChange={e => setEditConsignRecord({...editConsignRecord, costValueDisplay: e.target.value})}
+                    onBlur={() => {
+                      const raw = (editConsignRecord.costValueDisplay || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+                      const num = parseFloat(raw) || 0;
+                      setEditConsignRecord({...editConsignRecord, costValue: Math.round(num), costValueDisplay: num ? num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''});
+                    }}
+                    placeholder="Ex: 50.000,00"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                </div>
+              </div>
+              {editConsignRecord.vehicleStatus === 'financiado' && (
+                <div className="space-y-1">
+                  <Label className="text-gray-300 text-xs">Valor Quitação (R$)</Label>
+                  <Input
+                    value={editConsignRecord.payoffValueDisplay || ''}
+                    onChange={e => setEditConsignRecord({...editConsignRecord, payoffValueDisplay: e.target.value})}
+                    onBlur={() => {
+                      const raw = (editConsignRecord.payoffValueDisplay || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+                      const num = parseFloat(raw) || 0;
+                      setEditConsignRecord({...editConsignRecord, payoffValue: Math.round(num), payoffValueDisplay: num ? num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''});
+                    }}
+                    placeholder="Ex: 25.000,00"
+                    className="bg-gray-800 border-gray-700 text-white"
+                  />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-gray-300 text-xs">Observações</Label>
+                <Textarea value={editConsignRecord.notes || ''} onChange={e => setEditConsignRecord({...editConsignRecord, notes: e.target.value})} className="bg-gray-800 border-gray-700 text-white min-h-[60px]" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditConsignOpen(false)} className="border-gray-700 text-gray-300">Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!editConsignRecord) return;
+                const data: any = { id: editConsignRecord.id };
+                if (editConsignRecord.vehiclePlate) data.vehiclePlate = editConsignRecord.vehiclePlate;
+                if (editConsignRecord.vehicleModel) data.vehicleModel = editConsignRecord.vehicleModel;
+                data.hasAuction = editConsignRecord.hasAuction;
+                data.vehicleStatus = editConsignRecord.vehicleStatus;
+                data.costValue = editConsignRecord.costValue || undefined;
+                data.payoffValue = editConsignRecord.payoffValue || undefined;
+                data.notes = editConsignRecord.notes || undefined;
+                updateConsignmentMut.mutate(data);
+              }}
+              disabled={updateConsignmentMut.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {updateConsignmentMut.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Dar Saída */}
+      <Dialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <DialogContent className="bg-gray-900 border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">Registrar Saída do Pátio</DialogTitle>
+            <DialogDescription className="text-gray-400">O veículo será marcado como retirado. O registro permanece no histórico.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-gray-300">Data de saída</Label>
+              <Input
+                type="date"
+                value={exitDate}
+                onChange={e => setExitDate(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExitDialogOpen(false)} className="border-gray-700 text-gray-300">Cancelar</Button>
+            <Button
+              onClick={() => {
+                if (!exitRecordId || !exitDate) return;
+                updateExitMut.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime() });
+              }}
+              disabled={!exitDate || updateExitMut.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {updateExitMut.isPending ? "Registrando..." : "Confirmar Saída"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
