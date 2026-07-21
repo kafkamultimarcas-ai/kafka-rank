@@ -655,25 +655,19 @@ function EditChamadoForm({ chamado, oficinas, sellers, editData, setEditData, on
         <label className="text-xs text-muted-foreground flex items-center gap-1"><Wrench className="h-3 w-3 text-orange-400" /> O que está sendo feito (Serviço)</label>
         <Textarea defaultValue={chamado.servicoRealizado} onChange={(e) => setEditData((d: any) => ({ ...d, servicoRealizado: e.target.value }))} rows={2} placeholder="Descreva o que está sendo feito no veículo..." />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs text-muted-foreground">Oficina</label>
-          <Select defaultValue={chamado.oficinaId ? String(chamado.oficinaId) : undefined} onValueChange={(v) => {
-            const of_ = oficinas.find((o: any) => o.id === Number(v));
-            setEditData((d: any) => ({ ...d, oficinaId: Number(v), oficinaNome: of_?.name || "" }));
-          }}>
-            <SelectTrigger><SelectValue placeholder="Selecionar oficina" /></SelectTrigger>
-            <SelectContent>
-              {oficinas.map((o: any) => (
-                <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Ou digitar nome</label>
-          <Input placeholder="Nome da oficina" onChange={(e) => setEditData((d: any) => ({ ...d, oficinaNome: e.target.value }))} />
-        </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Oficina</label>
+        <Select defaultValue={chamado.oficinaId ? String(chamado.oficinaId) : undefined} onValueChange={(v) => {
+          const of_ = oficinas.find((o: any) => o.id === Number(v));
+          setEditData((d: any) => ({ ...d, oficinaId: Number(v), oficinaNome: of_?.name || "" }));
+        }}>
+          <SelectTrigger><SelectValue placeholder="Selecionar oficina" /></SelectTrigger>
+          <SelectContent>
+            {oficinas.map((o: any) => (
+              <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div>
         <label className="text-xs text-muted-foreground">Status</label>
