@@ -108,20 +108,7 @@ export async function findIdentityByEmail(email: string): Promise<IdentityByEmai
     };
   }
 
-  const managerRows = await db.select({
-    id: managers.id, email: managers.email, tenantId: managers.tenantId, passwordHash: managers.passwordHash,
-    active: managers.active, name: managers.name,
-  }).from(managers).where(eq(managers.email, normalized)).limit(1);
-  if (managerRows.length > 0) {
-    const m = managerRows[0];
-    const tenant = await lookupTenantInfo(m.tenantId);
-    if (!tenant) return null;
-    return {
-      userType: "manager", userId: m.id, tenantId: m.tenantId, tenantSlug: tenant.slug, tenantName: tenant.name,
-      passwordHash: m.passwordHash, active: m.active, name: m.name, email: m.email,
-    };
-  }
-
+  // Sellers checked FIRST since all managers have been migrated to sellers-gerente
   const sellerRows = await db.select({
     id: sellers.id, email: sellers.email, tenantId: sellers.tenantId, passwordHash: sellers.passwordHash,
     active: sellers.active, name: sellers.name, department: sellers.department, sellerRole: sellers.sellerRole,
@@ -135,6 +122,21 @@ export async function findIdentityByEmail(email: string): Promise<IdentityByEmai
       userType: "seller", userId: s.id, tenantId: s.tenantId, tenantSlug: tenant.slug, tenantName: tenant.name,
       passwordHash: s.passwordHash, active: s.active, name: s.name, email: s.email,
       department: s.department || "vendas", sellerRole: s.sellerRole || "vendedor",
+    };
+  }
+
+  // Legacy fallback: check managers table for any not-yet-migrated entries
+  const managerRows = await db.select({
+    id: managers.id, email: managers.email, tenantId: managers.tenantId, passwordHash: managers.passwordHash,
+    active: managers.active, name: managers.name,
+  }).from(managers).where(eq(managers.email, normalized)).limit(1);
+  if (managerRows.length > 0) {
+    const m = managerRows[0];
+    const tenant = await lookupTenantInfo(m.tenantId);
+    if (!tenant) return null;
+    return {
+      userType: "manager", userId: m.id, tenantId: m.tenantId, tenantSlug: tenant.slug, tenantName: tenant.name,
+      passwordHash: m.passwordHash, active: m.active, name: m.name, email: m.email,
     };
   }
 

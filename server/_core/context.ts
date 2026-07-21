@@ -3,7 +3,7 @@ import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import jwt from "jsonwebtoken";
 import { ENV } from "./env";
-import { getManagerById, getSellerById } from "../db";
+import { getSellerById, getSellerByUsername } from "../db";
 import { getAdminById } from "../crmDb";
 import { parse as parseCookieHeader } from "cookie";
 import { resolveTenantContext, assertTenantMatch } from "../tenantMiddleware";
@@ -16,7 +16,7 @@ import { withTenantAsync } from "../tenantDb";
 // ou da faixa numérica de `id`.
 export type AuthActor = User & {
   actorType: "oauth" | "manager" | "seller" | "crm_admin";
-  sellerRole?: "vendedor" | "gerente"; // só presente quando actorType === "seller"
+  sellerRole?: "vendedor" | "gerente";
 };
 
 export type TrpcContext = {
@@ -41,31 +41,33 @@ export async function createContext(
     user = null;
   }
 
-  // 2) If no OAuth user, try manager JWT cookie
+  // 2) Legacy: manager_session cookie → resolve as seller-gerente
+  //    (managers table deprecated — all gerentes now live in sellers)
   if (!user) {
     try {
       const cookies = parseCookieHeader(opts.req.headers.cookie || "");
-        const managerToken = cookies.manager_session;
+      const managerToken = cookies.manager_session;
       if (managerToken) {
         const payload = jwt.verify(managerToken, ENV.cookieSecret) as { managerId: number; username: string; tenantId?: number };
         if (!assertTenantMatch(payload.tenantId, requestTenantResolution.tenantId)) {
           console.warn(`[SECURITY] TENANT_MISMATCH manager_session: token tenantId=${payload.tenantId}, request tenantId=${requestTenantResolution.tenantId}`);
           throw new Error("TENANT_MISMATCH");
         }
-        const manager = await withTenantAsync(requestTenantResolution.tenantId, () => getManagerById(payload.managerId));
-        if (manager && manager.active) {
-          // Virtual user object com role "admin" pra adminProcedure funcionar.
+        // Resolve via sellers table by username (backward compat)
+        const seller = await withTenantAsync(requestTenantResolution.tenantId, () => getSellerByUsername(payload.username));
+        if (seller && seller.active && seller.sellerRole === 'gerente') {
           user = {
-            id: manager.id,
-            actorType: "manager",
-            openId: `manager_${manager.id}`,
-            name: manager.name,
-            email: null,
-            loginMethod: "password",
+            id: seller.id,
+            actorType: "seller",
+            openId: `seller_${seller.id}`,
+            name: seller.name,
+            email: seller.email,
+            loginMethod: "seller_password",
             role: "admin",
-            createdAt: manager.createdAt,
-            updatedAt: manager.updatedAt,
+            createdAt: seller.createdAt,
+            updatedAt: seller.updatedAt,
             lastSignedIn: new Date(),
+            sellerRole: "gerente",
           } as AuthActor;
         }
       }

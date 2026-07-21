@@ -23,7 +23,7 @@ const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminApprovals = lazy(() => import("./pages/admin/AdminApprovals"));
 const AdminGoals = lazy(() => import("./pages/admin/AdminGoals"));
 const AdminAgendamentos = lazy(() => import("./pages/admin/AdminAgendamentos"));
-const AdminGerentes = lazy(() => import("./pages/admin/AdminGerentes"));
+// AdminGerentes removed - gerentes are now managed via AdminSellers (Equipe)
 const AdminFei = lazy(() => import("./pages/admin/AdminFei"));
 const AdminPosVenda = lazy(() => import("./pages/admin/AdminPosVenda"));
 const AdminOficinas = lazy(() => import("./pages/admin/AdminOficinas"));
@@ -138,8 +138,8 @@ function Router() {
         <Route path="/t/:slug/admin/metas" component={AdminGoals} />
         <Route path="/admin/agendamentos" component={AdminAgendamentos} />
         <Route path="/t/:slug/admin/agendamentos" component={AdminAgendamentos} />
-        <Route path="/admin/gerentes" component={AdminGerentes} />
-        <Route path="/t/:slug/admin/gerentes" component={AdminGerentes} />
+        <Route path="/admin/gerentes" component={AdminSellers} />
+        <Route path="/t/:slug/admin/gerentes" component={AdminSellers} />
         <Route path="/admin/fei" component={AdminFei} />
         <Route path="/t/:slug/admin/fei" component={AdminFei} />
         <Route path="/admin/pos-venda" component={AdminPosVenda} />

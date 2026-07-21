@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { useBranding } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, UserCog, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown, Building2 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -60,7 +60,6 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     key: "equipe", label: "Equipe", items: [
       { icon: Users, label: "Equipe", path: "/admin/vendedores" },
-      { icon: UserCog, label: "Gerentes", path: "/admin/gerentes", ownerOnly: true },
       { icon: GraduationCap, label: "Treinamentos", path: "/admin/treinamentos" },
       { icon: ClipboardList, label: "Planos de Ação", path: "/admin/planos" },
     ],
@@ -133,15 +132,16 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
-  const managerQuery = trpc.managers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const sellerQuery = trpc.sellers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  // Legacy backward compat: managers.me still works but resolves as seller-gerente
+  const managerQuery = trpc.managers.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const billingQuery = trpc.billing.getMyPlan.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
     enabled: !!user && user.role === "admin",
   });
-  const isManagerLoading = managerQuery.isLoading;
   const isSellerLoading = sellerQuery.isLoading;
+  const isManagerLoading = managerQuery.isLoading;
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -153,10 +153,10 @@ export default function DashboardLayout({
 
   // Owner logged in via OAuth
   const isOwner = user && user.role === "admin" && (user.id > 0);
-  // Manager logged in via password (managers table)
-  const isManager = managerQuery.data && managerQuery.data.role === "manager";
-  // Seller-gerente logged in via seller login
+  // Seller-gerente (unified: both old managers and new gerentes resolve here)
   const isSellerGerente = sellerQuery.data && sellerQuery.data.sellerRole === 'gerente';
+  // Legacy backward compat: managers.me also returns gerente data
+  const isManager = managerQuery.data && managerQuery.data.role === "manager";
   const isSellerFinanceiro = sellerQuery.data?.department === "financeiro";
   const canAccessFinanceiroAdmin = isSellerFinanceiro && /\/admin\/financeiro(?:\/)?$/i.test(currentPath);
 
@@ -170,16 +170,12 @@ export default function DashboardLayout({
 
   const displayName = isOwner 
     ? (user?.name || "Gerente") 
-    : isManager 
-      ? (managerQuery.data?.name || "Gerente") 
-      : (sellerQuery.data?.nickname || sellerQuery.data?.name || "Gerente");
+    : (sellerQuery.data?.nickname || sellerQuery.data?.name || managerQuery.data?.name || "Gerente");
   const displayEmail = isOwner 
     ? (user?.email || "") 
-    : isManager 
-      ? "Gerente" 
-      : isSellerFinanceiro
-        ? "Financeiro"
-        : "Gerente";
+    : isSellerFinanceiro
+      ? "Financeiro"
+      : "Gerente";
   const showOwnerItems = !!isOwner;
 
   return (
@@ -284,8 +280,8 @@ function DashboardLayoutContent({
 }: DashboardLayoutContentProps) {
   const { logout: oauthLogout } = useAuth();
   const { logoUrl, name: brandName } = useBranding();
-  const managerLogout = trpc.managers.logout.useMutation();
   const sellerLogout = trpc.sellers.logout.useMutation();
+  const managerLogout = trpc.managers.logout.useMutation();
   const utils = trpc.useUtils();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
@@ -391,9 +387,11 @@ function DashboardLayoutContent({
       await utils.sellers.me.invalidate();
       toast.success("Logout realizado!");
       window.location.href = getTenantLoginPath(tenantSlug);
-    } else if (isManager) {
+    } else if (isManager && !isSellerGerente) {
+      // Legacy manager logout (clears both cookies)
       await managerLogout.mutateAsync();
       await utils.managers.me.invalidate();
+      await utils.sellers.me.invalidate();
       await utils.auth.me.invalidate();
       toast.success("Logout realizado!");
       if (tenantSlug) {

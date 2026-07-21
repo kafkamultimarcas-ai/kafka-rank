@@ -84,9 +84,8 @@ export const adminProcedure = publicProcedure.use(
 
 // Manager OR Admin procedure - allows:
 // 1. Admin users (OAuth owner with role='admin')
-// 2. Managers from managers table (negative ID, role='admin')
-// 3. CRM admins (negative ID with crm_admin login)
-// 4. Seller-gerente (sellers with sellerRole='gerente')
+// 2. CRM admins (crm_admin login)
+// 3. Seller-gerente (sellers with sellerRole='gerente')
 export const managerOrAdminProcedure = publicProcedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
@@ -96,24 +95,22 @@ export const managerOrAdminProcedure = publicProcedure.use(
     }
 
     const isAdmin = ctx.user.role === 'admin';
-    const isManager = ctx.user.actorType === 'manager';
     const isCrmAdmin = ctx.user.actorType === 'crm_admin';
     const isSellerGerente = ctx.user.sellerRole === 'gerente';
 
-    if (!isAdmin && !isManager && !isCrmAdmin && !isSellerGerente) {
+    if (!isAdmin && !isCrmAdmin && !isSellerGerente) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores e gerentes" });
     }
 
     const editorName = ctx.user.name ||
-      (isManager ? `Gerente #${ctx.user.id}` :
-       isSellerGerente ? `Gerente ${ctx.user.name}` : 'Admin');
+      (isSellerGerente ? `Gerente ${ctx.user.name}` : 'Admin');
 
     return next({
       ctx: {
         ...ctx,
         user: ctx.user,
         isAdmin,
-        isManager: isManager || isSellerGerente,
+        isManager: isSellerGerente || isAdmin,
         editorName,
       },
     });

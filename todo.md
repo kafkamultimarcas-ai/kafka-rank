@@ -2547,3 +2547,33 @@
 - [x] Botão de cadastro rápido de oficina ao lado do select no Pós-Venda
 - [x] Select de oficina com busca por texto (combobox searchable)
 - [x] Coluna Oficina na listagem de chamados com ícone de detalhes de contato
+
+## Unificação Equipe + Gerente
+- [ ] Migrar registros de managers para sellers com sellerRole=gerente
+- [ ] Remover router managers (login, logout, me, list, create, update, delete)
+- [ ] Atualizar context.ts - remover parsing de manager_session
+- [ ] Atualizar trpc.ts - remover actorType manager check
+- [ ] Atualizar managerMentorRouter - remover lógica de ID negativo
+- [ ] Atualizar emailPolicy.ts e usernamePolicy.ts - remover managers
+- [ ] Atualizar tenantMiddleware.ts - remover managers fallback
+- [ ] Remover AdminGerentes.tsx
+- [ ] Atualizar DashboardLayout - remover managers.me query e menu Gerentes
+- [ ] Atualizar GerentePanel - remover lógica de ID negativo
+- [ ] Remover db.ts funções de managers
+- [ ] Remover tabela managers do schema
+
+## Unificação Equipe + Gerente (Arquitetura Senior)
+
+- [x] Backend: Stub managers router (backward-compatible) - login redireciona para sellers table
+- [x] Backend: managers.me retorna dados do seller-gerente em formato compatível
+- [x] Backend: managers.logout limpa ambos cookies (seller_session + manager_session)
+- [x] Backend: tenantAuthRouter - login por email de manager agora emite seller_session cookie
+- [x] Backend: tenantAuthRouter - login legado por username de manager resolve via sellers table
+- [x] Backend: emailPolicy - sellers verificados ANTES de managers (prioridade ao seller-gerente)
+- [x] Frontend: Remover menu "Gerentes" do DashboardLayout sidebar
+- [x] Frontend: Remover AdminGerentes lazy import e redirecionar rota para AdminSellers
+- [x] Frontend: DashboardLayout - simplificar auth (priorizar sellerQuery sobre managerQuery)
+- [x] Frontend: GerentePanel - logout unificado via seller_session
+- [x] Frontend: GerentePanel - managerId resolve via seller-gerente primeiro
+- [x] Database: Migrar passwordHash dos managers para sellers-gerente correspondentes
+- [x] Cadastro de gerente agora é feito somente pela tela Equipe (AdminSellers) com sellerRole=gerente

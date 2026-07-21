@@ -164,18 +164,22 @@ export const tenantAuthRouter = router({
     }
 
     if (identity.userType === "manager") {
+      // DEPRECATED: managers are now sellers-gerente. Set seller_session cookie.
+      await withTenantAsync(identity.tenantId, () => db.updateSellerLastAccess(identity.userId));
       const token = jwt.sign(
-        { managerId: identity.userId, tenantId: identity.tenantId, tenantSlug: identity.tenantSlug },
+        { sellerId: identity.userId, tenantId: identity.tenantId, tenantSlug: identity.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
       ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
-      ctx.res.cookie("manager_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+      ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
       return {
-        userType: "manager",
+        userType: "seller",
         id: identity.userId,
         name: identity.name,
-        role: "manager",
+        role: "gerente",
+        sellerRole: "gerente",
         redirectPath: "/gerente",
         tenantSlug: identity.tenantSlug,
         tenantId: identity.tenantId,
@@ -250,28 +254,36 @@ export const tenantAuthRouter = router({
       }
     }
 
+    // Legacy: try managers table but issue seller_session cookie
     const manager = await db.getManagerByUsername(username);
-    if (manager && manager.active) {
-      const valid = await bcrypt.compare(input.password, manager.passwordHash);
+    if (manager && (manager as any).active) {
+      const valid = await bcrypt.compare(input.password, (manager as any).passwordHash);
       if (valid) {
-        const token = jwt.sign(
-          { managerId: manager.id, username: manager.username, tenantId: (manager as any).tenantId, tenantSlug: ctx.tenantSlug },
-          ENV.cookieSecret,
-          { expiresIn: "30d" }
-        );
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
-        ctx.res.cookie("manager_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-        return {
-          userType: "manager",
-          id: manager.id,
-          name: manager.name,
-          role: "manager",
-          redirectPath: "/gerente",
-          tenantSlug: ctx.tenantSlug,
-          tenantId: ctx.tenantId,
-          ...trialInfo,
-        };
+        // Find the corresponding seller-gerente entry
+        const sellerGerente = await db.getSellerByUsername(username);
+        if (sellerGerente && sellerGerente.active) {
+          await db.updateSellerLastAccess(sellerGerente.id);
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
+          ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
+          const token = jwt.sign(
+            { sellerId: sellerGerente.id, username: sellerGerente.username, tenantId: (sellerGerente as any).tenantId, tenantSlug: ctx.tenantSlug },
+            ENV.cookieSecret,
+            { expiresIn: "30d" }
+          );
+          ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+          return {
+            userType: "seller",
+            id: sellerGerente.id,
+            name: sellerGerente.name,
+            role: "gerente",
+            sellerRole: "gerente",
+            redirectPath: "/gerente",
+            tenantSlug: ctx.tenantSlug,
+            tenantId: ctx.tenantId,
+            ...trialInfo,
+          };
+        }
       }
     }
 

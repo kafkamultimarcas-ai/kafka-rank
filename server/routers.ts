@@ -2926,43 +2926,49 @@ export const appRouter = router({
     }),
   }),
 
-  // ===== MANAGERS (Gerentes com login por senha) =====
+  // ===== MANAGERS (DEPRECATED - backward compat stub) =====
+  // All gerentes are now in the sellers table with sellerRole='gerente'.
+  // This router is kept as a stub so old frontend code doesn't break.
   managers: router({
-    // Login por senha - público
+    // Login: redirect to sellers.login (same logic)
     login: publicProcedure.input(z.object({
       username: z.string().min(1),
       password: z.string().min(1),
     })).mutation(async ({ input, ctx }) => {
-      const manager = await db.getManagerByUsername(input.username);
-      if (!manager || !manager.active) {
+      // Resolve via sellers table (all managers migrated to sellers-gerente)
+      const seller = await db.getSellerByUsername(input.username);
+      if (!seller || !seller.active || !seller.passwordHash) {
         throw new Error("Usuário ou senha inválidos");
       }
-      const valid = await bcrypt.compare(input.password, manager.passwordHash);
+      const valid = await bcrypt.compare(input.password, seller.passwordHash);
       if (!valid) {
         throw new Error("Usuário ou senha inválidos");
       }
-      // Gerar JWT e setar cookie
+      // Set seller_session cookie (unified)
+      await db.updateSellerLastAccess(seller.id);
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
       const token = jwt.sign(
-        { managerId: manager.id, username: manager.username, tenantId: (manager as any).tenantId, tenantSlug: ctx.tenantSlug },
+        { sellerId: seller.id, username: seller.username, tenantId: (seller as any).tenantId, tenantSlug: ctx.tenantSlug },
         ENV.cookieSecret,
         { expiresIn: "30d" }
       );
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.cookie("manager_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
-      return { success: true, name: manager.name };
+      ctx.res.cookie("seller_session", token, { ...cookieOptions, maxAge: 30 * 24 * 60 * 60 * 1000 });
+      return { success: true, name: seller.name };
     }),
 
-    // Logout gerente
+    // Logout: clear both cookies for backward compat
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie("manager_session", { ...cookieOptions, maxAge: -1 });
+      ctx.res.clearCookie("seller_session", { ...cookieOptions, maxAge: -1 });
       return { success: true };
     }),
 
-    // Verificar se está logado como gerente
+    // me: returns seller-gerente data in manager-compatible shape
     me: publicProcedure.query(async ({ ctx }) => {
       if (!ctx.user) return null;
-      if (ctx.user.actorType === "manager") {
+      if (ctx.user.actorType === "seller" && ctx.user.sellerRole === "gerente") {
         const limits = await getTenantLimits(ctx.tenantId);
         return {
           id: ctx.user.id, name: ctx.user.name, role: "manager" as const,
@@ -2973,9 +2979,13 @@ export const appRouter = router({
       return null;
     }),
 
-    // CRUD - só dono (user com openId == ownerOpenId) pode gerenciar
+    // CRUD stubs - redirect to sellers
     list: adminProcedure.query(async () => {
-      return db.listManagers();
+      // Return sellers with sellerRole='gerente' in manager-compatible shape
+      const allSellers = await db.listSellers(false);
+      return allSellers
+        .filter((s: any) => s.sellerRole === 'gerente')
+        .map((s: any) => ({ id: s.id, name: s.name, username: s.username, email: s.email, active: s.active, createdAt: s.createdAt }));
     }),
 
     create: adminProcedure.input(z.object({
@@ -2984,9 +2994,11 @@ export const appRouter = router({
       name: z.string().min(1),
       email: z.string().email("E-mail do gerente inválido"),
     })).mutation(async ({ input, ctx }) => {
+      // Create as seller-gerente instead
       const passwordHash = await bcrypt.hash(input.password, 10);
       const username = input.username || input.email.split("@")[0];
-      const id = await db.createManager({ username, passwordHash, name: input.name, email: input.email });
+      const id = await db.createSeller({ name: input.name, email: input.email, department: 'vendas' });
+      await db.updateSeller(id, { username, passwordHash, sellerRole: 'gerente' } as any);
 
       const tenant = await getTenantById(ctx.tenantId);
       if (tenant) {
@@ -3007,12 +3019,12 @@ export const appRouter = router({
       if (input.name) data.name = input.name;
       if (input.password) data.passwordHash = await bcrypt.hash(input.password, 10);
       if (input.active !== undefined) data.active = input.active;
-      await db.updateManager(input.id, data);
+      await db.updateSeller(input.id, data);
       return { success: true };
     }),
 
     delete: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
-      await db.deleteManager(input.id);
+      await db.updateSeller(input.id, { active: false });
       return { success: true };
     }),
   }),

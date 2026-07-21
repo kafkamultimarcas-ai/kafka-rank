@@ -68,6 +68,7 @@ export default function GerentePanel() {
   const [, setLocation] = useLocation();
   const tenantSlug = getCurrentTenantSlug();
   const { data: sellerSession, isLoading: sellerSessionLoading } = trpc.sellers.me.useQuery();
+  // Legacy backward compat: managers.me now also resolves as seller-gerente
   const { data: managerSession, isLoading: managerSessionLoading } = trpc.managers.me.useQuery();
   const { data: myPerms, isLoading: permsLoading } = trpc.managerPerms.myPermissions.useQuery();
 
@@ -76,11 +77,12 @@ export default function GerentePanel() {
   const [expandedSeller, setExpandedSeller] = useState<number | null>(null);
 
   const isSellerGerente = !!sellerSession && sellerSession.sellerRole === "gerente";
-  const isManagerTableUser = !!managerSession;
-  const managerId = isManagerTableUser
-    ? -managerSession.id
-    : isSellerGerente
-      ? sellerSession.id
+  // Legacy: managerSession now returns seller-gerente data too
+  const isManagerTableUser = !!managerSession && !isSellerGerente;
+  const managerId = isSellerGerente
+    ? sellerSession.id
+    : isManagerTableUser
+      ? managerSession.id
       : 0;
   const managerDisplayName = sellerSession?.nickname || sellerSession?.name || managerSession?.name || "Gerente";
 
@@ -130,6 +132,7 @@ export default function GerentePanel() {
   const sellerLogoutMutation = trpc.sellers.logout.useMutation({
     onSuccess: () => { setLocation(getTenantLoginPath(tenantSlug)); },
   });
+  // Legacy: managers.logout clears both cookies
   const managerLogoutMutation = trpc.managers.logout.useMutation({
     onSuccess: () => { setLocation(getTenantLoginPath(tenantSlug)); },
   });
@@ -214,10 +217,7 @@ export default function GerentePanel() {
               size="sm"
               variant="outline"
               onClick={() => {
-                if (isManagerTableUser) {
-                  managerLogoutMutation.mutate();
-                  return;
-                }
+                // Unified logout: always use seller logout (clears seller_session)
                 sellerLogoutMutation.mutate();
               }}
               className="gap-1.5 text-xs h-8 border-red-600/50 text-red-400 hover:bg-red-600/10"
