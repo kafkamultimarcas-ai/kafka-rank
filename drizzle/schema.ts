@@ -216,6 +216,7 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   competitionId: int("competitionId"),
   vehiclePlate: varchar("vehiclePlate", { length: 10 }),
   vehicleModel: varchar("vehicleModel", { length: 255 }),
+  consignorId: int("consignorId"), // FK para tabela consignors
   ownerName: varchar("ownerName", { length: 255 }),
   ownerPhone: varchar("ownerPhone", { length: 20 }), // telefone do proprietário
   entryDate: bigint("entryDate", { mode: "number" }).notNull(), // data de entrada no pátio
@@ -1965,3 +1966,22 @@ export const integrationSyncLogs = mysqlTable("integration_sync_logs", {
 }));
 export type IntegrationSyncLog = typeof integrationSyncLogs.$inferSelect;
 export type InsertIntegrationSyncLog = typeof integrationSyncLogs.$inferInsert;
+
+// ===== CONSIGNADORES (Pessoa Física) =====
+export const consignors = mysqlTable("consignors", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  name: varchar("name", { length: 255 }).notNull(),
+  cpf: varchar("cpf", { length: 14 }),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  tenantIdx: index("idx_consignors_tenant").on(table.tenantId),
+  cpfIdx: index("idx_consignors_cpf").on(table.tenantId, table.cpf),
+}));
+export type Consignor = typeof consignors.$inferSelect;
+export type InsertConsignor = typeof consignors.$inferInsert;

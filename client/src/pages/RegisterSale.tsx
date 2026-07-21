@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X, User } from "lucide-react";
+import { ConsignorCombobox } from "@/components/ConsignorCombobox";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { maskCpfCnpj, maskPhone } from "@/lib/masks";
 import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
@@ -182,6 +183,7 @@ export default function RegisterSale() {
   // Consignação fields
   const [consignModel, setConsignModel] = useState("");
   const [consignPlate, setConsignPlate] = useState("");
+  const [consignorId, setConsignorId] = useState<number | null>(null);
   const [ownerName, setOwnerName] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [entryDate, setEntryDate] = useState("");
@@ -419,7 +421,9 @@ export default function RegisterSale() {
           result = await registerConsignment.mutateAsync({
             sellerId: sid, competitionId: cid,
             vehiclePlate: consignPlate,
-            vehicleModel: consignModel, ownerName,
+            vehicleModel: consignModel,
+            consignorId: consignorId || undefined,
+            ownerName,
             ownerPhone: ownerPhone || undefined,
             entryDate: Date.now(),
             hasAuction,
@@ -916,6 +920,20 @@ export default function RegisterSale() {
                   </Label>
                   <Input value={consignModel} onChange={e => setConsignModel(e.target.value)}
                     placeholder="Ex: Toyota Corolla 2023" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-gray-300 font-semibold flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-400" />
+                    Consignador (Pessoa)
+                  </Label>
+                  <ConsignorCombobox
+                    value={consignorId}
+                    onChange={(id, name) => {
+                      setConsignorId(id);
+                      if (name) setOwnerName(name);
+                    }}
+                  />
+                  <p className="text-xs text-gray-500">Selecione ou cadastre o consignador. O nome será preenchido automaticamente.</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Nome do proprietário *</Label>

@@ -116,6 +116,7 @@ export const appRouter = router({
       active: z.enum(["ativos", "inativos"]).default("ativos"),
       dept: z.string().default("todos"),
       role: z.enum(["todos", "gerente", "vendedor"]).default("todos"),
+      search: z.string().default(""),
       offset: z.number().int().min(0).default(0),
       limit: z.number().int().min(1).max(100).default(20),
     })).query(async ({ input }) => {
@@ -141,6 +142,15 @@ export const appRouter = router({
         deptCounts[dept] = (deptCounts[dept] || 0) + 1;
       }
       let filtered = input.dept === "todos" ? roleFiltered : roleFiltered.filter((s: any) => ((s as any).department || "vendas") === input.dept);
+      // Apply search filter
+      if (input.search.trim()) {
+        const q = input.search.trim().toLowerCase();
+        filtered = filtered.filter((s: any) =>
+          (s.name && s.name.toLowerCase().includes(q)) ||
+          (s.email && s.email.toLowerCase().includes(q)) ||
+          (s.nickname && s.nickname.toLowerCase().includes(q))
+        );
+      }
       filtered = [...filtered].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
       return { items: filtered.slice(input.offset, input.offset + input.limit), total: filtered.length, deptCounts, statusCounts, roleCounts };
     }),
@@ -1807,6 +1817,7 @@ export const appRouter = router({
       competitionId: z.number().optional(),
       vehiclePlate: z.string().min(1, "Placa é obrigatória"),
       vehicleModel: z.string().min(1),
+      consignorId: z.number().optional(),
       ownerName: z.string().min(1),
       ownerPhone: z.string().optional(),
       entryDate: z.number(),
@@ -1926,6 +1937,7 @@ export const appRouter = router({
       id: z.number(),
       vehiclePlate: z.string().optional(),
       vehicleModel: z.string().optional(),
+      consignorId: z.number().nullable().optional(),
       ownerName: z.string().optional(),
       ownerPhone: z.string().optional(),
       entryDate: z.number().optional(),
@@ -1946,6 +1958,45 @@ export const appRouter = router({
     })).mutation(async ({ input }) => {
       const result = await db.updateConsignmentExitDate(input.id, input.exitDate);
       return { success: true, isValid: result.isValid };
+    }),
+  }),
+
+  // ===== CONSIGNADORES (Pessoa) =====
+  consignors: router({
+    list: publicProcedure.input(z.object({ activeOnly: z.boolean().optional() }).optional()).query(async ({ input }) => {
+      return db.listConsignors(input?.activeOnly !== false);
+    }),
+    getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+      return db.getConsignorById(input.id);
+    }),
+    create: publicProcedure.input(z.object({
+      name: z.string().min(1, "Nome é obrigatório"),
+      cpf: z.string().optional(),
+      phone: z.string().optional(),
+      email: z.string().optional(),
+      address: z.string().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ input }) => {
+      const id = await db.createConsignor(input);
+      return { id, success: true };
+    }),
+    update: publicProcedure.input(z.object({
+      id: z.number(),
+      name: z.string().optional(),
+      cpf: z.string().optional(),
+      phone: z.string().optional(),
+      email: z.string().optional(),
+      address: z.string().optional(),
+      notes: z.string().optional(),
+      active: z.boolean().optional(),
+    })).mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await db.updateConsignor(id, data);
+      return { success: true };
+    }),
+    delete: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
+      await db.deleteConsignor(input.id);
+      return { success: true };
     }),
   }),
 

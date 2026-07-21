@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Key, Shield, ShieldCheck, Eye, Edit3 } from "lucide-react";
+import { Plus, Pencil, Trash2, Camera, UserCheck, UserX, Key, Shield, ShieldCheck, Eye, Edit3, Search, MoreVertical, Users, UserCog } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useState, useRef, useMemo } from "react";
 import { PaginationControls } from "@/components/PaginationControls";
 import { usePagination } from "@/hooks/usePagination";
@@ -42,6 +43,8 @@ export default function AdminSellers() {
   const [filterDept, setFilterDept] = useState<string>("todos");
   const [filterRole, setFilterRole] = useState<"todos" | "gerente" | "vendedor">("todos");
   const [filterActive, setFilterActive] = useState<"ativos" | "inativos">("ativos");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [passwordDialog, setPasswordDialog] = useState<{ open: boolean; seller: any | null }>({ open: false, seller: null });
@@ -62,15 +65,24 @@ export default function AdminSellers() {
     { enabled: !!permsDialog.seller?.id && permsDialog.open && permsDialog.seller?.sellerRole === 'gerente' }
   );
 
+  // Debounce search input
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function handleSearchChange(value: string) {
+    setSearchQuery(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => setDebouncedSearch(value), 300);
+  }
+
   // Paginação server-side (mesmo padrão das demais telas)
   const pagination = usePagination({
     initialPageSize: 20,
-    resetDeps: [filterDept, filterActive, filterRole],
+    resetDeps: [filterDept, filterActive, filterRole, debouncedSearch],
   });
   const sellersQuery = trpc.sellers.listPaged.useQuery({
     active: filterActive,
     dept: filterDept,
     role: filterRole,
+    search: debouncedSearch,
     offset: pagination.offset,
     limit: pagination.pageSize,
   });
@@ -292,6 +304,25 @@ export default function AdminSellers() {
             </Dialog>
           </div>
 
+          {/* Search bar */}
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Buscar por nome ou e-mail..."
+              className="pl-9 bg-input border-border text-foreground"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(""); setDebouncedSearch(""); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           {/* Filter by status (Ativos/Inativos) — padrão Ativos */}
           <div className="flex gap-2 mb-3">
             <button
@@ -450,22 +481,30 @@ export default function AdminSellers() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {/* Toggle Gerente */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => toggleRole(seller)}
-                          >
+                      {/* Quick Role Menu */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
                             {isGerente ? <ShieldCheck className="h-4 w-4 text-amber-400" /> : <Shield className="h-4 w-4 text-muted-foreground" />}
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                          <p>{isGerente ? "Remover papel de gerente" : "Tornar gerente"}</p>
-                        </TooltipContent>
-                      </Tooltip>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem
+                            onClick={() => !isGerente && toggleRole(seller)}
+                            className={isGerente ? "bg-amber-500/10 text-amber-400 font-medium" : ""}
+                          >
+                            <ShieldCheck className="h-4 w-4 mr-2" /> Gerente
+                            {isGerente && <span className="ml-auto text-[10px]">Atual</span>}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => isGerente && toggleRole(seller)}
+                            className={!isGerente ? "bg-blue-500/10 text-blue-400 font-medium" : ""}
+                          >
+                            <Users className="h-4 w-4 mr-2" /> Vendedor
+                            {!isGerente && <span className="ml-auto text-[10px]">Atual</span>}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       {/* Permissões de visibilidade - para TODOS os colaboradores */}
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -543,13 +582,27 @@ export default function AdminSellers() {
               })}
             </div>
           ) : (
-            <div className="racing-card p-12 text-center">
-              <p className="text-muted-foreground">
-                {filterActive === "inativos"
-                  ? "Nenhum colaborador inativo."
-                  : filterDept !== "todos"
-                    ? `Nenhum colaborador ativo no setor "${getDeptInfo(filterDept).label}". Adicione um novo ou mude o filtro.`
-                    : 'Nenhum colaborador cadastrado. Clique em "Novo" para começar.'}
+            <div className="racing-card p-12 text-center space-y-3">
+              <div className="flex justify-center">
+                <Users className="h-12 w-12 text-muted-foreground/40" />
+              </div>
+              <p className="text-muted-foreground font-medium">
+                {debouncedSearch
+                  ? `Nenhum resultado para "${debouncedSearch}"`
+                  : filterActive === "inativos"
+                    ? "Nenhum colaborador inativo no momento."
+                    : filterRole !== "todos"
+                      ? `Nenhum ${filterRole === "gerente" ? "gerente" : "vendedor"} encontrado${filterDept !== "todos" ? ` no setor ${getDeptInfo(filterDept).label}` : ""}.`
+                      : filterDept !== "todos"
+                        ? `Nenhum colaborador ativo no setor "${getDeptInfo(filterDept).label}".`
+                        : 'Nenhum colaborador cadastrado ainda.'}
+              </p>
+              <p className="text-muted-foreground/70 text-sm">
+                {debouncedSearch
+                  ? "Tente outro termo ou limpe a pesquisa."
+                  : filterDept !== "todos" || filterRole !== "todos"
+                    ? "Ajuste os filtros ou adicione um novo colaborador."
+                    : 'Clique em "Novo" para adicionar o primeiro colaborador.'}
               </p>
             </div>
           )}

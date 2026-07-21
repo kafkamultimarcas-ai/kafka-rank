@@ -36,6 +36,7 @@ import {
   feiraoEditions, InsertFeiraoEdition,
   vehicleCosts, InsertVehicleCost,
   vehicleCostItems, InsertVehicleCostItem,
+  consignors, InsertConsignor,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { assertGlobalUsernameAvailable } from "./usernamePolicy";
@@ -3966,4 +3967,42 @@ export async function searchAllByPlate(plate: string) {
     consignment: matchedConsignment,
     sdr: matchedSdr,
   };
+}
+
+
+// ===== CONSIGNADORES =====
+export async function listConsignors(activeOnly = true) {
+  const db = await getDb();
+  if (!db) return [];
+  if (activeOnly) {
+    return db.select().from(consignors).where(and(eq(consignors.tenantId, getCurrentTenantId()), eq(consignors.active, true))).orderBy(asc(consignors.name));
+  }
+  return db.select().from(consignors).where(eq(consignors.tenantId, getCurrentTenantId())).orderBy(asc(consignors.name));
+}
+
+export async function getConsignorById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(consignors).where(and(eq(consignors.tenantId, getCurrentTenantId()), eq(consignors.id, id))).limit(1);
+  return result[0];
+}
+
+export async function createConsignor(data: InsertConsignor) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const result = await db.insert(consignors).values({ ...data, tenantId: getCurrentTenantId() });
+  return result[0].insertId;
+}
+
+export async function updateConsignor(id: number, data: Partial<InsertConsignor>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(consignors).set(data).where(and(eq(consignors.tenantId, getCurrentTenantId()), eq(consignors.id, id)));
+}
+
+export async function deleteConsignor(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  // Soft delete - just deactivate
+  await db.update(consignors).set({ active: false }).where(and(eq(consignors.tenantId, getCurrentTenantId()), eq(consignors.id, id)));
 }

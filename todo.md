@@ -2582,3 +2582,18 @@
 
 - [x] Adicionar selo/badge visual diferenciando gerente de vendedor na lista da tela Equipe
 - [x] Criar filtro rápido (todos/gerentes/vendedores) na tela Equipe
+
+## Melhorias Tela Equipe - Pesquisa, Estado Vazio e Ação Rápida
+
+- [ ] Barra de pesquisa na tela Equipe para buscar por nome ou e-mail dentro dos filtros
+- [ ] Estado vazio personalizado com mensagem amigável quando filtros não retornam resultados
+- [ ] Menu de ação rápida em cada item para alterar papel (gerente/vendedor) diretamente
+
+## Cadastro de Consignador (Pessoa)
+
+- [x] Criar tabela consignadores no banco (nome, cpf, telefone, email, endereco, tenantId)
+- [x] Criar helpers de DB para CRUD de consignadores
+- [x] Criar rotas tRPC para listar, criar, editar e excluir consignadores
+- [x] Adicionar Combobox de seleção de consignador na tela de Registrar Consignação
+- [x] Adicionar botão "+" ao lado do Combobox para cadastro rápido via modal
+- [x] Criar modal de cadastro rápido de consignador
