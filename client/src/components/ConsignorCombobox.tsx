@@ -67,7 +67,7 @@ export function ConsignorCombobox({
       return;
     }
     if (newCpf && !isValidCpfCnpj(newCpf)) {
-      toast.error("CPF inválido.");
+      toast.error("CPF/CNPJ inválido.");
       return;
     }
     if (newPhone && !isValidBrazilianPhone(newPhone)) {
@@ -178,12 +178,12 @@ export function ConsignorCombobox({
                   <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do consignador" />
                 </div>
                 <div>
-                  <Label>CPF</Label>
+                  <Label>CPF / CNPJ</Label>
                   <Input
                     value={newCpf}
                     onChange={(e) => setNewCpf(maskCpfCnpj(e.target.value))}
-                    placeholder="000.000.000-00"
-                    maxLength={14}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                    maxLength={18}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">

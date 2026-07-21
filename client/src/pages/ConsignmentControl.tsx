@@ -34,6 +34,7 @@ export default function ConsignmentControl() {
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [exitRecordId, setExitRecordId] = useState<number | null>(null);
   const [exitDate, setExitDate] = useState("");
+  const [exitReason, setExitReason] = useState("");
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [searchTerm, setSearchTerm] = useState("");
@@ -161,8 +162,8 @@ export default function ConsignmentControl() {
   };
 
   const handleConfirmExit = () => {
-    if (!exitRecordId || !exitDate) return;
-    updateExit.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime() });
+    if (!exitRecordId || !exitDate || !exitReason) return;
+    updateExit.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime(), exitReason });
   };
 
   const toggleExpand = (id: number) => {
@@ -228,7 +229,7 @@ export default function ConsignmentControl() {
           <div className="flex items-center gap-1.5">
             <LogOut className="w-3 h-3 text-red-400 flex-shrink-0" />
             <span className="text-muted-foreground">Saída:</span>
-            <span className="text-foreground">{new Date(v.exitDate).toLocaleDateString('pt-BR')}</span>
+            <span className="text-foreground">{new Date(v.exitDate).toLocaleDateString('pt-BR')}{v.exitReason ? ` (${v.exitReason})` : ''}</span>
           </div>
         )}
       </div>
@@ -592,6 +593,20 @@ export default function ConsignmentControl() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
+              <Label className="text-foreground">Motivo da saída *</Label>
+              <select
+                value={exitReason}
+                onChange={e => setExitReason(e.target.value)}
+                className="w-full rounded-md border border-border bg-muted px-3 py-2 text-foreground text-sm"
+              >
+                <option value="">Selecione o motivo...</option>
+                <option value="vendido">Vendido</option>
+                <option value="devolvido">Devolvido ao proprietário</option>
+                <option value="transferido">Transferido</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label className="text-foreground">Data de saída</Label>
               <Input
                 type="date"
@@ -602,10 +617,10 @@ export default function ConsignmentControl() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setExitDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setExitDialogOpen(false); setExitReason(""); }}>Cancelar</Button>
             <Button
               onClick={handleConfirmExit}
-              disabled={!exitDate || updateExit.isPending}
+              disabled={!exitDate || !exitReason || updateExit.isPending}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {updateExit.isPending ? "Registrando..." : "Confirmar Saída"}

@@ -1956,6 +1956,7 @@ export const appRouter = router({
     updateExit: protectedProcedure.input(z.object({
       id: z.number(),
       exitDate: z.number(),
+      exitReason: z.string().min(1, "Motivo da saída é obrigatório"),
     })).mutation(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'admin';
       const isCrmAdmin = ctx.user.actorType === 'crm_admin';
@@ -1964,7 +1965,7 @@ export const appRouter = router({
       if (!isAdmin && !isCrmAdmin && !isGerente && !isConsignacao) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso restrito a administradores, gerentes e setor de consignação' });
       }
-      const result = await db.updateConsignmentExitDate(input.id, input.exitDate);
+      const result = await db.updateConsignmentExitDate(input.id, input.exitDate, input.exitReason);
       return { success: true, isValid: result.isValid };
     }),
   }),

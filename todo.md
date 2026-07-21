@@ -2644,3 +2644,9 @@
 
 - [x] Permitir que perfil Consignador (department=consignacao) possa dar saída em veículos (updateExit)
 - [x] Adicionar sellerDepartment ao AuthActor context para verificação de permissão
+
+## Melhorias Consignação v2
+
+- [x] Cadastro de consignador: aceitar CPF ou CNPJ (label dinâmico, máscara dinâmica, validação)
+- [x] Dar saída: campo obrigatório de motivo (vendido, devolvido, etc) salvo no histórico
+- [x] Filtro na lista de veículos consignados: ativos no pátio vs com saída

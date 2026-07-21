@@ -221,6 +221,7 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   ownerPhone: varchar("ownerPhone", { length: 20 }), // telefone do proprietário
   entryDate: bigint("entryDate", { mode: "number" }).notNull(), // data de entrada no pátio
   exitDate: bigint("exitDate", { mode: "number" }), // data de saída do pátio (preenchido quando sai)
+  exitReason: varchar("exitReason", { length: 50 }), // motivo da saída: vendido, devolvido, etc
   validAfterDays: int("validAfterDays").default(7).notNull(), // dias mínimos no pátio
   isValid: boolean("isValid").default(false).notNull(), // se já completou os 7 dias
   hasAuction: boolean("hasAuction").default(false), // se o carro tem leilão

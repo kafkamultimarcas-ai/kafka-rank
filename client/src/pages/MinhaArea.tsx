@@ -357,6 +357,8 @@ export default function MinhaArea() {
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [exitRecordId, setExitRecordId] = useState<number | null>(null);
   const [exitDate, setExitDate] = useState("");
+  const [exitReason, setExitReason] = useState("");
+  const [consignFilter, setConsignFilter] = useState<'todos' | 'patio' | 'saida'>('patio');
 
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
@@ -1751,8 +1753,14 @@ export default function MinhaArea() {
             )}
 
             {dept === "consignacao" && approvedConsignment.length > 0 && (
-              <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-                {approvedConsignment.slice(0, 10).map((r: any) => (
+              <div className="space-y-2">
+                <div className="flex gap-1 flex-wrap">
+                  <button onClick={() => setConsignFilter('todos')} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'todos' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Todos ({approvedConsignment.length})</button>
+                  <button onClick={() => setConsignFilter('patio')} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'patio' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>No Pátio ({approvedConsignment.filter((r: any) => !r.exitDate).length})</button>
+                  <button onClick={() => setConsignFilter('saida')} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'saida' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Com Saída ({approvedConsignment.filter((r: any) => !!r.exitDate).length})</button>
+                </div>
+                <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
+                {(consignFilter === 'todos' ? approvedConsignment : consignFilter === 'patio' ? approvedConsignment.filter((r: any) => !r.exitDate) : approvedConsignment.filter((r: any) => !!r.exitDate)).slice(0, 10).map((r: any) => (
                   <div key={r.id} className="p-3 space-y-1">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1762,7 +1770,7 @@ export default function MinhaArea() {
                       <div className="text-right">
                         <p className="text-xs text-yellow-500">+{r.points} pts</p>
                         {r.exitDate ? (
-                          <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}</p>
+                          <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}{r.exitReason ? ` (${r.exitReason})` : ''}</p>
                         ) : (
                           <p className="text-xs text-cyan-400">No pátio</p>
                         )}
@@ -1820,10 +1828,10 @@ export default function MinhaArea() {
                       </button>
                     </div>
                   </div>
-                ))}
+                                ))}
+                </div>
               </div>
             )}
-
             {dept === "despachante" && approvedDispatch.length > 0 && (
               <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
                 {approvedDispatch.map((r: any) => (
@@ -2402,6 +2410,20 @@ export default function MinhaArea() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
+              <Label className="text-gray-300">Motivo da saída *</Label>
+              <select
+                value={exitReason}
+                onChange={e => setExitReason(e.target.value)}
+                className="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-white text-sm"
+              >
+                <option value="">Selecione o motivo...</option>
+                <option value="vendido">Vendido</option>
+                <option value="devolvido">Devolvido ao proprietário</option>
+                <option value="transferido">Transferido</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label className="text-gray-300">Data de saída</Label>
               <Input
                 type="date"
@@ -2412,13 +2434,13 @@ export default function MinhaArea() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setExitDialogOpen(false)} className="border-gray-700 text-gray-300">Cancelar</Button>
+            <Button variant="outline" onClick={() => { setExitDialogOpen(false); setExitReason(""); }} className="border-gray-700 text-gray-300">Cancelar</Button>
             <Button
               onClick={() => {
-                if (!exitRecordId || !exitDate) return;
-                updateExitMut.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime() });
+                if (!exitRecordId || !exitDate || !exitReason) return;
+                updateExitMut.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime(), exitReason });
               }}
-              disabled={!exitDate || updateExitMut.isPending}
+              disabled={!exitDate || !exitReason || updateExitMut.isPending}
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               {updateExitMut.isPending ? "Registrando..." : "Confirmar Saída"}

@@ -1499,16 +1499,16 @@ export async function updateConsignmentRecord(id: number, data: Partial<{
   return updated[0];
 }
 
-export async function updateConsignmentExitDate(id: number, exitDate: number) {
+export async function updateConsignmentExitDate(id: number, exitDate: number, exitReason?: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   const result = await db.select().from(consignmentRecords).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id))).limit(1);
   const record = result[0];
-  if (!record) throw new Error("Registro n\u00e3o encontrado");
+  if (!record) throw new Error("Registro não encontrado");
   // Calcular se é válido baseado na diferença entre saída e entrada
   const daysPassed = Math.floor((exitDate - record.entryDate) / (1000 * 60 * 60 * 24));
   const isValid = daysPassed >= record.validAfterDays;
-  await db.update(consignmentRecords).set({ exitDate, isValid }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
+  await db.update(consignmentRecords).set({ exitDate, isValid, exitReason: exitReason || null }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
   // Se ficou válido agora e já estava aprovado, atualizar pontos
   if (isValid && record.status === 'approved' && !record.isValid) {
     await updateSaleTotals(record.sellerId, record.competitionId, record.points, false);

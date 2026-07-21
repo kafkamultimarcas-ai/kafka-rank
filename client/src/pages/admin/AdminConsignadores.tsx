@@ -10,17 +10,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, User, Phone, Mail, MapPin, FileText, ToggleLeft, ToggleRight, Car } from "lucide-react";
 import { toast } from "sonner";
 import { maskPhone } from "@/lib/masks";
-import { isValidCPF } from "@shared/validators";
+import { isValidCpfCnpj } from "@shared/validators";
+import { maskCpfCnpj } from "@/lib/masks";
 
 
-// CPF Mask helper
-function maskCPF(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-}
+
 
 type Consignor = {
   id: number;
@@ -103,18 +97,19 @@ function AdminConsignadoresInner() {
     setCpfError("");
   }
 
-  function validateCpf(value: string): boolean {
+  function validateCpfCnpj(value: string): boolean {
     const digits = value.replace(/\D/g, "");
     if (!digits) return true; // empty is ok
-    if (digits.length < 11) { setCpfError("CPF incompleto"); return false; }
-    if (!isValidCPF(digits)) { setCpfError("CPF inválido"); return false; }
+    if (digits.length < 11) { setCpfError("CPF/CNPJ incompleto"); return false; }
+    if (digits.length > 11 && digits.length < 14) { setCpfError("CNPJ incompleto"); return false; }
+    if (!isValidCpfCnpj(digits)) { setCpfError(digits.length <= 11 ? "CPF inválido" : "CNPJ inválido"); return false; }
     setCpfError("");
     return true;
   }
 
   function handleCreate() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
-    if (form.cpf && !validateCpf(form.cpf)) { toast.error("CPF inválido"); return; }
+    if (form.cpf && !validateCpfCnpj(form.cpf)) { toast.error("CPF/CNPJ inválido"); return; }
     createMut.mutate({
       name: form.name.trim(),
       cpf: form.cpf.replace(/\D/g, "") || undefined,
@@ -128,7 +123,7 @@ function AdminConsignadoresInner() {
   function handleUpdate() {
     if (!selectedConsignor) return;
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
-    if (form.cpf && !validateCpf(form.cpf)) { toast.error("CPF inválido"); return; }
+    if (form.cpf && !validateCpfCnpj(form.cpf)) { toast.error("CPF/CNPJ inválido"); return; }
     updateMut.mutate({
       id: selectedConsignor.id,
       name: form.name.trim(),
@@ -150,7 +145,7 @@ function AdminConsignadoresInner() {
     setSelectedConsignor(c);
     setForm({
       name: c.name,
-      cpf: c.cpf ? maskCPF(c.cpf) : "",
+      cpf: c.cpf ? maskCpfCnpj(c.cpf) : "",
       phone: c.phone ? maskPhone(c.phone) : "",
       email: c.email || "",
       address: c.address || "",
@@ -229,7 +224,7 @@ function AdminConsignadoresInner() {
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Nome</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">CPF</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">CPF/CNPJ</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Telefone</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
                 <th className="text-center px-4 py-3 font-medium text-muted-foreground">Veículos</th>
@@ -241,7 +236,7 @@ function AdminConsignadoresInner() {
               {filtered.map((c: Consignor) => (
                 <tr key={c.id} className={`hover:bg-muted/30 ${!c.active ? 'opacity-50' : ''}`}>
                   <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{c.cpf ? maskCPF(c.cpf) : "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{c.cpf ? maskCpfCnpj(c.cpf) : "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.phone ? maskPhone(c.phone) : "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.email || "—"}</td>
                   <td className="px-4 py-3 text-center">
@@ -302,13 +297,13 @@ function AdminConsignadoresInner() {
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Nome completo" />
             </div>
             <div className="space-y-1">
-              <Label>CPF</Label>
+              <Label>CPF / CNPJ</Label>
               <Input
                 value={form.cpf}
-                onChange={e => { setForm({ ...form, cpf: maskCPF(e.target.value) }); setCpfError(""); }}
-                onBlur={() => validateCpf(form.cpf)}
-                placeholder="000.000.000-00"
-                maxLength={14}
+                onChange={e => { setForm({ ...form, cpf: maskCpfCnpj(e.target.value) }); setCpfError(""); }}
+                onBlur={() => validateCpfCnpj(form.cpf)}
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                maxLength={18}
               />
               {cpfError && <p className="text-xs text-red-500">{cpfError}</p>}
             </div>
@@ -350,13 +345,13 @@ function AdminConsignadoresInner() {
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Nome completo" />
             </div>
             <div className="space-y-1">
-              <Label>CPF</Label>
+              <Label>CPF / CNPJ</Label>
               <Input
                 value={form.cpf}
-                onChange={e => { setForm({ ...form, cpf: maskCPF(e.target.value) }); setCpfError(""); }}
-                onBlur={() => validateCpf(form.cpf)}
-                placeholder="000.000.000-00"
-                maxLength={14}
+                onChange={e => { setForm({ ...form, cpf: maskCpfCnpj(e.target.value) }); setCpfError(""); }}
+                onBlur={() => validateCpfCnpj(form.cpf)}
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                maxLength={18}
               />
               {cpfError && <p className="text-xs text-red-500">{cpfError}</p>}
             </div>
@@ -409,8 +404,8 @@ function AdminConsignadoresInner() {
                 {selectedConsignor.cpf && (
                   <div className="flex items-center gap-2 text-sm">
                     <FileText className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">CPF:</span>
-                    <span className="text-foreground">{maskCPF(selectedConsignor.cpf)}</span>
+                    <span className="text-muted-foreground">CPF/CNPJ:</span>
+                    <span className="text-foreground">{maskCpfCnpj(selectedConsignor.cpf)}</span>
                   </div>
                 )}
                 {selectedConsignor.phone && (
