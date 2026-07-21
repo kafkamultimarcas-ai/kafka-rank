@@ -2577,3 +2577,8 @@
 - [x] Frontend: GerentePanel - managerId resolve via seller-gerente primeiro
 - [x] Database: Migrar passwordHash dos managers para sellers-gerente correspondentes
 - [x] Cadastro de gerente agora é feito somente pela tela Equipe (AdminSellers) com sellerRole=gerente
+
+## Selo Visual e Filtro na Tela Equipe
+
+- [x] Adicionar selo/badge visual diferenciando gerente de vendedor na lista da tela Equipe
+- [x] Criar filtro rápido (todos/gerentes/vendedores) na tela Equipe

@@ -40,6 +40,7 @@ export default function AdminSellers() {
   const [editingSeller, setEditingSeller] = useState<any>(null);
   const [form, setForm] = useState({ name: "", nickname: "", phone: "", email: "", department: "vendas" });
   const [filterDept, setFilterDept] = useState<string>("todos");
+  const [filterRole, setFilterRole] = useState<"todos" | "gerente" | "vendedor">("todos");
   const [filterActive, setFilterActive] = useState<"ativos" | "inativos">("ativos");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
@@ -64,11 +65,12 @@ export default function AdminSellers() {
   // Paginação server-side (mesmo padrão das demais telas)
   const pagination = usePagination({
     initialPageSize: 20,
-    resetDeps: [filterDept, filterActive],
+    resetDeps: [filterDept, filterActive, filterRole],
   });
   const sellersQuery = trpc.sellers.listPaged.useQuery({
     active: filterActive,
     dept: filterDept,
+    role: filterRole,
     offset: pagination.offset,
     limit: pagination.pageSize,
   });
@@ -77,6 +79,7 @@ export default function AdminSellers() {
   const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
   const deptCounts = sellersQuery.data?.deptCounts ?? { todos: 0 };
   const statusCounts = sellersQuery.data?.statusCounts ?? { ativos: 0, inativos: 0 };
+  const roleCounts = (sellersQuery.data as any)?.roleCounts ?? { todos: 0, gerente: 0, vendedor: 0 };
   const isLoading = sellersQuery.isLoading;
   const isFetching = sellersQuery.isFetching;
 
@@ -309,6 +312,28 @@ export default function AdminSellers() {
             </button>
           </div>
 
+          {/* Filter by role (Gerente/Vendedor) */}
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setFilterRole("todos")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${filterRole === "todos" ? "bg-primary text-primary-foreground" : "bg-accent/50 text-muted-foreground hover:bg-accent"}`}
+            >
+              Todos ({roleCounts.todos})
+            </button>
+            <button
+              onClick={() => setFilterRole("gerente")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1 ${filterRole === "gerente" ? "bg-amber-500 text-white" : "bg-amber-500/15 text-amber-400 hover:bg-amber-500/25"}`}
+            >
+              <ShieldCheck className="h-3 w-3" /> Gerentes ({roleCounts.gerente})
+            </button>
+            <button
+              onClick={() => setFilterRole("vendedor")}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1 ${filterRole === "vendedor" ? "bg-blue-500 text-white" : "bg-blue-500/15 text-blue-400 hover:bg-blue-500/25"}`}
+            >
+              Vendedores ({roleCounts.vendedor})
+            </button>
+          </div>
+
           {/* Filter by department */}
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <button
@@ -374,9 +399,13 @@ export default function AdminSellers() {
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${dept.color}`}>
                           {dept.label}
                         </span>
-                        {isGerente && (
+                        {isGerente ? (
                           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-500/20 text-amber-400 flex items-center gap-1">
                             <ShieldCheck className="h-2.5 w-2.5" /> Gerente
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-400">
+                            Vendedor
                           </span>
                         )}
                         {!seller.active && (

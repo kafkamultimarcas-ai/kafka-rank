@@ -115,6 +115,7 @@ export const appRouter = router({
     listPaged: adminProcedure.input(z.object({
       active: z.enum(["ativos", "inativos"]).default("ativos"),
       dept: z.string().default("todos"),
+      role: z.enum(["todos", "gerente", "vendedor"]).default("todos"),
       offset: z.number().int().min(0).default(0),
       limit: z.number().int().min(1).max(100).default(20),
     })).query(async ({ input }) => {
@@ -124,14 +125,24 @@ export const appRouter = router({
         inativos: all.filter((s: any) => !s.active).length,
       };
       const scoped = all.filter((s: any) => (input.active === "ativos" ? s.active : !s.active));
-      const deptCounts: Record<string, number> = { todos: scoped.length };
-      for (const s of scoped) {
+      // Role counts (based on status-scoped list)
+      const roleCounts: Record<string, number> = {
+        todos: scoped.length,
+        gerente: scoped.filter((s: any) => s.sellerRole === 'gerente').length,
+        vendedor: scoped.filter((s: any) => s.sellerRole !== 'gerente').length,
+      };
+      // Apply role filter
+      const roleFiltered = input.role === "todos" ? scoped
+        : input.role === "gerente" ? scoped.filter((s: any) => s.sellerRole === 'gerente')
+        : scoped.filter((s: any) => s.sellerRole !== 'gerente');
+      const deptCounts: Record<string, number> = { todos: roleFiltered.length };
+      for (const s of roleFiltered) {
         const dept = (s as any).department || "vendas";
         deptCounts[dept] = (deptCounts[dept] || 0) + 1;
       }
-      let filtered = input.dept === "todos" ? scoped : scoped.filter((s: any) => ((s as any).department || "vendas") === input.dept);
+      let filtered = input.dept === "todos" ? roleFiltered : roleFiltered.filter((s: any) => ((s as any).department || "vendas") === input.dept);
       filtered = [...filtered].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
-      return { items: filtered.slice(input.offset, input.offset + input.limit), total: filtered.length, deptCounts, statusCounts };
+      return { items: filtered.slice(input.offset, input.offset + input.limit), total: filtered.length, deptCounts, statusCounts, roleCounts };
     }),
     getById: publicProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return db.getSellerById(input.id);
