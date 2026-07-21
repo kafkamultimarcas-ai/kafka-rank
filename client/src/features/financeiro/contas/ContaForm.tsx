@@ -231,40 +231,40 @@ export function ContaForm(props: ContaFormProps) {
               <option value="yearly">Anual</option>
             </select>
           </div>
-          {txRecurrence === "monthly" && (
-            <div>
-              <label className="text-[10px] font-bold uppercase text-gray-500">Qtd. de meses *</label>
-              <Input
-                type="number"
-                min={1}
-                max={60}
-                value={txRecurrenceMonths}
-                onChange={(event) => setTxRecurrenceMonths(Math.max(1, Math.min(60, Number(event.target.value) || 1)))}
-                inputMode="numeric"
-                className="h-10 border-gray-700 bg-gray-800 text-sm text-white"
-              />
-              <p className="mt-1 text-[10px] text-gray-500">Gera 1 conta por mês.</p>
-            </div>
-          )}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-500">Forma de Pagamento</label>
+            <select
+              value={txPaymentMethod || ""}
+              onChange={(event) => setTxPaymentMethod(event.target.value || null)}
+              className="h-10 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-white"
+            >
+              <option value="">Selecione...</option>
+              <option value="pix">Pix</option>
+              <option value="cartao_credito">Cartão de Crédito</option>
+              <option value="boleto">Boleto</option>
+              <option value="dinheiro">Dinheiro</option>
+            </select>
+          </div>
+        </div>
+      )}
+      {!editingTx && txRecurrence === "monthly" && (
+        <div>
+          <label className="text-[10px] font-bold uppercase text-gray-500">Qtd. de meses *</label>
+          <Input
+            type="number"
+            min={1}
+            max={60}
+            value={txRecurrenceMonths}
+            onChange={(event) => setTxRecurrenceMonths(Math.max(1, Math.min(60, Number(event.target.value) || 1)))}
+            inputMode="numeric"
+            className="h-10 border-gray-700 bg-gray-800 text-sm text-white"
+          />
+          <p className="mt-1 text-[10px] text-gray-500">Gera 1 conta por mês.</p>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] font-bold uppercase text-gray-500">Forma de Pagamento</label>
-          <select
-            value={txPaymentMethod || ""}
-            onChange={(event) => setTxPaymentMethod(event.target.value || null)}
-            className="h-10 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-white"
-          >
-            <option value="">Selecione...</option>
-            <option value="pix">Pix</option>
-            <option value="cartao_credito">Cartão de Crédito</option>
-            <option value="boleto">Boleto</option>
-            <option value="dinheiro">Dinheiro</option>
-          </select>
-        </div>
-        {editingTx && (
+      {editingTx && (
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-[10px] font-bold uppercase text-gray-500">Recorrência</label>
             <select
@@ -279,8 +279,22 @@ export function ContaForm(props: ContaFormProps) {
               <option value="yearly">Anual</option>
             </select>
           </div>
-        )}
-      </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-500">Forma de Pagamento</label>
+            <select
+              value={txPaymentMethod || ""}
+              onChange={(event) => setTxPaymentMethod(event.target.value || null)}
+              className="h-10 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-white"
+            >
+              <option value="">Selecione...</option>
+              <option value="pix">Pix</option>
+              <option value="cartao_credito">Cartão de Crédito</option>
+              <option value="boleto">Boleto</option>
+              <option value="dinheiro">Dinheiro</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="text-[10px] font-bold uppercase text-gray-500">Observações</label>
