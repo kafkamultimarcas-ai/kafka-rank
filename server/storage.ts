@@ -118,6 +118,14 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
   };
 }
 
+/**
+ * Remove um objeto do bucket. ATENÇÃO à consistência de infra: o upload
+ * (`storagePut`) vai pelo proxy Forge (BUILT_IN_FORGE_API_URL) e guarda a key
+ * `t/<tenant>/...`; este delete usa o AWS SDK direto no AWS_S3_BUCKET com essa
+ * MESMA key. Para não gerar objetos órfãos, o proxy Forge PRECISA gravar no
+ * mesmo bucket (AWS_S3_BUCKET) e com o mesmo prefixo de key. Se apontarem para
+ * buckets diferentes, o delete "sucede" na API mas não remove o arquivo real.
+ */
 export async function storageDelete(relKey: string): Promise<{ key: string; deleted: boolean }> {
   const config = getS3DeleteConfig();
   const key = normalizeKey(relKey);

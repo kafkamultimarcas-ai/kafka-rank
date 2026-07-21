@@ -34,8 +34,8 @@ type InventoryMutationCtxUser = {
   email?: string | null;
 };
 
-const MAX_INVENTORY_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_INVENTORY_VIDEO_BYTES = 9 * 1024 * 1024;
+const MAX_INVENTORY_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_INVENTORY_VIDEO_BYTES = 40 * 1024 * 1024;
 
 function serializeList(values?: string[] | null) {
   if (!values || values.length === 0) return null;
@@ -777,8 +777,15 @@ export const inventoryRouter = router({
       let storageDeleteSkipped = false;
       if (media.storageProvider === "s3" && media.storageKey) {
         if (isStorageDeleteConfigured()) {
-          await storageDelete(media.storageKey);
-          storageDeleted = true;
+          try {
+            await storageDelete(media.storageKey);
+            storageDeleted = true;
+          } catch (err) {
+            // Best-effort: o registro já foi marcado como removido no banco; uma falha
+            // no bucket não deve derrubar a operação (evita erro na UI + estado inconsistente).
+            console.error(`[inventory deleteMedia] Falha ao remover objeto do bucket (${media.storageKey}):`, err);
+            storageDeleteSkipped = true;
+          }
         } else {
           storageDeleteSkipped = true;
         }

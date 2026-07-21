@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,21 @@ import AssinaturaContent from "@/components/billing/AssinaturaContent";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
 import { useBranding } from "@/contexts/TenantContext";
 import { getCurrentTenantSlug, getTenantLoginPath, buildTenantPath } from "@/lib/tenant";
+import { applyTenantBranding } from "@/lib/branding";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/PaginationControls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SyncLogSection } from "@/features/integrations/SyncLogSection";
 import { MetaIntegrationConfig } from "@/features/integrations/MetaIntegrationConfig";
+import { maskPhone } from "@/lib/masks";
+import {
+  normalizeEmailInput,
+  normalizeUfInput,
+  validateHexColor,
+  validateOptionalEmail,
+  validateOptionalPhone,
+  validateUf,
+} from "@/lib/formFieldValidation";
 
 const DEPT_LABELS: Record<string, string> = {
   vendas: "Vendas", pre_vendas: "Pré-Vendas/SDR", consignacao: "Consignação",
@@ -2667,22 +2677,162 @@ function StoreDataPanel() {
   };
 
   const [showStore, setShowStore] = useState(false);
-  const [storeForm, setStoreForm] = useState({ name: '', phone: '', email: '', city: '', state: '', address: '', primaryColor: '', secondaryColor: '' });
-  const [initialized, setInitialized] = useState(false);
+  const [storeForm, setStoreForm] = useState({ name: "", phone: "", email: "", city: "", state: "", address: "", primaryColor: "", secondaryColor: "" });
+  const [errors, setErrors] = useState<Partial<Record<"phone" | "email" | "state" | "primaryColor" | "secondaryColor", string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<"phone" | "email" | "state" | "primaryColor" | "secondaryColor", boolean>>>({});
 
-  if (settings && !initialized) {
+  // ===== Preview ao vivo do branding (cores da loja) =====
+  const savedBrandingRef = useRef<{ primaryColor: string | null; secondaryColor: string | null }>({ primaryColor: null, secondaryColor: null });
+  useEffect(() => {
+    savedBrandingRef.current = {
+      primaryColor: settings?.primaryColor ?? null,
+      secondaryColor: settings?.secondaryColor ?? null,
+    };
+  }, [settings?.primaryColor, settings?.secondaryColor]);
+
+  // Aplica o preview enquanto o painel está aberto (sem revert por tecla → sem flicker).
+  useEffect(() => {
+    if (showStore) {
+      applyTenantBranding(document.documentElement, {
+        primaryColor: storeForm.primaryColor || null,
+        secondaryColor: storeForm.secondaryColor || null,
+      });
+    }
+  }, [showStore, storeForm.primaryColor, storeForm.secondaryColor]);
+
+  // Restaura o branding salvo ao fechar o painel ou desmontar (descarta preview não salvo).
+  useEffect(() => {
+    if (!showStore) applyTenantBranding(document.documentElement, savedBrandingRef.current);
+    return () => { applyTenantBranding(document.documentElement, savedBrandingRef.current); };
+  }, [showStore]);
+
+  useEffect(() => {
+    if (!settings) return;
+
     setStoreForm({
-      name: settings.name || '',
-      phone: settings.phone || '',
-      email: settings.email || '',
-      city: settings.city || '',
-      state: settings.state || '',
-      address: settings.address || '',
-      primaryColor: settings.primaryColor || '#DC2626',
-      secondaryColor: settings.secondaryColor || '#1F2937',
+      name: settings.name || "",
+      phone: settings.phone || "",
+      email: settings.email || "",
+      city: settings.city || "",
+      state: settings.state || "",
+      address: settings.address || "",
+      primaryColor: settings.primaryColor || "#DC2626",
+      secondaryColor: settings.secondaryColor || "#1F2937",
     });
-    setInitialized(true);
-  }
+    setErrors({});
+    setTouched({});
+  }, [settings]);
+
+  const setStoreField = useCallback((field: keyof typeof storeForm, value: string) => {
+    setStoreForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }, []);
+
+  const runStoreFieldValidation = useCallback((field: "phone" | "email" | "state" | "primaryColor" | "secondaryColor", value: string) => {
+    let nextError: string | null = null;
+
+    switch (field) {
+      case "phone":
+        nextError = validateOptionalPhone(value);
+        break;
+      case "email":
+        nextError = validateOptionalEmail(value);
+        break;
+      case "state":
+        nextError = validateUf(value);
+        break;
+      case "primaryColor":
+      case "secondaryColor":
+        nextError = validateHexColor(value);
+        break;
+    }
+
+    setErrors((current) => {
+      if (!nextError) {
+        const { [field]: _removed, ...rest } = current;
+        return rest;
+      }
+
+      return {
+        ...current,
+        [field]: nextError,
+      };
+    });
+
+    return nextError;
+  }, []);
+
+  const handleStoreBlur = useCallback((field: "phone" | "email" | "state" | "primaryColor" | "secondaryColor") => {
+    setTouched((current) => ({ ...current, [field]: true }));
+
+    if (field === "email") {
+      const normalized = normalizeEmailInput(storeForm.email);
+      if (normalized !== storeForm.email) {
+        setStoreField("email", normalized);
+      }
+      return runStoreFieldValidation(field, normalized);
+    }
+
+    if (field === "state") {
+      const normalized = normalizeUfInput(storeForm.state);
+      if (normalized !== storeForm.state) {
+        setStoreField("state", normalized);
+      }
+      return runStoreFieldValidation(field, normalized);
+    }
+
+    return runStoreFieldValidation(field, storeForm[field]);
+  }, [runStoreFieldValidation, setStoreField, storeForm]);
+
+  const validateStoreForm = useCallback(() => {
+    const normalizedEmail = normalizeEmailInput(storeForm.email);
+    const normalizedState = normalizeUfInput(storeForm.state);
+
+    const phoneError = runStoreFieldValidation("phone", storeForm.phone);
+    const emailError = runStoreFieldValidation("email", normalizedEmail);
+    const stateError = runStoreFieldValidation("state", normalizedState);
+    const primaryColorError = runStoreFieldValidation("primaryColor", storeForm.primaryColor);
+    const secondaryColorError = runStoreFieldValidation("secondaryColor", storeForm.secondaryColor);
+
+    setTouched({
+      phone: true,
+      email: true,
+      state: true,
+      primaryColor: true,
+      secondaryColor: true,
+    });
+
+    return !phoneError && !emailError && !stateError && !primaryColorError && !secondaryColorError;
+  }, [runStoreFieldValidation, storeForm]);
+
+  const handleSaveStore = useCallback(() => {
+    const normalizedEmail = normalizeEmailInput(storeForm.email);
+    const normalizedState = normalizeUfInput(storeForm.state);
+
+    setStoreForm((current) => ({
+      ...current,
+      email: normalizedEmail,
+      state: normalizedState,
+    }));
+
+    if (!validateStoreForm()) {
+      toast.error("Revise os campos destacados antes de salvar.");
+      return;
+    }
+
+    updateSettings.mutate({
+      name: storeForm.name.trim(),
+      phone: storeForm.phone.trim(),
+      email: normalizedEmail,
+      city: storeForm.city.trim(),
+      state: normalizedState,
+      address: storeForm.address.trim(),
+      primaryColor: storeForm.primaryColor.trim(),
+      secondaryColor: storeForm.secondaryColor.trim(),
+    });
+  }, [storeForm, updateSettings, validateStoreForm]);
 
   // Store Data Configuration
   return (
@@ -2724,23 +2874,52 @@ function StoreDataPanel() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Nome da Loja</label>
-                <Input value={storeForm.name} onChange={e => setStoreForm({ ...storeForm, name: e.target.value })} className="h-9 text-sm" />
+                <Input value={storeForm.name} onChange={e => setStoreField("name", e.target.value)} className="h-9 text-sm" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Telefone</label>
-                <Input value={storeForm.phone} onChange={e => setStoreForm({ ...storeForm, phone: e.target.value })} className="h-9 text-sm" placeholder="(11) 99999-9999" />
+                <Input
+                  value={storeForm.phone}
+                  onChange={e => setStoreField("phone", maskPhone(e.target.value))}
+                  onBlur={() => handleStoreBlur("phone")}
+                  className="h-9 text-sm"
+                  placeholder="(11) 99999-9999"
+                  inputMode="tel"
+                  maxLength={15}
+                  aria-invalid={!!(touched.phone && errors.phone)}
+                />
+                {touched.phone && errors.phone && <p className="mt-1 text-[10px] text-destructive">{errors.phone}</p>}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Email</label>
-                <Input value={storeForm.email} onChange={e => setStoreForm({ ...storeForm, email: e.target.value })} className="h-9 text-sm" type="email" />
+                <Input
+                  value={storeForm.email}
+                  onChange={e => setStoreField("email", e.target.value)}
+                  onBlur={() => handleStoreBlur("email")}
+                  className="h-9 text-sm"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  aria-invalid={!!(touched.email && errors.email)}
+                />
+                {touched.email && errors.email && <p className="mt-1 text-[10px] text-destructive">{errors.email}</p>}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Cidade</label>
-                <Input value={storeForm.city} onChange={e => setStoreForm({ ...storeForm, city: e.target.value })} className="h-9 text-sm" />
+                <Input value={storeForm.city} onChange={e => setStoreField("city", e.target.value)} className="h-9 text-sm" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Estado (UF)</label>
-                <Input value={storeForm.state} onChange={e => setStoreForm({ ...storeForm, state: e.target.value })} className="h-9 text-sm" maxLength={2} placeholder="SP" />
+                <Input
+                  value={storeForm.state}
+                  onChange={e => setStoreField("state", normalizeUfInput(e.target.value))}
+                  onBlur={() => handleStoreBlur("state")}
+                  className="h-9 text-sm uppercase"
+                  maxLength={2}
+                  placeholder="SP"
+                  aria-invalid={!!(touched.state && errors.state)}
+                />
+                {touched.state && errors.state && <p className="mt-1 text-[10px] text-destructive">{errors.state}</p>}
               </div>
             </div>
             <div>
@@ -2751,25 +2930,33 @@ function StoreDataPanel() {
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Cor Principal</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={storeForm.primaryColor} onChange={e => setStoreForm({ ...storeForm, primaryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-border" />
-                  <Input value={storeForm.primaryColor} onChange={e => setStoreForm({ ...storeForm, primaryColor: e.target.value })} className="h-9 text-sm font-mono flex-1" />
+                  <input type="color" value={storeForm.primaryColor} onChange={e => setStoreField("primaryColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <Input
+                    value={storeForm.primaryColor}
+                    onChange={e => setStoreField("primaryColor", e.target.value)}
+                    onBlur={() => handleStoreBlur("primaryColor")}
+                    className="h-9 text-sm font-mono flex-1"
+                    aria-invalid={!!(touched.primaryColor && errors.primaryColor)}
+                  />
                 </div>
+                {touched.primaryColor && errors.primaryColor && <p className="mt-1 text-[10px] text-destructive">{errors.primaryColor}</p>}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Cor Secundária</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={storeForm.secondaryColor} onChange={e => setStoreForm({ ...storeForm, secondaryColor: e.target.value })} className="w-8 h-8 rounded cursor-pointer border border-border" />
-                  <Input value={storeForm.secondaryColor} onChange={e => setStoreForm({ ...storeForm, secondaryColor: e.target.value })} className="h-9 text-sm font-mono flex-1" />
+                  <input type="color" value={storeForm.secondaryColor} onChange={e => setStoreField("secondaryColor", e.target.value)} className="w-8 h-8 rounded cursor-pointer border border-border" />
+                  <Input
+                    value={storeForm.secondaryColor}
+                    onChange={e => setStoreField("secondaryColor", e.target.value)}
+                    onBlur={() => handleStoreBlur("secondaryColor")}
+                    className="h-9 text-sm font-mono flex-1"
+                    aria-invalid={!!(touched.secondaryColor && errors.secondaryColor)}
+                  />
                 </div>
+                {touched.secondaryColor && errors.secondaryColor && <p className="mt-1 text-[10px] text-destructive">{errors.secondaryColor}</p>}
               </div>
             </div>
-            <Button size="sm" className="w-full" onClick={() => {
-              const updates: any = {};
-              for (const [k, v] of Object.entries(storeForm)) {
-                if (v) updates[k] = v;
-              }
-              updateSettings.mutate(updates);
-            }} disabled={updateSettings.isPending}>
+            <Button size="sm" className="w-full" onClick={handleSaveStore} disabled={updateSettings.isPending}>
               <Save className="w-3.5 h-3.5 mr-1" />
               {updateSettings.isPending ? 'Salvando...' : 'Salvar Dados da Loja'}
             </Button>

@@ -45,7 +45,8 @@ const optionalBool = z.boolean().optional().default(false);
 const stringArray = z.array(z.string().trim().min(1).max(500)).max(200).default([]);
 // Galeria de fotos: são URLs, que em CDNs externas podem ser bem longas.
 const urlListSchema = z.array(z.string().trim().min(1).max(2048)).max(200).default([]);
-const inventoryMediaBase64Schema = z.string().max(12 * 1024 * 1024, "Arquivo muito grande. Máximo aproximado de 9MB.");
+// base64 infla ~33%: 40MB de vídeo ≈ 53M chars. Teto de 56M com folga.
+const inventoryMediaBase64Schema = z.string().max(56 * 1024 * 1024, "Arquivo muito grande.");
 const inventoryMediaFilenameSchema = z.string().trim().min(1).max(255);
 const mediaDimensionSchema = z.number().int().min(1).max(20000).optional();
 const mediaDurationSchema = z.number().min(0).max(60 * 60 * 12).optional();

@@ -5,6 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { usePagination } from "@/hooks/usePagination";
+import { PaginationControls } from "@/components/PaginationControls";
+import { ListSkeleton } from "@/components/ListSkeleton";
 import {
   ArrowLeft, Clock, CreditCard, Search, User, Car, Phone, Mail, Eye,
   CheckCircle2, XCircle, AlertCircle, Loader2, Building2, ChevronDown,
@@ -87,7 +90,17 @@ export default function MesaCredito() {
   const [feiSellerId, setFeiSellerId] = useState<number | null>(null);
   const [showCnhModal, setShowCnhModal] = useState(false);
 
-  const { data: fichas, refetch } = trpc.fichas.list.useQuery(undefined, { refetchInterval: 5000 });
+  const pagination = usePagination({ initialPageSize: 20, resetDeps: [filterStatus, search] });
+  const fichasQuery = trpc.fichas.listPaged.useQuery(
+    { status: filterStatus, search: search || undefined, offset: pagination.offset, limit: pagination.pageSize },
+    { refetchInterval: 5000 },
+  );
+  const refetch = fichasQuery.refetch;
+  const filteredFichas = fichasQuery.data?.items ?? [];
+  const total = fichasQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pagination.pageSize));
+  const isLoading = fichasQuery.isLoading;
+  const isFetching = fichasQuery.isFetching;
   const { data: filaCount } = trpc.fichas.filaCount.useQuery(undefined, { refetchInterval: 5000 });
   const { data: fichaDetail, refetch: refetchDetail } = trpc.fichas.getById.useQuery(
     { id: selectedFichaId! },
@@ -107,26 +120,6 @@ export default function MesaCredito() {
     return map;
   }, [sellersList]);
 
-  const filteredFichas = useMemo(() => {
-    let list = fichas || [];
-    if (filterStatus !== "todos") list = list.filter((f: any) => f.status === filterStatus);
-    if (search) {
-      const s = search.toLowerCase();
-      list = list.filter((f: any) =>
-        f.nomeCompleto?.toLowerCase().includes(s) ||
-        f.cpf?.includes(s) ||
-        f.placa?.toLowerCase().includes(s) ||
-        f.veiculo?.toLowerCase().includes(s)
-      );
-    }
-    // Na fila primeiro, depois em análise, depois os finalizados
-    return list.sort((a: any, b: any) => {
-      const order: Record<string, number> = { na_fila: 0, em_analise: 1, parcial: 2, aprovado: 3, recusado: 4 };
-      const diff = (order[a.status] ?? 5) - (order[b.status] ?? 5);
-      if (diff !== 0) return diff;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); // mais antigo primeiro
-    });
-  }, [fichas, filterStatus, search]);
 
   // Estado para edição de banco
   const [editingBancoId, setEditingBancoId] = useState<number | null>(null);
@@ -290,13 +283,14 @@ export default function MesaCredito() {
 
         {/* Lista de fichas */}
         <div className="space-y-3">
-          {filteredFichas.length === 0 && (
+          {isLoading && <ListSkeleton rows={6} />}
+          {!isLoading && filteredFichas.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p>Nenhuma ficha na fila</p>
             </div>
           )}
-          {filteredFichas.map((ficha: any) => {
+          {!isLoading && filteredFichas.map((ficha: any) => {
             const seller = allSellers[ficha.sellerId];
             return (
               <div
@@ -351,6 +345,19 @@ export default function MesaCredito() {
               </div>
             );
           })}
+
+          {!isLoading && total > 0 && (
+            <PaginationControls
+              page={pagination.page}
+              totalPages={totalPages}
+              total={total}
+              pageSize={pagination.pageSize}
+              isLoading={isFetching}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+              className="border-t border-gray-800 pt-5"
+            />
+          )}
         </div>
 
         {/* Detalhe da ficha selecionada */}

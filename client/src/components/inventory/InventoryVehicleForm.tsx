@@ -760,12 +760,12 @@ export default function InventoryVehicleForm({
         return null;
       }
 
-      const maxBytes = mediaType === "video" ? 9 * 1024 * 1024 : 8 * 1024 * 1024;
+      const maxBytes = mediaType === "video" ? 40 * 1024 * 1024 : 12 * 1024 * 1024;
       if (file.size > maxBytes) {
         toast.error(
           mediaType === "video"
-            ? `V?deo muito grande: ${file.name}. Limite atual de 9MB.`
-            : `Imagem muito grande: ${file.name}. Limite atual de 8MB.`,
+            ? `Vídeo muito grande: ${file.name}. Limite de 40MB.`
+            : `Imagem muito grande: ${file.name}. Limite de 12MB.`,
         );
         return null;
       }

@@ -83,10 +83,16 @@ export function isAllowedInventoryMediaMime(mimeType: string) {
 }
 
 export function inferFileExtension(fileName: string | null | undefined, mimeType: string) {
-  const fromMime = MIME_TO_EXTENSION[mimeType];
+  // Segurança: a extensão da key no bucket vem SEMPRE do mime já validado, nunca
+  // do nome enviado pelo cliente (evita persistir .html/.php/.svg etc. num objeto
+  // público). O nome só é usado como fallback sanitizado se o mime for desconhecido.
+  const normalizedMime = mimeType.toLowerCase().split(";")[0].trim();
+  const fromMime = MIME_TO_EXTENSION[normalizedMime];
+  if (fromMime) return fromMime;
   const sanitized = (fileName || "").trim();
   const fromName = sanitized.includes(".") ? sanitized.split(".").pop()?.toLowerCase() : undefined;
-  return fromName || fromMime || "bin";
+  const safeName = fromName?.replace(/[^a-z0-9]/g, "");
+  return safeName || "bin";
 }
 
 export function sanitizeInventoryFileName(fileName: string) {

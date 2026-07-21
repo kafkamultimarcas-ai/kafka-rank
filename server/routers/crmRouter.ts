@@ -17,6 +17,7 @@ import { eq } from "drizzle-orm";
 import { getCurrentTenantId } from "../tenantDb";
 import { encryptSecret, decryptSecret } from "../_core/secretCrypto";
 import { getTenantLimits } from "../tenantService";
+import { isValidBrazilianPhone, isValidEmail } from "../../shared/validators";
 
 // ===== HELPER: Notify seller via WhatsApp when they receive a new lead =====
 async function notifySellerViaWhatsApp(sellerId: number, leadName: string, leadPhone: string | null, source: string | null, vehicleInterest: string | null) {
@@ -2565,13 +2566,13 @@ export const crmPerformanceRouter = router({
 
   updateTenantSettings: adminProcedure.input(z.object({
     name: z.string().optional(),
-    phone: z.string().optional(),
-    email: z.string().optional(),
+    phone: z.string().optional().refine((value) => !value || isValidBrazilianPhone(value), "Telefone inválido"),
+    email: z.string().optional().refine((value) => !value || isValidEmail(value), "E-mail inválido"),
     city: z.string().optional(),
-    state: z.string().optional(),
+    state: z.string().optional().refine((value) => !value || /^[A-Za-z]{2}$/.test(value), "UF inválida"),
     address: z.string().optional(),
-    primaryColor: z.string().optional(),
-    secondaryColor: z.string().optional(),
+    primaryColor: z.string().optional().refine((value) => !value || /^#[0-9A-Fa-f]{6}$/.test(value), "Cor principal inválida"),
+    secondaryColor: z.string().optional().refine((value) => !value || /^#[0-9A-Fa-f]{6}$/.test(value), "Cor secundária inválida"),
     logoUrl: z.string().optional(),
     inventoryUrl: z.string().optional(),
     zapiInstanceId: z.string().optional(),
