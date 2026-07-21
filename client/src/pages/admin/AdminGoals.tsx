@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Target, Plus, Trash2, TrendingUp, DollarSign, Trophy, Banknote, Pencil, Check, X, Flame, Star, CheckCircle, Clock, AlertTriangle, Bell, Send, Eye, Filter, Users, BarChart3, Gift, History, ChevronLeft, ChevronRight, Timer, Zap } from "lucide-react";
@@ -881,7 +882,7 @@ export default function AdminGoals() {
                   </div>
                   <div>
                     <label className="text-sm text-muted-foreground mb-1 block">Valor do Prêmio R$ (opcional)</label>
-                    <Input type="number" value={bonusValue} onChange={e => setBonusValue(e.target.value)} placeholder="Ex: 500" />
+                    <MoneyInput value={bonusValue} onChange={setBonusValue} placeholder="500,00" />
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -1043,7 +1044,7 @@ function GoalCard({ goal, seller, isAdmin, isEditing, editValue, editTarget, edi
           </div>
           <div>
             <label className="text-[10px] text-muted-foreground">Valor R$</label>
-            <Input type="number" value={editBonusValue} onChange={e => setEditBonusValue(e.target.value)} className="h-8 text-sm" placeholder="0" />
+            <MoneyInput value={editBonusValue} onChange={setEditBonusValue} className="h-8 text-sm" placeholder="500,00" />
           </div>
           <div className="flex gap-2">
             <Button size="sm" className="h-7 text-xs flex-1 gap-1" onClick={onSave}>

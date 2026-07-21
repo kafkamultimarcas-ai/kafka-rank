@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -416,7 +417,7 @@ export default function MesaCredito() {
                       <div><label className="text-[10px] text-gray-500">Veículo</label><Input value={editForm.veiculo} onChange={e => setEditForm(p => ({...p, veiculo: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
                       <div><label className="text-[10px] text-gray-500">Placa</label><Input value={editForm.placa} onChange={e => setEditForm(p => ({...p, placa: e.target.value}))} className="bg-gray-800 border-gray-700 text-yellow-400 text-xs h-8 font-mono" /></div>
                       <div><label className="text-[10px] text-gray-500">Ano/Modelo</label><Input value={editForm.anoModelo} onChange={e => setEditForm(p => ({...p, anoModelo: e.target.value}))} className="bg-gray-800 border-gray-700 text-white text-xs h-8" /></div>
-                      <div><label className="text-[10px] text-gray-500">Valor Financiado</label><Input type="number" value={editForm.valorFinanciado} onChange={e => setEditForm(p => ({...p, valorFinanciado: e.target.value}))} className="bg-gray-800 border-gray-700 text-green-400 text-xs h-8" /></div>
+                      <div><label className="text-[10px] text-gray-500">Valor Financiado</label><MoneyInput value={editForm.valorFinanciado} onChange={v => setEditForm(p => ({...p, valorFinanciado: v}))} className="bg-gray-800 border-gray-700 text-green-400 text-xs h-8" /></div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2 text-sm">
@@ -533,8 +534,8 @@ export default function MesaCredito() {
                                   rows={2}
                                 />
                                 <div className="grid grid-cols-3 gap-2">
-                                  <Input value={bancoValorParcela} onChange={e => setBancoValorParcela(e.target.value)}
-                                    placeholder="Parcela R$" type="number" className="bg-gray-800 border-gray-700 text-white text-xs" />
+                                  <MoneyInput value={bancoValorParcela} onChange={setBancoValorParcela}
+                                    placeholder="Parcela R$" className="bg-gray-800 border-gray-700 text-white text-xs" />
                                   <Input value={bancoQtdParcelas} onChange={e => setBancoQtdParcelas(e.target.value)}
                                     placeholder="Qtd parcelas" type="number" className="bg-gray-800 border-gray-700 text-white text-xs" />
                                   <Input value={bancoTaxa} onChange={e => setBancoTaxa(e.target.value)}

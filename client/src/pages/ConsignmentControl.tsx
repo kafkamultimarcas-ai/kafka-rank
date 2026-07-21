@@ -18,6 +18,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { maskPhone } from "@/lib/masks";
@@ -649,16 +650,14 @@ export default function ConsignmentControl() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-foreground text-xs">Valor Custo (R$)</Label>
-                  <Input
+                  <MoneyInput
                     value={editRecord.costValueDisplay || (editRecord.costValue ? editRecord.costValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '')}
-                    onChange={e => setEditRecord({...editRecord, costValueDisplay: e.target.value})}
-                    onBlur={() => {
-                      const raw = (editRecord.costValueDisplay || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+                    onChange={v => {
+                      const raw = v.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
                       const num = parseFloat(raw) || 0;
-                      setEditRecord({...editRecord, costValue: Math.round(num), costValueDisplay: num ? num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''});
+                      setEditRecord({...editRecord, costValue: Math.round(num), costValueDisplay: v});
                     }}
-                    placeholder="Ex: 50.000,00"
-                    className="bg-muted border-border text-foreground"
+                    placeholder="50.000,00"
                   />
                 </div>
               </div>

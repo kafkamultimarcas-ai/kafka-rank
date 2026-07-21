@@ -2606,3 +2606,29 @@
 - [x] Edição completa no perfil do vendedor: permitir alterar todos os campos (modelo, placa, leilão, status, quitação, custo, obs, consignador) exceto data de entrada
 - [x] Adicionar botão "Dar Saída" ao lado de Editar/Excluir no histórico de consignações do vendedor
 - [x] Criar tela AdminConsignadores no menu principal para gerenciar consignadores (listar, editar, inativar, excluir)
+
+## Melhorias Consignação - Lote 3
+
+- [ ] Coluna de quantidade de veículos vinculados na tela AdminConsignadores + atalho para visualizar
+- [ ] Corrigir link "Registrar Consignação" para ir direto na aba consignação (não vendas)
+- [ ] Layout MinhaArea: ações rápidas lado a lado em cima, histórico full-width embaixo, responsivo
+
+## Máscara de Valor Monetário - Varredura Completa
+
+- [x] Criar componente compartilhado MoneyInput (money-input.tsx) com 2 casas decimais fixas, somente números, formatação pt-BR em tempo real
+- [x] Aplicar MoneyInput em RegisterSale.tsx (value, financedValue, payoffValue, costValue, transferValue)
+- [x] Aplicar MoneyInput em AdminSales.tsx (form.value, editForm.value)
+- [x] Aplicar MoneyInput em AdminFinanceiro.tsx (txAmount)
+- [x] Aplicar MoneyInput em AdminVehicleCosts.tsx (purchasePrice)
+- [x] Aplicar MoneyInput em VehicleDetail.tsx (amount, purchasePrice, salePrice)
+- [x] Aplicar MoneyInput em CrmAdminDashboard.tsx (amount)
+- [x] Aplicar MoneyInput em AdminGoals.tsx (bonusValue, editBonusValue)
+- [x] Aplicar MoneyInput em MinhaArea.tsx (costValue, payoffValue)
+- [x] Aplicar MoneyInput em AdminPosVenda.tsx (valor)
+- [x] Aplicar MoneyInput em SimuladorFinanciamento.tsx (valorVeiculo, entrada)
+- [x] Aplicar MoneyInput em FichaFinanciamento.tsx (valorFinanciado)
+- [x] Aplicar MoneyInput em AdminBonusVehicles.tsx (bonusAmount)
+- [x] Aplicar MoneyInput em MesaCredito.tsx (valorFinanciado, valorParcela)
+- [x] Aplicar MoneyInput em ConsignmentControl.tsx (costValue)
+- [x] AdminFei.tsx - sem campos de input monetário editáveis (somente display)
+- [x] RankingFeirao.tsx - sem campos monetários (campo type=number é edição numérica, não moeda)

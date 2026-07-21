@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Plus, Car, Trash2, Edit, ToggleLeft, ToggleRight, Search, Package, PenLine } from "lucide-react";
 import { toast } from "sonner";
@@ -250,7 +251,7 @@ export default function AdminBonusVehicles() {
               {/* Campos comuns */}
               <div className={inputMode === 'stock' ? '' : ''}>
                 <label className="text-sm text-muted-foreground mb-1 block">Valor do Bônus (R$) *</label>
-                <Input value={bonusAmount} onChange={(e) => setBonusAmount(e.target.value)} placeholder="500,00" className="bg-background" />
+                <MoneyInput value={bonusAmount} onChange={setBonusAmount} placeholder="500,00" className="bg-background" />
               </div>
               {inputMode === 'stock' && (
                 <div>

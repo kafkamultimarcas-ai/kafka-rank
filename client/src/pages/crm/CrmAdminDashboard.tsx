@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import CrmChat, { PerformanceDashboard } from "./CrmChat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -918,7 +919,7 @@ function FinTransactionList({ type }: { type: "payable" | "receivable" }) {
           <h4 className="text-sm font-bold text-foreground">{type === "payable" ? "Nova Conta a Pagar" : "Nova Conta a Receber"}</h4>
           <Input placeholder="Descrição *" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Valor (R$) *" type="number" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="h-9 text-sm" />
+            <MoneyInput value={form.amount} onChange={v => setForm({ ...form, amount: v })} placeholder="1.500,00" className="h-9 text-sm" />
             <Input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} className="h-9 text-sm" />
           </div>
           <div className="grid grid-cols-2 gap-2">

@@ -13,38 +13,14 @@ import { ConsignorCombobox } from "@/components/ConsignorCombobox";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { maskCpfCnpj, maskPhone } from "@/lib/masks";
 import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
+import { MoneyInput } from "@/components/ui/money-input";
 
 type Category = "vendas" | "fei" | "consignacao" | "despachante" | "pre_vendas";
-
-/** Formata valor monetário brasileiro: 50000 -> 50.000,00 */
-function formatCurrency(val: string): string {
-  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
-  if (isNaN(num)) return val;
-  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 /** Extrai número de string formatada: 50.000,00 -> 50000 */
 function parseCurrencyToNumber(val: string): number {
   const cleaned = val.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
   return parseFloat(cleaned) || 0;
-}
-
-/** Input de moeda com formatação automática */
-function CurrencyInput({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
-  const handleBlur = () => {
-    if (value && value.trim()) {
-      onChange(formatCurrency(value));
-    }
-  };
-  return (
-    <Input
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      onBlur={handleBlur}
-      placeholder={placeholder || "Ex: 50.000,00"}
-      className={className || "bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"}
-    />
-  );
 }
 
 const CATEGORIES: { value: Category; label: string; icon: typeof Car; color: string }[] = [
@@ -793,7 +769,7 @@ export default function RegisterSale() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">Valor (R$)</Label>
-                    <CurrencyInput value={value} onChange={setValue} placeholder="Ex: 50.000,00" />
+                    <MoneyInput value={value} onChange={setValue} placeholder="50.000,00" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold">Placa do veículo</Label>
@@ -843,7 +819,7 @@ export default function RegisterSale() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold">Valor financiado (R$)</Label>
-                  <CurrencyInput value={financedValue} onChange={setFinancedValue} placeholder="Ex: 50.000,00" />
+                  <MoneyInput value={financedValue} onChange={setFinancedValue} placeholder="50.000,00" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
@@ -970,14 +946,14 @@ export default function RegisterSale() {
                 {vehicleStatus === 'financiado' && (
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">Valor de quitação (R$)</Label>
-                    <CurrencyInput value={payoffValue} onChange={setPayoffValue} placeholder="Ex: 25.000,00" />
+                    <MoneyInput value={payoffValue} onChange={setPayoffValue} placeholder="25.000,00" />
                   </div>
                 )}
 
                 {/* Valor de custo */}
                 <div className="space-y-2">
                   <Label className="text-gray-300 font-semibold text-sm">Valor de custo (R$)</Label>
-                  <CurrencyInput value={costValue} onChange={setCostValue} placeholder="Ex: 50.000,00" />
+                  <MoneyInput value={costValue} onChange={setCostValue} placeholder="50.000,00" />
                 </div>
 
                 {/* Observações */}
@@ -1122,7 +1098,7 @@ export default function RegisterSale() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-gray-300 font-semibold text-sm">Valor (R$)</Label>
-                    <CurrencyInput value={transferValue} onChange={setTransferValue} placeholder="Ex: 350,00" />
+                    <MoneyInput value={transferValue} onChange={setTransferValue} placeholder="350,00" />
                   </div>
                 </div>
                 <div className="space-y-2">

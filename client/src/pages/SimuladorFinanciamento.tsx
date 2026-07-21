@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { MoneyInput } from "@/components/ui/money-input";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
@@ -62,16 +63,6 @@ export default function SimuladorFinanciamento() {
     };
   }, [entrada, prazo, taxaMensal, valorVeiculo]);
 
-  function handleCurrencyInput(value: string, setter: (nextValue: string) => void) {
-    const numbers = value.replace(/\D/g, "");
-    if (!numbers) {
-      setter("");
-      return;
-    }
-
-    const amount = parseInt(numbers, 10) / 100;
-    setter(amount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -108,17 +99,7 @@ export default function SimuladorFinanciamento() {
                 <Car className="h-3.5 w-3.5 text-emerald-400" />
                 Valor do Veículo
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-400">R$</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={valorVeiculo}
-                  onChange={(event) => handleCurrencyInput(event.target.value, setValorVeiculo)}
-                  placeholder="0,00"
-                  className="w-full rounded-xl border border-border/50 bg-muted/20 py-3 pl-10 pr-4 text-lg font-bold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                />
-              </div>
+              <MoneyInput value={valorVeiculo} onChange={setValorVeiculo} placeholder="0,00" className="rounded-xl border-border/50 bg-muted/20 py-3 text-lg font-bold" />
             </div>
 
             <div>
@@ -126,17 +107,7 @@ export default function SimuladorFinanciamento() {
                 <DollarSign className="h-3.5 w-3.5 text-blue-400" />
                 Entrada (opcional)
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-blue-400">R$</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={entrada}
-                  onChange={(event) => handleCurrencyInput(event.target.value, setEntrada)}
-                  placeholder="0,00"
-                  className="w-full rounded-xl border border-border/50 bg-muted/20 py-3 pl-10 pr-4 text-lg font-bold text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                />
-              </div>
+              <MoneyInput value={entrada} onChange={setEntrada} placeholder="0,00" className="rounded-xl border-border/50 bg-muted/20 py-3 text-lg font-bold" />
             </div>
 
             <div>

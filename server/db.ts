@@ -4006,3 +4006,26 @@ export async function deleteConsignor(id: number) {
   // Soft delete - just deactivate
   await db.update(consignors).set({ active: false }).where(and(eq(consignors.tenantId, getCurrentTenantId()), eq(consignors.id, id)));
 }
+
+
+export async function getConsignorVehicleCounts(): Promise<{ consignorId: number; count: number }[]> {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const tid = getCurrentTenantId();
+  const rows = await db.select({
+    consignorId: consignmentRecords.consignorId,
+    count: sql<number>`COUNT(*)`,
+  }).from(consignmentRecords)
+    .where(and(eq(consignmentRecords.tenantId, tid), sql`${consignmentRecords.consignorId} IS NOT NULL`))
+    .groupBy(consignmentRecords.consignorId);
+  return rows.map(r => ({ consignorId: r.consignorId as number, count: Number(r.count) }));
+}
+
+export async function getVehiclesByConsignor(consignorId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  const tid = getCurrentTenantId();
+  return db.select().from(consignmentRecords)
+    .where(and(eq(consignmentRecords.tenantId, tid), eq(consignmentRecords.consignorId, consignorId)))
+    .orderBy(sql`${consignmentRecords.entryDate} DESC`);
+}

@@ -30,6 +30,7 @@ import { useMemo, useState, useCallback, useRef } from "react";
 import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { maskPhone } from "@/lib/masks";
@@ -2335,32 +2336,28 @@ export default function MinhaArea() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-gray-300 text-xs">Valor Custo (R$)</Label>
-                  <Input
+                  <MoneyInput
                     value={editConsignRecord.costValueDisplay || ''}
-                    onChange={e => setEditConsignRecord({...editConsignRecord, costValueDisplay: e.target.value})}
-                    onBlur={() => {
-                      const raw = (editConsignRecord.costValueDisplay || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+                    onChange={v => {
+                      const raw = v.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
                       const num = parseFloat(raw) || 0;
-                      setEditConsignRecord({...editConsignRecord, costValue: Math.round(num), costValueDisplay: num ? num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''});
+                      setEditConsignRecord({...editConsignRecord, costValue: Math.round(num), costValueDisplay: v});
                     }}
-                    placeholder="Ex: 50.000,00"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="50.000,00"
                   />
                 </div>
               </div>
               {editConsignRecord.vehicleStatus === 'financiado' && (
                 <div className="space-y-1">
                   <Label className="text-gray-300 text-xs">Valor Quitação (R$)</Label>
-                  <Input
+                  <MoneyInput
                     value={editConsignRecord.payoffValueDisplay || ''}
-                    onChange={e => setEditConsignRecord({...editConsignRecord, payoffValueDisplay: e.target.value})}
-                    onBlur={() => {
-                      const raw = (editConsignRecord.payoffValueDisplay || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+                    onChange={v => {
+                      const raw = v.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
                       const num = parseFloat(raw) || 0;
-                      setEditConsignRecord({...editConsignRecord, payoffValue: Math.round(num), payoffValueDisplay: num ? num.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''});
+                      setEditConsignRecord({...editConsignRecord, payoffValue: Math.round(num), payoffValueDisplay: v});
                     }}
-                    placeholder="Ex: 25.000,00"
-                    className="bg-gray-800 border-gray-700 text-white"
+                    placeholder="25.000,00"
                   />
                 </div>
               )}

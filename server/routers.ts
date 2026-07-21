@@ -1998,6 +1998,12 @@ export const appRouter = router({
       await db.deleteConsignor(input.id);
       return { success: true };
     }),
+    vehicleCounts: publicProcedure.query(async () => {
+      return db.getConsignorVehicleCounts();
+    }),
+    vehiclesByConsignor: publicProcedure.input(z.object({ consignorId: z.number() })).query(async ({ input }) => {
+      return db.getVehiclesByConsignor(input.consignorId);
+    }),
   }),
 
   // ===== DESPACHANTE =====

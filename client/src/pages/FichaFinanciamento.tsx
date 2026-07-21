@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
@@ -290,8 +291,7 @@ export default function FichaFinanciamento() {
           </div>
           <div className="space-y-2">
             <Label className="text-gray-300 text-sm font-semibold">Valor Financiado (R$)</Label>
-            <Input value={valorFinanciado} onChange={e => setValorFinanciado(e.target.value)}
-              placeholder="Ex: 85000" type="number" className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500" />
+            <MoneyInput value={valorFinanciado} onChange={setValorFinanciado} placeholder="85.000,00" />
           </div>
         </Section>
 

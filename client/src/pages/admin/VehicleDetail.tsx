@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ChevronLeft, Edit, Trash2, Plus, DollarSign, Car, Loader2, TrendingUp, TrendingDown, Minus, Camera, User } from "lucide-react";
+import { MoneyInput } from "@/components/ui/money-input";
 
 function formatCurrency(value: number | string | null | undefined): string {
   const num = typeof value === "string" ? parseFloat(value) : (value || 0);
@@ -35,24 +36,7 @@ function getMarginColor(margin: number | null): string {
   return "text-red-500";
 }
 
-// Formatação de moeda
-function formatCurrencyInput(value: string): string {
-  if (!value) return '';
-  let clean = value.replace(/[^0-9.,]/g, '');
-  if (clean.includes(',') && !clean.includes('.')) {
-    const parts = clean.split(',');
-    if (parts.length === 2 && parts[1].length <= 2) {
-      clean = parts[0].replace(/\./g, '') + '.' + parts[1];
-    } else {
-      clean = clean.replace(/[.,]/g, '');
-    }
-  } else if (clean.includes('.') && clean.includes(',')) {
-    clean = clean.replace(/\./g, '').replace(',', '.');
-  }
-  const num = parseFloat(clean);
-  if (isNaN(num)) return '';
-  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+
 
 function currencyToNumber(value: string): string {
   if (!value) return '';
@@ -122,15 +106,7 @@ function AddCostItemDialog({ open, onClose, vehicleId, onSuccess }: { open: bool
           </div>
           <div>
             <Label>Valor (R$) *</Label>
-            <Input
-              placeholder="500,00"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              onBlur={(e) => {
-                const formatted = formatCurrencyInput(e.target.value);
-                if (formatted) setForm({ ...form, amount: formatted });
-              }}
-            />
+            <MoneyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} placeholder="500,00" />
           </div>
           <div>
             <Label>Observações</Label>
@@ -194,14 +170,7 @@ function EditCostItemDialog({ open, onClose, item, onSuccess }: { open: boolean;
           </div>
           <div>
             <Label>Valor (R$) *</Label>
-            <Input
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              onBlur={(e) => {
-                const formatted = formatCurrencyInput(e.target.value);
-                if (formatted) setForm({ ...form, amount: formatted });
-              }}
-            />
+            <MoneyInput value={form.amount} onChange={(v) => setForm({ ...form, amount: v })} placeholder="500,00" />
           </div>
           <div>
             <Label>Observações</Label>
@@ -310,27 +279,11 @@ function EditVehicleDialog({ open, onClose, vehicle, onSuccess }: { open: boolea
           </div>
           <div>
             <Label>Valor de Compra (R$)</Label>
-            <Input
-              placeholder="50.000,00"
-              value={form.purchasePrice}
-              onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
-              onBlur={(e) => {
-                const formatted = formatCurrencyInput(e.target.value);
-                if (formatted) setForm({ ...form, purchasePrice: formatted });
-              }}
-            />
+            <MoneyInput value={form.purchasePrice} onChange={(v) => setForm({ ...form, purchasePrice: v })} placeholder="50.000,00" />
           </div>
           <div>
             <Label>Valor de Venda (R$)</Label>
-            <Input
-              placeholder="60.000,00"
-              value={form.salePrice}
-              onChange={(e) => setForm({ ...form, salePrice: e.target.value })}
-              onBlur={(e) => {
-                const formatted = formatCurrencyInput(e.target.value);
-                if (formatted) setForm({ ...form, salePrice: formatted });
-              }}
-            />
+            <MoneyInput value={form.salePrice} onChange={(v) => setForm({ ...form, salePrice: v })} placeholder="60.000,00" />
           </div>
           <div className="col-span-2">
             <Label>Observações</Label>

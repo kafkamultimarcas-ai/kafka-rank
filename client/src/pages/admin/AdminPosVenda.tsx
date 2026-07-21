@@ -4,15 +4,10 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Textarea } from "@/components/ui/textarea";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/PaginationControls";
-
-function formatCurrencyPV(val: string): string {
-  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
-  if (isNaN(num)) return val;
-  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 import { toast } from "sonner";
 import { maskPhone } from "@/lib/masks";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
@@ -794,7 +789,7 @@ function GastosTab({ chamadoId, gastos, onRefresh }: { chamadoId: number; gastos
         <Card className="border-orange-500/30">
           <CardContent className="p-3 space-y-2">
             <Input placeholder="Descrição (ex: troca amortecedor)" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
-            <Input placeholder="Ex: 1.500,00" value={valor} onChange={(e) => setValor(e.target.value)} onBlur={() => { if (valor.trim()) setValor(formatCurrencyPV(valor)); }} />
+            <MoneyInput value={valor} onChange={setValor} placeholder="1.500,00" />
             <div>
               <label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
                 <ImagePlus className="h-3 w-3" /> Foto da nota (opcional)

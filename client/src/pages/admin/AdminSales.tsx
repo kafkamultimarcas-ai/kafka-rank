@@ -13,19 +13,11 @@ import MonthFilter from "@/components/MonthFilter";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/PaginationControls";
 import { ListSkeleton } from "@/components/ListSkeleton";
+import { MoneyInput } from "@/components/ui/money-input";
 
-function formatCurrency(val: string): string {
-  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
-  if (isNaN(num)) return val;
-  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 function parseCurrencyToNumber(val: string): number {
   const cleaned = val.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
   return parseFloat(cleaned) || 0;
-}
-function CurrencyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  const handleBlur = () => { if (value && value.trim()) onChange(formatCurrency(value)); };
-  return <Input value={value} onChange={e => onChange(e.target.value)} onBlur={handleBlur} placeholder={placeholder || "Ex: 50.000,00"} className="bg-input border-border text-foreground" />;
 }
 
 export default function AdminSales() {
@@ -217,7 +209,7 @@ export default function AdminSales() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-foreground">Valor (R$)</Label>
-                    <CurrencyInput value={form.value} onChange={v => setForm({ ...form, value: v })} placeholder="Ex: 50.000,00" />
+                    <MoneyInput value={form.value} onChange={v => setForm({ ...form, value: v })} placeholder="Ex: 50.000,00" />
                   </div>
                   <div>
                     <Label className="text-foreground">Pontos</Label>
@@ -259,7 +251,7 @@ export default function AdminSales() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-foreground">Valor (R$)</Label>
-                   <CurrencyInput value={editForm.value} onChange={v => setEditForm({ ...editForm, value: v })} placeholder="Ex: 50.000,00" />
+                   <MoneyInput value={editForm.value} onChange={v => setEditForm({ ...editForm, value: v })} placeholder="Ex: 50.000,00" />
                 </div>
                 <div>
                   <Label className="text-foreground">Status</Label>

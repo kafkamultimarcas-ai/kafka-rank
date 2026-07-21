@@ -11,18 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function formatCurrencyVal(val: string): string {
-  const num = parseFloat(val.replace(/[^\d.,]/g, "").replace(",", "."));
-  if (isNaN(num)) return val;
-  return num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { MoneyInput } from "@/components/ui/money-input";
 function parseCurrencyStr(val: string): string {
   const cleaned = val.replace(/\./g, "").replace(",", ".").replace(/[^\d.]/g, "");
   return cleaned || "0";
-}
-function FinCurrencyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  const handleBlur = () => { if (value && value.trim()) onChange(formatCurrencyVal(value)); };
-  return <Input value={value} onChange={e => onChange(e.target.value)} onBlur={handleBlur} placeholder={placeholder || "Ex: 50.000,00"} />;
 }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -650,7 +642,7 @@ export function AdminFinanceiroInner() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Valor (R$) *</Label>
-                  <FinCurrencyInput value={txAmount} onChange={setTxAmount} placeholder="Ex: 1.500,00" />
+                  <MoneyInput value={txAmount} onChange={setTxAmount} placeholder="Ex: 1.500,00" />
                 </div>
                 <div>
                   <Label>Vencimento *</Label>
@@ -793,7 +785,7 @@ export function AdminFinanceiroInner() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Valor (R$) *</Label>
-                  <FinCurrencyInput value={txAmount} onChange={setTxAmount} placeholder="Ex: 1.500,00" />
+                  <MoneyInput value={txAmount} onChange={setTxAmount} placeholder="Ex: 1.500,00" />
                 </div>
                 <div>
                   <Label>Vencimento *</Label>
