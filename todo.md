@@ -2542,3 +2542,5 @@
 - [x] Menu lateral: Oficinas abaixo de Pós-Venda
 - [x] Listagem com busca, paginação, ações (editar, excluir, ver, ativar/desativar)
 - [x] Modais de criação, edição, detalhes e confirmação de exclusão
+- [x] Select de Oficina no Pós-Venda busca da lista de oficinas ativas cadastradas
+- [x] Campo CEP com busca automática de endereço no formulário de Oficinas

@@ -16,6 +16,7 @@ type Oficina = {
   name: string;
   phone: string | null;
   address: string | null;
+  cep: string | null;
   notes: string | null;
   active: boolean;
   createdAt: Date;
@@ -25,6 +26,7 @@ const EMPTY_FORM = {
   name: "",
   phone: "",
   address: "",
+  cep: "",
   notes: "",
 };
 
@@ -45,7 +47,7 @@ function OficinasContent() {
   const [selectedOficina, setSelectedOficina] = useState<Oficina | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const { data: oficinas, isLoading, refetch } = trpc.pvOficinas.list.useQuery();
+  const { data: oficinas, isLoading, refetch } = trpc.pvOficinas.listAll.useQuery();
 
   const filtered = useMemo(() => {
     if (!oficinas) return [];
@@ -96,6 +98,7 @@ function OficinasContent() {
       name: o.name,
       phone: o.phone || "",
       address: o.address || "",
+      cep: o.cep || "",
       notes: o.notes || "",
     });
     setShowEdit(true);
@@ -111,16 +114,16 @@ function OficinasContent() {
     setShowDeleteConfirm(true);
   }
 
-  function handleCreate() {
+    function handleCreate() {
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
     createMut.mutate({
       name: form.name.trim(),
       phone: form.phone || undefined,
       address: form.address || undefined,
+      cep: form.cep || undefined,
       notes: form.notes || undefined,
     });
   }
-
   function handleUpdate() {
     if (!selectedOficina) return;
     if (!form.name.trim()) { toast.error("Nome é obrigatório"); return; }
@@ -129,6 +132,7 @@ function OficinasContent() {
       name: form.name.trim(),
       phone: form.phone || undefined,
       address: form.address || undefined,
+      cep: form.cep || undefined,
       notes: form.notes || undefined,
     });
   }
@@ -282,6 +286,7 @@ function OficinasContent() {
             <div className="space-y-4">
               <DetailRow icon={Building2} label="Nome" value={selectedOficina.name} />
               <DetailRow icon={Phone} label="Telefone" value={selectedOficina.phone} />
+              <DetailRow icon={MapPin} label="CEP" value={selectedOficina.cep} />
               <DetailRow icon={MapPin} label="Endereço" value={selectedOficina.address} />
               <DetailRow icon={FileText} label="Observações" value={selectedOficina.notes} />
               <div className="flex items-center gap-2">
@@ -320,6 +325,34 @@ function OficinasContent() {
 }
 
 function OficinaForm({ form, setForm }: { form: typeof EMPTY_FORM; setForm: (f: typeof EMPTY_FORM) => void }) {
+  const [cepLoading, setCepLoading] = useState(false);
+
+  function maskCep(value: string): string {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 5) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+    return digits;
+  }
+
+  async function lookupCep() {
+    const cep = form.cep.replace(/\D/g, "");
+    if (cep.length !== 8) { toast.error("CEP inválido (8 dígitos)"); return; }
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (!data.erro) {
+        const parts = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean);
+        setForm({ ...form, address: parts.join(", ") });
+        toast.success("Endereço preenchido!");
+      } else {
+        toast.error("CEP não encontrado");
+      }
+    } catch {
+      toast.error("Erro ao buscar CEP");
+    }
+    setCepLoading(false);
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -337,6 +370,23 @@ function OficinaForm({ form, setForm }: { form: typeof EMPTY_FORM; setForm: (f: 
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
         />
+      </div>
+      <div>
+        <label className="text-sm font-medium">CEP</label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="00000-000"
+            value={form.cep}
+            onChange={(e) => setForm({ ...form, cep: maskCep(e.target.value) })}
+            onBlur={() => { if (form.cep.replace(/\D/g, "").length === 8) lookupCep(); }}
+            maxLength={9}
+            inputMode="numeric"
+            className="flex-1"
+          />
+          <Button type="button" variant="outline" size="icon" onClick={lookupCep} disabled={cepLoading}>
+            {cepLoading ? <span className="animate-spin">...</span> : <Search className="w-4 h-4" />}
+          </Button>
+        </div>
       </div>
       <div>
         <label className="text-sm font-medium">Endereço</label>

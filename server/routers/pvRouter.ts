@@ -230,27 +230,32 @@ export const pvOficinasRouter = router({
   list: publicProcedure.query(async () => {
     return db.listOficinas();
   }),
+  listAll: adminProcedure.query(async () => {
+    return db.listAllOficinas();
+  }),
 
-  create: adminProcedure.input(z.object({
+    create: adminProcedure.input(z.object({
     name: z.string().min(1),
     phone: z.string().optional(),
     address: z.string().optional(),
+    cep: z.string().optional(),
     notes: z.string().optional(),
   })).mutation(async ({ input }) => {
     const id = await db.createOficina({
       name: input.name,
       phone: input.phone ?? null,
       address: input.address ?? null,
+      cep: input.cep ?? null,
       notes: input.notes ?? null,
     });
     return { id, message: 'Oficina cadastrada!' };
   }),
-
   update: adminProcedure.input(z.object({
     id: z.number(),
     name: z.string().optional(),
     phone: z.string().optional(),
     address: z.string().optional(),
+    cep: z.string().optional(),
     notes: z.string().optional(),
     active: z.boolean().optional(),
   })).mutation(async ({ input }) => {

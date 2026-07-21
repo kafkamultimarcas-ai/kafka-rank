@@ -984,6 +984,7 @@ export const pvOficinas = mysqlTable("pv_oficinas", {
   name: varchar("name", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 20 }),
   address: varchar("address", { length: 500 }),
+  cep: varchar("cep", { length: 10 }),
   notes: text("notes"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

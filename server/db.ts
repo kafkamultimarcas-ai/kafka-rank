@@ -2099,6 +2099,11 @@ export async function listOficinas() {
   if (!db) return [];
   return db.select().from(pvOficinas).where(and(eq(pvOficinas.tenantId, getCurrentTenantId()), eq(pvOficinas.active, true))).orderBy(pvOficinas.name);
 }
+export async function listAllOficinas() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pvOficinas).where(eq(pvOficinas.tenantId, getCurrentTenantId())).orderBy(pvOficinas.name);
+}
 
 export async function createOficina(data: InsertPvOficina) {
   const db = await getDb();
@@ -2107,7 +2112,7 @@ export async function createOficina(data: InsertPvOficina) {
   return result[0].insertId;
 }
 
-export async function updateOficina(id: number, data: { name?: string; phone?: string; address?: string; notes?: string; active?: boolean }) {
+export async function updateOficina(id: number, data: { name?: string; phone?: string; address?: string; cep?: string; notes?: string; active?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.update(pvOficinas).set(data).where(and(eq(pvOficinas.tenantId, getCurrentTenantId()), eq(pvOficinas.id, id)));
