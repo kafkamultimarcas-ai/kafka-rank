@@ -922,6 +922,7 @@ export const finTransactions = mysqlTable("fin_transactions", {
   receiptUrl: text("receiptUrl"), // URL do comprovante no S3
   receiptKey: varchar("receiptKey", { length: 500 }),
   recurrence: mysqlEnum("recurrence", ["none", "monthly", "weekly", "yearly"]).default("none"),
+  paymentMethod: mysqlEnum("paymentMethod", ["pix", "cartao_credito", "boleto", "dinheiro"]),
   installmentNumber: int("installmentNumber"), // parcela atual
   installmentTotal: int("installmentTotal"), // total de parcelas
   sellerId: int("sellerId"), // colaborador vinculado quando a conta é um Vale/adiantamento (null = conta normal)

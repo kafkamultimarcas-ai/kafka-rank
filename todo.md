@@ -2527,3 +2527,11 @@
 - [x] Improve sendMessage error handling in CrmCommandCenter.tsx with user-friendly messages
 - [x] Handle expired token errors with actionable guidance to user
 - [x] Handle 24h messaging window errors with explanation
+
+## Campo Forma de Pagamento no Financeiro (Jul 21, 2026)
+- [x] Adicionar coluna paymentMethod no schema (enum: pix, cartao_credito, boleto, dinheiro)
+- [ ] Migrar banco de dados com ALTER TABLE
+- [x] Atualizar finDb (create/update) para aceitar paymentMethod
+- [x] Atualizar finRouter (create/update) para aceitar paymentMethod
+- [x] Adicionar combobox "Forma de Pagamento" ao lado de Recorrência no ContaForm
+- [x] Exibir forma de pagamento no ContaCard/ContaList

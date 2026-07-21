@@ -101,6 +101,7 @@ export const finTransactionsRouter = router({
     receiptUrl: z.string().optional(),
     receiptKey: z.string().optional(),
     recurrence: z.enum(["none", "monthly", "weekly", "yearly"]).optional(),
+    paymentMethod: z.enum(["pix", "cartao_credito", "boleto", "dinheiro"]).nullable().optional(),
     // Quando a recorrência é "monthly", gera esta quantidade de contas (uma por mês).
     recurrenceMonths: z.number().int().min(1).max(60).optional(),
     installmentNumber: z.number().optional(),
@@ -184,6 +185,7 @@ export const finTransactionsRouter = router({
     notes: z.string().optional(),
     receiptUrl: z.string().optional(),
     receiptKey: z.string().optional(),
+    paymentMethod: z.enum(["pix", "cartao_credito", "boleto", "dinheiro"]).nullable().optional(),
   })).mutation(async ({ input }) => {
     const { id, ...data } = input;
     await updateFinTransaction(id, { ...data, categoryId: data.categoryId ?? undefined, paidDate: data.paidDate ?? undefined });

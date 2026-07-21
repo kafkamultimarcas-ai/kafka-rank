@@ -167,6 +167,7 @@ export async function createFinTransaction(data: {
   receiptUrl?: string;
   receiptKey?: string;
   recurrence?: "none" | "monthly" | "weekly" | "yearly";
+  paymentMethod?: "pix" | "cartao_credito" | "boleto" | "dinheiro" | null;
   installmentNumber?: number;
   installmentTotal?: number;
   createdBy?: number;
@@ -199,6 +200,7 @@ export async function updateFinTransaction(id: number, data: Partial<{
   approvedBy: string;
   approvedAt: number;
   sellerId: number | null;
+  paymentMethod: "pix" | "cartao_credito" | "boleto" | "dinheiro" | null;
 }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

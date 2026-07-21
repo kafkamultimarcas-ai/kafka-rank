@@ -46,6 +46,8 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
     setTxIsVale: state.setTxIsVale,
     txSellerId: state.txSellerId,
     setTxSellerId: state.setTxSellerId,
+    txPaymentMethod: state.txPaymentMethod,
+    setTxPaymentMethod: state.setTxPaymentMethod,
     onAudioResult: state.handleAudioResult,
     onSubmit: state.submitForm,
     isSubmitting: state.isSubmitting,

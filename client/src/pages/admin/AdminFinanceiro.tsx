@@ -155,6 +155,7 @@ export function AdminFinanceiroInner() {
   const [txNotes, setTxNotes] = useState("");
   const [txRecurrence, setTxRecurrence] = useState<"none" | "monthly" | "weekly" | "yearly">("none");
   const [txRecurrenceMonths, setTxRecurrenceMonths] = useState(2);
+  const [txPaymentMethod, setTxPaymentMethod] = useState<string | null>(null);
 
   // Month range
   const startOfMonth = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).getTime(), [selectedMonth]);
@@ -292,6 +293,7 @@ export function AdminFinanceiroInner() {
     setTxNotes("");
     setTxRecurrence("none");
     setTxRecurrenceMonths(2);
+    setTxPaymentMethod(null);
   }
 
   function openEditTransaction(tx: any) {
@@ -306,6 +308,7 @@ export function AdminFinanceiroInner() {
     setTxBarcode(tx.barcode || "");
     setTxNotes(tx.notes || "");
     setTxRecurrence(tx.recurrence || "none");
+    setTxPaymentMethod(tx.paymentMethod || null);
     setShowEditTransaction(true);
   }
 
@@ -679,21 +682,34 @@ export function AdminFinanceiroInner() {
                     </SelectContent>
                   </Select>
                 </div>
-                {txRecurrence === "monthly" && (
-                  <div>
-                    <Label>Qtd. de meses *</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={txRecurrenceMonths}
-                      onChange={(e) => setTxRecurrenceMonths(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
-                      inputMode="numeric"
-                    />
-                    <p className="mt-1 text-[10px] text-muted-foreground">Gera 1 conta por mês.</p>
-                  </div>
-                )}
+                <div>
+                  <Label>Forma de Pagamento</Label>
+                  <Select value={txPaymentMethod || "none"} onValueChange={(v: any) => setTxPaymentMethod(v === "none" ? null : v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Selecione...</SelectItem>
+                      <SelectItem value="pix">Pix</SelectItem>
+                      <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              {txRecurrence === "monthly" && (
+                <div>
+                  <Label>Qtd. de meses *</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={txRecurrenceMonths}
+                    onChange={(e) => setTxRecurrenceMonths(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                    inputMode="numeric"
+                  />
+                  <p className="mt-1 text-[10px] text-muted-foreground">Gera 1 conta por mês.</p>
+                </div>
+              )}
               <div>
                 <Label>Observações</Label>
                 <Textarea placeholder="Notas adicionais..." value={txNotes} onChange={(e) => setTxNotes(e.target.value)} />
@@ -721,6 +737,7 @@ export function AdminFinanceiroInner() {
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
                     recurrence: txRecurrence,
+                    paymentMethod: txPaymentMethod || undefined,
                     recurrenceMonths: txRecurrence === "monthly" ? Math.max(1, Number(txRecurrenceMonths) || 1) : undefined,
                   } as any);
                 }}
@@ -796,6 +813,19 @@ export function AdminFinanceiroInner() {
                 <Input value={txBarcode} onChange={(e) => setTxBarcode(e.target.value)} />
               </div>
               <div>
+                <Label>Forma de Pagamento</Label>
+                <Select value={txPaymentMethod || "none"} onValueChange={(v: any) => setTxPaymentMethod(v === "none" ? null : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecione...</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Observações</Label>
                 <Textarea value={txNotes} onChange={(e) => setTxNotes(e.target.value)} />
               </div>
@@ -820,6 +850,7 @@ export function AdminFinanceiroInner() {
                     vehicle: txVehicle || undefined,
                     barcode: txBarcode || undefined,
                     notes: txNotes || undefined,
+                    paymentMethod: txPaymentMethod || null,
                   } as any);
                 }}
                 disabled={updateTransaction.isPending}
@@ -862,6 +893,7 @@ export function AdminFinanceiroInner() {
                     {tx.vehicle && <div className="flex justify-between"><span className="text-muted-foreground">Veículo</span><span>{tx.vehicle}</span></div>}
                     {tx.barcode && <div className="flex justify-between"><span className="text-muted-foreground">Código Barras</span><span className="text-xs font-mono truncate max-w-[200px]">{tx.barcode}</span></div>}
                     {tx.recurrence && tx.recurrence !== "none" && <div className="flex justify-between"><span className="text-muted-foreground">Recorrência</span><span className="capitalize">{tx.recurrence === "monthly" ? "Mensal" : tx.recurrence === "weekly" ? "Semanal" : "Anual"}</span></div>}
+                    {tx.paymentMethod && <div className="flex justify-between"><span className="text-muted-foreground">Pagamento</span><span>{tx.paymentMethod === "pix" ? "Pix" : tx.paymentMethod === "cartao_credito" ? "Cartão de Crédito" : tx.paymentMethod === "boleto" ? "Boleto" : "Dinheiro"}</span></div>}
                     {tx.notes && <div><span className="text-muted-foreground">Observa\u00e7\u00f5es:</span><p className="mt-1 text-xs bg-muted/30 p-2 rounded">{tx.notes}</p></div>}
                     {(tx as any).createdByName && <div className="flex justify-between"><span className="text-muted-foreground">Lan\u00e7ado por</span><span>{(tx as any).createdByName}</span></div>}
                     {(tx as any).approvalStatus && (tx as any).approvalStatus !== "none" && (

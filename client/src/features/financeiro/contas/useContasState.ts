@@ -37,6 +37,7 @@ export function useContasState(initialContaId?: number | null) {
   const [txRecurrenceMonths, setTxRecurrenceMonths] = useState(2);
   const [txIsVale, setTxIsVale] = useState(false);
   const [txSellerId, setTxSellerId] = useState<number | null>(null);
+  const [txPaymentMethod, setTxPaymentMethod] = useState<string | null>(null);
 
   const startDate = useMemo(() => new Date(filterYear, filterMonth - 1, 1).getTime(), [filterMonth, filterYear]);
   const endDate = useMemo(() => new Date(filterYear, filterMonth, 0, 23, 59, 59).getTime(), [filterMonth, filterYear]);
@@ -91,6 +92,7 @@ export function useContasState(initialContaId?: number | null) {
     setTxRecurrenceMonths(2);
     setTxIsVale(false);
     setTxSellerId(null);
+    setTxPaymentMethod(null);
   };
 
   const createTransaction = trpc.finTransactions.create.useMutation({
@@ -161,6 +163,7 @@ export function useContasState(initialContaId?: number | null) {
     setTxCategoryId(transaction.categoryId);
     setTxIsVale(!!transaction.sellerId);
     setTxSellerId(transaction.sellerId ?? null);
+    setTxPaymentMethod((transaction as any).paymentMethod || null);
     setShowForm(true);
   };
 
@@ -307,6 +310,7 @@ export function useContasState(initialContaId?: number | null) {
         supplier: txSupplier || undefined,
         vehicle: txVehicle || undefined,
         notes: txNotes || undefined,
+        paymentMethod: txPaymentMethod || null,
         status: persistedStatus,
         paidDate: persistedPaidDate,
       } as any);
@@ -325,6 +329,7 @@ export function useContasState(initialContaId?: number | null) {
       vehicle: txVehicle || undefined,
       notes: txNotes || undefined,
       recurrence: txRecurrence as "none" | "monthly" | "weekly" | "yearly",
+      paymentMethod: txPaymentMethod || undefined,
       recurrenceMonths: txRecurrence === "monthly" ? Math.max(1, Number(txRecurrenceMonths) || 1) : undefined,
       needsApproval: txNeedsApproval,
       createdByName: sellerSession?.nickname || sellerSession?.name || "Financeiro",
@@ -409,6 +414,8 @@ export function useContasState(initialContaId?: number | null) {
     setTxIsVale,
     txSellerId,
     setTxSellerId,
+    txPaymentMethod,
+    setTxPaymentMethod,
     resetForm,
     submitForm,
     startEdit,
