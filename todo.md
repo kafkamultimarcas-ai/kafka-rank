@@ -2544,3 +2544,6 @@
 - [x] Modais de criação, edição, detalhes e confirmação de exclusão
 - [x] Select de Oficina no Pós-Venda busca da lista de oficinas ativas cadastradas
 - [x] Campo CEP com busca automática de endereço no formulário de Oficinas
+- [x] Botão de cadastro rápido de oficina ao lado do select no Pós-Venda
+- [x] Select de oficina com busca por texto (combobox searchable)
+- [x] Coluna Oficina na listagem de chamados com ícone de detalhes de contato

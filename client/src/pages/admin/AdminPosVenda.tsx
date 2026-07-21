@@ -29,10 +29,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import {
   Plus, Search, Wrench, Clock, Truck, CheckCircle2, AlertTriangle,
   Car, Phone, User, FileText, Calendar, Building2, DollarSign,
   ChevronRight, Trash2, Edit, Eye, X, ImagePlus, History,
-  MessageCircle, PhoneCall, Edit3
+  MessageCircle, PhoneCall, Edit3, ChevronsUpDown, Check, Info
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
@@ -237,6 +256,31 @@ export default function AdminPosVenda() {
                           <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
                             {chamado.carroPlaca}
                           </span>
+                        )}
+                        {chamado.oficinaNome && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="flex items-center gap-1 text-orange-400 cursor-help">
+                                  <Building2 className="h-3.5 w-3.5" />
+                                  {chamado.oficinaNome}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="font-semibold">{chamado.oficinaNome}</p>
+                                {(() => {
+                                  const of_ = (oficinasQuery.data || []).find((o: any) => o.id === chamado.oficinaId);
+                                  if (!of_) return <p className="text-xs text-muted-foreground">Sem detalhes</p>;
+                                  return (
+                                    <div className="text-xs space-y-0.5 mt-1">
+                                      {of_.phone && <p><Phone className="h-3 w-3 inline mr-1" />{of_.phone}</p>}
+                                      {of_.address && <p>{of_.address}</p>}
+                                    </div>
+                                  );
+                                })()}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                         {chamado.prazoEntrega && (
                           <span className="flex items-center gap-1">
@@ -655,20 +699,11 @@ function EditChamadoForm({ chamado, oficinas, sellers, editData, setEditData, on
         <label className="text-xs text-muted-foreground flex items-center gap-1"><Wrench className="h-3 w-3 text-orange-400" /> O que está sendo feito (Serviço)</label>
         <Textarea defaultValue={chamado.servicoRealizado} onChange={(e) => setEditData((d: any) => ({ ...d, servicoRealizado: e.target.value }))} rows={2} placeholder="Descreva o que está sendo feito no veículo..." />
       </div>
-      <div>
-        <label className="text-xs text-muted-foreground">Oficina</label>
-        <Select defaultValue={chamado.oficinaId ? String(chamado.oficinaId) : undefined} onValueChange={(v) => {
-          const of_ = oficinas.find((o: any) => o.id === Number(v));
-          setEditData((d: any) => ({ ...d, oficinaId: Number(v), oficinaNome: of_?.name || "" }));
-        }}>
-          <SelectTrigger><SelectValue placeholder="Selecionar oficina" /></SelectTrigger>
-          <SelectContent>
-            {oficinas.map((o: any) => (
-              <SelectItem key={o.id} value={String(o.id)}>{o.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <OficinaCombobox
+        oficinas={oficinas}
+        selectedId={editData.oficinaId ?? chamado.oficinaId}
+        onSelect={(id, name) => setEditData((d: any) => ({ ...d, oficinaId: id, oficinaNome: name }))}
+      />
       <div>
         <label className="text-xs text-muted-foreground">Status</label>
         <Select defaultValue={chamado.status} onValueChange={(v) => setEditData((d: any) => ({ ...d, status: v }))}>
@@ -1004,6 +1039,110 @@ function OrcamentoItensView({ orcamentoId }: { orcamentoId: number }) {
           <span className="text-green-400 font-mono">{formatCurrency(item.valorTotal)}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// ===== OFICINA COMBOBOX WITH SEARCH + QUICK ADD =====
+function OficinaCombobox({ oficinas, selectedId, onSelect }: { oficinas: any[]; selectedId?: number; onSelect: (id: number, name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const utils = trpc.useUtils();
+  const createMutation = trpc.pvOficinas.create.useMutation({
+    onSuccess: (data) => {
+      toast.success("Oficina cadastrada!");
+      utils.pvOficinas.list.invalidate();
+      onSelect(data.id, newName);
+      setShowQuickAdd(false);
+      setNewName("");
+      setNewPhone("");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const selected = oficinas.find((o: any) => o.id === selectedId);
+
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground">Oficina</label>
+      <div className="flex gap-2">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" aria-expanded={open} className="flex-1 justify-between font-normal">
+              {selected ? selected.name : "Selecionar oficina..."}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[300px] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Buscar oficina..." />
+              <CommandList>
+                <CommandEmpty>Nenhuma oficina encontrada.</CommandEmpty>
+                <CommandGroup>
+                  {oficinas.map((o: any) => (
+                    <CommandItem
+                      key={o.id}
+                      value={o.name}
+                      onSelect={() => {
+                        onSelect(o.id, o.name);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check className={`mr-2 h-4 w-4 ${selectedId === o.id ? "opacity-100" : "opacity-0"}`} />
+                      <div className="flex-1">
+                        <span>{o.name}</span>
+                        {o.phone && <span className="ml-2 text-xs text-muted-foreground">{o.phone}</span>}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={() => setShowQuickAdd(true)} className="shrink-0">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Cadastrar nova oficina</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      {/* Quick Add Dialog */}
+      <Dialog open={showQuickAdd} onOpenChange={setShowQuickAdd}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-orange-500" />
+              Cadastro Rápido de Oficina
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Nome *</label>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome da oficina" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Telefone</label>
+              <Input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="(00) 00000-0000" />
+            </div>
+            <Button
+              onClick={() => createMutation.mutate({ name: newName, phone: newPhone || undefined })}
+              disabled={!newName.trim() || createMutation.isPending}
+              className="w-full bg-orange-600 hover:bg-orange-700"
+            >
+              {createMutation.isPending ? "Cadastrando..." : "Cadastrar e Selecionar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
