@@ -2650,3 +2650,7 @@
 - [x] Cadastro de consignador: aceitar CPF ou CNPJ (label dinâmico, máscara dinâmica, validação)
 - [x] Dar saída: campo obrigatório de motivo (vendido, devolvido, etc) salvo no histórico
 - [x] Filtro na lista de veículos consignados: ativos no pátio vs com saída
+
+## Bug Fix - Validação Valor Contas
+
+- [x] Corrigir isPositiveNumberString em features/financeiro/utils/form.ts para lidar com pontos de milhar (ex: "1.308,47" falhava na validação)

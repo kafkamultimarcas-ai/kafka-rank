@@ -41,6 +41,8 @@ export function maskDecimalInput(value: string, precision = 2) {
 }
 
 export function isPositiveNumberString(value: string) {
-  const amount = Number(value.replace(",", "."));
+  // Remove pontos de milhar, substitui vírgula decimal por ponto
+  const normalized = value.replace(/\./g, "").replace(",", ".");
+  const amount = Number(normalized);
   return Number.isFinite(amount) && amount > 0;
 }
