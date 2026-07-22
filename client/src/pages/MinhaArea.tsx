@@ -371,6 +371,7 @@ export default function MinhaArea() {
   const [exitReason, setExitReason] = useState("");
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [consignFilter, setConsignFilter] = useState<'todos' | 'patio' | 'saida'>('patio');
+  const [consignStatusFilter, setConsignStatusFilter] = useState<'todos' | 'financiado' | 'quitado' | 'leilao' | 'sem_leilao'>('todos');
   const [consignPage, setConsignPage] = useState(1);
   const CONSIGN_PAGE_SIZE = 15;
 
@@ -1730,16 +1731,44 @@ export default function MinhaArea() {
             )}
 
             {dept === "consignacao" && approvedConsignment.length > 0 && (() => {
-              const filteredList = consignFilter === 'todos' ? approvedConsignment : consignFilter === 'patio' ? approvedConsignment.filter((r: any) => !r.exitDate) : approvedConsignment.filter((r: any) => !!r.exitDate);
+              const statusFiltered = consignStatusFilter === 'todos' ? approvedConsignment : consignStatusFilter === 'financiado' ? approvedConsignment.filter((r: any) => r.vehicleStatus === 'financiado') : consignStatusFilter === 'quitado' ? approvedConsignment.filter((r: any) => r.vehicleStatus !== 'financiado') : consignStatusFilter === 'leilao' ? approvedConsignment.filter((r: any) => r.hasAuction) : approvedConsignment.filter((r: any) => !r.hasAuction);
+              const filteredList = consignFilter === 'todos' ? statusFiltered : consignFilter === 'patio' ? statusFiltered.filter((r: any) => !r.exitDate) : statusFiltered.filter((r: any) => !!r.exitDate);
               const totalPages = Math.ceil(filteredList.length / CONSIGN_PAGE_SIZE);
               const paginatedList = filteredList.slice((consignPage - 1) * CONSIGN_PAGE_SIZE, consignPage * CONSIGN_PAGE_SIZE);
+              const hasActiveFilters = consignFilter !== 'patio' || consignStatusFilter !== 'todos' || sectorSearch.trim() !== '';
               return (
               <div className="space-y-3">
-                <div className="flex gap-1 flex-wrap">
-                  <button onClick={() => { setConsignFilter('todos'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'todos' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Todos ({approvedConsignment.length})</button>
-                  <button onClick={() => { setConsignFilter('patio'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'patio' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>No Pátio ({approvedConsignment.filter((r: any) => !r.exitDate).length})</button>
-                  <button onClick={() => { setConsignFilter('saida'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'saida' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Com Saída ({approvedConsignment.filter((r: any) => !!r.exitDate).length})</button>
+                {/* Filtro por localização */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold">Localização:</span>
+                  <div className="flex gap-1 flex-wrap">
+                    <button onClick={() => { setConsignFilter('todos'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'todos' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Todos ({statusFiltered.length})</button>
+                    <button onClick={() => { setConsignFilter('patio'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'patio' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>No Pátio ({statusFiltered.filter((r: any) => !r.exitDate).length})</button>
+                    <button onClick={() => { setConsignFilter('saida'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'saida' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Com Saída ({statusFiltered.filter((r: any) => !!r.exitDate).length})</button>
+                  </div>
                 </div>
+                {/* Filtro por status do veículo */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold">Status:</span>
+                  <div className="flex gap-1 flex-wrap">
+                    <button onClick={() => { setConsignStatusFilter('todos'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignStatusFilter === 'todos' ? 'bg-purple-600 border-purple-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Todos</button>
+                    <button onClick={() => { setConsignStatusFilter('quitado'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignStatusFilter === 'quitado' ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Quitado ({approvedConsignment.filter((r: any) => r.vehicleStatus !== 'financiado').length})</button>
+                    <button onClick={() => { setConsignStatusFilter('financiado'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignStatusFilter === 'financiado' ? 'bg-orange-600 border-orange-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Financiado ({approvedConsignment.filter((r: any) => r.vehicleStatus === 'financiado').length})</button>
+                    <button onClick={() => { setConsignStatusFilter('leilao'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignStatusFilter === 'leilao' ? 'bg-red-600 border-red-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Leilão ({approvedConsignment.filter((r: any) => r.hasAuction).length})</button>
+                    <button onClick={() => { setConsignStatusFilter('sem_leilao'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignStatusFilter === 'sem_leilao' ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Sem Leilão ({approvedConsignment.filter((r: any) => !r.hasAuction).length})</button>
+                  </div>
+                </div>
+                {/* Botão limpar filtros */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => { setConsignFilter('patio'); setConsignStatusFilter('todos'); setSectorSearch(''); setConsignPage(1); }}
+                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 border border-red-500/30 rounded-full px-3 py-1 hover:bg-red-500/10 transition-all"
+                  >
+                    <XIcon className="w-3 h-3" /> Limpar Filtros
+                  </button>
+                )}
+                {/* Resultado da filtragem */}
+                <p className="text-[10px] text-gray-500">{filteredList.length} veículo(s) encontrado(s)</p>
                 <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
                 {paginatedList.map((r: any) => {
                   const entryDate = new Date(r.entryDate);

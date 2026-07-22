@@ -2672,3 +2672,8 @@
 - [x] Ações rápidas no topo (grid horizontal)
 - [x] Filtros de busca abaixo das ações
 - [x] Listagem paginada dos veículos consignados com PaginationControls (15/pág)
+
+## Melhorias Filtros Consignação
+
+- [x] Adicionar filtro por status do veículo (Quitado, Financiado, Leilão, Sem Leilão) na busca
+- [x] Adicionar botão "Limpar Filtros" para resetar todos os filtros aplicados
