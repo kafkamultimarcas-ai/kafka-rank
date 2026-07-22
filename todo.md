@@ -2714,3 +2714,9 @@
 ## Melhorias CRM Consignados Kanban
 - [x] Barra de pesquisa para filtrar cards por nome do cliente, placa ou modelo do veículo
 - [x] Botão WhatsApp em cada card para abrir conversa direta com telefone do cliente/consignador
+
+## CRM Consignados - Filtros e Restrição de Drag
+- [x] Filtros avançados: por vendedor (dropdown), busca por cliente/placa/modelo
+- [x] Restrição drag-and-drop: vendedor só arrasta seus próprios cards (canDrag disabled)
+- [x] Admin/gerente pode arrastar qualquer card (sem restrição)
+- [x] Backend: ownership check no moveCrmStatus (TRPCError FORBIDDEN)

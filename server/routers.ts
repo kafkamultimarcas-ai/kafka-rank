@@ -1992,6 +1992,15 @@ export const appRouter = router({
       id: z.number(),
       crmStatus: z.enum(['cadastro', 'em_estoque', 'em_negociacao', 'vendido', 'devolvido']),
     })).mutation(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'admin' || ctx.user.actorType === 'oauth' || ctx.user.actorType === 'crm_admin';
+      const isGerente = ctx.user.sellerRole === 'gerente';
+      // Vendedor comum só pode mover seus próprios consignados
+      if (!isAdmin && !isGerente) {
+        const record = await db.getConsignmentDetail(input.id);
+        if (!record || record.sellerId !== ctx.user.id) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Você só pode mover seus próprios consignados' });
+        }
+      }
       await db.updateConsignmentCrmStatus(input.id, input.crmStatus);
       return { success: true };
     }),

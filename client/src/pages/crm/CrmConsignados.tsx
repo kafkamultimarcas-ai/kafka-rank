@@ -4,8 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useGoBack } from "@/hooks/useGoBack";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
   DndContext,
   DragOverlay,
@@ -21,7 +23,7 @@ import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Car, Calendar, User, Phone, GripVertical, Search, MessageCircle,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users
 } from "lucide-react";
 
 // CRM Status columns configuration
@@ -57,10 +59,11 @@ function openWhatsApp(phone: string) {
   window.open(`https://wa.me/${number}`, "_blank");
 }
 
-function DraggableCard({ record, onClick }: { record: any; onClick: () => void }) {
+function DraggableCard({ record, onClick, canDrag = true }: { record: any; onClick: () => void; canDrag?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(record.id),
     data: { record },
+    disabled: !canDrag,
   });
 
   const style = {
@@ -79,7 +82,7 @@ function DraggableCard({ record, onClick }: { record: any; onClick: () => void }
         <div
           {...listeners}
           {...attributes}
-          className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+          className={`mt-1 text-muted-foreground ${canDrag ? 'cursor-grab active:cursor-grabbing hover:text-foreground' : 'opacity-30 cursor-not-allowed'}`}
         >
           <GripVertical className="w-4 h-4" />
         </div>
@@ -144,10 +147,12 @@ function DroppableColumn({
   column,
   records,
   onCardClick,
+  canDragRecord,
 }: {
   column: typeof CRM_COLUMNS[number];
   records: any[];
   onCardClick: (r: any) => void;
+  canDragRecord?: (record: any) => boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key });
 
@@ -199,6 +204,7 @@ function DroppableColumn({
                 key={record.id}
                 record={record}
                 onClick={() => onCardClick(record)}
+                canDrag={canDragRecord ? canDragRecord(record) : true}
               />
             ))
           )}
@@ -228,10 +234,21 @@ function OverlayCard({ record }: { record: any }) {
 // ===== MAIN PAGE =====
 export default function CrmConsignados() {
   const goBack = useGoBack("/minha-area");
+  const { user } = useAuth();
   const [activeRecord, setActiveRecord] = useState<any | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterSeller, setFilterSeller] = useState<string>("all");
+
+  // Determine if current user is admin/gerente
+  const isAdmin = user?.role === 'admin' || (user as any)?.actorType === 'oauth' || (user as any)?.actorType === 'crm_admin';
+  const isGerente = (user as any)?.sellerRole === 'gerente';
+  const canMoveAny = isAdmin || isGerente;
+  const currentSellerId = (user as any)?.actorType === 'seller' ? (user as any)?.id : null;
+
+  // Load sellers list for filter (only for admin/gerente)
+  const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true }, { enabled: canMoveAny });
 
   const { data: records, isLoading, refetch } = trpc.consignment.listForCrm.useQuery();
   const { data: detail, isLoading: loadingDetail } = trpc.consignment.getDetail.useQuery(
@@ -246,18 +263,33 @@ export default function CrmConsignados() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Filter records by search query
+  // Check if current user can drag a specific record
+  const canDragRecord = (record: any) => {
+    if (canMoveAny) return true;
+    return record.sellerId === currentSellerId;
+  };
+
+  // Filter records by search query and seller filter
   const filteredRecords = useMemo(() => {
     if (!records) return [];
-    if (!searchQuery.trim()) return records;
-    const q = searchQuery.toLowerCase().trim();
-    return records.filter((r: any) =>
-      (r.vehiclePlate && r.vehiclePlate.toLowerCase().includes(q)) ||
-      (r.consignorName && r.consignorName.toLowerCase().includes(q)) ||
-      (r.vehicleModel && r.vehicleModel.toLowerCase().includes(q)) ||
-      (r.ownerName && r.ownerName.toLowerCase().includes(q))
-    );
-  }, [records, searchQuery]);
+    let filtered = records as any[];
+    // Seller filter
+    if (filterSeller !== "all") {
+      const sid = Number(filterSeller);
+      filtered = filtered.filter((r: any) => r.sellerId === sid);
+    }
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((r: any) =>
+        (r.vehiclePlate && r.vehiclePlate.toLowerCase().includes(q)) ||
+        (r.consignorName && r.consignorName.toLowerCase().includes(q)) ||
+        (r.vehicleModel && r.vehicleModel.toLowerCase().includes(q)) ||
+        (r.ownerName && r.ownerName.toLowerCase().includes(q))
+      );
+    }
+    return filtered;
+  }, [records, searchQuery, filterSeller]);
 
   // Group records by crmStatus
   const recordsByStatus = useMemo(() => {
@@ -337,8 +369,8 @@ export default function CrmConsignados() {
           </div>
           <Badge variant="secondary">{records?.length || 0} veículos</Badge>
         </div>
-        {/* Search bar */}
-        <div className="px-4 pb-3">
+        {/* Filters */}
+        <div className="px-4 pb-3 space-y-2">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -349,6 +381,29 @@ export default function CrmConsignados() {
               className="w-full pl-9 pr-4 py-2 text-sm bg-accent/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/60"
             />
           </div>
+          {canMoveAny && sellers && sellers.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Vendedor:</span>
+              <Select value={filterSeller} onValueChange={setFilterSeller}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" /> Todos
+                    </span>
+                  </SelectItem>
+                  {sellers.map((s: any) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.nickname || s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -367,6 +422,7 @@ export default function CrmConsignados() {
                 column={col}
                 records={recordsByStatus[col.key] || []}
                 onCardClick={openDetail}
+                canDragRecord={canDragRecord}
               />
             ))}
           </div>
