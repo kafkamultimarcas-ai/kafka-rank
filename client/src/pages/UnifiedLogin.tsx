@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Building2, CheckCircle2, Lock, LogIn, Mail, UserRound } from "lucide-react";
+import { ArrowLeft, Building2, CheckCircle2, Eye, EyeOff, Lock, LogIn, Mail, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -39,6 +39,7 @@ export default function UnifiedLogin() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePassword, setInvitePassword] = useState("");
   const [inviteConfirm, setInviteConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const inviteQuery = trpc.sellers.getInvite.useQuery(
     { inviteToken },
     { enabled: !!inviteToken, retry: false, refetchOnWindowFocus: false }
@@ -434,15 +435,25 @@ export default function UnifiedLogin() {
                 <Lock className="w-4 h-4 text-red-400" />
                 Senha
               </label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Sua senha"
-                className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
-                autoComplete="current-password"
-                autoFocus={!!email}
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Sua senha"
+                  className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 pr-10"
+                  autoComplete="current-password"
+                  autoFocus={!!email}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {/* Lembrar-me checkbox */}

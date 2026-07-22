@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, ReactNode } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Lock, User, UserPlus, ArrowLeft, Flag, ChevronDown } from "lucide-react";
+import { Lock, User, UserPlus, ArrowLeft, Flag, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useBranding } from "@/contexts/TenantContext";
@@ -41,6 +41,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [inviteCode, setInviteCode] = useState(() =>
     typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") || "" : ""
   );
@@ -216,14 +217,24 @@ export default function AccessGate({ children }: { children: ReactNode }) {
                 <Lock className="w-4 h-4 text-blue-400" />
                 Crie sua senha
               </label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 4 caracteres"
-                className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 4 caracteres"
+                  className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 pr-10"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -231,14 +242,24 @@ export default function AccessGate({ children }: { children: ReactNode }) {
                 <Lock className="w-4 h-4 text-blue-400" />
                 Confirme a senha
               </label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repita a senha"
-                className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repita a senha"
+                  className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 pr-10"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <Button
