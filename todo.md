@@ -2745,3 +2745,8 @@
 - [x] Backend: salvar histórico ao mover status no moveCrmStatus
 - [x] Frontend: exibir histórico de status no modal de detalhes (seller + admin)
 - [x] Backend: permitir dept consignação mover qualquer card (bypass ownership check)
+
+## Admin Layout - Consignação e CRM Consignados
+- [x] Página Consignação (/controle-patio) deve manter DashboardLayout (menu lateral) quando acessada pelo admin
+- [x] Página CRM-Consignados (/admin/crm-consignados) deve manter DashboardLayout (menu lateral) quando acessada pelo admin
+- [x] Skeleton loading no modal de detalhes do CRM Consignados (enquanto histórico carrega)

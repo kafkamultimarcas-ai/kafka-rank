@@ -483,8 +483,60 @@ export default function CrmConsignados() {
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-3">
             {loadingDetail ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+              <div className="space-y-4 animate-pulse">
+                {/* Skeleton: Veículo */}
+                <div>
+                  <div className="h-3 w-16 bg-muted rounded mb-2" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><div className="h-2.5 w-10 bg-muted/60 rounded" /><div className="h-4 w-20 bg-muted rounded" /></div>
+                    <div className="space-y-1"><div className="h-2.5 w-12 bg-muted/60 rounded" /><div className="h-4 w-28 bg-muted rounded" /></div>
+                    <div className="space-y-1"><div className="h-2.5 w-14 bg-muted/60 rounded" /><div className="h-4 w-16 bg-muted rounded" /></div>
+                    <div className="space-y-1"><div className="h-2.5 w-10 bg-muted/60 rounded" /><div className="h-4 w-12 bg-muted rounded" /></div>
+                  </div>
+                </div>
+                {/* Skeleton: Consignador */}
+                <div>
+                  <div className="h-3 w-24 bg-muted rounded mb-2" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><div className="h-2.5 w-10 bg-muted/60 rounded" /><div className="h-4 w-32 bg-muted rounded" /></div>
+                    <div className="space-y-1"><div className="h-2.5 w-14 bg-muted/60 rounded" /><div className="h-4 w-24 bg-muted rounded" /></div>
+                  </div>
+                </div>
+                {/* Skeleton: Datas */}
+                <div>
+                  <div className="h-3 w-12 bg-muted rounded mb-2" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><div className="h-2.5 w-12 bg-muted/60 rounded" /><div className="h-4 w-20 bg-muted rounded" /></div>
+                    <div className="space-y-1"><div className="h-2.5 w-10 bg-muted/60 rounded" /><div className="h-4 w-20 bg-muted rounded" /></div>
+                  </div>
+                </div>
+                {/* Skeleton: Financeiro */}
+                <div>
+                  <div className="h-3 w-20 bg-muted rounded mb-2" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><div className="h-2.5 w-16 bg-muted/60 rounded" /><div className="h-4 w-24 bg-muted rounded" /></div>
+                    <div className="space-y-1"><div className="h-2.5 w-16 bg-muted/60 rounded" /><div className="h-4 w-24 bg-muted rounded" /></div>
+                  </div>
+                </div>
+                {/* Skeleton: Histórico */}
+                <div>
+                  <div className="h-3 w-28 bg-muted rounded mb-2" />
+                  <div className="space-y-1.5">
+                    <div className="h-8 w-full bg-muted/40 rounded-lg" />
+                    <div className="h-8 w-full bg-muted/40 rounded-lg" />
+                  </div>
+                </div>
+                {/* Skeleton: Botões */}
+                <div className="pt-2 border-t border-border">
+                  <div className="h-3 w-20 bg-muted rounded mb-2" />
+                  <div className="flex gap-1.5">
+                    <div className="h-7 w-20 bg-muted/50 rounded" />
+                    <div className="h-7 w-20 bg-muted/50 rounded" />
+                    <div className="h-7 w-24 bg-muted/50 rounded" />
+                    <div className="h-7 w-16 bg-muted/50 rounded" />
+                    <div className="h-7 w-20 bg-muted/50 rounded" />
+                  </div>
+                </div>
               </div>
             ) : detail ? (
               <div className="space-y-4">

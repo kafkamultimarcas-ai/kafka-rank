@@ -1,6 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
 import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Phone, DollarSign, FileText, ShieldCheck, Tag, Download } from "lucide-react";
 import {
   AlertDialog,
@@ -315,14 +316,12 @@ export default function ConsignmentControl() {
   ];
 
   return (
+    <DashboardLayout>
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
         <div className="container py-3">
           <div className="flex items-center gap-3">
-            <button onClick={goBack} className="text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
             <Warehouse className="w-5 h-5 text-cyan-400" />
             <h1 className="font-heading font-bold text-lg text-foreground">CONSIGNAÇÃO</h1>
           </div>
@@ -805,5 +804,6 @@ export default function ConsignmentControl() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }
