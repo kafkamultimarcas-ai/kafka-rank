@@ -135,6 +135,14 @@ export function useContasState(initialContaId?: number | null) {
     onError: (error: any) => toast.error("Erro: " + error.message),
   });
 
+  const deleteGroup = trpc.finTransactions.deleteGroup.useMutation({
+    onSuccess: () => {
+      refetch();
+      toast.success("Parcelas futuras excluídas!");
+    },
+    onError: (error: any) => toast.error("Erro: " + error.message),
+  });
+
   const markPaid = trpc.finTransactions.markPaid.useMutation({
     onSuccess: () => {
       refetch();
@@ -428,6 +436,7 @@ export function useContasState(initialContaId?: number | null) {
     isSubmitting: createTransaction.isPending || updateTransaction.isPending,
     markPaid,
     deleteTransaction,
+    deleteGroup,
     approveTransaction,
   };
 }

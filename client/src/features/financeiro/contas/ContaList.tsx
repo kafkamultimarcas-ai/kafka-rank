@@ -11,6 +11,7 @@ interface ContaListProps {
   onToggleExpand: (id: number) => void;
   onEdit: (transaction: any) => void;
   onDelete: (transaction: any) => void;
+  onDeleteGroup?: (transaction: any) => void;
   onMarkPaid: (transaction: any) => void;
   onApprove: (transaction: any, approved: boolean) => void;
   getCategoryName: (categoryId: number) => string;
@@ -56,6 +57,7 @@ export function ContaList({
   onToggleExpand,
   onEdit,
   onDelete,
+  onDeleteGroup,
   onMarkPaid,
   onApprove,
   getCategoryName,
@@ -104,6 +106,7 @@ export function ContaList({
           onToggleExpand={() => onToggleExpand(transaction.id)}
           onEdit={() => onEdit(transaction)}
           onDelete={() => onDelete(transaction)}
+          onDeleteGroup={onDeleteGroup ? () => onDeleteGroup(transaction) : undefined}
           onMarkPaid={() => onMarkPaid(transaction)}
           onApprove={(approved) => onApprove(transaction, approved)}
           isMarkingPaid={isMarkingPaid}

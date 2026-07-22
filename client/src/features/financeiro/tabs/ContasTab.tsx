@@ -195,6 +195,11 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
               state.deleteTransaction.mutate({ id: transaction.id });
             }
           }}
+          onDeleteGroup={(transaction) => {
+            if (confirm(`Excluir todas as parcelas não pagas deste lançamento (${transaction.installmentTotal} parcelas)?`)) {
+              state.deleteGroup.mutate({ groupId: transaction.installmentGroupId });
+            }
+          }}
           onMarkPaid={(transaction) => state.markPaid.mutate({ id: transaction.id, paidDate: Date.now() })}
           onApprove={(transaction, approved) =>
             state.approveTransaction.mutate({

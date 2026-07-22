@@ -928,6 +928,7 @@ export const finTransactions = mysqlTable("fin_transactions", {
   paymentMethod: mysqlEnum("paymentMethod", ["pix", "cartao_credito", "boleto", "dinheiro"]),
   installmentNumber: int("installmentNumber"), // parcela atual
   installmentTotal: int("installmentTotal"), // total de parcelas
+  installmentGroupId: varchar("installmentGroupId", { length: 36 }), // UUID para agrupar parcelas do mesmo lançamento
   sellerId: int("sellerId"), // colaborador vinculado quando a conta é um Vale/adiantamento (null = conta normal)
   needsApproval: boolean("needsApproval").default(false), // conta que precisa de autorização de pagamento
   approvalStatus: mysqlEnum("approvalStatus", ["none", "pending_approval", "approved", "rejected"]).default("none"), // status da autorização

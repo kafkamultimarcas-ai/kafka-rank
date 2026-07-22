@@ -170,6 +170,7 @@ export async function createFinTransaction(data: {
   paymentMethod?: "pix" | "cartao_credito" | "boleto" | "dinheiro" | null;
   installmentNumber?: number;
   installmentTotal?: number;
+  installmentGroupId?: string;
   createdBy?: number;
   needsApproval?: boolean;
   approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
@@ -180,6 +181,69 @@ export async function createFinTransaction(data: {
   if (!db) throw new Error("Database not available");
   const result = await db.insert(finTransactions).values({...data, tenantId: getCurrentTenantId()});
   return Number(result[0].insertId);
+}
+
+// Create multiple installments for the same transaction group
+export async function createInstallments(baseData: {
+  type: "payable" | "receivable";
+  description: string;
+  amount: string;
+  dueDate: number;
+  status?: "pending" | "paid" | "overdue" | "cancelled";
+  categoryId?: number;
+  supplier?: string;
+  vehicle?: string;
+  barcode?: string;
+  notes?: string;
+  recurrence?: "none" | "monthly" | "weekly" | "yearly";
+  paymentMethod?: "pix" | "cartao_credito" | "boleto" | "dinheiro" | null;
+  installmentTotal: number;
+  createdBy?: number;
+  createdByName?: string;
+  sellerId?: number;
+  needsApproval?: boolean;
+  approvalStatus?: "none" | "pending_approval" | "approved" | "rejected";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const tenantId = getCurrentTenantId();
+  const groupId = crypto.randomUUID();
+  const { installmentTotal, dueDate, ...rest } = baseData;
+  const ids: number[] = [];
+
+  for (let i = 1; i <= installmentTotal; i++) {
+    // Calculate due date: add (i-1) months to the base dueDate
+    const baseDate = new Date(dueDate);
+    baseDate.setMonth(baseDate.getMonth() + (i - 1));
+    const installmentDueDate = baseDate.getTime();
+
+    const result = await db.insert(finTransactions).values({
+      ...rest,
+      dueDate: installmentDueDate,
+      installmentNumber: i,
+      installmentTotal,
+      installmentGroupId: groupId,
+      tenantId,
+    });
+    ids.push(Number(result[0].insertId));
+  }
+  return { groupId, ids };
+}
+
+// Delete unpaid installments from a group
+export async function deleteInstallmentGroup(groupId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const tenantId = getCurrentTenantId();
+  // Only delete installments that are NOT paid
+  const result = await db.delete(finTransactions).where(
+    and(
+      eq(finTransactions.tenantId, tenantId),
+      eq(finTransactions.installmentGroupId, groupId),
+      sql`${finTransactions.status} != 'paid'`
+    )
+  );
+  return result;
 }
 
 export async function updateFinTransaction(id: number, data: Partial<{

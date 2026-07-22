@@ -2720,3 +2720,10 @@
 - [x] Restrição drag-and-drop: vendedor só arrasta seus próprios cards (canDrag disabled)
 - [x] Admin/gerente pode arrastar qualquer card (sem restrição)
 - [x] Backend: ownership check no moveCrmStatus (TRPCError FORBIDDEN)
+
+## Parcelas (Boletos) no Módulo Financeiro
+- [x] Schema: adicionada coluna installmentGroupId (varchar(36), nullable) na tabela fin_transactions
+- [x] Backend: ao criar transação com recurrenceMonths > 1, gera UUID groupId e grava em todas parcelas
+- [x] Backend: mutation deleteGroup para excluir parcelas não pagas de um mesmo installmentGroupId
+- [x] Frontend: badge "Parcela X/N" (com ícone Layers) no item da lista quando installmentTotal > 1
+- [x] Frontend: botão "Excluir Parcelas Futuras" com confirmação no item parcelado (só aparece se tem groupId)

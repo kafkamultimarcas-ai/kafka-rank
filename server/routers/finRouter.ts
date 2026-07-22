@@ -8,6 +8,7 @@ import {
   getFinDashboard, parseDocumentWithLLM,
   getOverdueTransactions, getUpcomingDueTransactions, getFinancialAlerts,
   listFuelRecords, createFuelRecord, updateFuelRecord, deleteFuelRecord, getFuelDashboard,
+  deleteInstallmentGroup,
 } from "../finDb";
 import {
   createSellerAdvance, deleteAdvanceByFinTransaction, updateAdvanceByFinTransaction,
@@ -127,6 +128,8 @@ export const finTransactionsRouter = router({
     };
 
     const ids: number[] = [];
+    // Generate a group ID when creating multiple installments
+    const groupId = months > 1 ? crypto.randomUUID() : (input.installmentTotal && input.installmentTotal > 1 ? crypto.randomUUID() : undefined);
     for (let i = 0; i < months; i++) {
       const dueDate = months > 1 ? addMonths(i) : input.dueDate;
       const description = months > 1 ? `${input.description} (${i + 1}/${months})` : input.description;
@@ -138,6 +141,7 @@ export const finTransactionsRouter = router({
         paidDate: input.paidDate ?? undefined,
         installmentNumber: months > 1 ? i + 1 : input.installmentNumber,
         installmentTotal: months > 1 ? months : input.installmentTotal,
+        installmentGroupId: groupId,
         createdBy: ctx.user?.id,
         approvalStatus,
       });
@@ -223,6 +227,13 @@ export const finTransactionsRouter = router({
     return { success: true };
   }),
   
+  deleteGroup: publicProcedure.input(z.object({
+    groupId: z.string(),
+  })).mutation(async ({ input }) => {
+    await deleteInstallmentGroup(input.groupId);
+    return { success: true };
+  }),
+
   markPaid: publicProcedure.input(z.object({
     id: z.number(),
     paidDate: z.number().optional(),

@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Edit2,
   Eye,
+  Layers,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -24,6 +25,7 @@ interface ContaCardProps {
   onToggleExpand: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onDeleteGroup?: () => void;
   onMarkPaid: () => void;
   onApprove: (approved: boolean) => void;
   isMarkingPaid: boolean;
@@ -37,6 +39,7 @@ export function ContaCard({
   onToggleExpand,
   onEdit,
   onDelete,
+  onDeleteGroup,
   onMarkPaid,
   onApprove,
   isMarkingPaid,
@@ -80,6 +83,11 @@ export function ContaCard({
               <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(transaction.dueDate)}</span>
               {transaction.supplier && <span className="text-gray-400">{transaction.supplier}</span>}
               {(transaction as any).vehicle && <span className="flex items-center gap-1 text-sky-300"><Car className="h-3 w-3" /> {(transaction as any).vehicle}</span>}
+              {transaction.installmentTotal && transaction.installmentTotal > 1 && (
+                <span className="flex items-center gap-0.5 rounded bg-blue-500/20 px-1.5 py-0.5 font-bold text-blue-300">
+                  <Layers className="h-3 w-3" /> Parcela {transaction.installmentNumber || 1}/{transaction.installmentTotal}
+                </span>
+              )}
               {isOverdue && <span className="font-bold text-red-400">VENCIDA</span>}
               {isPaid && (
                 <span className="flex items-center gap-0.5 font-bold text-emerald-400">
@@ -161,6 +169,18 @@ export function ContaCard({
             >
               <Trash2 className="h-3.5 w-3.5" /> Excluir
             </button>
+
+            {transaction.installmentGroupId && transaction.installmentTotal > 1 && onDeleteGroup && (
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteGroup();
+                }}
+                className="flex items-center gap-1 rounded-lg bg-orange-500/20 px-3 py-2 text-xs font-bold text-orange-400 hover:bg-orange-500/30"
+              >
+                <Layers className="h-3.5 w-3.5" /> Excluir Parcelas Futuras
+              </button>
+            )}
 
             {needsAuth && (
               <>

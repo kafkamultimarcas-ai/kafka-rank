@@ -1,0 +1,1 @@
+ALTER TABLE `fin_transactions` ADD `installmentGroupId` varchar(36);
