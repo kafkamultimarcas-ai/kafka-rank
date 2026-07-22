@@ -233,6 +233,7 @@ export const consignmentRecords = mysqlTable("consignment_records", {
   soldVia: varchar("soldVia", { length: 20 }), // null=not sold, 'sale'=sold via sale registration
   saleId: int("saleId"), // FK to sales table if sold
   soldAt: bigint("soldAt", { mode: "number" }), // timestamp when marked as sold
+  crmStatus: varchar("crmStatus", { length: 30 }).default("cadastro"), // CRM Kanban: cadastro, em_estoque, em_negociacao, vendido, devolvido
   points: int("points").default(1).notNull(),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

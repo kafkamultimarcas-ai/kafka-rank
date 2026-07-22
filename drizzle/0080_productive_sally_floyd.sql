@@ -1,0 +1,1 @@
+ALTER TABLE `consignment_records` ADD `crmStatus` varchar(30) DEFAULT 'cadastro';

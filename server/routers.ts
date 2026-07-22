@@ -1966,7 +1966,38 @@ export const appRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso restrito a administradores, gerentes e setor de consignação' });
       }
       const result = await db.updateConsignmentExitDate(input.id, input.exitDate, input.exitReason);
+      // Atualizar crmStatus baseado no motivo
+      const crmStatusMap: Record<string, string> = { 'Vendido': 'vendido', 'Devolvido ao proprietário': 'devolvido', 'Transferido': 'devolvido' };
+      const newCrmStatus = crmStatusMap[input.exitReason] || 'devolvido';
+      await db.updateConsignmentCrmStatus(input.id, newCrmStatus);
       return { success: true, isValid: result.isValid };
+    }),
+    // CRM Consignados - Listar para Kanban (vendedor vê os seus, admin vê todos)
+    listForCrm: protectedProcedure.input(z.object({
+      sellerId: z.number().optional(),
+    }).optional()).query(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'admin';
+      const isCrmAdmin = ctx.user.actorType === 'crm_admin';
+      const isGerente = ctx.user.sellerRole === 'gerente';
+      // Admin/gerente pode ver de todos ou filtrar por vendedor
+      if (isAdmin || isCrmAdmin || isGerente) {
+        return db.listConsignmentForCrm(input?.sellerId);
+      }
+      // Vendedor só vê os seus
+      if (ctx.user.actorType !== 'seller') return [];
+      return db.listConsignmentForCrm(ctx.user.id);
+    }),
+    // CRM Consignados - Mover status no Kanban
+    moveCrmStatus: protectedProcedure.input(z.object({
+      id: z.number(),
+      crmStatus: z.enum(['cadastro', 'em_estoque', 'em_negociacao', 'vendido', 'devolvido']),
+    })).mutation(async ({ ctx, input }) => {
+      await db.updateConsignmentCrmStatus(input.id, input.crmStatus);
+      return { success: true };
+    }),
+    // CRM Consignados - Detalhe completo de um registro
+    getDetail: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
+      return db.getConsignmentDetail(input.id);
     }),
   }),
 

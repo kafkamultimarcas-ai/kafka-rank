@@ -1516,6 +1516,95 @@ export async function updateConsignmentExitDate(id: number, exitDate: number, ex
   return { ...record, exitDate, isValid };
 }
 
+// ===== CRM Consignados - Helpers =====
+export async function updateConsignmentCrmStatus(id: number, crmStatus: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(consignmentRecords).set({ crmStatus }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
+  return { success: true };
+}
+
+export async function listConsignmentForCrm(sellerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(consignmentRecords.tenantId, getCurrentTenantId())];
+  if (sellerId) conditions.push(eq(consignmentRecords.sellerId, sellerId));
+  const records = await db.select({
+    id: consignmentRecords.id,
+    sellerId: consignmentRecords.sellerId,
+    vehiclePlate: consignmentRecords.vehiclePlate,
+    vehicleModel: consignmentRecords.vehicleModel,
+    ownerName: consignmentRecords.ownerName,
+    ownerPhone: consignmentRecords.ownerPhone,
+    consignorId: consignmentRecords.consignorId,
+    entryDate: consignmentRecords.entryDate,
+    exitDate: consignmentRecords.exitDate,
+    exitReason: consignmentRecords.exitReason,
+    validAfterDays: consignmentRecords.validAfterDays,
+    isValid: consignmentRecords.isValid,
+    hasAuction: consignmentRecords.hasAuction,
+    vehicleStatus: consignmentRecords.vehicleStatus,
+    payoffValue: consignmentRecords.payoffValue,
+    costValue: consignmentRecords.costValue,
+    notes: consignmentRecords.notes,
+    crmStatus: consignmentRecords.crmStatus,
+    status: consignmentRecords.status,
+    soldVia: consignmentRecords.soldVia,
+    saleId: consignmentRecords.saleId,
+    soldAt: consignmentRecords.soldAt,
+    createdAt: consignmentRecords.createdAt,
+    consignorName: consignors.name,
+    consignorCpf: consignors.cpf,
+    consignorPhone: consignors.phone,
+  }).from(consignmentRecords)
+    .leftJoin(consignors, eq(consignmentRecords.consignorId, consignors.id))
+    .where(and(...conditions))
+    .orderBy(desc(consignmentRecords.createdAt));
+  return records;
+}
+
+export async function getConsignmentDetail(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select({
+    id: consignmentRecords.id,
+    sellerId: consignmentRecords.sellerId,
+    competitionId: consignmentRecords.competitionId,
+    vehiclePlate: consignmentRecords.vehiclePlate,
+    vehicleModel: consignmentRecords.vehicleModel,
+    ownerName: consignmentRecords.ownerName,
+    ownerPhone: consignmentRecords.ownerPhone,
+    consignorId: consignmentRecords.consignorId,
+    entryDate: consignmentRecords.entryDate,
+    exitDate: consignmentRecords.exitDate,
+    exitReason: consignmentRecords.exitReason,
+    validAfterDays: consignmentRecords.validAfterDays,
+    isValid: consignmentRecords.isValid,
+    hasAuction: consignmentRecords.hasAuction,
+    vehicleStatus: consignmentRecords.vehicleStatus,
+    payoffValue: consignmentRecords.payoffValue,
+    costValue: consignmentRecords.costValue,
+    notes: consignmentRecords.notes,
+    rejectionReason: consignmentRecords.rejectionReason,
+    crmStatus: consignmentRecords.crmStatus,
+    status: consignmentRecords.status,
+    soldVia: consignmentRecords.soldVia,
+    saleId: consignmentRecords.saleId,
+    soldAt: consignmentRecords.soldAt,
+    points: consignmentRecords.points,
+    createdAt: consignmentRecords.createdAt,
+    consignorName: consignors.name,
+    consignorCpf: consignors.cpf,
+    consignorPhone: consignors.phone,
+    consignorEmail: consignors.email,
+    consignorAddress: consignors.address,
+  }).from(consignmentRecords)
+    .leftJoin(consignors, eq(consignmentRecords.consignorId, consignors.id))
+    .where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)))
+    .limit(1);
+  return result[0] || null;
+}
+
 // Cross-reference: when a sale is approved, check if the plate matches a consignment vehicle
 export async function crossReferenceConsignmentWithSale(saleId: number, plate: string) {
   const db = await getDb();

@@ -2677,3 +2677,13 @@
 
 - [x] Adicionar filtro por status do veículo (Quitado, Financiado, Leilão, Sem Leilão) na busca
 - [x] Adicionar botão "Limpar Filtros" para resetar todos os filtros aplicados
+
+## CRM Consignados (Kanban)
+
+- [x] Adicionar campo crmStatus na tabela consignment_records (cadastro, em_estoque, em_negociacao, vendido, devolvido)
+- [x] Backend: procedures para listar consignados por vendedor com crmStatus, mover status, detalhar
+- [x] Frontend: Página CRM Consignados com Kanban (vendedor vê apenas os seus) - click-to-move entre colunas
+- [x] Modal de detalhes ao clicar no card (todos dados do consignado + consignador)
+- [x] Página Admin CRM Consignados (vê todos, filtro por vendedor, grid responsivo)
+- [x] Menu no sidebar admin abaixo de Consignação (KanbanSquare icon)
+- [x] Ação rápida na MinhaArea para consignacao dept (botão CRM Consignados)

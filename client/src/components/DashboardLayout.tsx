@@ -27,7 +27,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
 import { useBranding } from "@/contexts/TenantContext";
 import { trpc } from "@/lib/trpc";
-import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown, Building2 } from "lucide-react";
+import { LayoutDashboard, Users, Trophy, ShoppingCart, GraduationCap, ClipboardList, LogOut, PanelLeft, Flag, Home, Settings, CheckCircle, Target, Monitor, Gift, CalendarClock, Lock, LayoutGrid, Warehouse, Banknote, Wrench, DollarSign, Bot, FileText, Car, CalendarDays, Cake, CreditCard, Tv, ChevronDown, Building2, KanbanSquare } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -77,6 +77,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { icon: Car, label: "Estoque", path: "/admin/estoque" },
       { icon: Car, label: "Custo por Veículo", path: "/admin/custo-veiculo" },
       { icon: Warehouse, label: "Consignação", path: "/controle-patio" },
+      { icon: KanbanSquare, label: "CRM - Consignados", path: "/admin/crm-consignados" },
       { icon: Users, label: "Consignadores", path: "/admin/consignadores" },
     ],
   },

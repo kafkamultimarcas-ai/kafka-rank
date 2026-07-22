@@ -76,6 +76,8 @@ const CrmCommandCenter = lazy(() => import("./pages/crm/CrmCommandCenter"));
 const CrmLeadDetail = lazy(() => import("./pages/crm/CrmLeadDetail"));
 const CrmPipeline = lazy(() => import("./pages/crm/CrmPipeline"));
 const CrmAdminDashboard = lazy(() => import("./pages/crm/CrmAdminDashboard"));
+const CrmConsignados = lazy(() => import("./pages/crm/CrmConsignados"));
+const AdminCrmConsignados = lazy(() => import("./pages/admin/AdminCrmConsignados"));
 const IntegrationDocs = lazy(() => import("./pages/crm/IntegrationDocs"));
 const ComercialHome = lazy(() => import("./pages/public/ComercialHome"));
 const ComercialCadastro = lazy(() => import("./pages/public/ComercialCadastro"));
@@ -157,6 +159,8 @@ function Router() {
         <Route path="/t/:slug/admin/fornecedores" component={Fornecedores} />
         <Route path="/admin/consignadores" component={AdminConsignadores} />
         <Route path="/t/:slug/admin/consignadores" component={AdminConsignadores} />
+        <Route path="/admin/crm-consignados" component={AdminCrmConsignados} />
+        <Route path="/t/:slug/admin/crm-consignados" component={AdminCrmConsignados} />
         <Route path="/admin/meta-integration" component={AdminMetaIntegration} />
         <Route path="/t/:slug/admin/meta-integration" component={AdminMetaIntegration} />
         <Route path="/admin/iam" component={AdminIAM} />
@@ -202,6 +206,8 @@ function Router() {
         <Route path="/t/:slug/pos-venda" component={PosVenda} />
         <Route path="/controle-patio" component={ConsignmentControl} />
         <Route path="/t/:slug/controle-patio" component={ConsignmentControl} />
+        <Route path="/crm-consignados" component={CrmConsignados} />
+        <Route path="/t/:slug/crm-consignados" component={CrmConsignados} />
         <Route path="/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/t/:slug/ia-vendedor/:sellerId" component={IAVendedor} />
         <Route path="/simulador-financiamento/:sellerId" component={SimuladorFinanciamento} />

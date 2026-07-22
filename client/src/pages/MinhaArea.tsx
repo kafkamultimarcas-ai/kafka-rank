@@ -27,7 +27,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useRef } from "react";
-import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode } from "lucide-react";
+import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode, KanbanSquare } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -1523,6 +1523,22 @@ export default function MinhaArea() {
               <p className="text-gray-400 text-sm">Gerenciar leads, pipeline e contatos</p>
             </div>
           </button>
+
+          {/* CRM Consignados - apenas consignação */}
+          {dept === "consignacao" && (
+            <button
+              onClick={() => navigate(buildTenantPath(tenantSlug, "/crm-consignados"))}
+              className="w-full bg-gradient-to-r from-violet-600/20 to-purple-500/10 border border-violet-500/30 rounded-xl p-4 flex items-center gap-4 hover:border-violet-500/60 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-violet-500/20 flex items-center justify-center">
+                <KanbanSquare className="w-6 h-6 text-violet-400" />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-white font-bold">CRM Consignados</p>
+                <p className="text-gray-400 text-sm">Kanban de veículos consignados</p>
+              </div>
+            </button>
+          )}
 
           {/* Simulador de Financiamento */}
           {(dept === "vendas" || dept === "fei") && (
