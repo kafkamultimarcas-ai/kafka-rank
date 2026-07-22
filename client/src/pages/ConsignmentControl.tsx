@@ -1,7 +1,17 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
-import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Phone, DollarSign, FileText, ShieldCheck, Tag } from "lucide-react";
+import { Warehouse, Car, Clock, CheckCircle2, LogOut, AlertTriangle, ArrowLeft, Calendar, Search, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Phone, DollarSign, FileText, ShieldCheck, Tag, Download } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import MonthFilter, { filterByMonth } from "@/components/MonthFilter";
 import { Button } from "@/components/ui/button";
 import { usePagination } from "@/hooks/usePagination";
@@ -161,9 +171,49 @@ export default function ConsignmentControl() {
     setExitDialogOpen(true);
   };
 
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false);
+
   const handleConfirmExit = () => {
     if (!exitRecordId || !exitDate || !exitReason) return;
+    setConfirmExitOpen(true);
+  };
+
+  const handleFinalConfirmExit = () => {
+    if (!exitRecordId || !exitDate || !exitReason) return;
     updateExit.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime(), exitReason });
+    setConfirmExitOpen(false);
+  };
+
+  // Exportar CSV
+  const exportCSV = () => {
+    const allVehicles = [
+      ...(yardVehicles || []).map((v: any) => ({ ...v, _status: "No Pátio" })),
+      ...(exitedVehicles || []).map((v: any) => ({ ...v, _status: v.exitReason ? `Saída: ${v.exitReason}` : "Com Saída" })),
+    ];
+    if (!allVehicles.length) { toast.error("Nenhum veículo para exportar"); return; }
+    const headers = ["Placa", "Modelo", "Proprietário", "Telefone", "Data Entrada", "Data Saída", "Status", "Motivo Saída", "Custo", "Dias no Pátio", "Vendedor"];
+    const rows = allVehicles.map((v: any) => [
+      v.vehiclePlate || "",
+      v.vehicleModel || "",
+      v.ownerName || "",
+      v.ownerPhone || "",
+      v.entryDate ? new Date(v.entryDate).toLocaleDateString("pt-BR") : "",
+      v.exitDate ? new Date(v.exitDate).toLocaleDateString("pt-BR") : "",
+      v._status,
+      v.exitReason || "",
+      v.costValue ? `R$ ${v.costValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "",
+      getDaysInYard(v.entryDate, v.exitDate).toString(),
+      getSellerName(v.sellerId),
+    ]);
+    const csvContent = [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `consignacao_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("CSV exportado com sucesso!");
   };
 
   const toggleExpand = (id: number) => {
@@ -306,15 +356,21 @@ export default function ConsignmentControl() {
           onChange={(m, y) => { setFilterMonth(m); setFilterYear(y); }}
         />
 
-        {/* Busca */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por placa, modelo, proprietário..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        {/* Busca + Exportar */}
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por placa, modelo, proprietário..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={exportCSV} className="flex items-center gap-1.5 whitespace-nowrap">
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </Button>
         </div>
 
         {activeIsLoading && <ListSkeleton rows={6} />}
@@ -628,6 +684,24 @@ export default function ConsignmentControl() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Alerta de Confirmação Final */}
+      <AlertDialog open={confirmExitOpen} onOpenChange={setConfirmExitOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar saída do veículo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação registrará a saída definitiva do veículo do pátio. Motivo: <strong>{exitReason === "vendido" ? "Vendido" : exitReason === "devolvido" ? "Devolvido ao proprietário" : exitReason === "transferido" ? "Transferido" : "Outro"}</strong>. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFinalConfirmExit} className="bg-red-600 hover:bg-red-700 text-white">
+              Sim, confirmar saída
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog de Editar Consignação (Admin) */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

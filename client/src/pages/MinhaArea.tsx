@@ -29,6 +29,16 @@ import {
 import { useMemo, useState, useCallback, useRef } from "react";
 import { Award, Target, Wrench, ChevronRight, MapPin, Search, Eye, Clipboard, Building2, Upload, FileCheck, FileWarning, Image, MessageCircle, PhoneCall, Edit3, Camera, Package, Plus, Trash2, Check, X as XIcon, Receipt, Flame, Handshake, CreditCard, Fuel, Mic, AlertCircle, Banknote, Copy, QrCode } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
@@ -358,6 +368,7 @@ export default function MinhaArea() {
   const [exitRecordId, setExitRecordId] = useState<number | null>(null);
   const [exitDate, setExitDate] = useState("");
   const [exitReason, setExitReason] = useState("");
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [consignFilter, setConsignFilter] = useState<'todos' | 'patio' | 'saida'>('patio');
 
   // Stats por setor
@@ -2438,7 +2449,7 @@ export default function MinhaArea() {
             <Button
               onClick={() => {
                 if (!exitRecordId || !exitDate || !exitReason) return;
-                updateExitMut.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime(), exitReason });
+                setConfirmExitOpen(true);
               }}
               disabled={!exitDate || !exitReason || updateExitMut.isPending}
               className="bg-amber-600 hover:bg-amber-700 text-white"
@@ -2448,6 +2459,31 @@ export default function MinhaArea() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Alerta de Confirmação Final - Saída */}
+      <AlertDialog open={confirmExitOpen} onOpenChange={setConfirmExitOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar saída do veículo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação registrará a saída definitiva do veículo do pátio. Motivo: <strong>{exitReason === "vendido" ? "Vendido" : exitReason === "devolvido" ? "Devolvido ao proprietário" : exitReason === "transferido" ? "Transferido" : "Outro"}</strong>. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!exitRecordId || !exitDate || !exitReason) return;
+                updateExitMut.mutate({ id: exitRecordId, exitDate: new Date(exitDate).getTime(), exitReason });
+                setConfirmExitOpen(false);
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Sim, confirmar saída
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

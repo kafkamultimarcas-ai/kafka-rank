@@ -2654,3 +2654,8 @@
 ## Bug Fix - Validação Valor Contas
 
 - [x] Corrigir isPositiveNumberString em features/financeiro/utils/form.ts para lidar com pontos de milhar (ex: "1.308,47" falhava na validação)
+
+## Exportar CSV + Confirmação Saída
+
+- [x] Botão exportar CSV no relatório de veículos em consignação (com status)
+- [x] Alerta de confirmação antes de concluir saída de veículo (evitar alterações acidentais)
