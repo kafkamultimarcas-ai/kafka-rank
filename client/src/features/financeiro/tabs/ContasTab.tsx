@@ -1,12 +1,14 @@
-import { Plus, Receipt, X } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle, Clock, Layers, Plus, Receipt, X, XCircle } from "lucide-react";
 import { AudioLauncher } from "@/features/financeiro/components/AudioLauncher";
+import { trpc } from "@/lib/trpc";
+import { formatCurrency, formatDate } from "@/features/financeiro/utils/formatters";
 import { MonthNavigator } from "@/features/financeiro/components/MonthNavigator";
 import { ContaForm } from "@/features/financeiro/contas/ContaForm";
 import { ContaList } from "@/features/financeiro/contas/ContaList";
 import { ContasFilters } from "@/features/financeiro/contas/ContasFilters";
 import { ContasSummaryDesktop } from "@/features/financeiro/contas/ContasSummaryDesktop";
 import { useContasState } from "@/features/financeiro/contas/useContasState";
-import { formatCurrency } from "@/features/financeiro/utils/formatters";
 
 interface ContasTabProps {
   initialContaId?: number | null;
@@ -14,6 +16,11 @@ interface ContasTabProps {
 
 export function ContasTab({ initialContaId }: ContasTabProps = {}) {
   const state = useContasState(initialContaId);
+  const [installmentGroupId, setInstallmentGroupId] = useState<string | null>(null);
+  const { data: installmentItems } = trpc.finTransactions.listGroup.useQuery(
+    { groupId: installmentGroupId! },
+    { enabled: !!installmentGroupId }
+  );
 
   const formProps = {
     categories: state.categories,
@@ -200,6 +207,11 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
               state.deleteGroup.mutate({ groupId: transaction.installmentGroupId });
             }
           }}
+          onViewInstallments={(transaction) => {
+            if (transaction.installmentGroupId) {
+              setInstallmentGroupId(transaction.installmentGroupId);
+            }
+          }}
           onMarkPaid={(transaction) => state.markPaid.mutate({ id: transaction.id, paidDate: Date.now() })}
           onApprove={(transaction, approved) =>
             state.approveTransaction.mutate({
@@ -219,6 +231,109 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
           onPageSizeChange={state.setPageSize}
         />
       </div>
+
+      {/* Modal de Parcelas */}
+      {installmentGroupId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setInstallmentGroupId(null)}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 text-blue-400" />
+                <h3 className="text-lg font-bold text-white">Parcelas do Lançamento</h3>
+              </div>
+              <button onClick={() => setInstallmentGroupId(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[55vh] overflow-y-auto p-5">
+              {!installmentItems ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-800" />
+                  ))}
+                </div>
+              ) : installmentItems.length === 0 ? (
+                <p className="text-center text-sm text-gray-500">Nenhuma parcela encontrada.</p>
+              ) : (
+                <div className="space-y-2">
+                  {installmentItems.map((item: any, idx: number) => {
+                    const isPaid = item.status === "paid";
+                    const isOverdue = !isPaid && item.dueDate < Date.now();
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
+                          isPaid ? "border-emerald-500/20 bg-emerald-500/10" :
+                          isOverdue ? "border-red-500/20 bg-red-500/10" :
+                          "border-gray-800 bg-gray-800/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                            isPaid ? "bg-emerald-500/20 text-emerald-400" :
+                            isOverdue ? "bg-red-500/20 text-red-400" :
+                            "bg-gray-700 text-gray-300"
+                          }`}>
+                            {idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              Parcela {item.installmentNumber || idx + 1}/{item.installmentTotal || installmentItems.length}
+                            </p>
+                            <p className="text-xs text-gray-400">{formatDate(item.dueDate)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className={`text-sm font-bold ${
+                            isPaid ? "text-emerald-400" : isOverdue ? "text-red-400" : "text-white"
+                          }`}>
+                            {formatCurrency(item.amount)}
+                          </p>
+                          {isPaid ? (
+                            <CheckCircle className="h-4 w-4 text-emerald-400" />
+                          ) : isOverdue ? (
+                            <XCircle className="h-4 w-4 text-red-400" />
+                          ) : (
+                            <Clock className="h-4 w-4 text-yellow-400" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {installmentItems && installmentItems.length > 0 && (
+              <div className="border-t border-gray-800 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">Total ({installmentItems.length} parcelas)</p>
+                    <p className="text-lg font-bold text-white">
+                      {formatCurrency(installmentItems.reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0))}
+                    </p>
+                  </div>
+                  <div className="flex gap-4 text-xs">
+                    <span className="flex items-center gap-1 text-emerald-400">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      {installmentItems.filter((i: any) => i.status === "paid").length} pagas
+                    </span>
+                    <span className="flex items-center gap-1 text-yellow-400">
+                      <Clock className="h-3.5 w-3.5" />
+                      {installmentItems.filter((i: any) => i.status === "pending").length} pendentes
+                    </span>
+                    <span className="flex items-center gap-1 text-red-400">
+                      <XCircle className="h-3.5 w-3.5" />
+                      {installmentItems.filter((i: any) => i.status !== "paid" && i.dueDate < Date.now()).length} vencidas
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

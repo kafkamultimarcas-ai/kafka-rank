@@ -230,6 +230,20 @@ export async function createInstallments(baseData: {
   return { groupId, ids };
 }
 
+// List all installments in a group
+export async function listInstallmentGroup(groupId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const tenantId = getCurrentTenantId();
+  const items = await db.select().from(finTransactions).where(
+    and(
+      eq(finTransactions.tenantId, tenantId),
+      eq(finTransactions.installmentGroupId, groupId)
+    )
+  ).orderBy(asc(finTransactions.dueDate));
+  return items;
+}
+
 // Delete unpaid installments from a group
 export async function deleteInstallmentGroup(groupId: string) {
   const db = await getDb();

@@ -12,6 +12,7 @@ interface ContaListProps {
   onEdit: (transaction: any) => void;
   onDelete: (transaction: any) => void;
   onDeleteGroup?: (transaction: any) => void;
+  onViewInstallments?: (transaction: any) => void;
   onMarkPaid: (transaction: any) => void;
   onApprove: (transaction: any, approved: boolean) => void;
   getCategoryName: (categoryId: number) => string;
@@ -58,6 +59,7 @@ export function ContaList({
   onEdit,
   onDelete,
   onDeleteGroup,
+  onViewInstallments,
   onMarkPaid,
   onApprove,
   getCategoryName,
@@ -107,6 +109,7 @@ export function ContaList({
           onEdit={() => onEdit(transaction)}
           onDelete={() => onDelete(transaction)}
           onDeleteGroup={onDeleteGroup ? () => onDeleteGroup(transaction) : undefined}
+          onViewInstallments={onViewInstallments ? () => onViewInstallments(transaction) : undefined}
           onMarkPaid={() => onMarkPaid(transaction)}
           onApprove={(approved) => onApprove(transaction, approved)}
           isMarkingPaid={isMarkingPaid}

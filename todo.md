@@ -2727,3 +2727,9 @@
 - [x] Backend: mutation deleteGroup para excluir parcelas não pagas de um mesmo installmentGroupId
 - [x] Frontend: badge "Parcela X/N" (com ícone Layers) no item da lista quando installmentTotal > 1
 - [x] Frontend: botão "Excluir Parcelas Futuras" com confirmação no item parcelado (só aparece se tem groupId)
+
+## Modal de Parcelas na tela de Contas
+- [x] Botão "Parcelas" no card de conta parcelada (entre Editar e Excluir)
+- [x] Modal com listagem de todas parcelas do grupo (status, valor, data vencimento, ícone colorido)
+- [x] Totalizador somando todas as parcelas + contadores (pagas/pendentes/vencidas)
+- [x] Backend: procedure listGroup para buscar parcelas por installmentGroupId

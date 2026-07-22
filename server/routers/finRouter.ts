@@ -9,6 +9,7 @@ import {
   getOverdueTransactions, getUpcomingDueTransactions, getFinancialAlerts,
   listFuelRecords, createFuelRecord, updateFuelRecord, deleteFuelRecord, getFuelDashboard,
   deleteInstallmentGroup,
+  listInstallmentGroup,
 } from "../finDb";
 import {
   createSellerAdvance, deleteAdvanceByFinTransaction, updateAdvanceByFinTransaction,
@@ -232,6 +233,13 @@ export const finTransactionsRouter = router({
   })).mutation(async ({ input }) => {
     await deleteInstallmentGroup(input.groupId);
     return { success: true };
+  }),
+
+  listGroup: publicProcedure.input(z.object({
+    groupId: z.string(),
+  })).query(async ({ input }) => {
+    const items = await listInstallmentGroup(input.groupId);
+    return items;
   }),
 
   markPaid: publicProcedure.input(z.object({

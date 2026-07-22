@@ -26,6 +26,7 @@ interface ContaCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onDeleteGroup?: () => void;
+  onViewInstallments?: () => void;
   onMarkPaid: () => void;
   onApprove: (approved: boolean) => void;
   isMarkingPaid: boolean;
@@ -40,6 +41,7 @@ export function ContaCard({
   onEdit,
   onDelete,
   onDeleteGroup,
+  onViewInstallments,
   onMarkPaid,
   onApprove,
   isMarkingPaid,
@@ -159,6 +161,18 @@ export function ContaCard({
             >
               <Edit2 className="h-3.5 w-3.5" /> Editar
             </button>
+
+            {transaction.installmentGroupId && transaction.installmentTotal > 1 && onViewInstallments && (
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onViewInstallments();
+                }}
+                className="flex items-center gap-1 rounded-lg bg-blue-500/20 px-3 py-2 text-xs font-bold text-blue-300 hover:bg-blue-500/30"
+              >
+                <Layers className="h-3.5 w-3.5" /> Parcelas
+              </button>
+            )}
 
             <button
               onClick={(event) => {
