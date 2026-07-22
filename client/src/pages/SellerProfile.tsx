@@ -1,11 +1,13 @@
 import { trpc } from "@/lib/trpc";
 import { useParams, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { ArrowLeft, TrendingUp, ShoppingCart, Target, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function SellerProfile() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const sellerId = parseInt(params.id || "0");
 
   const { data: seller } = trpc.sellers.getById.useQuery({ id: sellerId });
@@ -24,7 +26,7 @@ export default function SellerProfile() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center gap-4 h-16">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+          <Button variant="ghost" size="icon" onClick={goBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="font-heading font-bold text-sm sm:text-base text-foreground truncate">Perfil do Piloto</h1>

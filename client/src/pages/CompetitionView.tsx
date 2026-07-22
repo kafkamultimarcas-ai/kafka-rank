@@ -1,5 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useParams, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { ArrowLeft, Trophy, Medal, Swords, Crown, Zap, Shield, Star, ChevronRight, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -177,6 +178,7 @@ function Podium({ ranking }: { ranking: any[] }) {
 export default function CompetitionView() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const competitionId = parseInt(params.id || "0");
   const [activeTab, setActiveTab] = useState<"ranking" | "bracket" | "teams">("ranking");
 
@@ -220,7 +222,7 @@ export default function CompetitionView() {
       <header className="relative overflow-hidden border-b border-border">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10" />
         <div className="relative container flex items-center gap-4 h-16">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="shrink-0">
+          <Button variant="ghost" size="icon" onClick={goBack} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0 flex-1">

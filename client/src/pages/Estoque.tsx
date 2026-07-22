@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { ArrowLeft, Search, Car, ExternalLink, ChevronDown, ChevronUp, X, Fuel, Gauge, Palette, Calendar, Tag, Copy, Check, Send, Download, ZoomIn, ChevronLeft, ChevronRight, Heart, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useBranding } from "@/contexts/TenantContext";
@@ -62,6 +63,7 @@ function isIOS() {
 export default function Estoque() {
   const { logoUrl, name: brandName } = useBranding();
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("available");
   const [brandFilter, setBrandFilter] = useState("");
@@ -303,7 +305,7 @@ export default function Estoque() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => setLocation("/")} className="gap-1.5 -ml-2">
+            <Button variant="ghost" size="sm" onClick={goBack} className="gap-1.5 -ml-2">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded-lg object-contain" />

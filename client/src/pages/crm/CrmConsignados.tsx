@@ -1,16 +1,28 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useGoBack } from "@/hooks/useGoBack";
 import {
-  ArrowLeft, Car, Calendar, User, Phone, ChevronLeft, ChevronRight,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { useDroppable, useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  ArrowLeft, Car, Calendar, User, Phone, GripVertical,
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot
 } from "lucide-react";
-import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 
 // CRM Status columns configuration
 const CRM_COLUMNS = [
@@ -38,10 +50,175 @@ function daysInYard(entryDate: number, exitDate?: number | null): number {
   return Math.floor((end - entryDate) / (1000 * 60 * 60 * 24));
 }
 
+// ===== DRAGGABLE CARD =====
+function DraggableCard({ record, onClick }: { record: any; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: String(record.id),
+    data: { record },
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.4 : 1,
+    touchAction: "none" as const,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-xl border border-border bg-card p-3 hover:border-primary/30 transition-all cursor-grab active:cursor-grabbing"
+    >
+      <div className="flex items-start gap-2">
+        <div
+          {...listeners}
+          {...attributes}
+          className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h4 className="text-sm font-bold text-foreground truncate">
+                {record.vehiclePlate || "Sem placa"}
+              </h4>
+              {record.isValid && (
+                <Badge variant="default" className="text-[9px] px-1.5 py-0 bg-green-500/20 text-green-500 border-green-500/30 shrink-0">
+                  7d+
+                </Badge>
+              )}
+              {record.hasAuction && (
+                <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">
+                  Leilão
+                </Badge>
+              )}
+            </div>
+            <span className="text-[10px] text-muted-foreground shrink-0 ml-2 flex items-center gap-0.5">
+              <Clock className="w-3 h-3" />
+              {daysInYard(record.entryDate, record.exitDate)}d
+            </span>
+          </div>
+          <div className="space-y-1">
+            {record.vehicleModel && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                <Car className="w-3 h-3 shrink-0" /> {record.vehicleModel}
+              </p>
+            )}
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              {record.consignorName && (
+                <span className="flex items-center gap-0.5 truncate">
+                  <User className="w-3 h-3 shrink-0" /> {record.consignorName}
+                </span>
+              )}
+              {record.ownerPhone && (
+                <span className="flex items-center gap-0.5 shrink-0">
+                  <Phone className="w-3 h-3" /> {record.ownerPhone}
+                </span>
+              )}
+              {record.costValue && (
+                <span className="ml-auto font-medium text-foreground text-xs shrink-0">
+                  {formatCurrency(record.costValue)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== DROPPABLE COLUMN =====
+function DroppableColumn({
+  column,
+  records,
+  onCardClick,
+}: {
+  column: typeof CRM_COLUMNS[number];
+  records: any[];
+  onCardClick: (r: any) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: column.key });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex flex-col min-w-[260px] w-[260px] lg:w-[280px] xl:w-[300px] rounded-xl border transition-all ${
+        isOver
+          ? "border-primary/60 bg-primary/5 shadow-lg shadow-primary/10"
+          : "border-border bg-accent/20"
+      }`}
+    >
+      {/* Column header */}
+      <div className="p-3 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: column.color + "22" }}
+          >
+            <column.icon className="w-4 h-4" style={{ color: column.color }} />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground">{column.label}</h3>
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 h-5"
+                style={{ backgroundColor: column.color + "22", color: column.color }}
+              >
+                {records.length}
+              </Badge>
+            </div>
+            <p className="text-[10px] text-muted-foreground">{column.description}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Cards */}
+      <ScrollArea className="flex-1 max-h-[calc(100vh-220px)]">
+        <div className="p-2 space-y-2">
+          {records.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CircleDot className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-xs">Arraste veículos aqui</p>
+            </div>
+          ) : (
+            records.map((record) => (
+              <DraggableCard
+                key={record.id}
+                record={record}
+                onClick={() => onCardClick(record)}
+              />
+            ))
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+// ===== OVERLAY CARD (shown while dragging) =====
+function OverlayCard({ record }: { record: any }) {
+  return (
+    <div className="rounded-xl border-2 border-primary bg-card p-3 shadow-2xl shadow-primary/20 w-[260px]">
+      <div className="flex items-center gap-2">
+        <GripVertical className="w-4 h-4 text-primary" />
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-bold text-foreground truncate">{record.vehiclePlate || "Sem placa"}</h4>
+          {record.vehicleModel && (
+            <p className="text-xs text-muted-foreground truncate">{record.vehicleModel}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== MAIN PAGE =====
 export default function CrmConsignados() {
-  const [, navigate] = useLocation();
-  const tenantSlug = getCurrentTenantSlug();
-  const [activeColumnIdx, setActiveColumnIdx] = useState(0);
+  const goBack = useGoBack("/minha-area");
+  const [activeRecord, setActiveRecord] = useState<any | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -73,20 +250,31 @@ export default function CrmConsignados() {
     return map;
   }, [records]);
 
-  const currentColumn = CRM_COLUMNS[activeColumnIdx];
-  const currentRecords = recordsByStatus[currentColumn.key] || [];
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+  );
 
-  const handleMoveNext = (record: any) => {
-    const currentIdx = CRM_COLUMNS.findIndex(c => c.key === (record.crmStatus || "cadastro"));
-    if (currentIdx < CRM_COLUMNS.length - 1) {
-      moveCrmStatus.mutate({ id: record.id, crmStatus: CRM_COLUMNS[currentIdx + 1].key });
-    }
+  const handleDragStart = (event: DragStartEvent) => {
+    const record = (event.active.data.current as any)?.record;
+    setActiveRecord(record || null);
   };
 
-  const handleMovePrev = (record: any) => {
-    const currentIdx = CRM_COLUMNS.findIndex(c => c.key === (record.crmStatus || "cadastro"));
-    if (currentIdx > 0) {
-      moveCrmStatus.mutate({ id: record.id, crmStatus: CRM_COLUMNS[currentIdx - 1].key });
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveRecord(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const record = (active.data.current as any)?.record;
+    if (!record) return;
+
+    const newStatus = over.id as string;
+    const currentStatus = (record.crmStatus || "cadastro") as string;
+
+    // Only move if dropped on a different column
+    if (newStatus !== currentStatus && CRM_COLUMNS.some(c => c.key === newStatus)) {
+      moveCrmStatus.mutate({ id: record.id, crmStatus: newStatus as CrmStatus });
     }
   };
 
@@ -104,162 +292,51 @@ export default function CrmConsignados() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate(buildTenantPath(tenantSlug, "/minha-area"))} className="p-1.5 hover:bg-accent rounded-lg">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button onClick={goBack} className="p-1.5 hover:bg-accent rounded-lg">
               <ArrowLeft className="w-5 h-5 text-muted-foreground" />
             </button>
-            <h1 className="text-sm font-bold text-foreground">CRM Consignados</h1>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            {records?.length || 0} veículos
-          </Badge>
-        </div>
-
-        {/* Column tabs - horizontal scroll */}
-        <div className="flex items-center px-1 pb-2">
-          <button
-            onClick={() => setActiveColumnIdx(Math.max(0, activeColumnIdx - 1))}
-            disabled={activeColumnIdx === 0}
-            className="p-1 shrink-0 disabled:opacity-30"
-          >
-            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-          </button>
-          <div className="flex-1 overflow-x-auto no-scrollbar">
-            <div className="flex gap-1">
-              {CRM_COLUMNS.map((col, i) => {
-                const count = recordsByStatus[col.key]?.length || 0;
-                const Icon = col.icon;
-                return (
-                  <button
-                    key={col.key}
-                    onClick={() => setActiveColumnIdx(i)}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 ${
-                      activeColumnIdx === i
-                        ? "bg-primary/20 border-primary/40 text-primary"
-                        : "bg-accent/30 border-border text-muted-foreground"
-                    }`}
-                  >
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                      style={{ backgroundColor: col.color + "33", color: col.color }}
-                    >
-                      {count}
-                    </span>
-                    <Icon className="w-3 h-3" />
-                    {col.label}
-                  </button>
-                );
-              })}
+            <div>
+              <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <Package className="w-5 h-5 text-primary" />
+                CRM Consignados
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Arraste os veículos entre as etapas do processo
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => setActiveColumnIdx(Math.min(CRM_COLUMNS.length - 1, activeColumnIdx + 1))}
-            disabled={activeColumnIdx >= CRM_COLUMNS.length - 1}
-            className="p-1 shrink-0 disabled:opacity-30"
-          >
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </button>
+          <Badge variant="secondary">{records?.length || 0} veículos</Badge>
         </div>
       </div>
 
-      {/* Current column info */}
-      <div className="px-3 mt-3">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: currentColumn.color }} />
-          <span className="text-sm font-bold text-foreground">{currentColumn.label}</span>
-          <span className="text-xs text-muted-foreground">({currentRecords.length})</span>
-          <span className="text-xs text-muted-foreground ml-auto">{currentColumn.description}</span>
-        </div>
-      </div>
-
-      {/* Cards */}
-      <div className="px-3 space-y-2">
-        {currentRecords.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Car className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">Nenhum veículo nesta etapa</p>
+      {/* Kanban Board */}
+      <div className="p-4">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-3 overflow-x-auto pb-4 -mx-2 px-2">
+            {CRM_COLUMNS.map((col) => (
+              <DroppableColumn
+                key={col.key}
+                column={col}
+                records={recordsByStatus[col.key] || []}
+                onCardClick={openDetail}
+              />
+            ))}
           </div>
-        ) : (
-          currentRecords.map((record: any) => (
-            <div
-              key={record.id}
-              className="rounded-xl border border-border bg-card p-3 active:scale-[0.98] transition-all"
-            >
-              <div className="cursor-pointer" onClick={() => openDetail(record)}>
-                <div className="flex items-start justify-between mb-1.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-foreground truncate">
-                        {record.vehiclePlate || "Sem placa"}
-                      </h3>
-                      {record.isValid && (
-                        <Badge variant="default" className="text-[9px] px-1.5 py-0 bg-green-500/20 text-green-500 border-green-500/30">
-                          7d+
-                        </Badge>
-                      )}
-                      {record.hasAuction && (
-                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0">
-                          Leilão
-                        </Badge>
-                      )}
-                    </div>
-                    {record.vehicleModel && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <Car className="w-3 h-3" /> {record.vehicleModel}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0 ml-2">
-                    <p className="text-[10px] text-muted-foreground flex items-center gap-0.5 justify-end">
-                      <Clock className="w-3 h-3" />
-                      {daysInYard(record.entryDate, record.exitDate)} dias
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                  {record.consignorName && (
-                    <span className="flex items-center gap-0.5">
-                      <User className="w-3 h-3" /> {record.consignorName}
-                    </span>
-                  )}
-                  {record.ownerPhone && (
-                    <span className="flex items-center gap-0.5">
-                      <Phone className="w-3 h-3" /> {record.ownerPhone}
-                    </span>
-                  )}
-                  {record.costValue && (
-                    <span className="ml-auto font-medium text-foreground">
-                      {formatCurrency(record.costValue)}
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              {/* Move actions */}
-              <div className="flex gap-1.5 mt-2 pt-2 border-t border-border/50">
-                <button
-                  onClick={() => handleMovePrev(record)}
-                  disabled={CRM_COLUMNS.findIndex(c => c.key === (record.crmStatus || "cadastro")) <= 0}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-accent/50 border border-border active:scale-95 transition-all disabled:opacity-30 text-xs text-muted-foreground"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" /> Anterior
-                </button>
-                <div className="flex-1" />
-                <button
-                  onClick={() => handleMoveNext(record)}
-                  disabled={CRM_COLUMNS.findIndex(c => c.key === (record.crmStatus || "cadastro")) >= CRM_COLUMNS.length - 1}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-primary/15 border border-primary/25 active:scale-95 transition-all disabled:opacity-30 text-xs text-primary"
-                >
-                  Próximo <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
+          <DragOverlay>
+            {activeRecord ? <OverlayCard record={activeRecord} /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {/* Detail Dialog */}

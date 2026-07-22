@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { Flag, Car, CheckCircle2, ArrowLeft, Trophy, Loader2, Banknote, FileText, Warehouse, Headphones, Mic, MicOff, Sparkles, FileWarning, Upload, Phone, Search, X, User } from "lucide-react";
 import { ConsignorCombobox } from "@/components/ConsignorCombobox";
 import { buildTenantPath, getCurrentTenantSlug, getTenantLoginPath } from "@/lib/tenant";
+import { useGoBack } from "@/hooks/useGoBack";
 import { maskCpfCnpj, maskPhone } from "@/lib/masks";
 import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -125,6 +126,7 @@ function VehicleSelector({ value, onChange }: { value: string; onChange: (model:
 }
 
 export default function RegisterSale() {
+  const goBack = useGoBack("/admin");
   const tenantSlug = getCurrentTenantSlug();
   const initialCategory = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1166,12 +1168,12 @@ export default function RegisterSale() {
         </Card>
 
         <div className="text-center">
-          <Link href="/">
+          <button onClick={goBack}>
             <Button variant="ghost" className="text-gray-400 hover:text-white">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar ao ranking
             </Button>
-          </Link>
+          </button>
         </div>
       </div>
     </div>

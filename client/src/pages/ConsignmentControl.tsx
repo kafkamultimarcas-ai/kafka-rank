@@ -19,6 +19,7 @@ import { PaginationControls } from "@/components/PaginationControls";
 import { ListSkeleton } from "@/components/ListSkeleton";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import { useGoBack } from "@/hooks/useGoBack";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ type Tab = "patio" | "completed" | "history";
 export default function ConsignmentControl() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const [activeTab, setActiveTab] = useState<Tab>("patio");
   const [now] = useState(() => new Date());
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
@@ -318,7 +320,7 @@ export default function ConsignmentControl() {
       <div className="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
         <div className="container py-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => setLocation("/")} className="text-muted-foreground hover:text-foreground">
+            <button onClick={goBack} className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <Warehouse className="w-5 h-5 text-cyan-400" />

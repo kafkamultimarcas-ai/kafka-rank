@@ -2699,3 +2699,10 @@
 - [x] Rota /kanban-financiamento registrada no App.tsx
 - [x] Menu no sidebar admin no grupo Financeiro (ícone KanbanSquare)
 - [x] Auto-set timestamps (inicioAnalise, fimAnalise) ao mover entre status
+
+## CRM Consignados - Refazer como Kanban Drag-and-Drop
+- [x] Refazer página CRM Consignados (seller) com @dnd-kit drag-and-drop (mesmo padrão do Kanban Financiamento)
+- [x] Refazer página Admin CRM Consignados com @dnd-kit drag-and-drop + filtro por vendedor
+## Correção Botão Voltar - Perda de Sessão
+- [x] Criado hook useGoBack que usa window.history.back() com fallback seguro
+- [x] Corrigido em 10+ páginas: ConsignmentControl, CompetitionView, Estoque, MeusAgendamentos, RankingFeirao, SellerProfile, TrainingsList, AdminApprovals, MesaCredito, FichaFinanciamento, RegisterSale, NotFound

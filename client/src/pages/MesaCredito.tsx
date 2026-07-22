@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/PaginationControls";
 import { ListSkeleton } from "@/components/ListSkeleton";
@@ -86,6 +87,7 @@ function WaitTimer({ createdAt, inicioAnalise }: { createdAt: string; inicioAnal
 
 export default function MesaCredito() {
   const [search, setSearch] = useState("");
+  const goBack = useGoBack("/admin");
   const [filterStatus, setFilterStatus] = useState<string>("todos");
   const [selectedFichaId, setSelectedFichaId] = useState<number | null>(null);
   const [feiSellerId, setFeiSellerId] = useState<number | null>(null);
@@ -224,11 +226,11 @@ export default function MesaCredito() {
       <div className="w-full max-w-4xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Link href="/">
+          <button onClick={goBack}>
             <button className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700">
               <ArrowLeft className="w-5 h-5 text-gray-300" />
             </button>
-          </Link>
+          </button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-white font-racing tracking-wider flex items-center gap-2">
               <CreditCard className="w-6 h-6 text-blue-400" />

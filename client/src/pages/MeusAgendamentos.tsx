@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { toast } from "sonner";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
 import {
@@ -116,6 +117,7 @@ export default function MeusAgendamentos() {
   const params = useParams<{ sellerId: string }>();
   const sellerId = parseInt(params.sellerId || "0");
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const [showForm, setShowForm] = useState(false);
   const [rescheduleId, setRescheduleId] = useState<number | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
@@ -965,7 +967,7 @@ export default function MeusAgendamentos() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <img src={logoUrl} alt={brandName} className="h-7 w-7 rounded" />

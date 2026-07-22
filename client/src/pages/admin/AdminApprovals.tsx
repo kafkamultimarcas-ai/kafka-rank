@@ -8,6 +8,7 @@ import { Check, X, Car, Clock, AlertCircle, Loader2, Home, Banknote, FileText, W
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/PaginationControls";
 import {
@@ -24,6 +25,7 @@ type Tab = "vendas" | "fei" | "consignacao" | "despachante" | "sdr" | "compareci
 
 export default function AdminApprovals() {
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const [tab, setTab] = useState<Tab>("vendas");
 
   const { data: pendingSales, isLoading: loadingSales, refetch: refetchSales } = trpc.sales.listPending.useQuery();
@@ -586,7 +588,7 @@ export default function AdminApprovals() {
             <Check className="w-12 h-12 text-green-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">Tudo aprovado!</h3>
             <p className="text-muted-foreground mb-6">Não há registros pendentes de {tabs.find(t => t.value === tab)?.label} no momento.</p>
-            <Button onClick={() => setLocation("/")} variant="outline" className="gap-2">
+            <Button onClick={goBack} variant="outline" className="gap-2">
               <Home className="w-4 h-4" /> Voltar ao Dashboard Público
             </Button>
           </CardContent>

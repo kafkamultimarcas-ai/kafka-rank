@@ -1,13 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Home } from "lucide-react";
-import { useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 
 export default function NotFound() {
-  const [, setLocation] = useLocation();
-
-  const handleGoHome = () => {
-    setLocation("/");
-  };
+  const goBack = useGoBack("/admin");
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-background">
@@ -20,7 +16,7 @@ export default function NotFound() {
         <p className="text-muted-foreground mb-8">
           A página que você procura não existe ou foi removida.
         </p>
-        <Button onClick={handleGoHome} size="lg">
+        <Button onClick={goBack} size="lg">
           <Home className="w-4 h-4 mr-2" />
           Voltar ao Início
         </Button>

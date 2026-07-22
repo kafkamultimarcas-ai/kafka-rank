@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import {
   Flame, Trophy, ArrowLeft, Search, UserCheck, UserX, Clock,
   Phone, Calendar, Car, Hash, ChevronDown, ChevronUp, Crown,
@@ -25,6 +26,7 @@ const PODIUM_COLORS = [
 export default function RankingFeirao() {
   const { logoUrl } = useBranding();
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const [tab, setTab] = useState<TabKey>("ranking");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -204,7 +206,7 @@ export default function RankingFeirao() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={goBack} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <img src={logoUrl} alt="" className="h-7 w-7 rounded" />

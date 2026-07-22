@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { ArrowLeft, GraduationCap, BookOpen, Video } from "lucide-react";
+import { useGoBack } from "@/hooks/useGoBack";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -18,6 +19,7 @@ function isDirectVideo(url: string): boolean {
 
 export default function TrainingsList() {
   const [, setLocation] = useLocation();
+  const goBack = useGoBack("/admin");
   const { data: trainings } = trpc.trainings.list.useQuery({ activeOnly: true });
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -25,7 +27,7 @@ export default function TrainingsList() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center gap-4 h-16">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
+          <Button variant="ghost" size="icon" onClick={goBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Link, useLocation } from "wouter";
+import { useGoBack } from "@/hooks/useGoBack";
 import { maskCpfCnpj, maskPhone } from "@/lib/masks";
 import { isValidCpfCnpj, isValidBrazilianPhone, isValidEmail } from "@shared/validators";
 import {
@@ -20,6 +21,7 @@ const BANCOS = [
 ];
 
 export default function FichaFinanciamento() {
+  const goBack = useGoBack("/admin");
   const [, setLocation] = useLocation();
   const [step, setStep] = useState(1); // 1=vendedor, 2=veículo, 3=dados pessoais, 4=complementar, 5=bancos+enviar
   const [submitted, setSubmitted] = useState(false);
@@ -191,11 +193,11 @@ export default function FichaFinanciamento() {
             <Button onClick={() => { setSubmitted(false); setStep(1); setSellerId(null); setNomeCompleto(""); setCpf(""); }} className="bg-blue-600 hover:bg-blue-700">
               <CreditCard className="w-4 h-4 mr-2" /> ENVIAR OUTRA FICHA
             </Button>
-            <Link href="/">
+            <button onClick={goBack}>
               <Button variant="outline" className="w-full border-gray-700 text-gray-300 hover:bg-gray-800">
                 <ArrowLeft className="w-4 h-4 mr-2" /> VOLTAR
               </Button>
-            </Link>
+            </button>
           </div>
         </div>
       </div>
@@ -226,11 +228,11 @@ export default function FichaFinanciamento() {
       <div className="w-full max-w-lg mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Link href="/">
+          <button onClick={goBack}>
             <button className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 transition-colors">
               <ArrowLeft className="w-5 h-5 text-gray-300" />
             </button>
-          </Link>
+          </button>
           <div>
             <h1 className="text-xl font-bold text-white font-racing tracking-wider flex items-center gap-2">
               <CreditCard className="w-6 h-6 text-blue-400" />
