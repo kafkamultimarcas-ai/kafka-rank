@@ -2733,3 +2733,7 @@
 - [x] Modal com listagem de todas parcelas do grupo (status, valor, data vencimento, ícone colorido)
 - [x] Totalizador somando todas as parcelas + contadores (pagas/pendentes/vencidas)
 - [x] Backend: procedure listGroup para buscar parcelas por installmentGroupId
+
+## Melhorias Modal de Parcelas
+- [x] Barra de progresso visual no cabeçalho mostrando % do valor total já pago (gradient verde)
+- [x] Botão "Exportar PDF" no rodapé que abre janela de impressão com tabela formatada

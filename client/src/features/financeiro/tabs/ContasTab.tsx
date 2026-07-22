@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, Clock, Layers, Plus, Receipt, X, XCircle } from "lucide-react";
+import { CheckCircle, Clock, Download, Layers, Plus, Receipt, X, XCircle } from "lucide-react";
 import { AudioLauncher } from "@/features/financeiro/components/AudioLauncher";
 import { trpc } from "@/lib/trpc";
 import { formatCurrency, formatDate } from "@/features/financeiro/utils/formatters";
@@ -236,14 +236,36 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
       {installmentGroupId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setInstallmentGroupId(null)}>
           <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
-              <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-blue-400" />
-                <h3 className="text-lg font-bold text-white">Parcelas do Lançamento</h3>
+            <div className="border-b border-gray-800 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-blue-400" />
+                  <h3 className="text-lg font-bold text-white">Parcelas do Lançamento</h3>
+                </div>
+                <button onClick={() => setInstallmentGroupId(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white">
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button onClick={() => setInstallmentGroupId(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
+              {installmentItems && installmentItems.length > 0 && (() => {
+                const totalAmount = installmentItems.reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
+                const paidAmount = installmentItems.filter((i: any) => i.status === "paid").reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
+                const pctPaid = totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0;
+                return (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-gray-400">Progresso de pagamento</span>
+                      <span className="font-bold text-emerald-400">{pctPaid}%</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-800">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                        style={{ width: `${pctPaid}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">{formatCurrency(paidAmount)} de {formatCurrency(totalAmount)} pago</p>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="max-h-[55vh] overflow-y-auto p-5">
@@ -329,6 +351,39 @@ export function ContasTab({ initialContaId }: ContasTabProps = {}) {
                     </span>
                   </div>
                 </div>
+                <button
+                  onClick={() => {
+                    if (!installmentItems) return;
+                    const totalAmt = installmentItems.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+                    const paidAmt = installmentItems.filter((i: any) => i.status === "paid").reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
+                    let html = `<html><head><meta charset="utf-8"><title>Parcelas</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#333}h1{font-size:18px;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:13px}th{background:#f5f5f5;font-weight:bold}.paid{color:#16a34a}.overdue{color:#dc2626}.pending{color:#ca8a04}.footer{margin-top:16px;font-size:14px;font-weight:bold}</style></head><body>`;
+                    html += `<h1>Parcelas do Lan\u00e7amento</h1>`;
+                    html += `<p style="font-size:13px;color:#666">Gerado em ${new Date().toLocaleDateString("pt-BR")} \u00e0s ${new Date().toLocaleTimeString("pt-BR")}</p>`;
+                    html += `<table><thead><tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead><tbody>`;
+                    installmentItems.forEach((item: any, idx: number) => {
+                      const isPd = item.status === "paid";
+                      const isOv = !isPd && item.dueDate < Date.now();
+                      const statusLabel = isPd ? "Paga" : isOv ? "Vencida" : "Pendente";
+                      const cls = isPd ? "paid" : isOv ? "overdue" : "pending";
+                      html += `<tr><td>${idx + 1}</td><td>${formatDate(item.dueDate)}</td><td>${formatCurrency(item.amount)}</td><td class="${cls}">${statusLabel}</td></tr>`;
+                    });
+                    html += `</tbody></table>`;
+                    html += `<p class="footer">Total: ${formatCurrency(totalAmt)} | Pago: ${formatCurrency(paidAmt)} | Restante: ${formatCurrency(totalAmt - paidAmt)}</p>`;
+                    html += `</body></html>`;
+                    const blob = new Blob([html], { type: "application/pdf" });
+                    const url = URL.createObjectURL(blob);
+                    const printWindow = window.open("", "_blank");
+                    if (printWindow) {
+                      printWindow.document.write(html);
+                      printWindow.document.close();
+                      setTimeout(() => { printWindow.print(); }, 300);
+                    }
+                  }}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar PDF
+                </button>
               </div>
             )}
           </div>
