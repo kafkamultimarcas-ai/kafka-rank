@@ -20,7 +20,7 @@ import {
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Car, User, Phone, GripVertical, CircleDot,
+  Car, User, Phone, GripVertical, CircleDot, Search, MessageCircle,
   Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, Filter, Users
 } from "lucide-react";
 
@@ -48,6 +48,12 @@ function formatDate(ts: number | null | undefined): string {
 function daysInYard(entryDate: number, exitDate?: number | null): number {
   const end = exitDate || Date.now();
   return Math.floor((end - entryDate) / (1000 * 60 * 60 * 24));
+}
+
+function openWhatsApp(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  const number = digits.startsWith("55") ? digits : `55${digits}`;
+  window.open(`https://wa.me/${number}`, "_blank");
 }
 
 // ===== DRAGGABLE CARD =====
@@ -117,11 +123,22 @@ function DraggableCard({ record, onClick, getSellerName }: { record: any; onClic
                 </span>
               )}
             </div>
-            {/* Seller badge */}
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              <User className="w-2.5 h-2.5 mr-0.5" />
-              {getSellerName(record.sellerId)}
-            </Badge>
+            {/* Seller badge + WhatsApp */}
+            <div className="flex items-center gap-2 mt-0.5">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                <User className="w-2.5 h-2.5 mr-0.5" />
+                {getSellerName(record.sellerId)}
+              </Badge>
+              {(record.ownerPhone || record.consignorPhone) && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); openWhatsApp(record.ownerPhone || record.consignorPhone); }}
+                  className="flex items-center gap-0.5 text-[10px] text-green-500 hover:text-green-400 transition-colors"
+                >
+                  <MessageCircle className="w-3 h-3" />
+                  WhatsApp
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -224,6 +241,7 @@ export default function AdminCrmConsignados() {
   const [activeRecord, setActiveRecord] = useState<any | null>(null);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
   const sellerIdFilter = selectedSellerId === "all" ? undefined : Number(selectedSellerId);
@@ -249,19 +267,30 @@ export default function AdminCrmConsignados() {
     return seller?.nickname || seller?.name || `#${sellerId}`;
   };
 
+  // Filter records by search query
+  const filteredRecords = useMemo(() => {
+    if (!records) return [];
+    if (!searchQuery.trim()) return records;
+    const q = searchQuery.toLowerCase().trim();
+    return records.filter((r: any) =>
+      (r.vehiclePlate && r.vehiclePlate.toLowerCase().includes(q)) ||
+      (r.consignorName && r.consignorName.toLowerCase().includes(q)) ||
+      (r.vehicleModel && r.vehicleModel.toLowerCase().includes(q)) ||
+      (r.ownerName && r.ownerName.toLowerCase().includes(q))
+    );
+  }, [records, searchQuery]);
+
   // Group records by crmStatus
   const recordsByStatus = useMemo(() => {
     const map: Record<string, any[]> = {};
     for (const col of CRM_COLUMNS) map[col.key] = [];
-    if (records) {
-      for (const r of records) {
-        const status = (r.crmStatus || "cadastro") as string;
-        if (map[status]) map[status].push(r);
-        else map["cadastro"].push(r);
-      }
+    for (const r of filteredRecords) {
+      const status = (r.crmStatus || "cadastro") as string;
+      if (map[status]) map[status].push(r);
+      else map["cadastro"].push(r);
     }
     return map;
-  }, [records]);
+  }, [filteredRecords]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -314,6 +343,18 @@ export default function AdminCrmConsignados() {
         <Badge variant="secondary" className="text-xs">
           {records?.length || 0} veículos
         </Badge>
+      </div>
+
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          placeholder="Buscar por placa, cliente ou modelo..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 text-sm bg-accent/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 placeholder:text-muted-foreground/60"
+        />
       </div>
 
       {/* Seller filter */}

@@ -2710,3 +2710,7 @@
 ## Correções CRM Consignados
 - [x] Bug: valor do carro mostrando dividido por 100 - corrigido formatCurrency (valor é em reais, não centavos)
 - [x] Toast visual de sucesso ao arrastar e soltar card em nova coluna no Kanban (mostra nome da coluna + placa)
+
+## Melhorias CRM Consignados Kanban
+- [x] Barra de pesquisa para filtrar cards por nome do cliente, placa ou modelo do veículo
+- [x] Botão WhatsApp em cada card para abrir conversa direta com telefone do cliente/consignador
