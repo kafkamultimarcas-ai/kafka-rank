@@ -2750,3 +2750,8 @@
 - [x] Página Consignação (/controle-patio) deve manter DashboardLayout (menu lateral) quando acessada pelo admin
 - [x] Página CRM-Consignados (/admin/crm-consignados) deve manter DashboardLayout (menu lateral) quando acessada pelo admin
 - [x] Skeleton loading no modal de detalhes do CRM Consignados (enquanto histórico carrega)
+
+## CRM Consignados (Seller) - Correções
+- [x] Organizar dados nos cards sem cortar informações (layout responsivo)
+- [x] Corrigir drag & drop que não funciona para mover cards entre colunas
+- [x] Barra de pesquisa por consignador ou modelo do veículo (já existia)

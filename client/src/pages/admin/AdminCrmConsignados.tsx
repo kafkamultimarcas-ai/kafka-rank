@@ -10,13 +10,15 @@ import { toast } from "sonner";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -86,40 +88,40 @@ function DraggableCard({ record, onClick, getSellerName }: { record: any; onClic
         </div>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <h4 className="text-sm font-bold text-foreground truncate">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <h4 className="text-sm font-bold text-foreground">
                 {record.vehiclePlate || "Sem placa"}
               </h4>
               {record.isValid && (
-                <Badge variant="default" className="text-[9px] px-1.5 py-0 bg-green-500/20 text-green-500 border-green-500/30 shrink-0">
+                <Badge variant="default" className="text-[9px] px-1 py-0 bg-green-500/20 text-green-500 border-green-500/30 shrink-0">
                   7d+
                 </Badge>
               )}
               {record.hasAuction && (
-                <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">
+                <Badge variant="destructive" className="text-[9px] px-1 py-0 shrink-0">
                   Leilão
                 </Badge>
               )}
             </div>
-            <span className="text-[10px] text-muted-foreground shrink-0 ml-2 flex items-center gap-0.5">
+            <span className="text-[10px] text-muted-foreground shrink-0 ml-1 flex items-center gap-0.5">
               <Clock className="w-3 h-3" />
               {daysInYard(record.entryDate, record.exitDate)}d
             </span>
           </div>
           <div className="space-y-1">
             {record.vehicleModel && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                <Car className="w-3 h-3 shrink-0" /> {record.vehicleModel}
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Car className="w-3 h-3 shrink-0" /> <span className="break-words">{record.vehicleModel}</span>
               </p>
             )}
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               {record.consignorName && (
-                <span className="flex items-center gap-0.5 truncate">
-                  <User className="w-3 h-3 shrink-0" /> {record.consignorName}
+                <span className="flex items-center gap-0.5 min-w-0">
+                  <User className="w-3 h-3 shrink-0" /> <span className="truncate">{record.consignorName}</span>
                 </span>
               )}
               {record.costValue && (
-                <span className="ml-auto font-medium text-foreground text-xs shrink-0">
+                <span className="font-medium text-foreground text-xs shrink-0 ml-1">
                   {formatCurrency(record.costValue)}
                 </span>
               )}
@@ -164,7 +166,7 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-[270px] w-[270px] lg:w-[290px] xl:w-[310px] rounded-xl border transition-all ${
+      className={`flex flex-col min-w-[280px] w-[280px] lg:w-[300px] xl:w-[320px] rounded-xl border transition-all ${
         isOver
           ? "border-primary/60 bg-primary/5 shadow-lg shadow-primary/10"
           : "border-border bg-accent/20"
@@ -308,6 +310,16 @@ export default function AdminCrmConsignados() {
     setActiveRecord(record || null);
   };
 
+  // Custom collision detection: only detect droppable columns, not other draggable cards
+  const collisionDetection: CollisionDetection = (args) => {
+    const columnIds: string[] = CRM_COLUMNS.map(c => c.key as string);
+    const pointerCollisions = pointerWithin(args);
+    const columnCollisions = pointerCollisions.filter(c => columnIds.includes(String(c.id)));
+    if (columnCollisions.length > 0) return columnCollisions;
+    const rectCollisions = rectIntersection(args);
+    return rectCollisions.filter(c => columnIds.includes(String(c.id)));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveRecord(null);
     const { active, over } = event;
@@ -316,11 +328,21 @@ export default function AdminCrmConsignados() {
     const record = (active.data.current as any)?.record;
     if (!record) return;
 
-    const newStatus = over.id as string;
+    let newStatus = String(over.id);
     const currentStatus = (record.crmStatus || "cadastro") as string;
 
-        // Only move if dropped on a different column
-    if (newStatus !== currentStatus && CRM_COLUMNS.some(c => c.key === newStatus)) {
+    // If over.id is not a column key, it might be a card id - find its column
+    if (!CRM_COLUMNS.some(c => c.key === newStatus)) {
+      const overRecord = filteredRecords.find((r: any) => String(r.id) === newStatus);
+      if (overRecord) {
+        newStatus = overRecord.crmStatus || "cadastro";
+      } else {
+        return;
+      }
+    }
+
+    // Only move if dropped on a different column
+    if (newStatus !== currentStatus) {
       const targetCol = CRM_COLUMNS.find(c => c.key === newStatus);
       toast.success(`Movido para "${targetCol?.label || newStatus}"`, {
         description: `${record.vehiclePlate || "Veículo"} atualizado com sucesso`,
@@ -394,7 +416,7 @@ export default function AdminCrmConsignados() {
       ) : (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >

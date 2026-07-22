@@ -1979,8 +1979,9 @@ export const appRouter = router({
       const isAdmin = ctx.user.role === 'admin';
       const isCrmAdmin = ctx.user.actorType === 'crm_admin';
       const isGerente = ctx.user.sellerRole === 'gerente';
-      // Admin/gerente pode ver de todos ou filtrar por vendedor
-      if (isAdmin || isCrmAdmin || isGerente) {
+      const isConsignacao = ctx.user.sellerDepartment === 'consignacao';
+      // Admin/gerente/consignacao pode ver de todos ou filtrar por vendedor
+      if (isAdmin || isCrmAdmin || isGerente || isConsignacao) {
         return db.listConsignmentForCrm(input?.sellerId);
       }
       // Vendedor só vê os seus
