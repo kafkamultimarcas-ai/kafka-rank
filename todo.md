@@ -2659,3 +2659,9 @@
 
 - [x] Botão exportar CSV no relatório de veículos em consignação (com status)
 - [x] Alerta de confirmação antes de concluir saída de veículo (evitar alterações acidentais)
+
+## Melhorias Consignação v3
+
+- [x] Cadastro Rápido de Consignador (ConsignorCombobox): já aceita CPF/CNPJ (maskCpfCnpj + isValidCpfCnpj + label atualizado)
+- [x] Toast de sucesso ao confirmar saída do veículo (já existia) e ao concluir download do CSV (já existia)
+- [x] Linha de resumo no CSV exportado (total de veículos + soma dos custos)

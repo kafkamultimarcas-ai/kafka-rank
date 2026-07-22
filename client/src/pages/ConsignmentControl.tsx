@@ -205,7 +205,11 @@ export default function ConsignmentControl() {
       getDaysInYard(v.entryDate, v.exitDate).toString(),
       getSellerName(v.sellerId),
     ]);
-    const csvContent = [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+    // Linha de resumo
+    const totalVehicles = allVehicles.length;
+    const totalCost = allVehicles.reduce((sum: number, v: any) => sum + (v.costValue || 0), 0);
+    const summaryRow = ["", "", "", "", "", "", "", `TOTAL: ${totalVehicles} veículos`, `R$ ${totalCost.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, "", ""];
+    const csvContent = [headers.join(";"), ...rows.map(r => r.join(";")), "", summaryRow.join(";")].join("\n");
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
