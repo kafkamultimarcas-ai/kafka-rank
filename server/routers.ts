@@ -1994,19 +1994,40 @@ export const appRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'admin' || ctx.user.actorType === 'oauth' || ctx.user.actorType === 'crm_admin';
       const isGerente = ctx.user.sellerRole === 'gerente';
+      const isConsignacao = ctx.user.sellerDepartment === 'consignacao';
       // Vendedor comum só pode mover seus próprios consignados
-      if (!isAdmin && !isGerente) {
+      // Consignacao dept pode mover qualquer card (gerencia o processo)
+      if (!isAdmin && !isGerente && !isConsignacao) {
         const record = await db.getConsignmentDetail(input.id);
         if (!record || record.sellerId !== ctx.user.id) {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Você só pode mover seus próprios consignados' });
         }
       }
+      // Get current status before update (for history)
+      const currentRecord = await db.getConsignmentDetail(input.id);
+      const fromStatus = currentRecord?.crmStatus || 'cadastro';
+      
       await db.updateConsignmentCrmStatus(input.id, input.crmStatus);
+      
+      // Record history entry
+      await db.createCrmHistoryEntry({
+        consignmentId: input.id,
+        fromStatus,
+        toStatus: input.crmStatus,
+        changedById: ctx.user.id,
+        changedByName: ctx.user.name || (ctx.user as any).nickname || `User #${ctx.user.id}`,
+        changedAt: Date.now(),
+      });
+      
       return { success: true };
     }),
     // CRM Consignados - Detalhe completo de um registro
     getDetail: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
       return db.getConsignmentDetail(input.id);
+    }),
+    // CRM Consignados - Histórico de mudanças de status
+    getCrmHistory: protectedProcedure.input(z.object({ consignmentId: z.number() })).query(async ({ input }) => {
+      return db.getCrmHistory(input.consignmentId);
     }),
   }),
 

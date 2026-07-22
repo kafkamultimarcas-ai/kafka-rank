@@ -2737,3 +2737,11 @@
 ## Melhorias Modal de Parcelas
 - [x] Barra de progresso visual no cabeçalho mostrando % do valor total já pago (gradient verde)
 - [x] Botão "Exportar PDF" no rodapé que abre janela de impressão com tabela formatada
+
+## CRM Consignados - Fix Drag + Histórico
+- [x] Bug: usuário consignação não consegue arrastar seus próprios cards (corrigir lógica canDrag)
+- [x] Criar tabela de histórico de mudanças de status (consignment_crm_history)
+- [x] Gravar no histórico: data, hora, usuário, status anterior, novo status
+- [x] Backend: salvar histórico ao mover status no moveCrmStatus
+- [x] Frontend: exibir histórico de status no modal de detalhes (seller + admin)
+- [x] Backend: permitir dept consignação mover qualquer card (bypass ownership check)

@@ -575,6 +575,13 @@
       "when": 1784748305635,
       "tag": "0081_abandoned_prism",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "5",
+      "when": 1784751052756,
+      "tag": "0082_icy_khan",
+      "breakpoints": true
     }
   ]
 }

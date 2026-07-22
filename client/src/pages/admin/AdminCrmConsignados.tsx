@@ -21,7 +21,7 @@ import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Car, User, Phone, GripVertical, CircleDot, Search, MessageCircle,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, Filter, Users, Lock
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, Filter, Users, Lock, History
 } from "lucide-react";
 
 // CRM Status columns configuration
@@ -251,6 +251,10 @@ export default function AdminCrmConsignados() {
   );
   const { data: detail, isLoading: loadingDetail } = trpc.consignment.getDetail.useQuery(
     { id: selectedRecord?.id || 0 },
+    { enabled: !!selectedRecord }
+  );
+  const { data: crmHistory } = trpc.consignment.getCrmHistory.useQuery(
+    { consignmentId: selectedRecord?.id || 0 },
     { enabled: !!selectedRecord }
   );
 
@@ -575,6 +579,38 @@ export default function AdminCrmConsignados() {
                   <div>
                     <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2 text-red-500">Motivo Rejeição</h4>
                     <p className="text-sm text-red-400 bg-red-500/10 rounded-lg p-2">{detail.rejectionReason}</p>
+                  </div>
+                )}
+
+                {/* History */}
+                {crmHistory && crmHistory.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2 flex items-center gap-1">
+                      <History className="w-3 h-3" /> Histórico de Status
+                    </h4>
+                    <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+                      {crmHistory.map((entry: any) => {
+                        const fromCol = CRM_COLUMNS.find(c => c.key === entry.fromStatus);
+                        const toCol = CRM_COLUMNS.find(c => c.key === entry.toStatus);
+                        return (
+                          <div key={entry.id} className="flex items-center gap-2 text-xs bg-accent/30 rounded-lg px-2 py-1.5">
+                            <div className="flex items-center gap-1 min-w-0 flex-1">
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0" style={{ borderColor: (fromCol?.color || '#6b7280') + '44', color: fromCol?.color || '#6b7280' }}>
+                                {fromCol?.label || entry.fromStatus || '—'}
+                              </Badge>
+                              <span className="text-muted-foreground">→</span>
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0" style={{ borderColor: (toCol?.color || '#6b7280') + '44', color: toCol?.color || '#6b7280' }}>
+                                {toCol?.label || entry.toStatus}
+                              </Badge>
+                            </div>
+                            <div className="text-right shrink-0 text-muted-foreground">
+                              <div className="text-[10px]">{entry.changedByName}</div>
+                              <div className="text-[9px]">{new Date(Number(entry.changedAt)).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

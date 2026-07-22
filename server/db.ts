@@ -37,6 +37,7 @@ import {
   vehicleCosts, InsertVehicleCost,
   vehicleCostItems, InsertVehicleCostItem,
   consignors, InsertConsignor,
+  consignmentCrmHistory, InsertConsignmentCrmHistory,
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { assertGlobalUsernameAvailable } from "./usernamePolicy";
@@ -1522,6 +1523,39 @@ export async function updateConsignmentCrmStatus(id: number, crmStatus: string) 
   if (!db) throw new Error("DB not available");
   await db.update(consignmentRecords).set({ crmStatus }).where(and(eq(consignmentRecords.tenantId, getCurrentTenantId()), eq(consignmentRecords.id, id)));
   return { success: true };
+}
+
+export async function createCrmHistoryEntry(data: {
+  consignmentId: number;
+  fromStatus: string;
+  toStatus: string;
+  changedById: number;
+  changedByName: string;
+  changedAt: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(consignmentCrmHistory).values({
+    tenantId: getCurrentTenantId(),
+    consignmentId: data.consignmentId,
+    fromStatus: data.fromStatus,
+    toStatus: data.toStatus,
+    changedById: data.changedById,
+    changedByName: data.changedByName,
+    changedAt: data.changedAt,
+  });
+}
+
+export async function getCrmHistory(consignmentId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select()
+    .from(consignmentCrmHistory)
+    .where(and(
+      eq(consignmentCrmHistory.tenantId, getCurrentTenantId()),
+      eq(consignmentCrmHistory.consignmentId, consignmentId)
+    ))
+    .orderBy(desc(consignmentCrmHistory.changedAt));
 }
 
 export async function listConsignmentForCrm(sellerId?: number) {

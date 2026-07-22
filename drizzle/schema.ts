@@ -1988,3 +1988,20 @@ export const consignors = mysqlTable("consignors", {
 }));
 export type Consignor = typeof consignors.$inferSelect;
 export type InsertConsignor = typeof consignors.$inferInsert;
+
+// Histórico de mudanças de status CRM Consignados
+export const consignmentCrmHistory = mysqlTable("consignment_crm_history", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenantId").notNull().default(1),
+  consignmentId: int("consignment_id").notNull(),
+  fromStatus: varchar("from_status", { length: 50 }),
+  toStatus: varchar("to_status", { length: 50 }).notNull(),
+  changedById: int("changed_by_id"),
+  changedByName: varchar("changed_by_name", { length: 100 }),
+  changedAt: bigint("changed_at", { mode: "number" }).notNull(),
+}, (table) => ({
+  consignmentIdx: index("idx_crm_history_consignment").on(table.consignmentId),
+  tenantIdx: index("idx_crm_history_tenant").on(table.tenantId),
+}));
+export type ConsignmentCrmHistory = typeof consignmentCrmHistory.$inferSelect;
+export type InsertConsignmentCrmHistory = typeof consignmentCrmHistory.$inferInsert;
