@@ -21,7 +21,7 @@ import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Car, User, Phone, GripVertical, CircleDot, Search, MessageCircle,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, Filter, Users
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, Filter, Users, Lock
 } from "lucide-react";
 
 // CRM Status columns configuration

@@ -23,7 +23,7 @@ import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Car, Calendar, User, Phone, GripVertical, Search, MessageCircle,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users, Lock
 } from "lucide-react";
 
 // CRM Status columns configuration
@@ -59,7 +59,7 @@ function openWhatsApp(phone: string) {
   window.open(`https://wa.me/${number}`, "_blank");
 }
 
-function DraggableCard({ record, onClick, canDrag = true }: { record: any; onClick: () => void; canDrag?: boolean }) {
+function DraggableCard({ record, onClick, canDrag = true, getSellerName }: { record: any; onClick: () => void; canDrag?: boolean; getSellerName?: (id: number) => string }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(record.id),
     data: { record },
@@ -68,7 +68,7 @@ function DraggableCard({ record, onClick, canDrag = true }: { record: any; onCli
 
   const style = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : (canDrag ? 1 : 0.65),
     touchAction: "none" as const,
   };
 
@@ -76,15 +76,23 @@ function DraggableCard({ record, onClick, canDrag = true }: { record: any; onCli
     <div
       ref={setNodeRef}
       style={style}
-      className="rounded-xl border border-border bg-card p-3 hover:border-primary/30 transition-all cursor-grab active:cursor-grabbing"
+      className={`rounded-xl border p-3 transition-all ${
+        canDrag
+          ? 'border-border bg-card hover:border-primary/30 cursor-grab active:cursor-grabbing'
+          : 'border-border/50 bg-card/60 cursor-default'
+      }`}
     >
       <div className="flex items-start gap-2">
         <div
           {...listeners}
           {...attributes}
-          className={`mt-1 text-muted-foreground ${canDrag ? 'cursor-grab active:cursor-grabbing hover:text-foreground' : 'opacity-30 cursor-not-allowed'}`}
+          className={`mt-1 text-muted-foreground ${canDrag ? 'cursor-grab active:cursor-grabbing hover:text-foreground' : 'cursor-not-allowed'}`}
         >
-          <GripVertical className="w-4 h-4" />
+          {canDrag ? (
+            <GripVertical className="w-4 h-4" />
+          ) : (
+            <Lock className="w-4 h-4 text-muted-foreground/50" />
+          )}
         </div>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
           <div className="flex items-center justify-between mb-1">
@@ -100,6 +108,11 @@ function DraggableCard({ record, onClick, canDrag = true }: { record: any; onCli
               {record.hasAuction && (
                 <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">
                   Leilão
+                </Badge>
+              )}
+              {!canDrag && (
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-muted-foreground/30 text-muted-foreground shrink-0">
+                  <Lock className="w-2.5 h-2.5 mr-0.5" /> Bloqueado
                 </Badge>
               )}
             </div>
@@ -126,6 +139,15 @@ function DraggableCard({ record, onClick, canDrag = true }: { record: any; onCli
                 </span>
               )}
             </div>
+            {/* Seller name badge */}
+            {getSellerName && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-500/30 text-blue-400">
+                  <Users className="w-2.5 h-2.5 mr-0.5" />
+                  {getSellerName(record.sellerId)}
+                </Badge>
+              </div>
+            )}
             {(record.ownerPhone || record.consignorPhone) && (
               <button
                 onClick={(e) => { e.stopPropagation(); openWhatsApp(record.ownerPhone || record.consignorPhone); }}
@@ -148,11 +170,13 @@ function DroppableColumn({
   records,
   onCardClick,
   canDragRecord,
+  getSellerName,
 }: {
   column: typeof CRM_COLUMNS[number];
   records: any[];
   onCardClick: (r: any) => void;
   canDragRecord?: (record: any) => boolean;
+  getSellerName?: (id: number) => string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key });
 
@@ -205,6 +229,7 @@ function DroppableColumn({
                 record={record}
                 onClick={() => onCardClick(record)}
                 canDrag={canDragRecord ? canDragRecord(record) : true}
+                getSellerName={getSellerName}
               />
             ))
           )}
@@ -247,8 +272,8 @@ export default function CrmConsignados() {
   const canMoveAny = isAdmin || isGerente;
   const currentSellerId = (user as any)?.actorType === 'seller' ? (user as any)?.id : null;
 
-  // Load sellers list for filter (only for admin/gerente)
-  const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true }, { enabled: canMoveAny });
+  // Load sellers list for filter and card display
+  const { data: sellers } = trpc.sellers.list.useQuery({ activeOnly: true });
 
   const { data: records, isLoading, refetch } = trpc.consignment.listForCrm.useQuery();
   const { data: detail, isLoading: loadingDetail } = trpc.consignment.getDetail.useQuery(
@@ -267,6 +292,13 @@ export default function CrmConsignados() {
   const canDragRecord = (record: any) => {
     if (canMoveAny) return true;
     return record.sellerId === currentSellerId;
+  };
+
+  // Get seller name by ID
+  const getSellerName = (sellerId: number) => {
+    if (!sellers) return `#${sellerId}`;
+    const seller = sellers.find((s: any) => s.id === sellerId);
+    return seller?.nickname || seller?.name || `#${sellerId}`;
   };
 
   // Filter records by search query and seller filter
@@ -423,6 +455,7 @@ export default function CrmConsignados() {
                 records={recordsByStatus[col.key] || []}
                 onCardClick={openDetail}
                 canDragRecord={canDragRecord}
+                getSellerName={getSellerName}
               />
             ))}
           </div>
