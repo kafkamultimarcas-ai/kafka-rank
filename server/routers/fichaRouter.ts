@@ -317,6 +317,40 @@ export const fichaRouter = router({
     return { message: "Ficha atualizada com sucesso" };
   }),
 
+  // Mover status no Kanban (drag-and-drop)
+  moveKanbanStatus: publicProcedure.input(z.object({
+    fichaId: z.number(),
+    newStatus: z.enum(["na_fila", "em_analise", "aprovado", "recusado", "parcial"]),
+  })).mutation(async ({ input }) => {
+    const ficha = await getFichaById(input.fichaId);
+    if (!ficha) throw new TRPCError({ code: "NOT_FOUND", message: "Ficha não encontrada" });
+    const updateData: Record<string, any> = { status: input.newStatus };
+    // Auto-set timestamps based on status transition
+    if (input.newStatus === "em_analise" && !ficha.inicioAnalise) {
+      updateData.inicioAnalise = Date.now();
+    }
+    if (["aprovado", "recusado", "parcial"].includes(input.newStatus) && !ficha.fimAnalise) {
+      updateData.fimAnalise = Date.now();
+    }
+    await updateFichaFinanciamento(input.fichaId, updateData);
+    return { message: "Status atualizado" };
+  }),
+
+  // Listar fichas para Kanban com nome do vendedor
+  listForKanban: publicProcedure.query(async () => {
+    const fichas = await listFichasFinanciamento();
+    const sellerIds = Array.from(new Set(fichas.map(f => f.sellerId)));
+    const sellerMap: Record<number, string> = {};
+    for (const sid of sellerIds) {
+      const seller = await getSellerById(sid);
+      if (seller) sellerMap[sid] = seller.nickname || seller.name;
+    }
+    return fichas.map(f => ({
+      ...f,
+      sellerName: sellerMap[f.sellerId] || `#${f.sellerId}`,
+    }));
+  }),
+
   // Deletar ficha
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {
     await deleteFichaFinanciamento(input.id);

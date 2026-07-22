@@ -85,6 +85,7 @@ const MENU_GROUPS: MenuGroup[] = [
     key: "financeiro", label: "Financeiro", items: [
       { icon: DollarSign, label: "Financeiro", path: "/admin/financeiro" },
       { icon: DollarSign, label: "Caixa da Loja", path: "/financeiro" },
+      { icon: KanbanSquare, label: "Kanban Financiamento", path: "/kanban-financiamento" },
       { icon: Users, label: "Financeiro Vendedores", path: "/admin/financeiro-vendedores" },
       { icon: Warehouse, label: "Fornecedores", path: "/admin/fornecedores" },
       { icon: CalendarDays, label: "Virada de Mês", path: "/admin/virada-mes" },

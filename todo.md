@@ -2687,3 +2687,15 @@
 - [x] Página Admin CRM Consignados (vê todos, filtro por vendedor, grid responsivo)
 - [x] Menu no sidebar admin abaixo de Consignação (KanbanSquare icon)
 - [x] Ação rápida na MinhaArea para consignacao dept (botão CRM Consignados)
+
+## Kanban Financiamento (Drag-and-Drop)
+
+- [x] Backend: procedure moveKanbanStatus para mover fichas entre status via drag-and-drop
+- [x] Backend: procedure listForKanban com nome do vendedor enriquecido
+- [x] Frontend: Página KanbanFinanciamento com @dnd-kit (drag-and-drop real entre colunas)
+- [x] 5 colunas: Na Fila, Em Análise, Parcial, Aprovado, Recusado
+- [x] Cards com nome do cliente, veículo, placa, vendedor, valor financiado
+- [x] Modal de detalhes ao clicar no card (dados completos + bancos)
+- [x] Rota /kanban-financiamento registrada no App.tsx
+- [x] Menu no sidebar admin no grupo Financeiro (ícone KanbanSquare)
+- [x] Auto-set timestamps (inicioAnalise, fimAnalise) ao mover entre status

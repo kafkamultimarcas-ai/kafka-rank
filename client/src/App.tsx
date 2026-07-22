@@ -60,6 +60,7 @@ const IAVendedor = lazy(() => import("./pages/IAVendedor"));
 const SimuladorFinanciamento = lazy(() => import("./pages/SimuladorFinanciamento"));
 const FichaFinanciamento = lazy(() => import("./pages/FichaFinanciamento"));
 const MesaCredito = lazy(() => import("./pages/MesaCredito"));
+const KanbanFinanciamento = lazy(() => import("./pages/KanbanFinanciamento"));
 const GerentePanel = lazy(() => import("./pages/GerentePanel"));
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 const Estoque = lazy(() => import("./pages/Estoque"));
@@ -218,6 +219,8 @@ function Router() {
         <Route path="/t/:slug/ficha-financiamento" component={FichaFinanciamento} />
         <Route path="/mesa-credito" component={MesaCredito} />
         <Route path="/t/:slug/mesa-credito" component={MesaCredito} />
+        <Route path="/kanban-financiamento" component={KanbanFinanciamento} />
+        <Route path="/t/:slug/kanban-financiamento" component={KanbanFinanciamento} />
         <Route path="/estoque" component={Estoque} />
         <Route path="/t/:slug/estoque" component={Estoque} />
         <Route path="/financeiro" component={FinanceiroPage} />
