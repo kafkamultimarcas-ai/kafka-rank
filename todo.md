@@ -2759,3 +2759,7 @@
 ## CRM Consignados - Feedback Visual + Exportação
 - [x] Feedback visual (animação/cor) quando card é solto corretamente em nova coluna
 - [x] Botão de exportação CSV/Excel dos registros filtrados
+
+## CRM Consignados - Confirmação + Spinner Export
+- [x] Modal de confirmação ao mover card para Vendido ou Devolvido
+- [x] Spinner no botão de exportação durante geração do CSV

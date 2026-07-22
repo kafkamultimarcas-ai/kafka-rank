@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -25,7 +25,7 @@ import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Car, Calendar, User, Phone, GripVertical, Search, MessageCircle,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users, Lock, History, Download
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users, Lock, History, Download, AlertTriangle, Loader2
 } from "lucide-react";
 
 // CRM Status columns configuration
@@ -272,6 +272,8 @@ export default function CrmConsignados() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSeller, setFilterSeller] = useState<string>("all");
   const [successColumnKey, setSuccessColumnKey] = useState<string | null>(null);
+  const [confirmMove, setConfirmMove] = useState<{ record: any; newStatus: string; targetCol: any } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Determine if current user is admin/gerente/consignacao
   const isAdmin = user?.role === 'admin' || (user as any)?.actorType === 'oauth' || (user as any)?.actorType === 'crm_admin';
@@ -397,51 +399,75 @@ export default function CrmConsignados() {
     // Only move if dropped on a different column
     if (newStatus !== currentStatus) {
       const targetCol = CRM_COLUMNS.find(c => c.key === newStatus);
-      toast.success(`Movido para "${targetCol?.label || newStatus}"`, {
-        description: `${record.vehiclePlate || "Veículo"} atualizado com sucesso`,
-      });
-      moveCrmStatus.mutate({ id: record.id, crmStatus: newStatus as CrmStatus });
-      // Visual feedback: flash the target column
-      setSuccessColumnKey(newStatus);
-      setTimeout(() => setSuccessColumnKey(null), 1200);
-      // Mini confetti burst
-      import(/* @vite-ignore */ "canvas-confetti")
-        .then((mod) => {
-          const confetti = mod.default;
-          confetti({ particleCount: 40, spread: 60, origin: { y: 0.5 }, colors: [targetCol?.color || '#10b981', '#ffffff', '#3b82f6'] });
-        })
-        .catch(() => {});
+      // Require confirmation for critical statuses (vendido, devolvido)
+      if (newStatus === 'vendido' || newStatus === 'devolvido') {
+        setConfirmMove({ record, newStatus, targetCol });
+        return;
+      }
+      executeMove(record, newStatus, targetCol);
+    }
+  };
+
+  // Execute the actual move (called directly or after confirmation)
+  const executeMove = (record: any, newStatus: string, targetCol: any) => {
+    toast.success(`Movido para "${targetCol?.label || newStatus}"`, {
+      description: `${record.vehiclePlate || "Ve\u00edculo"} atualizado com sucesso`,
+    });
+    moveCrmStatus.mutate({ id: record.id, crmStatus: newStatus as CrmStatus });
+    // Visual feedback: flash the target column
+    setSuccessColumnKey(newStatus);
+    setTimeout(() => setSuccessColumnKey(null), 1200);
+    // Mini confetti burst
+    import(/* @vite-ignore */ "canvas-confetti")
+      .then((mod) => {
+        const confetti = mod.default;
+        confetti({ particleCount: 40, spread: 60, origin: { y: 0.5 }, colors: [targetCol?.color || '#10b981', '#ffffff', '#3b82f6'] });
+      })
+      .catch(() => {});
+  };
+
+  const handleConfirmMove = () => {
+    if (confirmMove) {
+      executeMove(confirmMove.record, confirmMove.newStatus, confirmMove.targetCol);
+      setConfirmMove(null);
     }
   };
 
   // Export filtered records as CSV
-  const exportCSV = useCallback(() => {
+  const exportCSV = useCallback(async () => {
     if (!filteredRecords.length) {
       toast.error("Nenhum registro para exportar");
       return;
     }
-    const statusLabel = (s: string) => CRM_COLUMNS.find(c => c.key === s)?.label || s;
-    const headers = ["Placa", "Modelo", "Consignador", "Status CRM", "Valor Custo", "Entrada", "Dias no P\u00e1tio", "Vendedor"];
-    const rows = filteredRecords.map((r: any) => [
-      r.vehiclePlate || "",
-      r.vehicleModel || "",
-      r.consignorName || r.ownerName || "",
-      statusLabel(r.crmStatus || "cadastro"),
-      r.costValue ? String(r.costValue) : "",
-      r.entryDate ? new Date(r.entryDate).toLocaleDateString("pt-BR") : "",
-      r.entryDate ? String(Math.floor((Date.now() - r.entryDate) / (1000 * 60 * 60 * 24))) : "",
-      getSellerName(r.sellerId),
-    ]);
-    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `crm-consignados-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Exporta\u00e7\u00e3o conclu\u00edda", { description: `${filteredRecords.length} registros exportados` });
+    setIsExporting(true);
+    // Small delay to show spinner (simulates processing for large datasets)
+    await new Promise(resolve => setTimeout(resolve, 600));
+    try {
+      const statusLabel = (s: string) => CRM_COLUMNS.find(c => c.key === s)?.label || s;
+      const headers = ["Placa", "Modelo", "Consignador", "Status CRM", "Valor Custo", "Entrada", "Dias no P\u00e1tio", "Vendedor"];
+      const rows = filteredRecords.map((r: any) => [
+        r.vehiclePlate || "",
+        r.vehicleModel || "",
+        r.consignorName || r.ownerName || "",
+        statusLabel(r.crmStatus || "cadastro"),
+        r.costValue ? String(r.costValue) : "",
+        r.entryDate ? new Date(r.entryDate).toLocaleDateString("pt-BR") : "",
+        r.entryDate ? String(Math.floor((Date.now() - r.entryDate) / (1000 * 60 * 60 * 24))) : "",
+        getSellerName(r.sellerId),
+      ]);
+      const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
+      const BOM = "\uFEFF";
+      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `crm-consignados-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Exporta\u00e7\u00e3o conclu\u00edda", { description: `${filteredRecords.length} registros exportados` });
+    } finally {
+      setIsExporting(false);
+    }
   }, [filteredRecords, getSellerName]);
 
   const openDetail = (record: any) => {
@@ -477,9 +503,9 @@ export default function CrmConsignados() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCSV}>
-              <Download className="w-3.5 h-3.5" />
-              Exportar
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCSV} disabled={isExporting}>
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {isExporting ? "Exportando..." : "Exportar"}
             </Button>
             <Badge variant="secondary">{records?.length || 0} veículos</Badge>
           </div>
@@ -826,6 +852,34 @@ export default function CrmConsignados() {
               <p className="text-sm text-muted-foreground text-center py-4">Registro não encontrado</p>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog for critical moves (Vendido/Devolvido) */}
+      <Dialog open={!!confirmMove} onOpenChange={(open) => { if (!open) setConfirmMove(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-500">
+              <AlertTriangle className="w-5 h-5" />
+              Confirmar Movimentação
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Tem certeza que deseja mover <strong>{confirmMove?.record?.vehiclePlate || "este veículo"}</strong> para{" "}
+              <strong>{confirmMove?.targetCol?.label}</strong>?
+              <br />
+              <span className="text-muted-foreground text-xs mt-1 block">
+                Esta ação será registrada no histórico.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:gap-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmMove(null)}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleConfirmMove} className="bg-amber-600 hover:bg-amber-700 text-white">
+              Confirmar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
