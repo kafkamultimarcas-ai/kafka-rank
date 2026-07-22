@@ -2755,3 +2755,7 @@
 - [x] Organizar dados nos cards sem cortar informações (layout responsivo)
 - [x] Corrigir drag & drop que não funciona para mover cards entre colunas
 - [x] Barra de pesquisa por consignador ou modelo do veículo (já existia)
+
+## CRM Consignados - Feedback Visual + Exportação
+- [x] Feedback visual (animação/cor) quando card é solto corretamente em nova coluna
+- [x] Botão de exportação CSV/Excel dos registros filtrados

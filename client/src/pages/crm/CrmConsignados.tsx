@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { useDroppable, useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Car, Calendar, User, Phone, GripVertical, Search, MessageCircle,
-  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users, Lock, History
+  Package, Handshake, CheckCircle2, RotateCcw, Clock, MapPin, CircleDot, Filter, Users, Lock, History, Download
 } from "lucide-react";
 
 // CRM Status columns configuration
@@ -173,20 +173,24 @@ function DroppableColumn({
   onCardClick,
   canDragRecord,
   getSellerName,
+  isSuccess,
 }: {
   column: typeof CRM_COLUMNS[number];
   records: any[];
   onCardClick: (r: any) => void;
   canDragRecord?: (record: any) => boolean;
   getSellerName?: (id: number) => string;
+  isSuccess?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key });
 
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col min-w-[280px] w-[280px] lg:w-[300px] xl:w-[320px] rounded-xl border transition-all ${
-        isOver
+      className={`flex flex-col min-w-[280px] w-[280px] lg:w-[300px] xl:w-[320px] rounded-xl border transition-all duration-500 ${
+        isSuccess
+          ? "border-green-500/80 bg-green-500/10 shadow-lg shadow-green-500/20 ring-2 ring-green-500/30"
+          : isOver
           ? "border-primary/60 bg-primary/5 shadow-lg shadow-primary/10"
           : "border-border bg-accent/20"
       }`}
@@ -267,6 +271,7 @@ export default function CrmConsignados() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSeller, setFilterSeller] = useState<string>("all");
+  const [successColumnKey, setSuccessColumnKey] = useState<string | null>(null);
 
   // Determine if current user is admin/gerente/consignacao
   const isAdmin = user?.role === 'admin' || (user as any)?.actorType === 'oauth' || (user as any)?.actorType === 'crm_admin';
@@ -396,8 +401,48 @@ export default function CrmConsignados() {
         description: `${record.vehiclePlate || "Veículo"} atualizado com sucesso`,
       });
       moveCrmStatus.mutate({ id: record.id, crmStatus: newStatus as CrmStatus });
+      // Visual feedback: flash the target column
+      setSuccessColumnKey(newStatus);
+      setTimeout(() => setSuccessColumnKey(null), 1200);
+      // Mini confetti burst
+      import(/* @vite-ignore */ "canvas-confetti")
+        .then((mod) => {
+          const confetti = mod.default;
+          confetti({ particleCount: 40, spread: 60, origin: { y: 0.5 }, colors: [targetCol?.color || '#10b981', '#ffffff', '#3b82f6'] });
+        })
+        .catch(() => {});
     }
   };
+
+  // Export filtered records as CSV
+  const exportCSV = useCallback(() => {
+    if (!filteredRecords.length) {
+      toast.error("Nenhum registro para exportar");
+      return;
+    }
+    const statusLabel = (s: string) => CRM_COLUMNS.find(c => c.key === s)?.label || s;
+    const headers = ["Placa", "Modelo", "Consignador", "Status CRM", "Valor Custo", "Entrada", "Dias no P\u00e1tio", "Vendedor"];
+    const rows = filteredRecords.map((r: any) => [
+      r.vehiclePlate || "",
+      r.vehicleModel || "",
+      r.consignorName || r.ownerName || "",
+      statusLabel(r.crmStatus || "cadastro"),
+      r.costValue ? String(r.costValue) : "",
+      r.entryDate ? new Date(r.entryDate).toLocaleDateString("pt-BR") : "",
+      r.entryDate ? String(Math.floor((Date.now() - r.entryDate) / (1000 * 60 * 60 * 24))) : "",
+      getSellerName(r.sellerId),
+    ]);
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `crm-consignados-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Exporta\u00e7\u00e3o conclu\u00edda", { description: `${filteredRecords.length} registros exportados` });
+  }, [filteredRecords, getSellerName]);
 
   const openDetail = (record: any) => {
     setSelectedRecord(record);
@@ -431,7 +476,13 @@ export default function CrmConsignados() {
               </p>
             </div>
           </div>
-          <Badge variant="secondary">{records?.length || 0} veículos</Badge>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={exportCSV}>
+              <Download className="w-3.5 h-3.5" />
+              Exportar
+            </Button>
+            <Badge variant="secondary">{records?.length || 0} veículos</Badge>
+          </div>
         </div>
         {/* Filters */}
         <div className="px-4 pb-3 space-y-2">
@@ -488,6 +539,7 @@ export default function CrmConsignados() {
                 onCardClick={openDetail}
                 canDragRecord={canDragRecord}
                 getSellerName={getSellerName}
+                isSuccess={successColumnKey === col.key}
               />
             ))}
           </div>
