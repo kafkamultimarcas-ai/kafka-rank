@@ -2706,3 +2706,7 @@
 ## Correção Botão Voltar - Perda de Sessão
 - [x] Criado hook useGoBack que usa window.history.back() com fallback seguro
 - [x] Corrigido em 10+ páginas: ConsignmentControl, CompetitionView, Estoque, MeusAgendamentos, RankingFeirao, SellerProfile, TrainingsList, AdminApprovals, MesaCredito, FichaFinanciamento, RegisterSale, NotFound
+
+## Correções CRM Consignados
+- [x] Bug: valor do carro mostrando dividido por 100 - corrigido formatCurrency (valor é em reais, não centavos)
+- [x] Toast visual de sucesso ao arrastar e soltar card em nova coluna no Kanban (mostra nome da coluna + placa)

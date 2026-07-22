@@ -35,9 +35,9 @@ const CRM_COLUMNS = [
 
 type CrmStatus = typeof CRM_COLUMNS[number]["key"];
 
-function formatCurrency(cents: number | null | undefined): string {
-  if (!cents) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+function formatCurrency(value: number | null | undefined): string {
+  if (!value) return "—";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 function formatDate(ts: number | null | undefined): string {
@@ -239,7 +239,6 @@ export default function AdminCrmConsignados() {
   const moveCrmStatus = trpc.consignment.moveCrmStatus.useMutation({
     onSuccess: () => {
       refetch();
-      toast.success("Status atualizado!");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -286,8 +285,12 @@ export default function AdminCrmConsignados() {
     const newStatus = over.id as string;
     const currentStatus = (record.crmStatus || "cadastro") as string;
 
-    // Only move if dropped on a different column
+        // Only move if dropped on a different column
     if (newStatus !== currentStatus && CRM_COLUMNS.some(c => c.key === newStatus)) {
+      const targetCol = CRM_COLUMNS.find(c => c.key === newStatus);
+      toast.success(`Movido para "${targetCol?.label || newStatus}"`, {
+        description: `${record.vehiclePlate || "Veículo"} atualizado com sucesso`,
+      });
       moveCrmStatus.mutate({ id: record.id, crmStatus: newStatus as CrmStatus });
     }
   };
