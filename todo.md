@@ -2665,3 +2665,10 @@
 - [x] Cadastro Rápido de Consignador (ConsignorCombobox): já aceita CPF/CNPJ (maskCpfCnpj + isValidCpfCnpj + label atualizado)
 - [x] Toast de sucesso ao confirmar saída do veículo (já existia) e ao concluir download do CSV (já existia)
 - [x] Linha de resumo no CSV exportado (total de veículos + soma dos custos)
+
+## Redesign MinhaArea Consignação
+
+- [x] Layout full-width (max-w-7xl) no desktop e mobile
+- [x] Ações rápidas no topo (grid horizontal)
+- [x] Filtros de busca abaixo das ações
+- [x] Listagem paginada dos veículos consignados com PaginationControls (15/pág)

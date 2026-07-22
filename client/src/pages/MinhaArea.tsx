@@ -45,6 +45,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { maskPhone } from "@/lib/masks";
 import IAMFloatingButton from "@/components/IAMFloatingButton";
+import { PaginationControls } from "@/components/PaginationControls";
 import IAMGreeting from "@/components/IAMGreeting";
 import { buildTenantPath, getCurrentTenantSlug } from "@/lib/tenant";
 import { useBranding } from "@/contexts/TenantContext";
@@ -370,6 +371,8 @@ export default function MinhaArea() {
   const [exitReason, setExitReason] = useState("");
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [consignFilter, setConsignFilter] = useState<'todos' | 'patio' | 'saida'>('patio');
+  const [consignPage, setConsignPage] = useState(1);
+  const CONSIGN_PAGE_SIZE = 15;
 
   // Stats por setor
   const activeAppointments = (appointments || []).filter((a: any) => a.status === 'approved' && a.attendanceStatus === 'pending');
@@ -527,7 +530,7 @@ export default function MinhaArea() {
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950">
       {/* Header */}
       <div className="bg-gray-900/80 border-b border-gray-800 px-4 py-3">
-        <div className="flex items-center justify-between max-w-lg mx-auto">
+        <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             <input type="file" ref={profilePhotoRef} accept="image/*" className="hidden" onChange={handleProfilePhotoChange} />
             <div className="relative cursor-pointer" onClick={() => profilePhotoRef.current?.click()}>
@@ -582,7 +585,7 @@ export default function MinhaArea() {
       </div>
 
       {/* Content */}
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="w-full max-w-7xl mx-auto px-4 py-4 space-y-4">
         {/* Meu link de vendas - rastreia leads que vieram por este vendedor */}
         {dept === "vendas" && (
           <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-3">
@@ -1157,44 +1160,7 @@ export default function MinhaArea() {
           </div>
         )}
 
-        {dept === "consignacao" && activeConsignment.length > 0 && (
-          <div className="bg-cyan-950/30 border border-cyan-500/30 rounded-xl p-4">
-            <h3 className="text-cyan-400 font-bold text-sm mb-2 flex items-center gap-2">
-              <Car className="w-4 h-4" /> Veículos no pátio ({activeConsignment.length})
-            </h3>
-            {activeConsignment.map((r: any) => {
-              const entryDate = new Date(r.entryDate);
-              const daysSince = Math.floor((Date.now() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
-              const isOverdue = daysSince > 7;
-              return (
-                <div key={r.id} className="text-sm py-2 border-b border-gray-800 last:border-0">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-300 font-medium">{r.vehicleModel}</span>
-                    <span className={`text-xs font-bold ${isOverdue ? 'text-red-400' : 'text-cyan-400'}`}>
-                      {daysSince} dias
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-0.5">
-                    <span>Placa: {r.vehiclePlate || 'N/I'}</span>
-                    <span>Entrada: {formatDate(r.entryDate)}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {r.hasAuction && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">Leilão</span>}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.vehicleStatus === 'financiado' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                      {r.vehicleStatus === 'financiado' ? 'Financiado' : 'Quitado'}
-                    </span>
-                    {r.costValue && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {r.costValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>}
-                  </div>
-                  {isOverdue && (
-                    <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> Passou dos 7 dias!
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* Seção "Veículos no pátio" removida - agora integrada na listagem paginada abaixo */}
 
         {dept === "despachante" && pendingDispatch.length > 0 && (
           <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4">
@@ -1709,7 +1675,7 @@ export default function MinhaArea() {
         {dept !== "fei" && (
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-              Meu Histórico
+              {dept === 'consignacao' ? 'Meus Veículos Consignados' : 'Meu Histórico'}
             </h2>
 
             {dept === "vendas" && approvedSales.length > 0 && (
@@ -1763,15 +1729,23 @@ export default function MinhaArea() {
               </div>
             )}
 
-            {dept === "consignacao" && approvedConsignment.length > 0 && (
-              <div className="space-y-2">
+            {dept === "consignacao" && approvedConsignment.length > 0 && (() => {
+              const filteredList = consignFilter === 'todos' ? approvedConsignment : consignFilter === 'patio' ? approvedConsignment.filter((r: any) => !r.exitDate) : approvedConsignment.filter((r: any) => !!r.exitDate);
+              const totalPages = Math.ceil(filteredList.length / CONSIGN_PAGE_SIZE);
+              const paginatedList = filteredList.slice((consignPage - 1) * CONSIGN_PAGE_SIZE, consignPage * CONSIGN_PAGE_SIZE);
+              return (
+              <div className="space-y-3">
                 <div className="flex gap-1 flex-wrap">
-                  <button onClick={() => setConsignFilter('todos')} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'todos' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Todos ({approvedConsignment.length})</button>
-                  <button onClick={() => setConsignFilter('patio')} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'patio' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>No Pátio ({approvedConsignment.filter((r: any) => !r.exitDate).length})</button>
-                  <button onClick={() => setConsignFilter('saida')} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'saida' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Com Saída ({approvedConsignment.filter((r: any) => !!r.exitDate).length})</button>
+                  <button onClick={() => { setConsignFilter('todos'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'todos' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Todos ({approvedConsignment.length})</button>
+                  <button onClick={() => { setConsignFilter('patio'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'patio' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>No Pátio ({approvedConsignment.filter((r: any) => !r.exitDate).length})</button>
+                  <button onClick={() => { setConsignFilter('saida'); setConsignPage(1); }} className={`text-xs px-2.5 py-1 rounded-full border ${consignFilter === 'saida' ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-gray-700 text-gray-400 hover:text-white'}`}>Com Saída ({approvedConsignment.filter((r: any) => !!r.exitDate).length})</button>
                 </div>
                 <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
-                {(consignFilter === 'todos' ? approvedConsignment : consignFilter === 'patio' ? approvedConsignment.filter((r: any) => !r.exitDate) : approvedConsignment.filter((r: any) => !!r.exitDate)).slice(0, 10).map((r: any) => (
+                {paginatedList.map((r: any) => {
+                  const entryDate = new Date(r.entryDate);
+                  const daysSince = Math.floor((Date.now() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+                  const isOverdue = !r.exitDate && daysSince > 7;
+                  return (
                   <div key={r.id} className="p-3 space-y-1">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1783,7 +1757,7 @@ export default function MinhaArea() {
                         {r.exitDate ? (
                           <p className="text-xs text-emerald-400">Saiu: {formatDate(r.exitDate)}{r.exitReason ? ` (${r.exitReason})` : ''}</p>
                         ) : (
-                          <p className="text-xs text-cyan-400">No pátio</p>
+                          <p className="text-xs text-cyan-400 font-bold">{daysSince} dias no pátio</p>
                         )}
                       </div>
                     </div>
@@ -1799,6 +1773,7 @@ export default function MinhaArea() {
                       {r.costValue && (
                         <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Custo: R$ {r.costValue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                       )}
+                      {isOverdue && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> +7 dias!</span>}
                     </div>
                     {r.notes && <p className="text-[10px] text-gray-500 italic mt-0.5">{r.notes}</p>}
                     <div className="flex items-center gap-3 mt-2 pt-1 border-t border-gray-800/50">
@@ -1839,10 +1814,22 @@ export default function MinhaArea() {
                       </button>
                     </div>
                   </div>
-                                ))}
+                  );
+                })}
                 </div>
+                {totalPages > 1 && (
+                  <PaginationControls
+                    page={consignPage}
+                    totalPages={totalPages}
+                    total={filteredList.length}
+                    pageSize={CONSIGN_PAGE_SIZE}
+                    onPageChange={setConsignPage}
+                    showPageSize={false}
+                  />
+                )}
               </div>
-            )}
+              );
+            })()}
             {dept === "despachante" && approvedDispatch.length > 0 && (
               <div className="bg-gray-900/60 border border-gray-800 rounded-xl divide-y divide-gray-800">
                 {approvedDispatch.map((r: any) => (
